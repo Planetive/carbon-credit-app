@@ -1,0 +1,21 @@
+CREATE TABLE ccus_projects (
+    id SERIAL PRIMARY KEY,
+    "Project name" TEXT NOT NULL,
+    "ID" TEXT,
+    "Country or economy" TEXT,
+    "Partners" TEXT,
+    "Project type" TEXT,
+    "Announcement" NUMERIC,
+    "FID" NUMERIC,
+    "Operation" NUMERIC,
+    "Suspension/decommissioning/cancellation" DATE,
+    "Project Status" TEXT,
+    "Project phase" TEXT,
+    "Announced capacity (Mt CO2/yr)" TEXT,
+    "Estimated capacity by IEA (Mt CO2/yr)" TEXT,
+    "Sector" TEXT,
+    "Fate of carbon" TEXT,
+    "Part of CCUS hub" TEXT,
+    "Region" TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+); 
