@@ -29,10 +29,10 @@ const BankPortfolio: React.FC = () => {
   const [search, setSearch] = useState('');
   const [entries, setEntries] = useState<PortfolioEntry[]>([
     { 
-      id: '1', 
-      company: 'Acme Manufacturing Ltd.', 
+      id: '0001', 
+      company: 'National Steel Limited', 
       amount: 250000000,
-      counterparty: 'ACME001',
+      counterparty: '0001',
       sector: 'Manufacturing',
       geography: 'Pakistan',
       probabilityOfDefault: 2.5,
@@ -40,10 +40,10 @@ const BankPortfolio: React.FC = () => {
       tenor: 36
     },
     { 
-      id: '2', 
-      company: 'Green Energy Corp.', 
+      id: '0002', 
+      company: 'Sunrise Power Pvt. Ltd.', 
       amount: 450000000,
-      counterparty: 'GREEN001',
+      counterparty: '0002',
       sector: 'Energy',
       geography: 'Pakistan',
       probabilityOfDefault: 1.8,
@@ -51,10 +51,10 @@ const BankPortfolio: React.FC = () => {
       tenor: 60
     },
     { 
-      id: '3', 
-      company: 'Prime Retail Pvt.', 
+      id: '0003', 
+      company: 'Metro Retail Holdings', 
       amount: 150000000,
-      counterparty: 'PRIME001',
+      counterparty: '0003',
       sector: 'Retail',
       geography: 'Pakistan',
       probabilityOfDefault: 3.2,
@@ -62,6 +62,24 @@ const BankPortfolio: React.FC = () => {
       tenor: 24
     }
   ]);
+
+  const zeroPadId = (num: number, width = 4) => num.toString().padStart(width, '0');
+  const getNextId = (): string => {
+    const numericIds = entries
+      .map(e => parseInt(e.id, 10))
+      .filter(n => !isNaN(n));
+    const max = numericIds.length ? Math.max(...numericIds) : 0;
+    return zeroPadId(max + 1);
+  };
+
+  const zeroPadCounterparty = (num: number, width = 4) => num.toString().padStart(width, '0');
+  const getNextCounterparty = (): string => {
+    const numericCps = entries
+      .map(e => parseInt(e.counterparty, 10))
+      .filter(n => !isNaN(n));
+    const max = numericCps.length ? Math.max(...numericCps) : 0;
+    return zeroPadCounterparty(max + 1);
+  };
   
   // Form state
   const [newCompany, setNewCompany] = useState('');
@@ -87,7 +105,6 @@ const BankPortfolio: React.FC = () => {
   const addEntry = () => {
     if (!newCompany.trim() || 
         (Number(newAmount) || 0) <= 0 || 
-        !newCounterparty.trim() || 
         !newSector || 
         !newGeography || 
         (Number(newPD) || 0) <= 0 || 
@@ -96,10 +113,10 @@ const BankPortfolio: React.FC = () => {
     
     setEntries(prev => [
       { 
-        id: Date.now().toString(), 
+        id: getNextId(), 
         company: newCompany.trim(), 
         amount: Number(newAmount) || 0,
-        counterparty: newCounterparty.trim(),
+        counterparty: getNextCounterparty(),
         sector: newSector,
         geography: newGeography,
         probabilityOfDefault: Number(newPD) || 0,
@@ -123,9 +140,9 @@ const BankPortfolio: React.FC = () => {
   const downloadTemplate = () => {
     const csvContent = [
       'Company Name,Counterparty ID,Loan Amount (PKR),Sector,Geography,Probability of Default (%),Loss Given Default (%),Tenor (months)',
-      'Acme Manufacturing Ltd.,ACME001,250000000,Manufacturing,Pakistan,2.5,45,36',
-      'Green Energy Corp.,GREEN001,450000000,Energy,Pakistan,1.8,40,60',
-      'Prime Retail Pvt.,PRIME001,150000000,Retail,Pakistan,3.2,50,24'
+      'National Steel Limited,0001,250000000,Manufacturing,Pakistan,2.5,45,36',
+      'Sunrise Power Pvt. Ltd.,0002,450000000,Energy,Pakistan,1.8,40,60',
+      'Metro Retail Holdings,0003,150000000,Retail,Pakistan,3.2,50,24'
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -161,6 +178,20 @@ const BankPortfolio: React.FC = () => {
     }
 
     const entries: PortfolioEntry[] = [];
+    let nextIdBase = (() => {
+      const numericIds = entriesStateRef()
+        .map(e => parseInt(e.id, 10))
+        .filter(n => !isNaN(n));
+      const max = numericIds.length ? Math.max(...numericIds) : 0;
+      return max;
+    })();
+    let nextCpBase = (() => {
+      const numericCps = entriesStateRef()
+        .map(e => parseInt(e.counterparty, 10))
+        .filter(n => !isNaN(n));
+      const max = numericCps.length ? Math.max(...numericCps) : 0;
+      return max;
+    })();
     
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim());
@@ -169,10 +200,11 @@ const BankPortfolio: React.FC = () => {
         throw new Error(`Row ${i + 1}: Incorrect number of columns`);
       }
 
+      nextIdBase += 1;
       const entry: PortfolioEntry = {
-        id: Date.now().toString() + i,
+        id: zeroPadId(nextIdBase),
         company: values[headers.indexOf('Company Name')] || '',
-        counterparty: values[headers.indexOf('Counterparty ID')] || '',
+        counterparty: zeroPadCounterparty(++nextCpBase),
         amount: Number(values[headers.indexOf('Loan Amount (PKR)')]) || 0,
         sector: values[headers.indexOf('Sector')] || '',
         geography: values[headers.indexOf('Geography')] || '',
@@ -213,6 +245,9 @@ const BankPortfolio: React.FC = () => {
       setIsUploading(false);
     }
   };
+
+  // Helper to safely access latest entries inside parseCSV closure
+  const entriesStateRef = () => entries;
 
   const editEntry = (entry: PortfolioEntry) => {
     setEditingEntry(entry);
@@ -290,7 +325,7 @@ const BankPortfolio: React.FC = () => {
                                 {e.company}
                                 </div>
                                 <div className="text-xs text-muted-foreground mb-3">
-                                  ID: {e.counterparty}
+                                  Counterparty: {e.counterparty}
                                 </div>
                                 
                                 {/* Left side details - Geography and Tenor */}
