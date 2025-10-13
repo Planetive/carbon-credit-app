@@ -402,7 +402,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         label: 'Outstanding Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Outstanding amount in the company'
       },
       {
@@ -410,7 +410,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         label: 'Total Assets Value',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total assets value for attribution factor calculation'
       },
       {
@@ -418,7 +418,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         label: 'EVIC (Enterprise Value Including Cash)',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'EVIC for listed companies'
       },
       {

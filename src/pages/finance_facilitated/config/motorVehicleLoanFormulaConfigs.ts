@@ -54,7 +54,7 @@ export const OPTION_1A_MOTOR_VEHICLE: FormulaConfig = {
       label: 'Total Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {
@@ -161,7 +161,7 @@ export const OPTION_1B_MOTOR_VEHICLE: FormulaConfig = {
       label: 'Total Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {
@@ -278,7 +278,7 @@ export const OPTION_2A_MOTOR_VEHICLE: FormulaConfig = {
       label: 'Total Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {
@@ -395,7 +395,7 @@ export const OPTION_2B_MOTOR_VEHICLE: FormulaConfig = {
       label: 'Total Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {

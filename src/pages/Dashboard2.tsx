@@ -14,7 +14,8 @@ import {
   FileText, 
   Factory,
   Grid3X3,
-  Info
+  Info,
+  Shield
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +37,9 @@ const Dashboard2 = () => {
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
   const [hasAnyEmissions, setHasAnyEmissions] = useState<boolean>(false);
+  const [financeEmissionData, setFinanceEmissionData] = useState<any>(null);
+  const [facilitatedEmissionData, setFacilitatedEmissionData] = useState<any>(null);
+  const [riskAssessmentData, setRiskAssessmentData] = useState<any>(null);
   const navigate = useNavigate();
   // Onboarding gate removed
   // Hooks must be declared before any early returns
@@ -165,6 +169,43 @@ const Dashboard2 = () => {
       } catch (_) {
         setHasAnyEmissions(false);
       }
+
+      // Fetch Finance Emission calculations
+      try {
+        const { data: financeData, error: financeError } = await supabase
+          .from('finance_emission_calculations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'finance_emission')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!financeError && financeData && financeData.length > 0) {
+          setFinanceEmissionData(financeData[0]);
+        }
+      } catch (_) {
+        setFinanceEmissionData(null);
+      }
+
+      // Fetch Facilitated Emission calculations
+      try {
+        const { data: facilitatedData, error: facilitatedError } = await supabase
+          .from('finance_emission_calculations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'facilitated_emission')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!facilitatedError && facilitatedData && facilitatedData.length > 0) {
+          setFacilitatedEmissionData(facilitatedData[0]);
+        }
+      } catch (_) {
+        setFacilitatedEmissionData(null);
+      }
+
+      // TODO: Fetch Risk Assessment data (placeholder for now)
+      setRiskAssessmentData(null);
       
       setLoading(false);
     };
@@ -364,51 +405,65 @@ const Dashboard2 = () => {
                 </div>
               </div>
 
-              {/* Action Buttons Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <Card className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-200 hover:border-teal-300">
+
+              {/* Top Row - Main Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {/* Finance Emission Card */}
+                <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-14 h-14 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Factory className="h-7 w-7 text-teal-600" />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Finance Emission</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {financeEmissionData ? `${financeEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : 'N/A'}
+                        </p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Finance Emission</h3>
-                        <p className="text-gray-600 mb-4 text-sm leading-relaxed">Calculate your organization's emissions</p>
-                        <Button 
-                          className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all duration-200 hover:shadow-md"
-                          onClick={() => navigate('/finance-emission', { state: { mode: 'finance', resetWizard: true } })}
-                        >
-                          Calculate
-                        </Button>
+                      <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                        <Factory className="h-6 w-6 text-teal-600" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-200 hover:border-emerald-300">
+                {/* Facilitated Emission Card */}
+                <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <BarChart3 className="h-7 w-7 text-emerald-600" />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Facilitated Emission</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {facilitatedEmissionData ? `${facilitatedEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : 'N/A'}
+                        </p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Facilitated Emission</h3>
-                        <p className="text-gray-600 mb-4 text-sm leading-relaxed">Assess your ESG performance</p>
-                        <Button 
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-6 rounded-lg transition-all duration-200 hover:shadow-md"
-                          onClick={() => navigate('/finance-emission', { state: { mode: 'facilitated', resetWizard: true } })}
-                        >
-                          Calculate
-                        </Button>
+                      <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <BarChart3 className="h-6 w-6 text-emerald-600" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Risk Assessment Card */}
+                <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Risk Assessment</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {riskAssessmentData ? `${riskAssessmentData.risk_score || 'N/A'}` : 'Not Started'}
+                        </p>
+                      </div>
+                      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Shield className="h-6 w-6 text-orange-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
               </div>
 
-              {/* Stats Overview */}
+              {/* Bottom Row - Secondary Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {/* Total Projects Card */}
                 <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -416,13 +471,14 @@ const Dashboard2 = () => {
                         <p className="text-sm font-medium text-gray-600">Total Projects</p>
                         <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
                       </div>
-                      <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
-                        <FileText className="h-6 w-6 text-teal-600" />
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FileText className="h-6 w-6 text-blue-600" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
+                {/* ESG Score Card */}
                 <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -432,13 +488,14 @@ const Dashboard2 = () => {
                           {esgScores ? `${Math.round(esgScores.overall_score || 0)}%` : 'N/A'}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <BarChart3 className="h-6 w-6 text-blue-600" />
+                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="h-6 w-6 text-purple-600" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
+                {/* Emissions Tracked Card */}
                 <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -455,6 +512,7 @@ const Dashboard2 = () => {
                   </CardContent>
                 </Card>
 
+                {/* Assessment Status Card */}
                 <Card className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -464,8 +522,8 @@ const Dashboard2 = () => {
                           {esgAssessment ? (esgAssessment.status === 'submitted' ? 'Complete' : 'Draft') : 'Not Started'}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="h-6 w-6 text-purple-600" />
+                      <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center">
+                        <BarChart3 className="h-6 w-6 text-cyan-600" />
                       </div>
                     </div>
                   </CardContent>

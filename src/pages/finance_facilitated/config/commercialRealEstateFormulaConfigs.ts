@@ -54,7 +54,7 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Value of the commercial property at the time of loan origination'
     },
     {
@@ -157,7 +157,7 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Value of the commercial property at the time of loan origination'
     },
     {
@@ -260,7 +260,7 @@ export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Value of the commercial property at the time of loan origination'
     },
     {
@@ -382,7 +382,7 @@ export const OPTION_2B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Value of the commercial property at the time of loan origination'
     },
     {

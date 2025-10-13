@@ -21,7 +21,7 @@ COMMON_INPUTS: Dict[str, FormulaInput] = {
         label='Outstanding Amount',
         type='number',
         required=True,
-        unit='USD',
+        unit='PKR',
         description='Outstanding amount in the company'
     ),
     'total_assets': FormulaInput(
@@ -29,7 +29,7 @@ COMMON_INPUTS: Dict[str, FormulaInput] = {
         label='Total Assets Value',
         type='number',
         required=True,
-        unit='USD',
+        unit='PKR',
         description='Total assets value for attribution factor calculation'
     ),
     'evic': FormulaInput(
@@ -37,7 +37,7 @@ COMMON_INPUTS: Dict[str, FormulaInput] = {
         label='EVIC (Enterprise Value Including Cash)',
         type='number',
         required=True,
-        unit='USD',
+        unit='PKR',
         description='EVIC for listed companies'
     ),
     'total_equity_plus_debt': FormulaInput(
@@ -45,7 +45,7 @@ COMMON_INPUTS: Dict[str, FormulaInput] = {
         label='Total Equity + Debt',
         type='number',
         required=True,
-        unit='USD',
+        unit='PKR',
         description='Total equity plus debt for business loans and equity investments'
     )
 }
@@ -245,14 +245,38 @@ def validate_financial_inputs(inputs: Dict[str, Any], company_type: str) -> List
 
 def get_denominator_for_company_type(inputs: Dict[str, Any], company_type: str) -> float:
     """
-    Get the appropriate denominator based on company type
+    Get the appropriate denominator based on company type and available inputs
     """
+    # Try different denominator types in order of preference
+    denominator_candidates = []
+    
     if company_type == 'listed':
-        return inputs.get('evic', 0)
-    elif company_type == 'unlisted':
-        return inputs.get('total_equity_plus_debt', 0)
+        # For listed companies, try EVIC first
+        denominator_candidates = ['evic', 'total_equity_plus_debt', 'total_assets']
     else:
-        raise ValueError(f"Unknown company type: {company_type}")
+        # For unlisted companies, try total_equity_plus_debt first
+        denominator_candidates = ['total_equity_plus_debt', 'evic', 'total_assets']
+    
+    # Also check for formula-specific denominators
+    formula_specific_denominators = [
+        'property_value_at_origination',  # Commercial real estate, mortgage
+        'total_value_at_origination',     # Motor vehicle loans
+        'total_project_equity_plus_debt', # Project finance
+        'ppp_adjusted_gdp'                # Sovereign debt
+    ]
+    
+    # Add formula-specific denominators to the list
+    denominator_candidates.extend(formula_specific_denominators)
+    
+    # Find the first available denominator
+    for denominator_key in denominator_candidates:
+        value = inputs.get(denominator_key, 0)
+        if value > 0:
+            return value
+    
+    # If no denominator found, raise an error
+    available_keys = [k for k, v in inputs.items() if v > 0]
+    raise ValueError(f"No valid denominator found. Available inputs: {available_keys}")
 
 
 def format_calculation_step(step_name: str, value: float, formula: str) -> CalculationStep:

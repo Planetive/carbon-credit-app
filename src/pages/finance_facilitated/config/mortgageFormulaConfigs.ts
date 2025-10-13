@@ -54,7 +54,7 @@ export const OPTION_1A_MORTGAGE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Property value at the time of mortgage origination'
     },
     {
@@ -156,7 +156,7 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Property value at the time of mortgage origination'
     },
     {
@@ -257,7 +257,7 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Property value at the time of mortgage origination'
     },
     {
@@ -376,7 +376,7 @@ export const OPTION_2B_MORTGAGE: FormulaConfig = {
       label: 'Property Value at Origination',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Property value at the time of mortgage origination'
     },
     {

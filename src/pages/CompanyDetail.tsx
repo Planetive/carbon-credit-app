@@ -242,10 +242,10 @@ const CompanyDetail: React.FC = () => {
                 Create and evaluate various scenarios including stress testing, climate scenarios, and market conditions.
               </p>
               <Button
-                onClick={() => navigate('/scenario-building', { state: { ...portfolioData } })}
+                onClick={() => navigate('/pcaf-scenario-building', { state: { ...portfolioData } })}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white"
               >
-                Open Scenario Builder
+                Open PCAF Scenario Builder
               </Button>
             </CardContent>
           </Card>

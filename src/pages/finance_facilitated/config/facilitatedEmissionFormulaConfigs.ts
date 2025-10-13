@@ -68,7 +68,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -159,7 +159,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -250,7 +250,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -341,7 +341,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -432,7 +432,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -558,7 +558,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -684,7 +684,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,
@@ -803,7 +803,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Facilitated Amount',
         type: 'number',
         required: true,
-        unit: 'USD',
+        unit: 'PKR',
         description: 'Total amount of financial services provided to the client'
       },
       COMMON_INPUTS.total_assets,

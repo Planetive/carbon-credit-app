@@ -19,6 +19,14 @@ from .shared_formula_utils import (
     create_emission_calculation_steps, create_activity_calculation_steps
 )
 from .unit_conversions import smart_convert_unit
+from .formula_configs import BASIC_FORMULAS
+from .corporate_bond_business_loan_configs import CORPORATE_BOND_BUSINESS_LOAN_FORMULAS
+from .commercial_real_estate_configs import COMMERCIAL_REAL_ESTATE_FORMULAS
+from .mortgage_configs import MORTGAGE_FORMULAS
+from .motor_vehicle_loan_configs import MOTOR_VEHICLE_LOAN_FORMULAS
+from .project_finance_configs import PROJECT_FINANCE_FORMULAS
+from .sovereign_debt_configs import SOVEREIGN_DEBT_FORMULAS
+from .facilitated_emission_configs import FACILITATED_EMISSION_FORMULAS
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,9 +41,18 @@ class CalculationEngine:
     
     def __init__(self):
         """Initialize the calculation engine with all formulas"""
-        self.formulas: List[FormulaConfig] = []
-        # Note: Formula configurations will be loaded from database or config files
-        # For now, we'll implement the core engine logic
+        # Load all formula configurations
+        self.formulas: List[FormulaConfig] = (
+            BASIC_FORMULAS +
+            CORPORATE_BOND_BUSINESS_LOAN_FORMULAS +
+            COMMERCIAL_REAL_ESTATE_FORMULAS +
+            MORTGAGE_FORMULAS +
+            MOTOR_VEHICLE_LOAN_FORMULAS +
+            PROJECT_FINANCE_FORMULAS +
+            SOVEREIGN_DEBT_FORMULAS +
+            FACILITATED_EMISSION_FORMULAS
+        )
+        logger.info(f"Loaded {len(self.formulas)} formula configurations")
     
     def get_all_formulas(self) -> List[FormulaConfig]:
         """Get all available formulas"""
@@ -323,11 +340,20 @@ class CalculationEngine:
         denominator = get_denominator_for_company_type(inputs, company_type.value)
         outstanding_amount = inputs.get('outstanding_amount', 0)
         
-        # Calculate attribution factor
-        if company_type == CompanyType.LISTED:
-            attribution_factor = calculate_attribution_factor_listed(outstanding_amount, denominator)
+        # Calculate attribution factor based on formula type
+        if formula.category.value == 'facilitated_emission':
+            # For facilitated emissions, use facilitated_amount
+            facilitated_amount = inputs.get('facilitated_amount', 0)
+            if company_type == CompanyType.LISTED:
+                attribution_factor = calculate_attribution_factor_listed(facilitated_amount, denominator)
+            else:
+                attribution_factor = calculate_attribution_factor_unlisted(facilitated_amount, denominator)
         else:
-            attribution_factor = calculate_attribution_factor_unlisted(outstanding_amount, denominator)
+            # For finance emissions, use outstanding_amount
+            if company_type == CompanyType.LISTED:
+                attribution_factor = calculate_attribution_factor_listed(outstanding_amount, denominator)
+            else:
+                attribution_factor = calculate_attribution_factor_unlisted(outstanding_amount, denominator)
         
         # Calculate financed emissions based on formula type
         financed_emissions, emission_factor, calculation_steps = self._calculate_emissions(
@@ -360,11 +386,38 @@ class CalculationEngine:
         """
         Calculate emissions based on formula type
         """
-        # This is a simplified implementation
-        # The actual implementation would depend on the specific formula type
-        
-        if formula.option_code in ['1a', '1b']:
-            # Direct emission data
+        # Check if this is a facilitated emission
+        if formula.category.value == 'facilitated_emission':
+            # Facilitated emission calculation
+            facilitated_amount = inputs.get('facilitated_amount', 0)
+            weighting_factor = inputs.get('weighting_factor', 0)
+            emission_data = inputs.get('verified_emissions', 0) or inputs.get('unverified_emissions', 0)
+            
+            # For facilitated emissions: (Facilitated Amount / Company Value) × Weighting Factor × Emission Data
+            attribution_factor = facilitated_amount / denominator if denominator > 0 else 0
+            financed_emissions = attribution_factor * weighting_factor * emission_data
+            emission_factor = 0  # Not applicable for direct emissions
+            
+            calculation_steps = [
+                CalculationStep(
+                    step='Attribution Factor',
+                    value=attribution_factor,
+                    formula=f"{facilitated_amount} / {denominator} = {attribution_factor:.6f}"
+                ),
+                CalculationStep(
+                    step='Weighting Factor',
+                    value=weighting_factor,
+                    formula=f"Fixed weighting factor: {weighting_factor}"
+                ),
+                CalculationStep(
+                    step='Facilitated Emissions',
+                    value=financed_emissions,
+                    formula=f"({facilitated_amount} / {denominator:.2f}) × {weighting_factor} × {emission_data} = {financed_emissions:.2f}"
+                )
+            ]
+            
+        elif formula.option_code in ['1a', '1b']:
+            # Direct emission data (finance emissions)
             emission_data = inputs.get('verified_emissions', 0) or inputs.get('unverified_emissions', 0)
             emission_factor = 0  # Not applicable for direct emissions
             financed_emissions = (outstanding_amount / denominator) * emission_data

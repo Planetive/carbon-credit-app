@@ -61,7 +61,7 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
       label: 'GDP (Gross Domestic Product)',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Gross Domestic Product of the country in nominal terms'
     },
     {
@@ -175,7 +175,7 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
       label: 'GDP (Gross Domestic Product)',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Gross Domestic Product of the country in nominal terms'
     },
     {
@@ -289,7 +289,7 @@ export const OPTION_2A_SOVEREIGN_DEBT: FormulaConfig = {
       label: 'GDP (Gross Domestic Product)',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Gross Domestic Product of the country in nominal terms'
     },
     {

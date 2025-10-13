@@ -58,7 +58,7 @@ export const OPTION_1A_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Equity',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total equity invested in the project'
     },
     {
@@ -66,7 +66,7 @@ export const OPTION_1A_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Debt',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total debt for the project'
     },
     {
@@ -153,7 +153,7 @@ export const OPTION_1B_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Equity',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total equity invested in the project'
     },
     {
@@ -161,7 +161,7 @@ export const OPTION_1B_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Debt',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total debt for the project'
     },
     {
@@ -248,7 +248,7 @@ export const OPTION_2A_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Equity',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total equity invested in the project'
     },
     {
@@ -256,7 +256,7 @@ export const OPTION_2A_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Debt',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total debt for the project'
     },
     {
@@ -360,7 +360,7 @@ export const OPTION_2B_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Equity',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total equity invested in the project'
     },
     {
@@ -368,7 +368,7 @@ export const OPTION_2B_PROJECT_FINANCE: FormulaConfig = {
       label: 'Total Project Debt',
       type: 'number',
       required: true,
-      unit: 'USD',
+      unit: 'PKR',
       description: 'Total debt for the project'
     },
     {
