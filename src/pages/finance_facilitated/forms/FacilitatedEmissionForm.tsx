@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,8 @@ interface FacilitatedEmissionFormProps {
 interface CalculationResult {
   attributionFactor: number;
   facilitatedEmission: number;
+  evic?: number;
+  totalEquityPlusDebt?: number;
   dataQualityScore?: number;
   methodology?: string;
   calculationSteps?: Array<{
@@ -78,15 +80,54 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [companyType, setCompanyType] = useState<'listed' | 'unlisted'>(corporateStructure === 'listed' ? 'listed' : 'unlisted');
 
-  // Restore saved facilitated form state so going back keeps values
+  // Load questionnaire data from database and restore saved form state
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('facilitatedFormState');
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed?.formData) setFormData(parsed.formData);
-      if (parsed?.companyType) setCompanyType(parsed.companyType);
-    } catch {}
+    const initializeForm = async () => {
+      try {
+        // First, try to load from database if we have a counterparty ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const counterpartyId = urlParams.get('counterpartyId') || 
+                              (window.location.state as any)?.counterpartyId ||
+                              (window.location.state as any)?.counterparty ||
+                              (window.location.state as any)?.id;
+        
+        if (counterpartyId) {
+          const { PortfolioClient } = await import('@/integrations/supabase/portfolioClient');
+          const questionnaire = await PortfolioClient.getQuestionnaire(counterpartyId);
+          
+          if (questionnaire) {
+            console.log('FacilitatedEmissionForm - Loaded questionnaire from database:', questionnaire);
+            
+            // Update company type from database
+            const dbCompanyType = questionnaire.corporate_structure === 'listed' ? 'listed' : 'unlisted';
+            setCompanyType(dbCompanyType);
+            
+            // Update form data with database values
+            setFormData(prev => ({
+              ...prev,
+              sharePrice: questionnaire.share_price || 0,
+              outstandingShares: questionnaire.outstanding_shares || 0,
+              totalDebt: questionnaire.total_debt || 0,
+              minorityInterest: questionnaire.minority_interest || 0,
+              preferredStock: questionnaire.preferred_stock || 0,
+              totalEquity: questionnaire.total_equity || 0
+            }));
+          }
+        }
+        
+        // Then, restore from sessionStorage (this will override database values if more recent)
+        const raw = sessionStorage.getItem('facilitatedFormState');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.formData) setFormData(prev => ({ ...prev, ...parsed.formData }));
+          if (parsed?.companyType) setCompanyType(parsed.companyType);
+        }
+      } catch (error) {
+        console.error('Error initializing facilitated form:', error);
+      }
+    };
+    
+    initializeForm();
   }, []);
 
   // Get available formulas based on selections (same logic as Finance Emission)
@@ -194,6 +235,8 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       const result: CalculationResult = {
         attributionFactor: calculationResult.attributionFactor,
         facilitatedEmission: calculationResult.financedEmissions,
+        evic: companyType === 'listed' ? totalAssetsValue : undefined,
+        totalEquityPlusDebt: companyType === 'unlisted' ? totalAssetsValue : undefined,
         dataQualityScore: calculationResult.dataQualityScore,
         methodology: calculationResult.methodology,
         calculationSteps: calculationResult.calculationSteps

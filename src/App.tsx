@@ -17,7 +17,8 @@ import AIAdvisor from "./pages/AIAdvisor";
 import ProjectWizard from "./pages/ProjectWizard";
 import BankPortfolio from "./pages/BankPortfolio";
 import CompanyDetail from "./pages/CompanyDetail";
-import ScenarioBuildingComparison from "./pages/ScenarioBuildingComparison";
+import SimpleScenarioBuilding from "./pages/SimpleScenarioBuilding";
+import ClimateRiskResults from "./pages/ClimateRiskResults";
 import ProjectResults from "./pages/ProjectResults";
 import ProjectReports from "./pages/ProjectReports";
 import ProjectDrafts from "./pages/ProjectDrafts";
@@ -110,9 +111,14 @@ const AppRoutes = () => {
               <CompanyDetail />
             </ProtectedRoute>
           } />
-          <Route path="/pcaf-scenario-building" element={
+          <Route path="/scenario-building" element={
             <ProtectedRoute>
-              <ScenarioBuildingComparison />
+              <SimpleScenarioBuilding />
+            </ProtectedRoute>
+          } />
+          <Route path="/climate-risk-results" element={
+            <ProtectedRoute>
+              <ClimateRiskResults />
             </ProtectedRoute>
           } />
           <Route path="/project-results" element={

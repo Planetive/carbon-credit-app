@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, AlertTriangle, Layers } from 'lucide-react';
+import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, AlertTriangle, Layers, Edit, CheckCircle } from 'lucide-react';
+import { PortfolioClient, EmissionCalculation } from '@/integrations/supabase/portfolioClient';
+import { useToast } from '@/hooks/use-toast';
 
 const currencyFormat = (value: number) => (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -12,6 +14,7 @@ interface PortfolioEntry {
   company: string;
   amount: number;
   counterparty: string;
+  counterpartyId?: string;
   sector: string;
   geography: string;
   probabilityOfDefault: number;
@@ -21,6 +24,7 @@ interface PortfolioEntry {
 
 const CompanyDetail: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { id } = useParams();
   const location = useLocation() as any;
   
@@ -35,17 +39,99 @@ const CompanyDetail: React.FC = () => {
     lossGivenDefault: 0,
     tenor: 0
   };
+
+  // Load all portfolio entries for scenario building
+  const [allPortfolioEntries, setAllPortfolioEntries] = useState<PortfolioEntry[]>([]);
+  
+  useEffect(() => {
+    const loadAllPortfolioEntries = async () => {
+      try {
+        const counterparties = await PortfolioClient.getCounterparties();
+        const exposures = await PortfolioClient.getExposures();
+        
+        // Combine counterparty and exposure data
+        const portfolioEntries: PortfolioEntry[] = exposures.map(exposure => {
+          const counterparty = counterparties.find(cp => cp.id === exposure.counterparty_id);
+          return {
+            id: exposure.exposure_id,
+            company: counterparty?.name || 'Unknown Company',
+            amount: exposure.amount_pkr,
+            counterparty: counterparty?.counterparty_code || 'N/A',
+            counterpartyId: counterparty?.id,
+            sector: counterparty?.sector || 'N/A',
+            geography: counterparty?.geography || 'N/A',
+            probabilityOfDefault: exposure.probability_of_default,
+            lossGivenDefault: exposure.loss_given_default,
+            tenor: exposure.tenor_months
+          };
+        });
+        
+        setAllPortfolioEntries(portfolioEntries);
+      } catch (error) {
+        console.error('Error loading portfolio entries:', error);
+        // Fallback to single entry if loading fails
+        setAllPortfolioEntries([portfolioData]);
+      }
+    };
+    
+    loadAllPortfolioEntries();
+  }, []);
   
   const {
     company,
     amount,
     counterparty,
+    counterpartyId,
     sector,
     geography,
     probabilityOfDefault,
     lossGivenDefault,
     tenor
   } = portfolioData;
+
+  // State for emission calculations
+  const [emissionCalculations, setEmissionCalculations] = useState<EmissionCalculation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load emission calculations for this counterparty
+  useEffect(() => {
+    const loadEmissionCalculations = async () => {
+      if (!counterpartyId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const calculations = await PortfolioClient.getEmissionCalculations(counterpartyId);
+        setEmissionCalculations(calculations);
+      } catch (error) {
+        console.error('Error loading emission calculations:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load emission calculations",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEmissionCalculations();
+  }, [counterpartyId, toast]);
+
+  // Helper functions to get emission results
+  const getFinanceEmissionResult = () => {
+    return emissionCalculations.find(calc => calc.calculation_type === 'finance');
+  };
+
+  const getFacilitatedEmissionResult = () => {
+    return emissionCalculations.find(calc => calc.calculation_type === 'facilitated');
+  };
+
+  const formatEmissionValue = (value: number | null) => {
+    if (!value || !isFinite(value)) return '0';
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-teal-50/30">
@@ -157,20 +243,50 @@ const CompanyDetail: React.FC = () => {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Finance Emission</CardTitle>
-                  <CardDescription>Calculate financed emissions for this loan</CardDescription>
+                  <CardDescription>
+                    {getFinanceEmissionResult() ? 'Financed emissions calculated' : 'Calculate financed emissions for this loan'}
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Assess the carbon footprint associated with this specific loan using PCAF methodology.
-              </p>
-              <Button
-                onClick={() => navigate('/finance-emission', { state: { mode: 'finance', ...portfolioData } })}
-                className="w-full bg-green-600 hover:bg-green-700"
-              >
-                Open Finance Emission Calculator
-              </Button>
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="text-sm text-muted-foreground">Loading emission data...</div>
+                </div>
+              ) : getFinanceEmissionResult() ? (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-lg p-4 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Financed Emissions</span>
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatEmissionValue(getFinanceEmissionResult()?.financed_emissions)} tCO₂e
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/finance-emission', { state: { mode: 'finance', ...portfolioData } })}
+                    className="w-full border-green-200 text-green-700 hover:bg-green-50"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Calculation
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Assess the carbon footprint associated with this specific loan using PCAF methodology.
+                  </p>
+                  <Button
+                    onClick={() => navigate('/finance-emission', { state: { mode: 'finance', ...portfolioData } })}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    Open Finance Emission Calculator
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -182,21 +298,51 @@ const CompanyDetail: React.FC = () => {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Facilitated Emission</CardTitle>
-                  <CardDescription>Calculate facilitated emissions for this loan</CardDescription>
+                  <CardDescription>
+                    {getFacilitatedEmissionResult() ? 'Facilitated emissions calculated' : 'Calculate facilitated emissions for this loan'}
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Evaluate the environmental impact of facilitating this loan using advanced metrics.
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => navigate('/finance-emission', { state: { mode: 'facilitated', ...portfolioData } })}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Open Facilitated Emission Calculator
-              </Button>
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="text-sm text-muted-foreground">Loading emission data...</div>
+                </div>
+              ) : getFacilitatedEmissionResult() ? (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-lg p-4 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Facilitated Emissions</span>
+                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatEmissionValue(getFacilitatedEmissionResult()?.financed_emissions)} tCO₂e
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/finance-emission', { state: { mode: 'facilitated', ...portfolioData } })}
+                    className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Calculation
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Evaluate the environmental impact of facilitating this loan using advanced metrics.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate('/finance-emission', { state: { mode: 'facilitated', ...portfolioData } })}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Open Facilitated Emission Calculator
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -242,10 +388,10 @@ const CompanyDetail: React.FC = () => {
                 Create and evaluate various scenarios including stress testing, climate scenarios, and market conditions.
               </p>
               <Button
-                onClick={() => navigate('/pcaf-scenario-building', { state: { ...portfolioData } })}
+                onClick={() => navigate('/scenario-building', { state: allPortfolioEntries })}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white"
               >
-                Open PCAF Scenario Builder
+                Open Scenario Builder
               </Button>
             </CardContent>
           </Card>

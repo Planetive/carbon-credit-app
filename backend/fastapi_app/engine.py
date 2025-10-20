@@ -46,31 +46,11 @@ class CalculationEngine:
         )
 
     def calculate_facilitated(self, req: FacilitatedEmissionRequest) -> FacilitatedEmissionResponse:
-        if req.company_type == "listed":
-            market_cap = (req.share_price or 0) * (req.outstanding_shares or 0)
-            total_assets = market_cap + (req.total_debt or 0) + (req.minority_interest or 0) + (req.preferred_stock or 0)
-        else:
-            total_assets = (req.total_equity or 0) + (req.total_debt or 0)
-
-        if total_assets <= 0:
-            raise EngineError("Total assets must be greater than 0")
-
-        facilitated_amount = (req.underwriting_amount or 0) * ((req.underwriting_share_pct or 0) / 100.0)
-        weighting_factor = 0.33
-        af = (facilitated_amount / total_assets) * weighting_factor
-
-        emissions = (req.verified_emissions or 0) or (req.unverified_emissions or 0)
-        if emissions == 0 and req.energy_consumption and req.emission_factor:
-            emissions = req.energy_consumption * req.emission_factor
-
-        facilitated = af * emissions
-
-        return FacilitatedEmissionResponse(
-            engine_version=self.version,
-            methodology="PCAF (placeholder)",
-            attribution_factor=af,
-            facilitated_emissions=facilitated,
-            calculation_steps=None,
-        )
+        """
+        DEPRECATED: This method is no longer used.
+        Facilitated emission calculations now use the detailed formula configurations
+        in facilitated_emission_configs.py through the main calculation engine.
+        """
+        raise EngineError("This method is deprecated. Use the main calculation engine with formula configurations instead.")
 
 

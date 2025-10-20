@@ -1,33 +1,22 @@
 /**
- * Scenario Building Calculation Engine
- * Handles all PCAF climate stress testing calculations
+ * Simple Scenario Building Calculation Engine
+ * Handles TCFD climate stress testing calculations
  */
 
-import { ScenarioPortfolioEntry, ScenarioResult, CalculationParameters } from './types';
-import { SECTOR_SEGMENTS, CLIMATE_SCENARIOS } from './constants';
+import { ScenarioPortfolioEntry, ScenarioResult } from './types';
+import { CLIMATE_SCENARIOS, DEFAULT_FINANCED_EMISSIONS_BY_SECTOR } from './constants';
 
 /**
  * Main calculation function for scenario analysis
  */
-export function calculateScenarioResults(params: CalculationParameters): ScenarioResult {
-  const { selectedScenario, portfolioEntries, selectedAssetClasses, selectedSectors } = params;
-  
+export function calculateScenarioResults(
+  selectedScenario: string,
+  portfolioEntries: ScenarioPortfolioEntry[]
+): ScenarioResult {
   console.log('CalculationEngine - Input params:', {
     selectedScenario,
-    portfolioEntriesCount: portfolioEntries.length,
-    selectedAssetClasses,
-    selectedSectors
+    portfolioEntriesCount: portfolioEntries.length
   });
-  
-  console.log('CalculationEngine - Available sectors:', SECTOR_SEGMENTS.map(s => s.id));
-  console.log('CalculationEngine - Portfolio entry sectors:', portfolioEntries.map(e => e.sector));
-  console.log('CalculationEngine - Selected sectors:', selectedSectors);
-  console.log('CalculationEngine - Selected asset classes:', selectedAssetClasses);
-  
-  // Filter portfolio entries based on selections
-  const filteredEntries = filterPortfolioEntries(portfolioEntries, selectedAssetClasses, selectedSectors);
-  
-  console.log('CalculationEngine - Filtered entries:', filteredEntries);
   
   // Get scenario configuration
   const scenario = CLIMATE_SCENARIOS.find(s => s.id === selectedScenario);
@@ -36,390 +25,256 @@ export function calculateScenarioResults(params: CalculationParameters): Scenari
   }
   
   // Calculate basic metrics
-  const totalPortfolioValue = calculateTotalPortfolioValue(filteredEntries);
-  const totalFinancedEmissions = calculateTotalFinancedEmissions(filteredEntries);
+  const totalPortfolioValue = calculateTotalPortfolioValue(portfolioEntries);
+  const totalFinancedEmissions = calculateTotalFinancedEmissions(portfolioEntries);
   
   console.log('CalculationEngine - Basic metrics:', {
     totalPortfolioValue,
     totalFinancedEmissions,
-    filteredEntriesCount: filteredEntries.length
+    portfolioEntriesCount: portfolioEntries.length
   });
   
   // Calculate scenario-specific impacts
   const { totalPortfolioLoss, portfolioLossPercentage } = calculatePortfolioLoss(
-    filteredEntries, 
-    selectedScenario
+    portfolioEntries, 
+    scenario
   );
   
-  console.log('CalculationEngine - Portfolio loss:', {
-    totalPortfolioLoss,
-    portfolioLossPercentage
-  });
+  // Calculate breakdowns
+  const assetClassBreakdown = calculateAssetClassBreakdown(portfolioEntries, scenario);
+  const sectorBreakdown = calculateSectorBreakdown(portfolioEntries, scenario);
+  const topExposures = calculateTopExposures(portfolioEntries, scenario);
   
-  // Calculate risk metrics
-  const baselineRisk = 2.5; // Base risk percentage
-  const scenarioRisk = baselineRisk + portfolioLossPercentage;
-  const riskIncrease = ((scenarioRisk - baselineRisk) / baselineRisk) * 100;
+  // Calculate portfolio-weighted baseline risk from actual data
+  const totalBaselineExpectedLoss = portfolioEntries.reduce((sum, entry) => {
+    return sum + (entry.amount * (entry.probabilityOfDefault / 100) * (entry.lossGivenDefault / 100));
+  }, 0);
   
-  // Generate breakdowns
-  const assetClassBreakdown = calculateAssetClassBreakdown(filteredEntries, selectedScenario, baselineRisk);
-  const sectorBreakdown = calculateSectorBreakdown(filteredEntries, selectedScenario, baselineRisk);
-  const topExposures = calculateTopExposures(filteredEntries, selectedScenario, baselineRisk);
-  
-  return {
+  const baselineRisk = totalPortfolioValue > 0 ? (totalBaselineExpectedLoss / totalPortfolioValue) * 100 : 0;
+  const scenarioRisk = baselineRisk + (baselineRisk * portfolioLossPercentage / 100);
+  const riskIncrease = baselineRisk > 0 ? ((scenarioRisk - baselineRisk) / baselineRisk) * 100 : 0;
+
+  const result: ScenarioResult = {
     scenarioType: scenario.name,
     totalPortfolioValue,
     totalFinancedEmissions,
     totalPortfolioLoss,
     portfolioLossPercentage,
-    baselineRisk,
-    scenarioRisk,
-    riskIncrease,
+    baselineRisk, // Now calculated from actual portfolio data
+    scenarioRisk, // Now calculated from actual portfolio data
+    riskIncrease, // Now calculated from actual portfolio data
     assetClassBreakdown,
     sectorBreakdown,
     topExposures
   };
-}
-
-/**
- * Filter portfolio entries based on selected asset classes and sectors
- */
-function filterPortfolioEntries(
-  entries: ScenarioPortfolioEntry[],
-  selectedAssetClasses: string[],
-  selectedSectors: string[]
-): ScenarioPortfolioEntry[] {
-  let filtered = entries;
   
-  console.log('filterPortfolioEntries - Input:', {
-    entriesCount: entries.length,
-    selectedAssetClasses,
-    selectedSectors
-  });
-  
-  // If no asset classes are selected, include all
-  if (selectedAssetClasses.length > 0) {
-    console.log('filterPortfolioEntries - Filtering by asset classes:', selectedAssetClasses);
-    filtered = filtered.filter(entry => {
-      const matches = selectedAssetClasses.includes(entry.assetClass);
-      console.log(`filterPortfolioEntries - Entry ${entry.id} assetClass ${entry.assetClass} matches:`, matches);
-      return matches;
-    });
-    console.log('filterPortfolioEntries - After asset class filter:', filtered.length);
-  }
-  
-  // If no sectors are selected, include all
-  if (selectedSectors.length > 0) {
-    console.log('filterPortfolioEntries - Filtering by sectors:', selectedSectors);
-    filtered = filtered.filter(entry => {
-      const matches = selectedSectors.includes(entry.sector);
-      console.log(`filterPortfolioEntries - Entry ${entry.id} sector ${entry.sector} matches:`, matches);
-      return matches;
-    });
-    console.log('filterPortfolioEntries - After sector filter:', filtered.length);
-  }
-  
-  console.log('filterPortfolioEntries - Final result:', filtered.length);
-  return filtered;
+  console.log('CalculationEngine - Final result:', result);
+  return result;
 }
 
 /**
  * Calculate total portfolio value
  */
 function calculateTotalPortfolioValue(entries: ScenarioPortfolioEntry[]): number {
-  return entries.reduce((sum, entry) => sum + entry.amount, 0);
+  return entries.reduce((total, entry) => total + entry.amount, 0);
 }
 
 /**
  * Calculate total financed emissions
  */
 function calculateTotalFinancedEmissions(entries: ScenarioPortfolioEntry[]): number {
-  return entries.reduce((sum, entry) => sum + entry.financedEmissions, 0);
+  return entries.reduce((total, entry) => {
+    const sectorEmissions = DEFAULT_FINANCED_EMISSIONS_BY_SECTOR[entry.sector] || 0.2;
+    return total + (entry.amount / 1000000) * sectorEmissions; // Convert to millions
+  }, 0);
 }
 
 /**
  * Calculate portfolio loss based on scenario
  */
 function calculatePortfolioLoss(
-  entries: ScenarioPortfolioEntry[],
-  scenarioId: string
+  entries: ScenarioPortfolioEntry[], 
+  scenario: any
 ): { totalPortfolioLoss: number; portfolioLossPercentage: number } {
-  let totalPortfolioLoss = 0;
-  let totalExposure = 0;
-  
-  console.log('calculatePortfolioLoss - Input:', { entries, scenarioId });
+  let totalLoss = 0;
   
   entries.forEach(entry => {
-    console.log('calculatePortfolioLoss - Processing entry:', entry);
-    const sector = SECTOR_SEGMENTS.find(s => s.id === entry.sector);
-    console.log('calculatePortfolioLoss - Found sector:', sector);
+    // Simple loss calculation based on scenario type
+    let lossPercentage = 0;
     
-    if (sector && sector.impacts) {
-      const exposure = entry.amount;
-      totalExposure += exposure;
-      
-      // Apply scenario-specific impacts
-      let sectorLoss = 0;
-      if (scenarioId === 'transition_shock') {
-        // Apply transition impacts
-        const transitionImpact = sector.impacts.transition;
-        sectorLoss = exposure * (Math.abs(transitionImpact.revenueChange || 0) + 
-                               Math.abs(transitionImpact.costIncrease || 0) + 
-                               Math.abs(transitionImpact.demandChange || 0)) / 100;
-      } else if (scenarioId === 'physical_shock') {
-        // Apply physical impacts
-        const physicalImpact = sector.impacts.physical;
-        sectorLoss = exposure * (Math.abs(physicalImpact.damage || 0) + 
-                               Math.abs(physicalImpact.efficiencyLoss || 0) + 
-                               Math.abs(physicalImpact.outputLoss || 0)) / 100;
-      } else if (scenarioId === 'dual_stress') {
-        // Apply both transition and physical impacts
-        const transitionImpact = sector.impacts.transition;
-        const physicalImpact = sector.impacts.physical;
-        sectorLoss = exposure * (
-          (Math.abs(transitionImpact.revenueChange || 0) + 
-           Math.abs(transitionImpact.costIncrease || 0) + 
-           Math.abs(transitionImpact.demandChange || 0)) +
-          (Math.abs(physicalImpact.damage || 0) + 
-           Math.abs(physicalImpact.efficiencyLoss || 0) + 
-           Math.abs(physicalImpact.outputLoss || 0))
-        ) / 100;
-      } else {
-        // Baseline - use estimated portfolio loss percentage
-        sectorLoss = exposure * (sector.impacts.estimatedPortfolioLoss || 0) / 100;
-      }
-      
-      totalPortfolioLoss += sectorLoss;
+    switch (scenario.id) {
+      case 'transition_shock':
+        lossPercentage = getTransitionLossPercentage(entry.sector);
+        break;
+      case 'physical_shock':
+        lossPercentage = getPhysicalLossPercentage(entry.sector);
+        break;
+      case 'dual_stress':
+        lossPercentage = getTransitionLossPercentage(entry.sector) + getPhysicalLossPercentage(entry.sector);
+        break;
+      default:
+        lossPercentage = 0;
     }
+    
+    totalLoss += entry.amount * (lossPercentage / 100);
   });
   
-  const portfolioLossPercentage = totalExposure > 0 ? (totalPortfolioLoss / totalExposure) * 100 : 0;
+  const totalPortfolioValue = calculateTotalPortfolioValue(entries);
+  const portfolioLossPercentage = totalPortfolioValue > 0 ? (totalLoss / totalPortfolioValue) * 100 : 0;
   
-  return { totalPortfolioLoss, portfolioLossPercentage };
+  return { totalPortfolioLoss: totalLoss, portfolioLossPercentage };
+}
+
+/**
+ * Get transition loss percentage by sector
+ */
+function getTransitionLossPercentage(sector: string): number {
+  const transitionLosses: { [key: string]: number } = {
+    'Energy': 3.5,
+    'Manufacturing': 2.0,
+    'Transportation': 1.8,
+    'Agriculture': 2.5,
+    'Real Estate': 2.5,
+    'Construction': 1.2,
+    'Retail': 0.8,
+    'Technology': 0.5,
+    'Healthcare': 0.5,
+    'Financial Services': 0.5,
+    'Other': 1.0
+  };
+  
+  return transitionLosses[sector] || 1.0;
+}
+
+/**
+ * Get physical loss percentage by sector
+ */
+function getPhysicalLossPercentage(sector: string): number {
+  const physicalLosses: { [key: string]: number } = {
+    'Energy': 1.0,
+    'Manufacturing': 0.5,
+    'Transportation': 0.8,
+    'Agriculture': 2.0,
+    'Real Estate': 1.5,
+    'Construction': 0.5,
+    'Retail': 0.3,
+    'Technology': 0.2,
+    'Healthcare': 0.2,
+    'Financial Services': 0.2,
+    'Other': 0.5
+  };
+  
+  return physicalLosses[sector] || 0.5;
 }
 
 /**
  * Calculate asset class breakdown
  */
-function calculateAssetClassBreakdown(
-  entries: ScenarioPortfolioEntry[],
-  scenarioId: string,
-  baselineRisk: number
-) {
-  const assetClassGroups = groupByAssetClass(entries);
+function calculateAssetClassBreakdown(entries: ScenarioPortfolioEntry[], scenario: any) {
+  const breakdown: { [key: string]: { amount: number; estimatedLoss: number } } = {};
   
-  return Object.entries(assetClassGroups).map(([assetClass, assetClassEntries]) => {
-    const amount = assetClassEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  entries.forEach(entry => {
+    if (!breakdown[entry.assetClass]) {
+      breakdown[entry.assetClass] = { amount: 0, estimatedLoss: 0 };
+    }
     
-    // Calculate asset class specific impacts
-    let assetClassLoss = 0;
-    assetClassEntries.forEach(entry => {
-      const sector = SECTOR_SEGMENTS.find(s => s.id === entry.sector);
-      if (sector && sector.impacts) {
-        let sectorLoss = 0;
-        if (scenarioId === 'transition_shock') {
-          const transitionImpact = sector.impacts.transition;
-          sectorLoss = entry.amount * (Math.abs(transitionImpact.revenueChange || 0) + 
-                                     Math.abs(transitionImpact.costIncrease || 0) + 
-                                     Math.abs(transitionImpact.demandChange || 0)) / 100;
-        } else if (scenarioId === 'physical_shock') {
-          const physicalImpact = sector.impacts.physical;
-          sectorLoss = entry.amount * (Math.abs(physicalImpact.damage || 0) + 
-                                     Math.abs(physicalImpact.efficiencyLoss || 0) + 
-                                     Math.abs(physicalImpact.outputLoss || 0)) / 100;
-        } else if (scenarioId === 'dual_stress') {
-          const transitionImpact = sector.impacts.transition;
-          const physicalImpact = sector.impacts.physical;
-          sectorLoss = entry.amount * (
-            (Math.abs(transitionImpact.revenueChange || 0) + 
-             Math.abs(transitionImpact.costIncrease || 0) + 
-             Math.abs(transitionImpact.demandChange || 0)) +
-            (Math.abs(physicalImpact.damage || 0) + 
-             Math.abs(physicalImpact.efficiencyLoss || 0) + 
-             Math.abs(physicalImpact.outputLoss || 0))
-          ) / 100;
-        } else {
-          sectorLoss = entry.amount * (sector.impacts.estimatedPortfolioLoss || 0) / 100;
-        }
-        assetClassLoss += sectorLoss;
-      }
-    });
+    breakdown[entry.assetClass].amount += entry.amount;
     
-    const assetClassRisk = baselineRisk + (amount > 0 ? (assetClassLoss / amount) * 100 : 0);
-    const assetClassRiskIncrease = ((assetClassRisk - baselineRisk) / baselineRisk) * 100;
+    // Calculate estimated loss for this entry
+    let lossPercentage = 0;
+    switch (scenario.id) {
+      case 'transition_shock':
+        lossPercentage = getTransitionLossPercentage(entry.sector);
+        break;
+      case 'physical_shock':
+        lossPercentage = getPhysicalLossPercentage(entry.sector);
+        break;
+      case 'dual_stress':
+        lossPercentage = getTransitionLossPercentage(entry.sector) + getPhysicalLossPercentage(entry.sector);
+        break;
+    }
     
-    return {
-      assetClass: getAssetClassName(assetClass),
-      amount,
-      baselineRisk: baselineRisk,
-      scenarioRisk: assetClassRisk,
-      riskIncrease: assetClassRiskIncrease,
-      estimatedLoss: assetClassLoss
-    };
+    breakdown[entry.assetClass].estimatedLoss += entry.amount * (lossPercentage / 100);
   });
+  
+  const totalAmount = calculateTotalPortfolioValue(entries);
+  
+  return Object.entries(breakdown).map(([assetClass, data]) => ({
+    assetClass,
+    amount: data.amount,
+    percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
+    estimatedLoss: data.estimatedLoss
+  }));
 }
 
 /**
  * Calculate sector breakdown
  */
-function calculateSectorBreakdown(
-  entries: ScenarioPortfolioEntry[],
-  scenarioId: string,
-  baselineRisk: number
-) {
-  const sectorGroups = groupBySector(entries);
+function calculateSectorBreakdown(entries: ScenarioPortfolioEntry[], scenario: any) {
+  const breakdown: { [key: string]: { amount: number; estimatedLoss: number } } = {};
   
-  return Object.entries(sectorGroups).map(([sectorId, sectorEntries]) => {
-    const amount = sectorEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  entries.forEach(entry => {
+    if (!breakdown[entry.sector]) {
+      breakdown[entry.sector] = { amount: 0, estimatedLoss: 0 };
+    }
     
-    // Calculate sector-specific impacts
-    let sectorLoss = 0;
-    sectorEntries.forEach(entry => {
-      const sector = SECTOR_SEGMENTS.find(s => s.id === entry.sector);
-      if (sector && sector.impacts) {
-        if (scenarioId === 'transition_shock') {
-          const transitionImpact = sector.impacts.transition;
-          sectorLoss += entry.amount * (Math.abs(transitionImpact.revenueChange || 0) + 
-                                      Math.abs(transitionImpact.costIncrease || 0) + 
-                                      Math.abs(transitionImpact.demandChange || 0)) / 100;
-        } else if (scenarioId === 'physical_shock') {
-          const physicalImpact = sector.impacts.physical;
-          sectorLoss += entry.amount * (Math.abs(physicalImpact.damage || 0) + 
-                                      Math.abs(physicalImpact.efficiencyLoss || 0) + 
-                                      Math.abs(physicalImpact.outputLoss || 0)) / 100;
-        } else if (scenarioId === 'dual_stress') {
-          const transitionImpact = sector.impacts.transition;
-          const physicalImpact = sector.impacts.physical;
-          sectorLoss += entry.amount * (
-            (Math.abs(transitionImpact.revenueChange || 0) + 
-             Math.abs(transitionImpact.costIncrease || 0) + 
-             Math.abs(transitionImpact.demandChange || 0)) +
-            (Math.abs(physicalImpact.damage || 0) + 
-             Math.abs(physicalImpact.efficiencyLoss || 0) + 
-             Math.abs(physicalImpact.outputLoss || 0))
-          ) / 100;
-        } else {
-          sectorLoss += entry.amount * (sector.impacts.estimatedPortfolioLoss || 0) / 100;
-        }
-      }
-    });
+    breakdown[entry.sector].amount += entry.amount;
     
-    const sectorRisk = baselineRisk + (amount > 0 ? (sectorLoss / amount) * 100 : 0);
-    const sectorRiskIncrease = ((sectorRisk - baselineRisk) / baselineRisk) * 100;
+    // Calculate estimated loss for this entry
+    let lossPercentage = 0;
+    switch (scenario.id) {
+      case 'transition_shock':
+        lossPercentage = getTransitionLossPercentage(entry.sector);
+        break;
+      case 'physical_shock':
+        lossPercentage = getPhysicalLossPercentage(entry.sector);
+        break;
+      case 'dual_stress':
+        lossPercentage = getTransitionLossPercentage(entry.sector) + getPhysicalLossPercentage(entry.sector);
+        break;
+    }
     
-    return {
-      sector: getSectorName(sectorId),
-      amount,
-      baselineRisk: baselineRisk,
-      scenarioRisk: sectorRisk,
-      riskIncrease: sectorRiskIncrease,
-      estimatedLoss: sectorLoss
-    };
+    breakdown[entry.sector].estimatedLoss += entry.amount * (lossPercentage / 100);
   });
+  
+  const totalAmount = calculateTotalPortfolioValue(entries);
+  
+  return Object.entries(breakdown).map(([sector, data]) => ({
+    sector,
+    amount: data.amount,
+    percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0,
+    estimatedLoss: data.estimatedLoss
+  }));
 }
 
 /**
  * Calculate top exposures
  */
-function calculateTopExposures(
-  entries: ScenarioPortfolioEntry[],
-  scenarioId: string,
-  baselineRisk: number
-) {
+function calculateTopExposures(entries: ScenarioPortfolioEntry[], scenario: any) {
   return entries
     .map(entry => {
-      const sector = SECTOR_SEGMENTS.find(s => s.id === entry.sector);
-      let estimatedLoss = 0;
-      
-      if (sector && sector.impacts) {
-        if (scenarioId === 'transition_shock') {
-          const transitionImpact = sector.impacts.transition;
-          estimatedLoss = entry.amount * (Math.abs(transitionImpact.revenueChange || 0) + 
-                                        Math.abs(transitionImpact.costIncrease || 0) + 
-                                        Math.abs(transitionImpact.demandChange || 0)) / 100;
-        } else if (scenarioId === 'physical_shock') {
-          const physicalImpact = sector.impacts.physical;
-          estimatedLoss = entry.amount * (Math.abs(physicalImpact.damage || 0) + 
-                                        Math.abs(physicalImpact.efficiencyLoss || 0) + 
-                                        Math.abs(physicalImpact.outputLoss || 0)) / 100;
-        } else if (scenarioId === 'dual_stress') {
-          const transitionImpact = sector.impacts.transition;
-          const physicalImpact = sector.impacts.physical;
-          estimatedLoss = entry.amount * (
-            (Math.abs(transitionImpact.revenueChange || 0) + 
-             Math.abs(transitionImpact.costIncrease || 0) + 
-             Math.abs(transitionImpact.demandChange || 0)) +
-            (Math.abs(physicalImpact.damage || 0) + 
-             Math.abs(physicalImpact.efficiencyLoss || 0) + 
-             Math.abs(physicalImpact.outputLoss || 0))
-          ) / 100;
-        } else {
-          estimatedLoss = entry.amount * (sector.impacts.estimatedPortfolioLoss || 0) / 100;
-        }
+      let lossPercentage = 0;
+      switch (scenario.id) {
+        case 'transition_shock':
+          lossPercentage = getTransitionLossPercentage(entry.sector);
+          break;
+        case 'physical_shock':
+          lossPercentage = getPhysicalLossPercentage(entry.sector);
+          break;
+        case 'dual_stress':
+          lossPercentage = getTransitionLossPercentage(entry.sector) + getPhysicalLossPercentage(entry.sector);
+          break;
       }
       
-      const entryRisk = baselineRisk + (entry.amount > 0 ? (estimatedLoss / entry.amount) * 100 : 0);
-      
       return {
-        ...entry,
-        baselineRisk: baselineRisk,
-        scenarioRisk: entryRisk,
-        financedEmissions: entry.financedEmissions,
-        estimatedLoss: estimatedLoss
+        company: entry.company,
+        sector: entry.sector,
+        assetClass: entry.assetClass,
+        amount: entry.amount,
+        baselineRisk: entry.probabilityOfDefault,
+        scenarioRisk: entry.probabilityOfDefault + lossPercentage,
+        estimatedLoss: entry.amount * (lossPercentage / 100)
       };
     })
-    .sort((a, b) => b.estimatedLoss - a.estimatedLoss)
-    .slice(0, 5);
-}
-
-/**
- * Helper function to group entries by asset class
- */
-function groupByAssetClass(entries: ScenarioPortfolioEntry[]): { [key: string]: ScenarioPortfolioEntry[] } {
-  return entries.reduce((groups, entry) => {
-    if (!groups[entry.assetClass]) {
-      groups[entry.assetClass] = [];
-    }
-    groups[entry.assetClass].push(entry);
-    return groups;
-  }, {} as { [key: string]: ScenarioPortfolioEntry[] });
-}
-
-/**
- * Helper function to group entries by sector
- */
-function groupBySector(entries: ScenarioPortfolioEntry[]): { [key: string]: ScenarioPortfolioEntry[] } {
-  return entries.reduce((groups, entry) => {
-    if (!groups[entry.sector]) {
-      groups[entry.sector] = [];
-    }
-    groups[entry.sector].push(entry);
-    return groups;
-  }, {} as { [key: string]: ScenarioPortfolioEntry[] });
-}
-
-/**
- * Get asset class name from ID
- */
-function getAssetClassName(assetClassId: string): string {
-  const assetClassNames: { [key: string]: string } = {
-    'listed_equity': 'Listed Equity & Corporate Bonds',
-    'business_loans': 'Business Loans & Unlisted Equity',
-    'project_finance': 'Project Finance',
-    'commercial_real_estate': 'Commercial Real Estate',
-    'mortgages': 'Mortgages (Residential Real Estate)',
-    'motor_vehicle_loans': 'Motor Vehicle Loans',
-    'sovereign_debt': 'Sovereign Debt',
-    'insurance_facilitation': 'Insurance / Facilitation Exposure'
-  };
-  
-  return assetClassNames[assetClassId] || assetClassId;
-}
-
-/**
- * Get sector name from ID
- */
-function getSectorName(sectorId: string): string {
-  const sector = SECTOR_SEGMENTS.find(s => s.id === sectorId);
-  return sector ? sector.name : sectorId;
+    .sort((a, b) => b.estimatedLoss - a.estimatedLoss);
 }

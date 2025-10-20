@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,24 +18,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastAuthEventRef = useRef<string>('');
+  const lastAuthTimeRef = useRef<number>(0);
 
   useEffect(() => {
+    let isInitialized = false;
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, session?.user?.id);
+        // Debounce rapid auth state changes
+        const now = Date.now();
+        const eventKey = `${event}-${session?.user?.id || 'null'}`;
+        
+        // Skip if same event within 100ms (rapid fire protection)
+        if (eventKey === lastAuthEventRef.current && (now - lastAuthTimeRef.current) < 100) {
+          return; // Skip duplicate events
+        }
+        
+        lastAuthEventRef.current = eventKey;
+        lastAuthTimeRef.current = now;
+        
+        // Only log significant auth events, not every state change
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          // Only log if this is a new event (not a duplicate)
+          console.log('Auth state change:', event, session?.user?.id);
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        isInitialized = true;
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.id);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (!isInitialized) {
+        console.log('Initial session check:', session?.user?.id);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+        isInitialized = true;
+      }
     });
 
     return () => subscription.unsubscribe();

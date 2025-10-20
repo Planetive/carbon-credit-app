@@ -183,7 +183,63 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const updateSharedCompanyData = (field: keyof typeof sharedCompanyData, value: number) => {
     setSharedCompanyData(prev => ({ ...prev, [field]: value }));
   };
+
+  // Calculate shared EVIC/Total Equity + Debt once and cache it
+  const getSharedDenominatorValue = (corporateStructure: string) => {
+    // If shared data is empty, try to get it from the first loan
+    const hasSharedData = sharedCompanyData.sharePrice > 0 || sharedCompanyData.totalEquity > 0;
+    let dataToUse = sharedCompanyData;
+    
+    if (!hasSharedData && propLoanTypes.length > 1) {
+      const firstLoanType = propLoanTypes[0].type;
+      const firstLoanData = perLoanFormData[firstLoanType];
+      if (firstLoanData) {
+        console.log('Shared data empty, using first loan data:', firstLoanData);
+        dataToUse = {
+          sharePrice: firstLoanData.sharePrice || 0,
+          outstandingShares: firstLoanData.outstandingShares || 0,
+          totalDebt: firstLoanData.totalDebt || 0,
+          minorityInterest: firstLoanData.minorityInterest || 0,
+          preferredStock: firstLoanData.preferredStock || 0,
+          totalEquity: firstLoanData.totalEquity || 0
+        };
+      }
+    }
+
+    if (corporateStructure === 'listed') {
+      // EVIC = Market Cap + Total Debt + Minority Interest + Preferred Stock
+      const marketCap = (dataToUse.sharePrice || 0) * (dataToUse.outstandingShares || 0);
+      const evic = marketCap + (dataToUse.totalDebt || 0) + (dataToUse.minorityInterest || 0) + (dataToUse.preferredStock || 0);
+      console.log('Shared EVIC calculation:', {
+        sharePrice: dataToUse.sharePrice,
+        outstandingShares: dataToUse.outstandingShares,
+        totalDebt: dataToUse.totalDebt,
+        minorityInterest: dataToUse.minorityInterest,
+        preferredStock: dataToUse.preferredStock,
+        marketCap,
+        evic,
+        dataSource: hasSharedData ? 'sharedData' : 'firstLoanData'
+      });
+      return evic;
+    } else {
+      // Total Equity + Debt for unlisted companies
+      const totalEquityPlusDebt = (dataToUse.totalEquity || 0) + (dataToUse.totalDebt || 0);
+      console.log('Shared Total Equity + Debt calculation:', {
+        totalEquity: dataToUse.totalEquity,
+        totalDebt: dataToUse.totalDebt,
+        totalEquityPlusDebt,
+        dataSource: hasSharedData ? 'sharedData' : 'firstLoanData'
+      });
+      return totalEquityPlusDebt;
+    }
+  };
   const initialFormDataRef = useRef<any>(null);
+  
+  // Sync shared data when loan index changes
+  useEffect(() => {
+    syncSharedDataFromFirstLoan();
+  }, [currentLoanIndex, perLoanFormData]);
+
   useEffect(() => {
     if (!initialFormDataRef.current) {
       initialFormDataRef.current = formData;
@@ -212,19 +268,54 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
   }, [loanType, currentLoanIndex]);
 
-  // Restore calculator state from sessionStorage (so going back keeps values)
+  // Load questionnaire data from database and restore calculator state
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('financeCalculatorState');
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed?.perLoanFormData) setPerLoanFormData(parsed.perLoanFormData);
-      if (parsed?.sharedCompanyData) setSharedCompanyData(parsed.sharedCompanyData);
-      if (parsed?.properties) setProperties(parsed.properties);
-      if (parsed?.selectedFormula) setSelectedFormula(parsed.selectedFormula);
-      if (typeof parsed?.currentLoanIndex === 'number') setCurrentLoanIndex(parsed.currentLoanIndex);
-      if (parsed?.formData) setFormData(parsed.formData);
-    } catch {}
+    const initializeCalculator = async () => {
+      try {
+        // First, try to load from database if we have a counterparty ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const counterpartyId = urlParams.get('counterpartyId') || 
+                              (window.location.state as any)?.counterpartyId ||
+                              (window.location.state as any)?.counterparty ||
+                              (window.location.state as any)?.id;
+        
+        if (counterpartyId) {
+          const { PortfolioClient } = await import('@/integrations/supabase/portfolioClient');
+          const questionnaire = await PortfolioClient.getQuestionnaire(counterpartyId);
+          
+          if (questionnaire) {
+            console.log('FinanceEmissionCalculator - Loaded questionnaire from database:', questionnaire);
+            
+            // Update shared company data from database
+            setSharedCompanyData(prev => ({
+              ...prev,
+              sharePrice: questionnaire.share_price || 0,
+              outstandingShares: questionnaire.outstanding_shares || 0,
+              totalDebt: questionnaire.total_debt || 0,
+              minorityInterest: questionnaire.minority_interest || 0,
+              preferredStock: questionnaire.preferred_stock || 0,
+              totalEquity: questionnaire.total_equity || 0
+            }));
+          }
+        }
+        
+        // Then, restore from sessionStorage (this will override database values if more recent)
+        const raw = sessionStorage.getItem('financeCalculatorState');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.perLoanFormData) setPerLoanFormData(parsed.perLoanFormData);
+          if (parsed?.sharedCompanyData) setSharedCompanyData(prev => ({ ...prev, ...parsed.sharedCompanyData }));
+          if (parsed?.properties) setProperties(parsed.properties);
+          if (parsed?.selectedFormula) setSelectedFormula(parsed.selectedFormula);
+          if (typeof parsed?.currentLoanIndex === 'number') setCurrentLoanIndex(parsed.currentLoanIndex);
+          if (parsed?.formData) setFormData(parsed.formData);
+        }
+      } catch (error) {
+        console.error('Error initializing finance calculator:', error);
+      }
+    };
+    
+    initializeCalculator();
   }, []);
 
   // Get available formulas based on questionnaire answers for a given loan type
@@ -393,12 +484,43 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       if (propLoanTypes.length > 1 && currentLoanIndex === 0) {
         const evicFields = ['sharePrice', 'outstandingShares', 'totalDebt', 'minorityInterest', 'preferredStock', 'totalEquity'];
         if (evicFields.includes(field)) {
-          setSharedCompanyData(prev => ({ ...prev, [field]: value }));
+          console.log('Updating shared company data:', { field, value, currentLoanIndex });
+          setSharedCompanyData(prev => {
+            const updated = { ...prev, [field]: value };
+            console.log('Updated shared company data:', updated);
+            return updated;
+          });
         }
       }
       
       return next;
     });
+  };
+
+  // Sync shared data from the first loan when switching to other loans
+  const syncSharedDataFromFirstLoan = () => {
+    if (propLoanTypes.length > 1 && currentLoanIndex > 0) {
+      const firstLoanType = propLoanTypes[0].type;
+      const firstLoanData = perLoanFormData[firstLoanType];
+      if (firstLoanData) {
+        const evicFields = ['sharePrice', 'outstandingShares', 'totalDebt', 'minorityInterest', 'preferredStock', 'totalEquity'];
+        const hasSharedData = evicFields.some(field => firstLoanData[field] && firstLoanData[field] > 0);
+        
+        if (hasSharedData) {
+          console.log('Syncing shared data from first loan:', firstLoanData);
+          setSharedCompanyData(prev => {
+            const updated = { ...prev };
+            evicFields.forEach(field => {
+              if (firstLoanData[field] && firstLoanData[field] > 0) {
+                updated[field] = firstLoanData[field];
+              }
+            });
+            console.log('Synced shared company data:', updated);
+            return updated;
+          });
+        }
+      }
+    }
   };
 
   const getDataQualityColor = (score: number) => {
@@ -524,11 +646,24 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       denominatorValue = (loanFormData.totalProjectEquity || 0) + (loanFormData.totalProjectDebt || 0);
       denominatorLabel = 'Total Project Equity + Debt';
     } else if (corporateStructure === 'listed') {
-      const marketCap = ((useShared ? sharedCompanyData.sharePrice : loanFormData.sharePrice) || 0) * ((useShared ? sharedCompanyData.outstandingShares : loanFormData.outstandingShares) || 0);
-      denominatorValue = marketCap + ((useShared ? sharedCompanyData.totalDebt : loanFormData.totalDebt) || 0) + ((useShared ? sharedCompanyData.minorityInterest : loanFormData.minorityInterest) || 0) + ((useShared ? sharedCompanyData.preferredStock : loanFormData.preferredStock) || 0);
+      // For listed companies: Use shared EVIC value
+      if (useShared) {
+        denominatorValue = getSharedDenominatorValue('listed');
+        console.log('Using shared EVIC for single loan calculation:', loanTypeKey, 'Value:', denominatorValue);
+      } else {
+        denominatorValue = ((loanFormData.sharePrice || 0) * (loanFormData.outstandingShares || 0) + (loanFormData.totalDebt || 0) + (loanFormData.minorityInterest || 0) + (loanFormData.preferredStock || 0));
+        console.log('Using individual EVIC for single loan calculation:', loanTypeKey, 'Value:', denominatorValue);
+      }
       denominatorLabel = 'EVIC';
     } else {
-      denominatorValue = ((useShared ? sharedCompanyData.totalEquity : loanFormData.totalEquity) || 0) + ((useShared ? sharedCompanyData.totalDebt : loanFormData.totalDebt) || 0);
+      // For unlisted companies: Use shared Total Equity + Debt value
+      if (useShared) {
+        denominatorValue = getSharedDenominatorValue('unlisted');
+        console.log('Using shared Total Equity + Debt for single loan calculation:', loanTypeKey, 'Value:', denominatorValue);
+      } else {
+        denominatorValue = ((loanFormData.totalEquity || 0) + (loanFormData.totalDebt || 0));
+        console.log('Using individual Total Equity + Debt for single loan calculation:', loanTypeKey, 'Value:', denominatorValue);
+      }
       denominatorLabel = 'Total Equity + Debt';
     }
 
@@ -750,13 +885,24 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         denominatorValue = (formData.totalProjectEquity || 0) + (formData.totalProjectDebt || 0);
         denominatorLabel = 'Total Project Equity + Debt';
       } else if (corporateStructure === 'listed') {
-        // For listed companies: EVIC = Market Capitalization + Total Debt + Minority Interest + Preferred Stock
-        const marketCap = ((useShared ? sharedCompanyData.sharePrice : formData.sharePrice) || 0) * ((useShared ? sharedCompanyData.outstandingShares : formData.outstandingShares) || 0);
-        denominatorValue = marketCap + ((useShared ? sharedCompanyData.totalDebt : formData.totalDebt) || 0) + ((useShared ? sharedCompanyData.minorityInterest : formData.minorityInterest) || 0) + ((useShared ? sharedCompanyData.preferredStock : formData.preferredStock) || 0);
+        // For listed companies: Use shared EVIC value
+        if (useShared) {
+          denominatorValue = getSharedDenominatorValue('listed');
+          console.log('Using shared EVIC for loan type:', loanType, 'Value:', denominatorValue);
+        } else {
+          denominatorValue = ((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0));
+          console.log('Using individual EVIC for loan type:', loanType, 'Value:', denominatorValue);
+        }
         denominatorLabel = 'EVIC';
       } else {
-        // For unlisted companies: Total Equity + Debt
-        denominatorValue = ((useShared ? sharedCompanyData.totalEquity : formData.totalEquity) || 0) + ((useShared ? sharedCompanyData.totalDebt : formData.totalDebt) || 0);
+        // For unlisted companies: Use shared Total Equity + Debt value
+        if (useShared) {
+          denominatorValue = getSharedDenominatorValue('unlisted');
+          console.log('Using shared Total Equity + Debt for loan type:', loanType, 'Value:', denominatorValue);
+        } else {
+          denominatorValue = ((formData.totalEquity || 0) + (formData.totalDebt || 0));
+          console.log('Using individual Total Equity + Debt for loan type:', loanType, 'Value:', denominatorValue);
+        }
         denominatorLabel = 'Total Equity + Debt';
       }
       
@@ -1527,6 +1673,21 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           onCalculationComplete={(result) => {
             // Handle facilitated emission calculation result
             console.log('Facilitated emission result:', result);
+            // Convert facilitated result to the expected format and pass to parent
+            if (onResults) {
+              const denominatorValue = result.evic || result.totalEquityPlusDebt || 0;
+              const denominatorLabel = result.evic ? 'EVIC' : 'Total Equity + Debt';
+              
+              const formattedResult = {
+                type: 'facilitated',
+                label: 'Facilitated Emission',
+                attributionFactor: result.attributionFactor,
+                financedEmissions: result.facilitatedEmission,
+                denominatorLabel: denominatorLabel,
+                denominatorValue: denominatorValue
+              };
+              onResults([formattedResult]);
+            }
           }}
         />
       )}

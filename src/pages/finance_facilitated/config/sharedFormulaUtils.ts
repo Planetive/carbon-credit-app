@@ -54,39 +54,78 @@ export const EMISSION_UNIT_OPTIONS = [
 
 // Attribution factor for Corporate Bonds/Business Loans (Listed) - uses EVIC
 export const calculateAttributionFactorListed = (outstandingAmount: number, evic: number): number => {
-  return outstandingAmount / evic;
+  if (evic === 0 || !isFinite(evic)) {
+    return 0;
+  }
+  const result = outstandingAmount / evic;
+  return isFinite(result) ? result : 0;
 };
 
 // Attribution factor for Corporate Bonds/Business Loans (Unlisted) - uses Total Equity + Debt
 export const calculateAttributionFactorUnlisted = (outstandingAmount: number, totalEquityPlusDebt: number): number => {
-  return outstandingAmount / totalEquityPlusDebt;
+  if (totalEquityPlusDebt === 0 || !isFinite(totalEquityPlusDebt)) {
+    return 0;
+  }
+  const result = outstandingAmount / totalEquityPlusDebt;
+  return isFinite(result) ? result : 0;
 };
 
 // Attribution factor for Project Finance - uses Total Project Equity + Debt
 export const calculateAttributionFactorProject = (outstandingAmount: number, totalProjectEquityPlusDebt: number): number => {
-  return outstandingAmount / totalProjectEquityPlusDebt;
+  if (totalProjectEquityPlusDebt === 0 || !isFinite(totalProjectEquityPlusDebt)) {
+    return 0;
+  }
+  const result = outstandingAmount / totalProjectEquityPlusDebt;
+  return isFinite(result) ? result : 0;
 };
 
 // Attribution factor for Commercial Real Estate - uses Property Value at Origination
 export const calculateAttributionFactorCommercialRealEstate = (outstandingAmount: number, propertyValueAtOrigination: number): number => {
-  return outstandingAmount / propertyValueAtOrigination;
+  if (propertyValueAtOrigination === 0 || !isFinite(propertyValueAtOrigination)) {
+    return 0;
+  }
+  const result = outstandingAmount / propertyValueAtOrigination;
+  return isFinite(result) ? result : 0;
 };
 
 // Legacy function - kept for backward compatibility but should not be used
 export const calculateAttributionFactor = (outstandingAmount: number, totalAssets: number): number => {
-  return outstandingAmount / totalAssets;
+  if (totalAssets === 0 || !isFinite(totalAssets)) {
+    return 0;
+  }
+  const result = outstandingAmount / totalAssets;
+  return isFinite(result) ? result : 0;
 };
 
 export const calculateEVIC = (inputs: any): number => {
-  return inputs.sharePrice * inputs.outstandingShares + inputs.totalDebt + inputs.minorityInterest + inputs.preferredStock;
+  const sharePrice = inputs.sharePrice || 0;
+  const outstandingShares = inputs.outstandingShares || 0;
+  const totalDebt = inputs.totalDebt || 0;
+  const minorityInterest = inputs.minorityInterest || 0;
+  const preferredStock = inputs.preferredStock || 0;
+  
+  const marketCap = sharePrice * outstandingShares;
+  const result = marketCap + totalDebt + minorityInterest + preferredStock;
+  
+  return isFinite(result) ? result : 0;
 };
 
 export const calculateTotalEquityPlusDebt = (inputs: any): number => {
-  return inputs.totalEquity + inputs.totalDebt;
+  const totalEquity = inputs.totalEquity || 0;
+  const totalDebt = inputs.totalDebt || 0;
+  const result = totalEquity + totalDebt;
+  
+  return isFinite(result) ? result : 0;
 };
 
 export const calculateFinancedEmissions = (outstandingAmount: number, denominator: number, emissionData: number): number => {
-  return (outstandingAmount / denominator) * emissionData;
+  // Prevent division by zero to avoid Infinity values
+  if (denominator === 0 || !isFinite(denominator)) {
+    return 0;
+  }
+  const result = (outstandingAmount / denominator) * emissionData;
+  // Ensure result is finite
+  return isFinite(result) ? result : 0;
 };
 
 export const createCommonCalculationSteps = (

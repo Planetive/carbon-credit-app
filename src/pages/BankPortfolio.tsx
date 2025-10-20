@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormattedNumberInput } from './finance_facilitated/components/FormattedNumberInput';
 import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, TrendingUp, Upload, Download, FileSpreadsheet, Edit, Trash2, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { PortfolioClient, Counterparty, Exposure } from '@/integrations/supabase/portfolioClient';
+import { supabase } from '@/integrations/supabase/client';
 
 const currencyFormat = (value: number) =>
   (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -17,6 +20,7 @@ interface PortfolioEntry {
   company: string;
   amount: number;
   counterparty: string;
+  counterpartyId?: string; // Add the UUID for database operations (optional for CSV uploads)
   sector: string;
   geography: string;
   probabilityOfDefault: number;
@@ -26,42 +30,11 @@ interface PortfolioEntry {
 
 const BankPortfolio: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
-  const [entries, setEntries] = useState<PortfolioEntry[]>([
-    { 
-      id: '0001', 
-      company: 'National Steel Limited', 
-      amount: 250000000,
-      counterparty: '0001',
-      sector: 'Manufacturing',
-      geography: 'Pakistan',
-      probabilityOfDefault: 2.5,
-      lossGivenDefault: 45,
-      tenor: 36
-    },
-    { 
-      id: '0002', 
-      company: 'Sunrise Power Pvt. Ltd.', 
-      amount: 450000000,
-      counterparty: '0002',
-      sector: 'Energy',
-      geography: 'Pakistan',
-      probabilityOfDefault: 1.8,
-      lossGivenDefault: 40,
-      tenor: 60
-    },
-    { 
-      id: '0003', 
-      company: 'Metro Retail Holdings', 
-      amount: 150000000,
-      counterparty: '0003',
-      sector: 'Retail',
-      geography: 'Pakistan',
-      probabilityOfDefault: 3.2,
-      lossGivenDefault: 50,
-      tenor: 24
-    }
-  ]);
+  const [entries, setEntries] = useState<PortfolioEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const zeroPadId = (num: number, width = 4) => num.toString().padStart(width, '0');
   const getNextId = (): string => {
@@ -96,13 +69,56 @@ const BankPortfolio: React.FC = () => {
   const [editingEntry, setEditingEntry] = useState<PortfolioEntry | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
+  // Load data from database on component mount
+  useEffect(() => {
+    loadPortfolioData();
+  }, []);
+
+  const loadPortfolioData = async () => {
+    try {
+      setLoading(true);
+      const counterparties = await PortfolioClient.getCounterparties();
+      const exposures = await PortfolioClient.getExposures();
+      
+      // Combine counterparty and exposure data into PortfolioEntry format
+      const portfolioEntries: PortfolioEntry[] = counterparties.map(counterparty => {
+        const exposure = exposures.find(e => e.counterparty_id === counterparty.id);
+        if (!exposure) return null;
+        
+        return {
+          id: exposure.exposure_id,
+          company: counterparty.name,
+          amount: exposure.amount_pkr,
+          counterparty: counterparty.counterparty_code,
+          counterpartyId: counterparty.id, // Add the UUID
+          sector: counterparty.sector,
+          geography: counterparty.geography,
+          probabilityOfDefault: exposure.probability_of_default,
+          lossGivenDefault: exposure.loss_given_default,
+          tenor: exposure.tenor_months
+        };
+      }).filter(Boolean) as PortfolioEntry[];
+
+      setEntries(portfolioEntries);
+    } catch (error) {
+      console.error('Error loading portfolio data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load portfolio data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return entries;
     return entries.filter(e => e.company.toLowerCase().includes(q));
   }, [entries, search]);
 
-  const addEntry = () => {
+  const addEntry = async () => {
     if (!newCompany.trim() || 
         (Number(newAmount) || 0) <= 0 || 
         !newSector || 
@@ -111,30 +127,69 @@ const BankPortfolio: React.FC = () => {
         (Number(newLGD) || 0) <= 0 || 
         (Number(newTenor) || 0) <= 0) return;
     
-    setEntries(prev => [
-      { 
-        id: getNextId(), 
-        company: newCompany.trim(), 
+    try {
+      setSaving(true);
+      
+      const counterpartyCode = getNextCounterparty();
+      const exposureId = getNextId();
+      
+      // Create counterparty and exposure in database
+      const { counterparty, exposure } = await PortfolioClient.createCounterpartyWithExposure(
+        {
+          counterparty_code: counterpartyCode,
+          name: newCompany.trim(),
+          sector: newSector,
+          geography: newGeography
+        },
+        {
+          exposure_id: exposureId,
+          amount_pkr: Number(newAmount) || 0,
+          probability_of_default: Number(newPD) || 0,
+          loss_given_default: Number(newLGD) || 0,
+          tenor_months: Number(newTenor) || 0
+        }
+      );
+
+      // Add to local state
+      const newEntry: PortfolioEntry = {
+        id: exposureId,
+        company: newCompany.trim(),
         amount: Number(newAmount) || 0,
-        counterparty: getNextCounterparty(),
+        counterparty: counterpartyCode,
+        counterpartyId: counterparty.id, // Add the UUID from the created counterparty
         sector: newSector,
         geography: newGeography,
         probabilityOfDefault: Number(newPD) || 0,
         lossGivenDefault: Number(newLGD) || 0,
         tenor: Number(newTenor) || 0
-      },
-      ...prev
-    ]);
-    
-    // Reset form
-    setNewCompany('');
-    setNewAmount(0);
-    setNewCounterparty('');
-    setNewSector('');
-    setNewGeography('');
-    setNewPD(0);
-    setNewLGD(0);
-    setNewTenor(0);
+      };
+      
+      setEntries(prev => [newEntry, ...prev]);
+      
+      // Reset form
+      setNewCompany('');
+      setNewAmount(0);
+      setNewCounterparty('');
+      setNewSector('');
+      setNewGeography('');
+      setNewPD(0);
+      setNewLGD(0);
+      setNewTenor(0);
+
+      toast({
+        title: "Success",
+        description: "Company added to portfolio successfully",
+      });
+    } catch (error) {
+      console.error('Error adding company:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add company to portfolio",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const downloadTemplate = () => {
@@ -253,18 +308,94 @@ const BankPortfolio: React.FC = () => {
     setEditingEntry(entry);
   };
 
-  const updateEntry = () => {
+  const updateEntry = async () => {
     if (!editingEntry) return;
     
-    setEntries(prev => prev.map(entry => 
-      entry.id === editingEntry.id ? editingEntry : entry
-    ));
-    setEditingEntry(null);
+    try {
+      setSaving(true);
+      
+      // Update counterparty data (name, sector, geography)
+      if (editingEntry.counterpartyId) {
+        await PortfolioClient.updateCounterparty(editingEntry.counterpartyId, {
+          name: editingEntry.company,
+          sector: editingEntry.sector,
+          geography: editingEntry.geography
+        });
+      }
+      
+      // Update exposure data (amount, PD, LGD, tenor)
+      // We need to find the exposure ID from the database
+      const exposures = await PortfolioClient.getExposures();
+      const exposure = exposures.find(e => e.exposure_id === editingEntry.id);
+      
+      if (exposure) {
+        await PortfolioClient.updateExposure(exposure.id, {
+          amount_pkr: editingEntry.amount,
+          probability_of_default: editingEntry.probabilityOfDefault,
+          loss_given_default: editingEntry.lossGivenDefault,
+          tenor_months: editingEntry.tenor
+        });
+      }
+      
+      // Update local state
+      setEntries(prev => prev.map(entry => 
+        entry.id === editingEntry.id ? editingEntry : entry
+      ));
+      setEditingEntry(null);
+      
+      toast({
+        title: "Success",
+        description: "Company updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating company:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update company. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteEntry = (id: string) => {
-    setEntries(prev => prev.filter(entry => entry.id !== id));
-    setShowDeleteConfirm(null);
+  const deleteEntry = async (id: string) => {
+    try {
+      setSaving(true);
+      
+      // Find the entry to get the counterparty ID
+      const entryToDelete = entries.find(e => e.id === id);
+      if (!entryToDelete) return;
+      
+      // Delete from database
+      if (entryToDelete.counterpartyId) {
+        // Delete the counterparty (this will cascade delete the exposure due to foreign key)
+        const { error } = await supabase
+          .from('counterparties')
+          .delete()
+          .eq('id', entryToDelete.counterpartyId);
+          
+        if (error) throw error;
+      }
+      
+      // Update local state
+      setEntries(prev => prev.filter(entry => entry.id !== id));
+      setShowDeleteConfirm(null);
+      
+      toast({
+        title: "Success",
+        description: "Company deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting company:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete company. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelEdit = () => {
@@ -307,7 +438,9 @@ const BankPortfolio: React.FC = () => {
               </div>
 
               {/* Grid of entries */}
-              {filtered.length === 0 ? (
+              {loading ? (
+                <div className="text-center text-muted-foreground py-12">Loading portfolio data...</div>
+              ) : filtered.length === 0 ? (
                 <div className="text-center text-muted-foreground py-12">No companies found.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -448,17 +581,42 @@ const BankPortfolio: React.FC = () => {
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Energy">Energy</SelectItem>
+                      <SelectItem value="Oil & Gas (Upstream, Midstream, Downstream)">Oil & Gas (Upstream, Midstream, Downstream)</SelectItem>
+                      <SelectItem value="Coal Mining">Coal Mining</SelectItem>
+                      <SelectItem value="Power Generation – Fossil Fuel">Power Generation – Fossil Fuel</SelectItem>
+                      <SelectItem value="Power Generation – Renewable">Power Generation – Renewable</SelectItem>
+                      <SelectItem value="Power Transmission & Distribution">Power Transmission & Distribution</SelectItem>
+                      <SelectItem value="Utilities (Integrated)">Utilities (Integrated)</SelectItem>
+                      <SelectItem value="Steel & Iron">Steel & Iron</SelectItem>
+                      <SelectItem value="Cement">Cement</SelectItem>
+                      <SelectItem value="Chemicals & Petrochemicals">Chemicals & Petrochemicals</SelectItem>
+                      <SelectItem value="Fertilizers">Fertilizers</SelectItem>
+                      <SelectItem value="Pulp & Paper">Pulp & Paper</SelectItem>
+                      <SelectItem value="Textile & Apparel">Textile & Apparel</SelectItem>
+                      <SelectItem value="Automotive & Transport Equipment">Automotive & Transport Equipment</SelectItem>
+                      <SelectItem value="Electronics & Machinery">Electronics & Machinery</SelectItem>
+                      <SelectItem value="Aviation">Aviation</SelectItem>
+                      <SelectItem value="Shipping / Marine Transport">Shipping / Marine Transport</SelectItem>
+                      <SelectItem value="Rail Transport">Rail Transport</SelectItem>
+                      <SelectItem value="Road Freight & Logistics">Road Freight & Logistics</SelectItem>
+                      <SelectItem value="Public Transport & Mobility">Public Transport & Mobility</SelectItem>
+                      <SelectItem value="Commercial Real Estate">Commercial Real Estate</SelectItem>
+                      <SelectItem value="Residential Real Estate">Residential Real Estate</SelectItem>
+                      <SelectItem value="Construction & Infrastructure">Construction & Infrastructure</SelectItem>
                       <SelectItem value="Agriculture">Agriculture</SelectItem>
-                      <SelectItem value="Real Estate">Real Estate</SelectItem>
-                      <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="Retail">Retail</SelectItem>
-                      <SelectItem value="Technology">Technology</SelectItem>
-                      <SelectItem value="Healthcare">Healthcare</SelectItem>
-                      <SelectItem value="Financial Services">Financial Services</SelectItem>
-                      <SelectItem value="Transportation">Transportation</SelectItem>
-                      <SelectItem value="Construction">Construction</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="Livestock & Dairy">Livestock & Dairy</SelectItem>
+                      <SelectItem value="Forestry & Logging">Forestry & Logging</SelectItem>
+                      <SelectItem value="Fisheries & Aquaculture">Fisheries & Aquaculture</SelectItem>
+                      <SelectItem value="Food Processing & Packaging">Food Processing & Packaging</SelectItem>
+                      <SelectItem value="Banking / Financial Services">Banking / Financial Services</SelectItem>
+                      <SelectItem value="Insurance & Reinsurance">Insurance & Reinsurance</SelectItem>
+                      <SelectItem value="Asset Management / Investment">Asset Management / Investment</SelectItem>
+                      <SelectItem value="Retail & Consumer Goods">Retail & Consumer Goods</SelectItem>
+                      <SelectItem value="Hospitality & Leisure">Hospitality & Leisure</SelectItem>
+                      <SelectItem value="Healthcare & Pharma">Healthcare & Pharma</SelectItem>
+                      <SelectItem value="Telecom & Data Centers">Telecom & Data Centers</SelectItem>
+                      <SelectItem value="Public Sector & Sovereign">Public Sector & Sovereign</SelectItem>
+                      <SelectItem value="Technology (IT & Cloud)">Technology (IT & Cloud)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -467,24 +625,189 @@ const BankPortfolio: React.FC = () => {
                   <Label htmlFor="geography">Geography *</Label>
                   <Select value={newGeography} onValueChange={setNewGeography}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select country/region" />
+                      <SelectValue placeholder="Select Pakistan or district" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Pakistan">Pakistan</SelectItem>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="Bangladesh">Bangladesh</SelectItem>
-                      <SelectItem value="Sri Lanka">Sri Lanka</SelectItem>
-                      <SelectItem value="Nepal">Nepal</SelectItem>
-                      <SelectItem value="Afghanistan">Afghanistan</SelectItem>
-                      <SelectItem value="China">China</SelectItem>
-                      <SelectItem value="United States">United States</SelectItem>
-                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                      <SelectItem value="Germany">Germany</SelectItem>
-                      <SelectItem value="France">France</SelectItem>
-                      <SelectItem value="Japan">Japan</SelectItem>
-                      <SelectItem value="Australia">Australia</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="__heading_azad_kashmir" disabled>Azad Kashmir</SelectItem>
+                      <SelectItem value="Muzaffarabad">Muzaffarabad</SelectItem>
+                      <SelectItem value="Hattian Bala">Hattian Bala</SelectItem>
+                      <SelectItem value="Neelum">Neelum</SelectItem>
+                      <SelectItem value="Poonch (Rawalakot)">Poonch (Rawalakot)</SelectItem>
+                      <SelectItem value="Bagh">Bagh</SelectItem>
+                      <SelectItem value="Haveli">Haveli</SelectItem>
+                      <SelectItem value="Mirpur">Mirpur</SelectItem>
+                      <SelectItem value="Bhimber">Bhimber</SelectItem>
+                      <SelectItem value="Kotli">Kotli</SelectItem>
+                      <SelectItem value="Sudhnoti">Sudhnoti</SelectItem>
+                      <SelectItem value="__heading_khyber_pakhtunkhwa" disabled>Khyber Pakhtunkhwa</SelectItem>
+                      <SelectItem value="Abbottabad">Abbottabad</SelectItem>
+                      <SelectItem value="Allai">Allai</SelectItem>
+                      <SelectItem value="Battagram">Battagram</SelectItem>
+                      <SelectItem value="Haripur">Haripur</SelectItem>
+                      <SelectItem value="Kolai Palas">Kolai Palas</SelectItem>
+                      <SelectItem value="Torghar">Torghar</SelectItem>
+                      <SelectItem value="Upper Kohistan">Upper Kohistan</SelectItem>
+                      <SelectItem value="Lower Kohistan">Lower Kohistan</SelectItem>
+                      <SelectItem value="Mansehra">Mansehra</SelectItem>
+                      <SelectItem value="Hangu">Hangu</SelectItem>
+                      <SelectItem value="Karak">Karak</SelectItem>
+                      <SelectItem value="Kohat">Kohat</SelectItem>
+                      <SelectItem value="Kurram">Kurram</SelectItem>
+                      <SelectItem value="Orakzai">Orakzai</SelectItem>
+                      <SelectItem value="Bannu">Bannu</SelectItem>
+                      <SelectItem value="Lakki Marwat">Lakki Marwat</SelectItem>
+                      <SelectItem value="North Waziristan">North Waziristan</SelectItem>
+                      <SelectItem value="Khyber">Khyber</SelectItem>
+                      <SelectItem value="Mohmand">Mohmand</SelectItem>
+                      <SelectItem value="Nowshera">Nowshera</SelectItem>
+                      <SelectItem value="Peshawar">Peshawar</SelectItem>
+                      <SelectItem value="Charsadda">Charsadda</SelectItem>
+                      <SelectItem value="Dera Ismail Khan">Dera Ismail Khan</SelectItem>
+                      <SelectItem value="Upper South Waziristan">Upper South Waziristan</SelectItem>
+                      <SelectItem value="Lower South Waziristan">Lower South Waziristan</SelectItem>
+                      <SelectItem value="Tank">Tank</SelectItem>
+                      <SelectItem value="Paharpur">Paharpur</SelectItem>
+                      <SelectItem value="Mardan">Mardan</SelectItem>
+                      <SelectItem value="Swabi">Swabi</SelectItem>
+                      <SelectItem value="Upper Chitral">Upper Chitral</SelectItem>
+                      <SelectItem value="Upper Dir">Upper Dir</SelectItem>
+                      <SelectItem value="Lower Chitral">Lower Chitral</SelectItem>
+                      <SelectItem value="Lower Dir">Lower Dir</SelectItem>
+                      <SelectItem value="Malakand">Malakand</SelectItem>
+                      <SelectItem value="Shangla">Shangla</SelectItem>
+                      <SelectItem value="Swat">Swat</SelectItem>
+                      <SelectItem value="Upper Swat">Upper Swat</SelectItem>
+                      <SelectItem value="Bajaur">Bajaur</SelectItem>
+                      <SelectItem value="Buner">Buner</SelectItem>
+                      <SelectItem value="Central Dir">Central Dir</SelectItem>
+                      <SelectItem value="__heading_punjab" disabled>Punjab</SelectItem>
+                      <SelectItem value="Attock">Attock</SelectItem>
+                      <SelectItem value="Bahawalnagar">Bahawalnagar</SelectItem>
+                      <SelectItem value="Bahawalpur">Bahawalpur</SelectItem>
+                      <SelectItem value="Bhakkar">Bhakkar</SelectItem>
+                      <SelectItem value="Chakwal">Chakwal</SelectItem>
+                      <SelectItem value="Chiniot">Chiniot</SelectItem>
+                      <SelectItem value="Dera Ghazi Khan">Dera Ghazi Khan</SelectItem>
+                      <SelectItem value="Faisalabad">Faisalabad</SelectItem>
+                      <SelectItem value="Gujranwala">Gujranwala</SelectItem>
+                      <SelectItem value="Gujrat">Gujrat</SelectItem>
+                      <SelectItem value="Hafizabad">Hafizabad</SelectItem>
+                      <SelectItem value="Jhang">Jhang</SelectItem>
+                      <SelectItem value="Jhelum">Jhelum</SelectItem>
+                      <SelectItem value="Kasur">Kasur</SelectItem>
+                      <SelectItem value="Khanewal">Khanewal</SelectItem>
+                      <SelectItem value="Khushab">Khushab</SelectItem>
+                      <SelectItem value="Lahore">Lahore</SelectItem>
+                      <SelectItem value="Layyah">Layyah</SelectItem>
+                      <SelectItem value="Lodhran">Lodhran</SelectItem>
+                      <SelectItem value="Mandi Bahauddin">Mandi Bahauddin</SelectItem>
+                      <SelectItem value="Mianwali">Mianwali</SelectItem>
+                      <SelectItem value="Multan">Multan</SelectItem>
+                      <SelectItem value="Muzaffargarh">Muzaffargarh</SelectItem>
+                      <SelectItem value="Nankana Sahib">Nankana Sahib</SelectItem>
+                      <SelectItem value="Narowal">Narowal</SelectItem>
+                      <SelectItem value="Okara">Okara</SelectItem>
+                      <SelectItem value="Pakpattan">Pakpattan</SelectItem>
+                      <SelectItem value="Rahim Yar Khan">Rahim Yar Khan</SelectItem>
+                      <SelectItem value="Rajanpur">Rajanpur</SelectItem>
+                      <SelectItem value="Rawalpindi">Rawalpindi</SelectItem>
+                      <SelectItem value="Sahiwal">Sahiwal</SelectItem>
+                      <SelectItem value="Sargodha">Sargodha</SelectItem>
+                      <SelectItem value="Sheikhupura">Sheikhupura</SelectItem>
+                      <SelectItem value="Sialkot">Sialkot</SelectItem>
+                      <SelectItem value="Toba Tek Singh">Toba Tek Singh</SelectItem>
+                      <SelectItem value="Vehari">Vehari</SelectItem>
+                      <SelectItem value="Talagang">Talagang</SelectItem>
+                      <SelectItem value="Murree">Murree</SelectItem>
+                      <SelectItem value="Taunsa">Taunsa</SelectItem>
+                      <SelectItem value="Kot Addu">Kot Addu</SelectItem>
+                      <SelectItem value="Wazirabad">Wazirabad</SelectItem>
+                      <SelectItem value="__heading_sindh" disabled>Sindh</SelectItem>
+                      <SelectItem value="Badin">Badin</SelectItem>
+                      <SelectItem value="Dadu">Dadu</SelectItem>
+                      <SelectItem value="Ghotki">Ghotki</SelectItem>
+                      <SelectItem value="Hyderabad">Hyderabad</SelectItem>
+                      <SelectItem value="Jacobabad">Jacobabad</SelectItem>
+                      <SelectItem value="Jamshoro">Jamshoro</SelectItem>
+                      <SelectItem value="Karachi Central">Karachi Central</SelectItem>
+                      <SelectItem value="Karachi East">Karachi East</SelectItem>
+                      <SelectItem value="Karachi South">Karachi South</SelectItem>
+                      <SelectItem value="Karachi West">Karachi West</SelectItem>
+                      <SelectItem value="Kashmore">Kashmore</SelectItem>
+                      <SelectItem value="Keamari">Keamari</SelectItem>
+                      <SelectItem value="Khairpur">Khairpur</SelectItem>
+                      <SelectItem value="Korangi">Korangi</SelectItem>
+                      <SelectItem value="Larkana">Larkana</SelectItem>
+                      <SelectItem value="Malir">Malir</SelectItem>
+                      <SelectItem value="Matiari">Matiari</SelectItem>
+                      <SelectItem value="Mirpur Khas">Mirpur Khas</SelectItem>
+                      <SelectItem value="Naushahro Feroze">Naushahro Feroze</SelectItem>
+                      <SelectItem value="Qambar Shahdadkot">Qambar Shahdadkot</SelectItem>
+                      <SelectItem value="Sanghar">Sanghar</SelectItem>
+                      <SelectItem value="Shaheed Benazirabad">Shaheed Benazirabad</SelectItem>
+                      <SelectItem value="Shikarpur">Shikarpur</SelectItem>
+                      <SelectItem value="Sujawal">Sujawal</SelectItem>
+                      <SelectItem value="Sukkur">Sukkur</SelectItem>
+                      <SelectItem value="Tando Allahyar">Tando Allahyar</SelectItem>
+                      <SelectItem value="Tando Muhammad Khan">Tando Muhammad Khan</SelectItem>
+                      <SelectItem value="Tharparkar">Tharparkar</SelectItem>
+                      <SelectItem value="Thatta">Thatta</SelectItem>
+                      <SelectItem value="Umerkot">Umerkot</SelectItem>
+                      <SelectItem value="__heading_capital_territory" disabled>Capital Territory</SelectItem>
+                      <SelectItem value="Islamabad">Islamabad</SelectItem>
+                      <SelectItem value="__heading_gilgit_baltistan" disabled>Gilgit-Baltistan</SelectItem>
+                      <SelectItem value="Gilgit">Gilgit</SelectItem>
+                      <SelectItem value="Hunza">Hunza</SelectItem>
+                      <SelectItem value="Nagar">Nagar</SelectItem>
+                      <SelectItem value="Ghizer">Ghizer</SelectItem>
+                      <SelectItem value="Gupis–Yasin">Gupis–Yasin</SelectItem>
+                      <SelectItem value="Astore">Astore</SelectItem>
+                      <SelectItem value="Diamer">Diamer</SelectItem>
+                      <SelectItem value="Darel">Darel</SelectItem>
+                      <SelectItem value="Tangir">Tangir</SelectItem>
+                      <SelectItem value="Skardu">Skardu</SelectItem>
+                      <SelectItem value="Shigar">Shigar</SelectItem>
+                      <SelectItem value="Kharmang">Kharmang</SelectItem>
+                      <SelectItem value="Ghanche">Ghanche</SelectItem>
+                      <SelectItem value="Roundu">Roundu</SelectItem>
+                      <SelectItem value="__heading_balochistan" disabled>Balochistan</SelectItem>
+                      <SelectItem value="Awaran">Awaran</SelectItem>
+                      <SelectItem value="Hub">Hub</SelectItem>
+                      <SelectItem value="Lasbela">Lasbela</SelectItem>
+                      <SelectItem value="Surab">Surab</SelectItem>
+                      <SelectItem value="Mastung">Mastung</SelectItem>
+                      <SelectItem value="Khuzdar">Khuzdar</SelectItem>
+                      <SelectItem value="Kalat">Kalat</SelectItem>
+                      <SelectItem value="Chaman">Chaman</SelectItem>
+                      <SelectItem value="Pishin">Pishin</SelectItem>
+                      <SelectItem value="Quetta">Quetta</SelectItem>
+                      <SelectItem value="Qila Abdullah">Qila Abdullah</SelectItem>
+                      <SelectItem value="Sohbatpur">Sohbatpur</SelectItem>
+                      <SelectItem value="Nasirabad">Nasirabad</SelectItem>
+                      <SelectItem value="Usta Muhammad">Usta Muhammad</SelectItem>
+                      <SelectItem value="Jafarabad">Jafarabad</SelectItem>
+                      <SelectItem value="Jhal Magsi">Jhal Magsi</SelectItem>
+                      <SelectItem value="Kachhi">Kachhi</SelectItem>
+                      <SelectItem value="Chagai">Chagai</SelectItem>
+                      <SelectItem value="Washuk">Washuk</SelectItem>
+                      <SelectItem value="Kharan">Kharan</SelectItem>
+                      <SelectItem value="Nushki">Nushki</SelectItem>
+                      <SelectItem value="Ziarat">Ziarat</SelectItem>
+                      <SelectItem value="Harnai">Harnai</SelectItem>
+                      <SelectItem value="Kohlu">Kohlu</SelectItem>
+                      <SelectItem value="Dera Bugti">Dera Bugti</SelectItem>
+                      <SelectItem value="Sibi">Sibi</SelectItem>
+                      <SelectItem value="Barkhan">Barkhan</SelectItem>
+                      <SelectItem value="Duki">Duki</SelectItem>
+                      <SelectItem value="Musakhel">Musakhel</SelectItem>
+                      <SelectItem value="Loralai">Loralai</SelectItem>
+                      <SelectItem value="Panjgur">Panjgur</SelectItem>
+                      <SelectItem value="Gwadar">Gwadar</SelectItem>
+                      <SelectItem value="Kech">Kech</SelectItem>
+                      <SelectItem value="Zhob">Zhob</SelectItem>
+                      <SelectItem value="Qilla Saifullah">Qilla Saifullah</SelectItem>
+                      <SelectItem value="Sherani">Sherani</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -533,7 +856,9 @@ const BankPortfolio: React.FC = () => {
                   />
                 </div>
                 
-                <Button onClick={addEntry} className="w-full">Add Company</Button>
+                <Button onClick={addEntry} className="w-full" disabled={saving}>
+                  {saving ? 'Adding...' : 'Add Company'}
+                </Button>
                 
                 <Separator />
                 
@@ -647,17 +972,42 @@ const BankPortfolio: React.FC = () => {
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Energy">Energy</SelectItem>
+                      <SelectItem value="Oil & Gas (Upstream, Midstream, Downstream)">Oil & Gas (Upstream, Midstream, Downstream)</SelectItem>
+                      <SelectItem value="Coal Mining">Coal Mining</SelectItem>
+                      <SelectItem value="Power Generation – Fossil Fuel">Power Generation – Fossil Fuel</SelectItem>
+                      <SelectItem value="Power Generation – Renewable">Power Generation – Renewable</SelectItem>
+                      <SelectItem value="Power Transmission & Distribution">Power Transmission & Distribution</SelectItem>
+                      <SelectItem value="Utilities (Integrated)">Utilities (Integrated)</SelectItem>
+                      <SelectItem value="Steel & Iron">Steel & Iron</SelectItem>
+                      <SelectItem value="Cement">Cement</SelectItem>
+                      <SelectItem value="Chemicals & Petrochemicals">Chemicals & Petrochemicals</SelectItem>
+                      <SelectItem value="Fertilizers">Fertilizers</SelectItem>
+                      <SelectItem value="Pulp & Paper">Pulp & Paper</SelectItem>
+                      <SelectItem value="Textile & Apparel">Textile & Apparel</SelectItem>
+                      <SelectItem value="Automotive & Transport Equipment">Automotive & Transport Equipment</SelectItem>
+                      <SelectItem value="Electronics & Machinery">Electronics & Machinery</SelectItem>
+                      <SelectItem value="Aviation">Aviation</SelectItem>
+                      <SelectItem value="Shipping / Marine Transport">Shipping / Marine Transport</SelectItem>
+                      <SelectItem value="Rail Transport">Rail Transport</SelectItem>
+                      <SelectItem value="Road Freight & Logistics">Road Freight & Logistics</SelectItem>
+                      <SelectItem value="Public Transport & Mobility">Public Transport & Mobility</SelectItem>
+                      <SelectItem value="Commercial Real Estate">Commercial Real Estate</SelectItem>
+                      <SelectItem value="Residential Real Estate">Residential Real Estate</SelectItem>
+                      <SelectItem value="Construction & Infrastructure">Construction & Infrastructure</SelectItem>
                       <SelectItem value="Agriculture">Agriculture</SelectItem>
-                      <SelectItem value="Real Estate">Real Estate</SelectItem>
-                      <SelectItem value="Manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="Retail">Retail</SelectItem>
-                      <SelectItem value="Technology">Technology</SelectItem>
-                      <SelectItem value="Healthcare">Healthcare</SelectItem>
-                      <SelectItem value="Financial Services">Financial Services</SelectItem>
-                      <SelectItem value="Transportation">Transportation</SelectItem>
-                      <SelectItem value="Construction">Construction</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="Livestock & Dairy">Livestock & Dairy</SelectItem>
+                      <SelectItem value="Forestry & Logging">Forestry & Logging</SelectItem>
+                      <SelectItem value="Fisheries & Aquaculture">Fisheries & Aquaculture</SelectItem>
+                      <SelectItem value="Food Processing & Packaging">Food Processing & Packaging</SelectItem>
+                      <SelectItem value="Banking / Financial Services">Banking / Financial Services</SelectItem>
+                      <SelectItem value="Insurance & Reinsurance">Insurance & Reinsurance</SelectItem>
+                      <SelectItem value="Asset Management / Investment">Asset Management / Investment</SelectItem>
+                      <SelectItem value="Retail & Consumer Goods">Retail & Consumer Goods</SelectItem>
+                      <SelectItem value="Hospitality & Leisure">Hospitality & Leisure</SelectItem>
+                      <SelectItem value="Healthcare & Pharma">Healthcare & Pharma</SelectItem>
+                      <SelectItem value="Telecom & Data Centers">Telecom & Data Centers</SelectItem>
+                      <SelectItem value="Public Sector & Sovereign">Public Sector & Sovereign</SelectItem>
+                      <SelectItem value="Technology (IT & Cloud)">Technology (IT & Cloud)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -666,24 +1016,189 @@ const BankPortfolio: React.FC = () => {
                   <Label htmlFor="edit-geography">Geography *</Label>
                   <Select value={editingEntry.geography} onValueChange={(value) => setEditingEntry({...editingEntry, geography: value})}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select country/region" />
+                      <SelectValue placeholder="Select Pakistan or district" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Pakistan">Pakistan</SelectItem>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="Bangladesh">Bangladesh</SelectItem>
-                      <SelectItem value="Sri Lanka">Sri Lanka</SelectItem>
-                      <SelectItem value="Nepal">Nepal</SelectItem>
-                      <SelectItem value="Afghanistan">Afghanistan</SelectItem>
-                      <SelectItem value="China">China</SelectItem>
-                      <SelectItem value="United States">United States</SelectItem>
-                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                      <SelectItem value="Germany">Germany</SelectItem>
-                      <SelectItem value="France">France</SelectItem>
-                      <SelectItem value="Japan">Japan</SelectItem>
-                      <SelectItem value="Australia">Australia</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      <SelectItem value="__heading_azad_kashmir" disabled>Azad Kashmir</SelectItem>
+                      <SelectItem value="Muzaffarabad">Muzaffarabad</SelectItem>
+                      <SelectItem value="Hattian Bala">Hattian Bala</SelectItem>
+                      <SelectItem value="Neelum">Neelum</SelectItem>
+                      <SelectItem value="Poonch (Rawalakot)">Poonch (Rawalakot)</SelectItem>
+                      <SelectItem value="Bagh">Bagh</SelectItem>
+                      <SelectItem value="Haveli">Haveli</SelectItem>
+                      <SelectItem value="Mirpur">Mirpur</SelectItem>
+                      <SelectItem value="Bhimber">Bhimber</SelectItem>
+                      <SelectItem value="Kotli">Kotli</SelectItem>
+                      <SelectItem value="Sudhnoti">Sudhnoti</SelectItem>
+                      <SelectItem value="__heading_khyber_pakhtunkhwa" disabled>Khyber Pakhtunkhwa</SelectItem>
+                      <SelectItem value="Abbottabad">Abbottabad</SelectItem>
+                      <SelectItem value="Allai">Allai</SelectItem>
+                      <SelectItem value="Battagram">Battagram</SelectItem>
+                      <SelectItem value="Haripur">Haripur</SelectItem>
+                      <SelectItem value="Kolai Palas">Kolai Palas</SelectItem>
+                      <SelectItem value="Torghar">Torghar</SelectItem>
+                      <SelectItem value="Upper Kohistan">Upper Kohistan</SelectItem>
+                      <SelectItem value="Lower Kohistan">Lower Kohistan</SelectItem>
+                      <SelectItem value="Mansehra">Mansehra</SelectItem>
+                      <SelectItem value="Hangu">Hangu</SelectItem>
+                      <SelectItem value="Karak">Karak</SelectItem>
+                      <SelectItem value="Kohat">Kohat</SelectItem>
+                      <SelectItem value="Kurram">Kurram</SelectItem>
+                      <SelectItem value="Orakzai">Orakzai</SelectItem>
+                      <SelectItem value="Bannu">Bannu</SelectItem>
+                      <SelectItem value="Lakki Marwat">Lakki Marwat</SelectItem>
+                      <SelectItem value="North Waziristan">North Waziristan</SelectItem>
+                      <SelectItem value="Khyber">Khyber</SelectItem>
+                      <SelectItem value="Mohmand">Mohmand</SelectItem>
+                      <SelectItem value="Nowshera">Nowshera</SelectItem>
+                      <SelectItem value="Peshawar">Peshawar</SelectItem>
+                      <SelectItem value="Charsadda">Charsadda</SelectItem>
+                      <SelectItem value="Dera Ismail Khan">Dera Ismail Khan</SelectItem>
+                      <SelectItem value="Upper South Waziristan">Upper South Waziristan</SelectItem>
+                      <SelectItem value="Lower South Waziristan">Lower South Waziristan</SelectItem>
+                      <SelectItem value="Tank">Tank</SelectItem>
+                      <SelectItem value="Paharpur">Paharpur</SelectItem>
+                      <SelectItem value="Mardan">Mardan</SelectItem>
+                      <SelectItem value="Swabi">Swabi</SelectItem>
+                      <SelectItem value="Upper Chitral">Upper Chitral</SelectItem>
+                      <SelectItem value="Upper Dir">Upper Dir</SelectItem>
+                      <SelectItem value="Lower Chitral">Lower Chitral</SelectItem>
+                      <SelectItem value="Lower Dir">Lower Dir</SelectItem>
+                      <SelectItem value="Malakand">Malakand</SelectItem>
+                      <SelectItem value="Shangla">Shangla</SelectItem>
+                      <SelectItem value="Swat">Swat</SelectItem>
+                      <SelectItem value="Upper Swat">Upper Swat</SelectItem>
+                      <SelectItem value="Bajaur">Bajaur</SelectItem>
+                      <SelectItem value="Buner">Buner</SelectItem>
+                      <SelectItem value="Central Dir">Central Dir</SelectItem>
+                      <SelectItem value="__heading_punjab" disabled>Punjab</SelectItem>
+                      <SelectItem value="Attock">Attock</SelectItem>
+                      <SelectItem value="Bahawalnagar">Bahawalnagar</SelectItem>
+                      <SelectItem value="Bahawalpur">Bahawalpur</SelectItem>
+                      <SelectItem value="Bhakkar">Bhakkar</SelectItem>
+                      <SelectItem value="Chakwal">Chakwal</SelectItem>
+                      <SelectItem value="Chiniot">Chiniot</SelectItem>
+                      <SelectItem value="Dera Ghazi Khan">Dera Ghazi Khan</SelectItem>
+                      <SelectItem value="Faisalabad">Faisalabad</SelectItem>
+                      <SelectItem value="Gujranwala">Gujranwala</SelectItem>
+                      <SelectItem value="Gujrat">Gujrat</SelectItem>
+                      <SelectItem value="Hafizabad">Hafizabad</SelectItem>
+                      <SelectItem value="Jhang">Jhang</SelectItem>
+                      <SelectItem value="Jhelum">Jhelum</SelectItem>
+                      <SelectItem value="Kasur">Kasur</SelectItem>
+                      <SelectItem value="Khanewal">Khanewal</SelectItem>
+                      <SelectItem value="Khushab">Khushab</SelectItem>
+                      <SelectItem value="Lahore">Lahore</SelectItem>
+                      <SelectItem value="Layyah">Layyah</SelectItem>
+                      <SelectItem value="Lodhran">Lodhran</SelectItem>
+                      <SelectItem value="Mandi Bahauddin">Mandi Bahauddin</SelectItem>
+                      <SelectItem value="Mianwali">Mianwali</SelectItem>
+                      <SelectItem value="Multan">Multan</SelectItem>
+                      <SelectItem value="Muzaffargarh">Muzaffargarh</SelectItem>
+                      <SelectItem value="Nankana Sahib">Nankana Sahib</SelectItem>
+                      <SelectItem value="Narowal">Narowal</SelectItem>
+                      <SelectItem value="Okara">Okara</SelectItem>
+                      <SelectItem value="Pakpattan">Pakpattan</SelectItem>
+                      <SelectItem value="Rahim Yar Khan">Rahim Yar Khan</SelectItem>
+                      <SelectItem value="Rajanpur">Rajanpur</SelectItem>
+                      <SelectItem value="Rawalpindi">Rawalpindi</SelectItem>
+                      <SelectItem value="Sahiwal">Sahiwal</SelectItem>
+                      <SelectItem value="Sargodha">Sargodha</SelectItem>
+                      <SelectItem value="Sheikhupura">Sheikhupura</SelectItem>
+                      <SelectItem value="Sialkot">Sialkot</SelectItem>
+                      <SelectItem value="Toba Tek Singh">Toba Tek Singh</SelectItem>
+                      <SelectItem value="Vehari">Vehari</SelectItem>
+                      <SelectItem value="Talagang">Talagang</SelectItem>
+                      <SelectItem value="Murree">Murree</SelectItem>
+                      <SelectItem value="Taunsa">Taunsa</SelectItem>
+                      <SelectItem value="Kot Addu">Kot Addu</SelectItem>
+                      <SelectItem value="Wazirabad">Wazirabad</SelectItem>
+                      <SelectItem value="__heading_sindh" disabled>Sindh</SelectItem>
+                      <SelectItem value="Badin">Badin</SelectItem>
+                      <SelectItem value="Dadu">Dadu</SelectItem>
+                      <SelectItem value="Ghotki">Ghotki</SelectItem>
+                      <SelectItem value="Hyderabad">Hyderabad</SelectItem>
+                      <SelectItem value="Jacobabad">Jacobabad</SelectItem>
+                      <SelectItem value="Jamshoro">Jamshoro</SelectItem>
+                      <SelectItem value="Karachi Central">Karachi Central</SelectItem>
+                      <SelectItem value="Karachi East">Karachi East</SelectItem>
+                      <SelectItem value="Karachi South">Karachi South</SelectItem>
+                      <SelectItem value="Karachi West">Karachi West</SelectItem>
+                      <SelectItem value="Kashmore">Kashmore</SelectItem>
+                      <SelectItem value="Keamari">Keamari</SelectItem>
+                      <SelectItem value="Khairpur">Khairpur</SelectItem>
+                      <SelectItem value="Korangi">Korangi</SelectItem>
+                      <SelectItem value="Larkana">Larkana</SelectItem>
+                      <SelectItem value="Malir">Malir</SelectItem>
+                      <SelectItem value="Matiari">Matiari</SelectItem>
+                      <SelectItem value="Mirpur Khas">Mirpur Khas</SelectItem>
+                      <SelectItem value="Naushahro Feroze">Naushahro Feroze</SelectItem>
+                      <SelectItem value="Qambar Shahdadkot">Qambar Shahdadkot</SelectItem>
+                      <SelectItem value="Sanghar">Sanghar</SelectItem>
+                      <SelectItem value="Shaheed Benazirabad">Shaheed Benazirabad</SelectItem>
+                      <SelectItem value="Shikarpur">Shikarpur</SelectItem>
+                      <SelectItem value="Sujawal">Sujawal</SelectItem>
+                      <SelectItem value="Sukkur">Sukkur</SelectItem>
+                      <SelectItem value="Tando Allahyar">Tando Allahyar</SelectItem>
+                      <SelectItem value="Tando Muhammad Khan">Tando Muhammad Khan</SelectItem>
+                      <SelectItem value="Tharparkar">Tharparkar</SelectItem>
+                      <SelectItem value="Thatta">Thatta</SelectItem>
+                      <SelectItem value="Umerkot">Umerkot</SelectItem>
+                      <SelectItem value="__heading_capital_territory" disabled>Capital Territory</SelectItem>
+                      <SelectItem value="Islamabad">Islamabad</SelectItem>
+                      <SelectItem value="__heading_gilgit_baltistan" disabled>Gilgit-Baltistan</SelectItem>
+                      <SelectItem value="Gilgit">Gilgit</SelectItem>
+                      <SelectItem value="Hunza">Hunza</SelectItem>
+                      <SelectItem value="Nagar">Nagar</SelectItem>
+                      <SelectItem value="Ghizer">Ghizer</SelectItem>
+                      <SelectItem value="Gupis–Yasin">Gupis–Yasin</SelectItem>
+                      <SelectItem value="Astore">Astore</SelectItem>
+                      <SelectItem value="Diamer">Diamer</SelectItem>
+                      <SelectItem value="Darel">Darel</SelectItem>
+                      <SelectItem value="Tangir">Tangir</SelectItem>
+                      <SelectItem value="Skardu">Skardu</SelectItem>
+                      <SelectItem value="Shigar">Shigar</SelectItem>
+                      <SelectItem value="Kharmang">Kharmang</SelectItem>
+                      <SelectItem value="Ghanche">Ghanche</SelectItem>
+                      <SelectItem value="Roundu">Roundu</SelectItem>
+                      <SelectItem value="__heading_balochistan" disabled>Balochistan</SelectItem>
+                      <SelectItem value="Awaran">Awaran</SelectItem>
+                      <SelectItem value="Hub">Hub</SelectItem>
+                      <SelectItem value="Lasbela">Lasbela</SelectItem>
+                      <SelectItem value="Surab">Surab</SelectItem>
+                      <SelectItem value="Mastung">Mastung</SelectItem>
+                      <SelectItem value="Khuzdar">Khuzdar</SelectItem>
+                      <SelectItem value="Kalat">Kalat</SelectItem>
+                      <SelectItem value="Chaman">Chaman</SelectItem>
+                      <SelectItem value="Pishin">Pishin</SelectItem>
+                      <SelectItem value="Quetta">Quetta</SelectItem>
+                      <SelectItem value="Qila Abdullah">Qila Abdullah</SelectItem>
+                      <SelectItem value="Sohbatpur">Sohbatpur</SelectItem>
+                      <SelectItem value="Nasirabad">Nasirabad</SelectItem>
+                      <SelectItem value="Usta Muhammad">Usta Muhammad</SelectItem>
+                      <SelectItem value="Jafarabad">Jafarabad</SelectItem>
+                      <SelectItem value="Jhal Magsi">Jhal Magsi</SelectItem>
+                      <SelectItem value="Kachhi">Kachhi</SelectItem>
+                      <SelectItem value="Chagai">Chagai</SelectItem>
+                      <SelectItem value="Washuk">Washuk</SelectItem>
+                      <SelectItem value="Kharan">Kharan</SelectItem>
+                      <SelectItem value="Nushki">Nushki</SelectItem>
+                      <SelectItem value="Ziarat">Ziarat</SelectItem>
+                      <SelectItem value="Harnai">Harnai</SelectItem>
+                      <SelectItem value="Kohlu">Kohlu</SelectItem>
+                      <SelectItem value="Dera Bugti">Dera Bugti</SelectItem>
+                      <SelectItem value="Sibi">Sibi</SelectItem>
+                      <SelectItem value="Barkhan">Barkhan</SelectItem>
+                      <SelectItem value="Duki">Duki</SelectItem>
+                      <SelectItem value="Musakhel">Musakhel</SelectItem>
+                      <SelectItem value="Loralai">Loralai</SelectItem>
+                      <SelectItem value="Panjgur">Panjgur</SelectItem>
+                      <SelectItem value="Gwadar">Gwadar</SelectItem>
+                      <SelectItem value="Kech">Kech</SelectItem>
+                      <SelectItem value="Zhob">Zhob</SelectItem>
+                      <SelectItem value="Qilla Saifullah">Qilla Saifullah</SelectItem>
+                      <SelectItem value="Sherani">Sherani</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

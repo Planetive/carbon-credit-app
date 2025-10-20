@@ -8,20 +8,13 @@ import {
   ArrowLeft, 
   Play, 
   BarChart3, 
-  Map, 
   TrendingUp, 
-  FileText, 
-  Download,
-  CheckCircle,
   AlertTriangle,
   Clock,
   Building,
-  Factory,
-  Car,
-  Home,
   Briefcase,
-  Landmark,
-  Zap
+  Zap,
+  CheckCircle
 } from 'lucide-react';
 
 // Import separated scenario building logic
@@ -30,41 +23,49 @@ import {
   convertPortfolioToScenario,
   calculateScenarioResults,
   type PortfolioEntry,
-  type ScenarioPortfolioEntry,
-  type ScenarioResult
+  type ScenarioPortfolioEntry
 } from './scenario-building';
 
 const SimpleScenarioBuilding: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [currentView, setCurrentView] = useState<'scenarios' | 'results'>('scenarios');
   const [selectedScenario, setSelectedScenario] = useState<string>('');
-  const [selectedPortfolio, setSelectedPortfolio] = useState<string>('current');
   const [portfolioEntries, setPortfolioEntries] = useState<ScenarioPortfolioEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState<ScenarioResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Get portfolio data from BankPortfolio (passed via navigation state)
   const bankPortfolioData = location.state as PortfolioEntry | PortfolioEntry[] | undefined;
 
   useEffect(() => {
+    console.log('SimpleScenarioBuilding - Received bankPortfolioData:', bankPortfolioData);
+    
     if (bankPortfolioData) {
       // Handle both single entry and array of entries
       const portfolioArray = Array.isArray(bankPortfolioData) ? bankPortfolioData : [bankPortfolioData];
       
+      console.log('SimpleScenarioBuilding - Portfolio array:', portfolioArray);
+      
       if (portfolioArray.length > 0) {
         // Convert BankPortfolio data to Scenario Building format
-        const convertedPortfolio = convertPortfolioToScenario(portfolioArray);
-        setPortfolioEntries(convertedPortfolio);
+        convertPortfolioToScenario(portfolioArray).then(convertedPortfolio => {
+          console.log('SimpleScenarioBuilding - Converted portfolio:', convertedPortfolio);
+          setPortfolioEntries(convertedPortfolio);
+        }).catch(error => {
+          console.error('Error converting portfolio:', error);
+          // Fallback to sample data on error
+          loadSampleData();
+        });
       } else {
         // Fallback to sample data
+        console.log('SimpleScenarioBuilding - Using sample data (empty portfolio)');
         loadSampleData();
       }
     } else {
       // Fallback to sample data
+      console.log('SimpleScenarioBuilding - Using sample data (no portfolio data)');
       loadSampleData();
     }
   }, [bankPortfolioData]);
@@ -118,8 +119,17 @@ const SimpleScenarioBuilding: React.FC = () => {
       }
     ];
     
-    const convertedPortfolio = convertPortfolioToScenario(samplePortfolio);
-    setPortfolioEntries(convertedPortfolio);
+    convertPortfolioToScenario(samplePortfolio).then(convertedPortfolio => {
+      setPortfolioEntries(convertedPortfolio);
+    }).catch(error => {
+      console.error('Error converting sample portfolio:', error);
+      // Fallback to basic portfolio entries
+      setPortfolioEntries(samplePortfolio.map(entry => ({
+        ...entry,
+        assetClass: 'Business Loan',
+        financedEmissions: 0
+      })));
+    });
   };
 
   const runScenario = async () => {
@@ -131,8 +141,6 @@ const SimpleScenarioBuilding: React.FC = () => {
     setIsRunning(true);
     setProgress(0);
     setError(null);
-    setResults(null);
-    setCurrentView('results');
 
     // Simulate API call with progress updates
     const progressInterval = setInterval(() => {
@@ -146,22 +154,177 @@ const SimpleScenarioBuilding: React.FC = () => {
     }, 500);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Use the separated calculation engine - include ALL portfolio entries
-      const calculationParams = {
-        selectedScenario,
-        portfolioEntries,
-        selectedAssetClasses: [], // Include all asset classes
-        selectedSectors: [] // Include all sectors
+      // Transform portfolio entries for backend API
+      const backendPortfolioEntries = portfolioEntries.map(entry => ({
+        id: entry.id,
+        company: entry.company,
+        amount: entry.amount,
+        counterparty: entry.counterparty,
+        sector: entry.sector,
+        geography: entry.geography,
+        probability_of_default: entry.probabilityOfDefault,
+        loss_given_default: entry.lossGivenDefault,
+        tenor: entry.tenor
+      }));
+
+      // Map frontend scenario IDs to backend scenario types
+      const scenarioTypeMap: { [key: string]: string } = {
+        'baseline': 'transition', // Use transition as default for baseline
+        'transition_shock': 'transition',
+        'physical_shock': 'physical',
+        'dual_stress': 'combined'
       };
+
+      const backendScenarioType = scenarioTypeMap[selectedScenario] || 'transition';
+
+      console.log('Frontend - Sending portfolio data to backend:', {
+        portfolioEntriesCount: backendPortfolioEntries.length,
+        entries: backendPortfolioEntries,
+        selectedScenario,
+        backendScenarioType
+      });
+
+      // Call backend API
+      const response = await fetch('http://127.0.0.1:8000/scenario/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario_type: backendScenarioType,
+          portfolio_entries: backendPortfolioEntries
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to calculate scenario';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const backendResults = await response.json();
+
+      // Transform backend results to frontend format
+      const sortedResults = backendResults.results.sort((a, b) => b.loss_increase - a.loss_increase);
+
+      const sectorBreakdown = backendResults.results.reduce((acc, result) => {
+        if (!acc[result.sector]) {
+          acc[result.sector] = {
+            sector: result.sector,
+            amount: 0,
+            estimatedLoss: 0
+          };
+        }
+        acc[result.sector].amount += result.exposure;
+        acc[result.sector].estimatedLoss += result.climate_adjusted_expected_loss;
+        return acc;
+      }, {});
+
+      const sectorBreakdownArray = Object.values(sectorBreakdown).map((sector: any) => ({
+        sector: sector.sector,
+        amount: sector.amount,
+        percentage: (sector.amount / backendResults.total_exposure) * 100,
+        estimatedLoss: sector.estimatedLoss
+      }));
+
+      // Asset Class Breakdown - Use portfolio entries with proper asset class names
+      const assetClassBreakdown = portfolioEntries.reduce((acc, entry) => {
+        if (!acc[entry.assetClass]) {
+          acc[entry.assetClass] = {
+            assetClass: entry.assetClass,
+            amount: 0,
+            estimatedLoss: 0
+          };
+        }
+        acc[entry.assetClass].amount += entry.amount;
+        
+        // Find corresponding backend result for this entry to get estimated loss
+        const backendResult = backendResults.results.find(r => r.company === entry.company);
+        if (backendResult) {
+          acc[entry.assetClass].estimatedLoss += backendResult.climate_adjusted_expected_loss;
+        }
+        return acc;
+      }, {});
+
+      const assetClassBreakdownArray = Object.values(assetClassBreakdown).map((assetClass: any) => ({
+        assetClass: assetClass.assetClass,
+        amount: assetClass.amount,
+        percentage: (assetClass.amount / backendResults.total_exposure) * 100,
+        estimatedLoss: assetClass.estimatedLoss
+      }));
+
+      console.log('Asset Class Breakdown Debug:', {
+        portfolioEntries: portfolioEntries.map(e => ({ company: e.company, assetClass: e.assetClass })),
+        assetClassBreakdown: assetClassBreakdown,
+        assetClassBreakdownArray: assetClassBreakdownArray
+      });
+
+      // Calculate correct total loss percentage
+      const totalLossPercentage = backendResults.total_exposure > 0 
+        ? (backendResults.total_climate_adjusted_expected_loss / backendResults.total_exposure) * 100
+        : 0;
+
+      // Calculate proper risk metrics using actual portfolio data
+      const totalExposure = backendResults.total_exposure || 0;
+      const totalBaselineExpectedLoss = backendResults.total_baseline_expected_loss || 0;
       
-      const results = calculateScenarioResults(calculationParams);
-      setResults(results);
+      // Calculate portfolio-weighted baseline risk from actual data
+      const baselineRisk = totalExposure > 0 ? (totalBaselineExpectedLoss / totalExposure) * 100 : 0;
+      const riskIncreasePercentage = backendResults.total_loss_increase_percentage || 0;
+      const scenarioRisk = baselineRisk + (baselineRisk * riskIncreasePercentage / 100);
+      
+      // Calculate the actual risk increase percentage for display
+      const actualRiskIncrease = baselineRisk > 0 ? ((scenarioRisk - baselineRisk) / baselineRisk) * 100 : 0;
+
+      console.log('Risk Calculation Debug:', {
+        baselineRisk,
+        riskIncreasePercentage,
+        scenarioRisk,
+        totalLossPercentage,
+        backendResults: {
+          total_loss_increase_percentage: backendResults.total_loss_increase_percentage,
+          total_climate_adjusted_expected_loss: backendResults.total_climate_adjusted_expected_loss,
+          total_exposure: backendResults.total_exposure
+        }
+      });
+
+      const results = {
+        scenarioType: backendResults.scenario_type,
+        totalPortfolioValue: backendResults.total_exposure,
+        totalPortfolioLoss: backendResults.total_climate_adjusted_expected_loss,
+        portfolioLossPercentage: totalLossPercentage,
+        baselineRisk: baselineRisk,
+        scenarioRisk: scenarioRisk,
+        riskIncrease: actualRiskIncrease,
+        totalFinancedEmissions: 0, // Add missing property
+        assetClassBreakdown: assetClassBreakdownArray,
+        sectorBreakdown: sectorBreakdownArray,
+        topExposures: sortedResults.map(result => ({
+          company: result.company,
+          sector: result.sector,
+          assetClass: 'Business Loans',
+          amount: result.exposure,
+          baselineRisk: result.baseline_pd,
+          scenarioRisk: result.adjusted_pd,
+          estimatedLoss: result.climate_adjusted_expected_loss
+        }))
+      };
+
+      // Navigate to results page with data
+      navigate('/climate-risk-results', {
+        state: {
+          results,
+          selectedScenario,
+          portfolioEntries
+        }
+      });
       clearInterval(progressInterval);
     } catch (err) {
-      setError('Failed to run scenario analysis');
+      console.error('Scenario calculation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to run scenario analysis');
       clearInterval(progressInterval);
     } finally {
       setIsRunning(false);
@@ -181,274 +344,180 @@ const SimpleScenarioBuilding: React.FC = () => {
     return new Intl.NumberFormat('en-US').format(num);
   };
 
-  // Portfolio options for selection
-  const portfolioOptions = [
-    {
-      id: 'current',
-      name: 'Current Portfolio',
-      description: 'Portfolio data from Bank Portfolio page',
-      count: portfolioEntries.length,
-      totalValue: portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0)
-    },
-    {
-      id: 'sample',
-      name: 'Sample Portfolio',
-      description: 'Demo portfolio with sample data',
-      count: 4,
-      totalValue: 322000000000 // Sample data total
-    },
-    {
-      id: 'upload',
-      name: 'Upload New Dataset',
-      description: 'Upload CSV/Excel file with loan data',
-      count: 0,
-      totalValue: 0
-    }
-  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-12">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Climate Risk Scenario Analysis</h1>
-              <p className="mt-2 text-gray-600">
-                TCFD-compliant climate stress testing for your portfolio
-              </p>
-            </div>
-            <Badge variant="outline" className="text-sm">
-              TCFD Compliant
-            </Badge>
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setCurrentView('scenarios')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'scenarios'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Run Scenarios
-              </button>
-              <button
-                onClick={() => setCurrentView('results')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'results'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                View Results
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Portfolio Summary */}
-        <div className="mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building className="h-5 w-5" />
-                <span>Your Portfolio</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{portfolioEntries.length}</div>
-                  <div className="text-sm text-gray-600">Total Investments</div>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg">
+                  <BarChart3 className="h-8 w-8 text-white" />
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0))}
-                  </div>
-                  <div className="text-sm text-gray-600">Total Portfolio Value</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {formatNumber(portfolioEntries.reduce((sum, entry) => sum + entry.financedEmissions, 0))} tCO₂e
-                  </div>
-                  <div className="text-sm text-gray-600">Financed Emissions</div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                    Climate Risk Analysis
+                  </h1>
+                  <p className="text-xl text-gray-600 mt-2">
+                    Advanced TCFD-compliant climate stress testing
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </div>
+
+
+        {/* Portfolio Summary */}
+        <div className="mb-10">
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl">
+                <Building className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Portfolio Overview</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-600 mb-1">Total Investments</p>
+                    <p className="text-3xl font-bold text-blue-900">{portfolioEntries.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-500 rounded-xl">
+                    <TrendingUp className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-6 border border-emerald-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-emerald-600 mb-1">Portfolio Value</p>
+                    <p className="text-3xl font-bold text-emerald-900">
+                      {formatCurrency(portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0))}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-500 rounded-xl">
+                    <Briefcase className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Main Content */}
-        {currentView === 'scenarios' && (
-          <div className="space-y-6">
-            {/* Portfolio Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Select Portfolio/Dataset</span>
-                </CardTitle>
-                <CardDescription>
-                  Choose which portfolio or dataset to apply the climate scenario to
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {portfolioOptions.map((option) => (
-                    <Card
-                      key={option.id}
-                      className={`cursor-pointer transition-all duration-200 ${
-                        selectedPortfolio === option.id
-                          ? 'ring-2 ring-blue-500 bg-blue-50'
-                          : 'hover:shadow-md'
-                      }`}
-                      onClick={() => {
-                        setSelectedPortfolio(option.id);
-                        if (option.id === 'sample') {
-                          loadSampleData();
-                        }
-                      }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900">{option.name}</h3>
-                            <p className="text-sm text-gray-600 mt-1">{option.description}</p>
-                            <div className="mt-3 space-y-1">
-                              <div className="text-sm">
-                                <span className="font-medium">{option.count}</span> investments
-                              </div>
-                              <div className="text-sm">
-                                <span className="font-medium">{formatCurrency(option.totalValue)}</span> total value
-                              </div>
-                            </div>
-                          </div>
-                          {selectedPortfolio === option.id && (
-                            <CheckCircle className="h-5 w-5 text-blue-600" />
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-                
-                {/* Upload Interface */}
-                {selectedPortfolio === 'upload' && (
-                  <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                    <div className="text-center">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Loan/Investment Data</h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Upload a CSV or Excel file with your loan/investment data
-                      </p>
-                      <div className="space-y-2 text-xs text-gray-500 mb-4">
-                        <div><strong>Required fields:</strong> Company, Amount, Sector, Geography, PD, LGD, Tenor</div>
-                        <div><strong>Supported formats:</strong> CSV, Excel (.xlsx, .xls)</div>
-                        <div><strong>Max file size:</strong> 10MB</div>
-                      </div>
-                      <Button variant="outline" className="mb-2">
-                        <Download className="h-4 w-4 mr-2" />
-                        Choose File
-                      </Button>
-                      <div className="text-xs text-gray-500">
-                        Or drag and drop your file here
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        <div className="space-y-6">
 
             {/* Scenario Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Zap className="h-5 w-5" />
-                  <span>Select Climate Scenario</span>
-                </CardTitle>
-                <CardDescription>
-                  Choose a climate scenario to analyze your portfolio's risk exposure
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {CLIMATE_SCENARIOS.map((scenario) => (
-                    <Card
-                      key={scenario.id}
-                      className={`cursor-pointer transition-all duration-200 ${
-                        selectedScenario === scenario.id
-                          ? 'ring-2 ring-blue-500 bg-blue-50'
-                          : 'hover:shadow-md'
-                      }`}
-                      onClick={() => setSelectedScenario(scenario.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900">{scenario.name}</h3>
-                            <p className="text-sm text-gray-600 mt-1">{scenario.description}</p>
-                            <div className="mt-3">
-                              <Badge variant="outline" className="text-xs">
-                                {scenario.type}
-                              </Badge>
-                            </div>
-                          </div>
-                          {selectedScenario === scenario.id && (
-                            <CheckCircle className="h-5 w-5 text-blue-600" />
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl">
+                  <Zap className="h-6 w-6 text-white" />
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Run Analysis Button */}
-            <div className="text-center">
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-2">Analysis Configuration</h3>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <div><strong>Portfolio:</strong> {portfolioOptions.find(p => p.id === selectedPortfolio)?.name}</div>
-                  <div><strong>Scenario:</strong> {selectedScenario ? CLIMATE_SCENARIOS.find(s => s.id === selectedScenario)?.name : 'Not selected'}</div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Climate Scenarios</h2>
+                  <p className="text-gray-600 mt-1">Select a scenario to analyze your portfolio's climate risk exposure</p>
                 </div>
               </div>
-              
-              <Button
-                onClick={runScenario}
-                disabled={!selectedScenario || !selectedPortfolio || isRunning}
-                size="lg"
-                className="px-8 py-3"
-              >
-                {isRunning ? (
-                  <>
-                    <Clock className="h-4 w-4 mr-2 animate-spin" />
-                    Running Analysis...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Run Climate Risk Analysis
-                  </>
-                )}
-              </Button>
-              
-              {(!selectedScenario || !selectedPortfolio) && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
-                    <span className="text-sm text-yellow-600">
-                      Please select both a portfolio and a scenario to run the analysis
-                    </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {CLIMATE_SCENARIOS.map((scenario) => (
+                  <div
+                    key={scenario.id}
+                    onClick={() => setSelectedScenario(scenario.id)}
+                    className={`group relative p-6 rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+                      selectedScenario === scenario.id
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-2xl ring-4 ring-blue-200'
+                        : 'bg-white/70 hover:bg-white/90 shadow-lg hover:shadow-xl border border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-xl ${
+                          selectedScenario === scenario.id 
+                            ? 'bg-white/20' 
+                            : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                        }`}>
+                          <Zap className={`h-5 w-5 ${
+                            selectedScenario === scenario.id ? 'text-white' : 'text-white'
+                          }`} />
+                        </div>
+                        <h3 className={`font-bold text-lg ${
+                          selectedScenario === scenario.id ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {scenario.name}
+                        </h3>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        selectedScenario === scenario.id
+                          ? 'bg-white/20 text-white'
+                          : scenario.bgColor
+                      }`}>
+                        {scenario.type}
+                      </div>
+                    </div>
+                    <p className={`text-sm leading-relaxed ${
+                      selectedScenario === scenario.id ? 'text-white/90' : 'text-gray-600'
+                    }`}>
+                      {scenario.description}
+                    </p>
+                    {selectedScenario === scenario.id && (
+                      <div className="absolute top-4 right-4">
+                        <CheckCircle className="h-6 w-6 text-white" />
+                      </div>
+                    )}
                   </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between space-x-6">
+              <Button
+                variant="outline"
+                onClick={() => navigate(-1)}
+                className="flex items-center space-x-3 px-6 py-3 bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white hover:border-gray-300 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                <span className="font-medium">Back to Portfolio</span>
+              </Button>
+
+              <div className="flex-1 max-w-md">
+                <Button
+                  onClick={runScenario}
+                  disabled={!selectedScenario || isRunning}
+                  size="lg"
+                  className="w-full px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isRunning ? (
+                    <>
+                      <Clock className="h-5 w-5 mr-3 animate-spin" />
+                      Running Analysis...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-5 w-5 mr-3" />
+                      Run Climate Risk Analysis
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {!selectedScenario && (
+              <div className="mt-6 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="p-2 bg-amber-100 rounded-xl">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <span className="text-amber-800 font-medium">
+                    Please select a scenario to run the analysis
+                  </span>
                 </div>
-              )}
+              </div>
+            )}
               
               {error && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -458,221 +527,58 @@ const SimpleScenarioBuilding: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
+        </div>
 
-          </div>
-        )}
-
-        {/* Results View */}
-        {currentView === 'results' && (
-          <div className="space-y-6">
-            {/* Loading State */}
-            {isRunning && (
-              <Card>
-                <CardContent className="p-8">
-                  <div className="text-center">
-                    <div className="mb-6">
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Clock className="h-8 w-8 text-blue-600 animate-spin" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Analyzing Portfolio Risk...</h3>
-                      <p className="text-gray-600 mb-4">
-                        Running climate scenario analysis on your portfolio
-                      </p>
-                    </div>
-                    
-                    <div className="max-w-md mx-auto">
-                      <Progress value={progress} className="h-3 mb-4" />
-                      <div className="flex justify-between text-sm text-gray-600 mb-4">
-                        <span>Processing...</span>
-                        <span>{Math.round(progress)}%</span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{portfolioEntries.length}</div>
-                        <div className="text-sm text-gray-600">Investments</div>
-                      </div>
-                      <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0))}
-                        </div>
-                        <div className="text-sm text-gray-600">Portfolio Value</div>
-                      </div>
-                      <div className="text-center p-4 bg-purple-50 rounded-lg">
-                        <div className="text-2xl font-bold text-purple-600">
-                          {CLIMATE_SCENARIOS.find(s => s.id === selectedScenario)?.name || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600">Scenario</div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 text-sm text-gray-500">
-                      <p>This may take a few moments depending on portfolio size...</p>
-                    </div>
+        {/* Loading State */}
+        {isRunning && (
+          <Card className="mt-10">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <div className="mb-6">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock className="h-8 w-8 text-blue-600 animate-spin" />
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Results Display */}
-            {!isRunning && results && (
-              <div className="space-y-6">
-            {/* Portfolio Summary Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5" />
-                  <span>Portfolio Summary - {results.scenarioType}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Analyzing Portfolio Risk...</h3>
+                  <p className="text-gray-600 mb-4">
+                    Running climate scenario analysis on your portfolio
+                  </p>
+                </div>
+                
+                <div className="max-w-md mx-auto">
+                  <Progress value={progress} className="h-3 mb-4" />
+                  <div className="flex justify-between text-sm text-gray-600 mb-4">
+                    <span>Processing...</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
                   <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(results.totalPortfolioValue)}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Portfolio Value</div>
+                    <div className="text-2xl font-bold text-blue-600">{portfolioEntries.length}</div>
+                    <div className="text-sm text-gray-600">Investments</div>
                   </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">
-                      {formatCurrency(results.totalPortfolioLoss)}
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatCurrency(portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0))}
                     </div>
-                    <div className="text-sm text-gray-600">Expected Loss</div>
-                  </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {results.portfolioLossPercentage.toFixed(2)}%
-                    </div>
-                    <div className="text-sm text-gray-600">Loss Percentage</div>
+                    <div className="text-sm text-gray-600">Portfolio Value</div>
                   </div>
                   <div className="text-center p-4 bg-purple-50 rounded-lg">
                     <div className="text-2xl font-bold text-purple-600">
-                      {formatNumber(results.totalFinancedEmissions)} tCO₂e
+                      {CLIMATE_SCENARIOS.find(s => s.id === selectedScenario)?.name || 'Unknown'}
                     </div>
-                    <div className="text-sm text-gray-600">Financed Emissions</div>
+                    <div className="text-sm text-gray-600">Scenario</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Top Exposures */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  <span>Top Risk Exposures</span>
-                </CardTitle>
-                <CardDescription>
-                  Investments with the highest expected losses under this scenario
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {results.topExposures.slice(0, 5).map((exposure, index) => (
-                    <div key={exposure.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-semibold text-red-600">{index + 1}</span>
-                        </div>
-                        <div>
-                          <div className="font-semibold">{exposure.company}</div>
-                          <div className="text-sm text-gray-600">{exposure.sector} • {exposure.assetClass}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-red-600">
-                          {formatCurrency(exposure.estimatedLoss)}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {formatCurrency(exposure.amount)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Sector Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span>Sector Risk Breakdown</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {results.sectorBreakdown.slice(0, 5).map((sector) => (
-                    <div key={sector.sector} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="font-semibold">{sector.sector}</div>
-                        <div className="text-sm text-gray-600">
-                          {formatCurrency(sector.amount)} • {sector.riskIncrease.toFixed(1)}% risk increase
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-red-600">
-                          {formatCurrency(sector.estimatedLoss)}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Expected Loss
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-                {/* Export Button */}
-                <div className="text-center">
-                  <Button variant="outline" size="lg" className="px-8 py-3">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export TCFD Report
-                  </Button>
+                
+                <div className="mt-6 text-sm text-gray-500">
+                  <p>This may take a few moments depending on portfolio size...</p>
                 </div>
               </div>
-            )}
-
-            {/* No Results State */}
-            {!isRunning && !results && (
-              <Card>
-                <CardContent className="p-8">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <BarChart3 className="h-8 w-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Results Yet</h3>
-                    <p className="text-gray-600 mb-4">
-                      Run a climate scenario analysis to see your portfolio risk results
-                    </p>
-                    <Button 
-                      onClick={() => setCurrentView('scenarios')}
-                      className="px-6 py-2"
-                    >
-                      Go to Scenarios
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Back Button */}
-        <div className="mt-8">
-          <Button
-            variant="outline"
-            onClick={() => navigate(-1)}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Portfolio</span>
-          </Button>
-        </div>
       </div>
     </div>
   );

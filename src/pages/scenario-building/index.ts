@@ -17,30 +17,15 @@ export * from './calculationEngine';
 
 // Re-export commonly used items for convenience
 export {
-  PCAF_ASSET_CLASSES,
-  SECTOR_SEGMENTS,
   CLIMATE_SCENARIOS,
-  SECTOR_TO_ASSET_CLASS_MAPPING,
   DEFAULT_FINANCED_EMISSIONS_BY_SECTOR
 } from './constants';
 
 export {
   convertPortfolioToScenario,
   mapSectorToAssetClass,
-  mapSectorToScenarioSector,
   calculateFinancedEmissions,
-  filterByAssetClasses,
-  filterBySectors,
-  getUniqueAssetClasses,
-  getUniqueSectors,
-  calculateTotalPortfolioValue,
-  calculateTotalFinancedEmissions,
-  groupByAssetClass,
-  groupBySector,
-  sortByAmount,
-  getTopEntries,
-  validatePortfolioEntry,
-  validatePortfolioEntries
+  generateSamplePortfolio
 } from './dataUtils';
 
 export {

@@ -8,7 +8,9 @@
     "build": "node ./node_modules/vite/bin/vite.js build",
     "build:dev": "node ./node_modules/vite/bin/vite.js build --mode development",
     "lint": "eslint .",
-    "preview": "node ./node_modules/vite/bin/vite.js preview"
+    "preview": "node ./node_modules/vite/bin/vite.js preview",
+    "backend": "python -m uvicorn backend.fastapi_app.main:app --reload --host 127.0.0.1 --port 8000",
+    "backend:dev": "cd backend && python -m uvicorn fastapi_app.main:app --reload --host 127.0.0.1 --port 8000"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

@@ -1080,9 +1080,380 @@ export interface Database {
           }
         ]
       }
+      counterparties: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_code: string
+          name: string
+          sector: string
+          geography: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_code: string
+          name: string
+          sector: string
+          geography: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_code?: string
+          name?: string
+          sector?: string
+          geography?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counterparties_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      exposures: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_id: string
+          exposure_id: string
+          amount_pkr: number
+          probability_of_default: number
+          loss_given_default: number
+          tenor_months: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_id: string
+          exposure_id: string
+          amount_pkr: number
+          probability_of_default: number
+          loss_given_default: number
+          tenor_months: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_id?: string
+          exposure_id?: string
+          amount_pkr?: number
+          probability_of_default?: number
+          loss_given_default?: number
+          tenor_months?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exposures_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exposures_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      counterparty_questionnaires: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_id: string
+          corporate_structure: string
+          has_emissions: boolean
+          scope1_emissions: number | null
+          scope2_emissions: number | null
+          scope3_emissions: number | null
+          verification_status: string
+          verifier_name: string | null
+          evic: number | null
+          total_equity_plus_debt: number | null
+          share_price: number | null
+          outstanding_shares: number | null
+          total_debt: number | null
+          minority_interest: number | null
+          preferred_stock: number | null
+          total_equity: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_id: string
+          corporate_structure: string
+          has_emissions: boolean
+          scope1_emissions?: number | null
+          scope2_emissions?: number | null
+          scope3_emissions?: number | null
+          verification_status: string
+          verifier_name?: string | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          share_price?: number | null
+          outstanding_shares?: number | null
+          total_debt?: number | null
+          minority_interest?: number | null
+          preferred_stock?: number | null
+          total_equity?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_id?: string
+          corporate_structure?: string
+          has_emissions?: boolean
+          scope1_emissions?: number | null
+          scope2_emissions?: number | null
+          scope3_emissions?: number | null
+          verification_status?: string
+          verifier_name?: string | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          share_price?: number | null
+          outstanding_shares?: number | null
+          total_debt?: number | null
+          minority_interest?: number | null
+          preferred_stock?: number | null
+          total_equity?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counterparty_questionnaires_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counterparty_questionnaires_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      emission_calculations: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_id: string | null
+          exposure_id: string | null
+          questionnaire_id: string | null
+          calculation_type: string
+          company_type: string
+          formula_id: string
+          inputs: Json
+          results: Json
+          financed_emissions: number
+          attribution_factor: number | null
+          evic: number | null
+          total_equity_plus_debt: number | null
+          status: 'draft' | 'completed' | 'failed'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_id?: string | null
+          exposure_id?: string | null
+          questionnaire_id?: string | null
+          calculation_type: string
+          company_type: string
+          formula_id: string
+          inputs: Json
+          results: Json
+          financed_emissions: number
+          attribution_factor?: number | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          status: 'draft' | 'completed' | 'failed'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_id?: string | null
+          exposure_id?: string | null
+          questionnaire_id?: string | null
+          calculation_type?: string
+          company_type?: string
+          formula_id?: string
+          inputs?: Json
+          results?: Json
+          financed_emissions?: number
+          attribution_factor?: number | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          status?: 'draft' | 'completed' | 'failed'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emission_calculations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emission_calculations_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emission_calculations_exposure_id_fkey"
+            columns: ["exposure_id"]
+            isOneToOne: false
+            referencedRelation: "exposures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emission_calculations_questionnaire_id_fkey"
+            columns: ["questionnaire_id"]
+            isOneToOne: false
+            referencedRelation: "counterparty_questionnaires"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      scenario_runs: {
+        Row: {
+          id: string
+          user_id: string
+          scenario_name: string
+          run_date: string
+          status: 'running' | 'completed' | 'failed'
+          parameters: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          scenario_name: string
+          run_date: string
+          status: 'running' | 'completed' | 'failed'
+          parameters: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          scenario_name?: string
+          run_date?: string
+          status?: 'running' | 'completed' | 'failed'
+          parameters?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenario_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      scenario_results: {
+        Row: {
+          id: string
+          user_id: string
+          scenario_run_id: string
+          counterparty_id: string
+          metrics: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          scenario_run_id: string
+          counterparty_id: string
+          metrics: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          scenario_run_id?: string
+          counterparty_id?: string
+          metrics?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenario_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_results_scenario_run_id_fkey"
+            columns: ["scenario_run_id"]
+            isOneToOne: false
+            referencedRelation: "scenario_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_results_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      v_user_portfolio_totals: {
+        Row: {
+          user_id: string
+          total_finance_emissions: number
+          total_facilitated_emissions: number
+          total_exposure_pkr: number
+          total_counterparties: number
+          total_exposures: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

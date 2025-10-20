@@ -42,3 +42,49 @@ class FacilitatedEmissionResponse(BaseModel):
     result: Optional[CalculationResult] = None
     error: Optional[str] = None
     calculation_id: Optional[str] = None
+
+
+# Scenario Building Models
+class PortfolioEntry(BaseModel):
+    id: str
+    company: str
+    amount: float  # Exposure amount
+    counterparty: str
+    sector: str
+    geography: str
+    probability_of_default: float  # Baseline PD (%)
+    loss_given_default: float  # Baseline LGD (%)
+    tenor: int  # months
+
+
+class ScenarioRequest(BaseModel):
+    scenario_type: Literal["transition", "physical", "combined"]
+    portfolio_entries: List[PortfolioEntry]
+
+
+class ScenarioResult(BaseModel):
+    company: str
+    sector: str
+    exposure: float
+    baseline_pd: float
+    baseline_lgd: float
+    pd_multiplier: float
+    adjusted_pd: float
+    lgd_change: float
+    adjusted_lgd: float
+    climate_adjusted_expected_loss: float
+    baseline_expected_loss: float
+    loss_increase: float
+    loss_increase_percentage: float
+
+
+class ScenarioResponse(BaseModel):
+    success: bool
+    scenario_type: str
+    total_exposure: float
+    total_baseline_expected_loss: float
+    total_climate_adjusted_expected_loss: float
+    total_loss_increase: float
+    total_loss_increase_percentage: float
+    results: List[ScenarioResult]
+    error: Optional[str] = None

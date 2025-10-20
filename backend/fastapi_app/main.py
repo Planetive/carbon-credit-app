@@ -6,8 +6,11 @@ from .models import (
     FinanceEmissionResponse,
     FacilitatedEmissionRequest,
     FacilitatedEmissionResponse,
+    ScenarioRequest,
+    ScenarioResponse,
 )
 from .calculation_engine import CalculationEngine
+from .scenario_engine import ScenarioEngine
 from .database import test_connection, get_supabase_client
 from .finance_models import CompanyType
 import logging
@@ -28,8 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the calculation engine
+# Initialize the calculation engines
 calculation_engine = CalculationEngine()
+scenario_engine = ScenarioEngine()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -138,6 +142,38 @@ def facilitated_emission(req: FacilitatedEmissionRequest) -> FacilitatedEmission
     except Exception as e:
         logger.error(f"Internal error in facilitated emission calculation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal calculation error")
+
+
+@app.post("/scenario/calculate", response_model=ScenarioResponse)
+def calculate_scenario(req: ScenarioRequest) -> ScenarioResponse:
+    """
+    Calculate climate stress testing scenarios using sector-specific multipliers
+    """
+    try:
+        logger.info(f"Calculating {req.scenario_type} scenario for {len(req.portfolio_entries)} portfolio entries")
+        
+        # Validate portfolio entries
+        if not req.portfolio_entries:
+            raise ValueError("Portfolio entries cannot be empty")
+        
+        # Perform scenario calculation
+        result = scenario_engine.calculate_scenario(
+            portfolio_entries=req.portfolio_entries,
+            scenario_type=req.scenario_type
+        )
+        
+        if not result.success:
+            raise ValueError(result.error or "Scenario calculation failed")
+        
+        logger.info(f"Scenario calculation completed successfully. Total loss increase: {result.total_loss_increase_percentage:.2f}%")
+        return result
+        
+    except ValueError as e:
+        logger.error(f"Validation error in scenario calculation: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Internal error in scenario calculation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal scenario calculation error")
 
 
 # Local dev entrypoint: uvicorn backend.fastapi_app.main:app --reload

@@ -4,23 +4,32 @@
  */
 
 import { PortfolioEntry, ScenarioPortfolioEntry } from './types';
-import { SECTOR_TO_ASSET_CLASS_MAPPING, DEFAULT_FINANCED_EMISSIONS_BY_SECTOR } from './constants';
+import { DEFAULT_FINANCED_EMISSIONS_BY_SECTOR } from './constants';
+import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 
 /**
  * Convert BankPortfolio entries to Scenario Building portfolio entries
+ * Now uses real loan types from the database instead of hardcoded mapping
  */
-export function convertPortfolioToScenario(
+export async function convertPortfolioToScenario(
   portfolioEntries: PortfolioEntry[]
-): ScenarioPortfolioEntry[] {
+): Promise<ScenarioPortfolioEntry[]> {
+  // Get loan type mappings from database
+  const loanTypeMap = await PortfolioClient.getLoanTypeMappings();
+  
   return portfolioEntries.map(entry => {
-    const assetClass = mapSectorToAssetClass(entry.sector);
-    const sector = mapSectorToScenarioSector(entry.sector);
+    // Get real asset class from database, fallback to sector-based mapping
+    const realAssetClass = entry.counterpartyId 
+      ? getAssetClassFromLoanType(loanTypeMap.get(entry.counterpartyId) || 'business-loan')
+      : mapSectorToAssetClass(entry.sector);
+    
     const financedEmissions = calculateFinancedEmissions(entry.amount, entry.sector);
     
     console.log('convertPortfolioToScenario - Converting entry:', {
       originalSector: entry.sector,
-      mappedAssetClass: assetClass,
-      mappedSector: sector,
+      counterpartyId: entry.counterpartyId,
+      loanTypeFromDB: loanTypeMap.get(entry.counterpartyId),
+      mappedAssetClass: realAssetClass,
       amount: entry.amount,
       financedEmissions
     });
@@ -29,202 +38,110 @@ export function convertPortfolioToScenario(
       id: entry.id,
       company: entry.company,
       amount: entry.amount,
-      assetClass,
-      sector,
+      counterparty: entry.counterparty,
+      sector: entry.sector,
       geography: entry.geography,
+      probabilityOfDefault: entry.probabilityOfDefault,
+      lossGivenDefault: entry.lossGivenDefault,
+      tenor: entry.tenor,
+      assetClass: realAssetClass,
       financedEmissions
     };
   });
 }
 
 /**
- * Map portfolio sector to PCAF asset class
+ * Map loan type from database to display-friendly asset class name
+ */
+export function getAssetClassFromLoanType(loanType: string): string {
+  const loanTypeLabels: { [key: string]: string } = {
+    'corporate-bond': 'Corporate Bond',
+    'business-loan': 'Business Loan',
+    'project-finance': 'Project Finance',
+    'mortgage': 'Mortgage',
+    'sovereign-debt': 'Sovereign Debt',
+    'motor-vehicle-loan': 'Motor Vehicle Loan',
+    'commercial-real-estate': 'Commercial Real Estate'
+  };
+  
+  return loanTypeLabels[loanType] || 'Business Loan';
+}
+
+/**
+ * Map portfolio sector to simple asset class (fallback for entries without loan type data)
  */
 export function mapSectorToAssetClass(sector: string): string {
-  return SECTOR_TO_ASSET_CLASS_MAPPING[sector] || 'business_loans';
+  // Simple mapping - all business loans for now (fallback)
+  return 'Business Loan';
 }
 
 /**
- * Map portfolio sector to scenario building sector ID
- */
-export function mapSectorToScenarioSector(sector: string): string {
-  const sectorMapping: { [key: string]: string } = {
-    'Energy': 'power_fossil',
-    'Agriculture': 'agriculture',
-    'Real Estate': 'real_estate',
-    'Manufacturing': 'manufacturing',
-    'Retail': 'retail',
-    'Technology': 'manufacturing', // Map to manufacturing for now
-    'Healthcare': 'manufacturing', // Map to manufacturing for now
-    'Financial Services': 'banking_finance',
-    'Transportation': 'transport',
-    'Construction': 'construction',
-    'Other': 'manufacturing' // Default to manufacturing
-  };
-  
-  return sectorMapping[sector] || 'manufacturing';
-}
-
-/**
- * Calculate financed emissions based on amount and sector
+ * Calculate financed emissions for an entry
  */
 export function calculateFinancedEmissions(amount: number, sector: string): number {
-  const emissionFactor = DEFAULT_FINANCED_EMISSIONS_BY_SECTOR[sector] || 0.2;
-  // Convert amount from PKR to millions for calculation
-  const amountInMillions = amount / 1000000;
-  return amountInMillions * emissionFactor;
+  const sectorEmissions = DEFAULT_FINANCED_EMISSIONS_BY_SECTOR[sector] || 0.2;
+  return (amount / 1000000) * sectorEmissions; // Convert to millions
 }
 
 /**
- * Filter portfolio entries by selected asset classes
+ * Generate sample portfolio data for testing
  */
-export function filterByAssetClasses(
-  portfolioEntries: ScenarioPortfolioEntry[],
-  selectedAssetClasses: string[]
-): ScenarioPortfolioEntry[] {
-  if (selectedAssetClasses.length === 0) return portfolioEntries;
-  
-  return portfolioEntries.filter(entry => 
-    selectedAssetClasses.includes(entry.assetClass)
-  );
-}
-
-/**
- * Filter portfolio entries by selected sectors
- */
-export function filterBySectors(
-  portfolioEntries: ScenarioPortfolioEntry[],
-  selectedSectors: string[]
-): ScenarioPortfolioEntry[] {
-  if (selectedSectors.length === 0) return portfolioEntries;
-  
-  return portfolioEntries.filter(entry => 
-    selectedSectors.includes(entry.sector)
-  );
-}
-
-/**
- * Get unique asset classes from portfolio entries
- */
-export function getUniqueAssetClasses(portfolioEntries: ScenarioPortfolioEntry[]): string[] {
-  const assetClasses = new Set(portfolioEntries.map(entry => entry.assetClass));
-  return Array.from(assetClasses);
-}
-
-/**
- * Get unique sectors from portfolio entries
- */
-export function getUniqueSectors(portfolioEntries: ScenarioPortfolioEntry[]): string[] {
-  const sectors = new Set(portfolioEntries.map(entry => entry.sector));
-  return Array.from(sectors);
-}
-
-/**
- * Calculate total portfolio value
- */
-export function calculateTotalPortfolioValue(portfolioEntries: ScenarioPortfolioEntry[]): number {
-  return portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0);
-}
-
-/**
- * Calculate total financed emissions
- */
-export function calculateTotalFinancedEmissions(portfolioEntries: ScenarioPortfolioEntry[]): number {
-  return portfolioEntries.reduce((sum, entry) => sum + entry.financedEmissions, 0);
-}
-
-/**
- * Group portfolio entries by asset class
- */
-export function groupByAssetClass(portfolioEntries: ScenarioPortfolioEntry[]): { [key: string]: ScenarioPortfolioEntry[] } {
-  return portfolioEntries.reduce((groups, entry) => {
-    if (!groups[entry.assetClass]) {
-      groups[entry.assetClass] = [];
+export function generateSamplePortfolio(): PortfolioEntry[] {
+  return [
+    {
+      id: '1',
+      company: 'Acme Manufacturing Ltd.',
+      amount: 70000000000, // 70 billion PKR
+      counterparty: 'ACME001',
+      sector: 'Manufacturing',
+      geography: 'Pakistan',
+      probabilityOfDefault: 2.5,
+      lossGivenDefault: 45,
+      tenor: 36
+    },
+    {
+      id: '2',
+      company: 'Green Energy Corp.',
+      amount: 126000000000, // 126 billion PKR
+      counterparty: 'GREEN001',
+      sector: 'Energy',
+      geography: 'Pakistan',
+      probabilityOfDefault: 1.8,
+      lossGivenDefault: 40,
+      tenor: 60
+    },
+    {
+      id: '3',
+      company: 'Prime Retail Pvt.',
+      amount: 42000000000, // 42 billion PKR
+      counterparty: 'PRIME001',
+      sector: 'Retail',
+      geography: 'Pakistan',
+      probabilityOfDefault: 3.2,
+      lossGivenDefault: 50,
+      tenor: 24
+    },
+    {
+      id: '4',
+      company: 'Tech Solutions Inc.',
+      amount: 28000000000, // 28 billion PKR
+      counterparty: 'TECH001',
+      sector: 'Technology',
+      geography: 'Pakistan',
+      probabilityOfDefault: 2.1,
+      lossGivenDefault: 35,
+      tenor: 48
+    },
+    {
+      id: '5',
+      company: 'AgriCorp Ltd.',
+      amount: 56000000000, // 56 billion PKR
+      counterparty: 'AGRI001',
+      sector: 'Agriculture',
+      geography: 'Pakistan',
+      probabilityOfDefault: 4.0,
+      lossGivenDefault: 55,
+      tenor: 18
     }
-    groups[entry.assetClass].push(entry);
-    return groups;
-  }, {} as { [key: string]: ScenarioPortfolioEntry[] });
-}
-
-/**
- * Group portfolio entries by sector
- */
-export function groupBySector(portfolioEntries: ScenarioPortfolioEntry[]): { [key: string]: ScenarioPortfolioEntry[] } {
-  return portfolioEntries.reduce((groups, entry) => {
-    if (!groups[entry.sector]) {
-      groups[entry.sector] = [];
-    }
-    groups[entry.sector].push(entry);
-    return groups;
-  }, {} as { [key: string]: ScenarioPortfolioEntry[] });
-}
-
-/**
- * Sort portfolio entries by amount (descending)
- */
-export function sortByAmount(portfolioEntries: ScenarioPortfolioEntry[]): ScenarioPortfolioEntry[] {
-  return [...portfolioEntries].sort((a, b) => b.amount - a.amount);
-}
-
-/**
- * Get top N portfolio entries by amount
- */
-export function getTopEntries(portfolioEntries: ScenarioPortfolioEntry[], count: number): ScenarioPortfolioEntry[] {
-  return sortByAmount(portfolioEntries).slice(0, count);
-}
-
-/**
- * Validate portfolio entry
- */
-export function validatePortfolioEntry(entry: ScenarioPortfolioEntry): string[] {
-  const errors: string[] = [];
-  
-  if (!entry.company || entry.company.trim() === '') {
-    errors.push('Company name is required');
-  }
-  
-  if (entry.amount <= 0) {
-    errors.push('Amount must be greater than zero');
-  }
-  
-  if (!entry.assetClass) {
-    errors.push('Asset class is required');
-  }
-  
-  if (!entry.sector) {
-    errors.push('Sector is required');
-  }
-  
-  if (!entry.geography) {
-    errors.push('Geography is required');
-  }
-  
-  if (entry.financedEmissions < 0) {
-    errors.push('Financed emissions cannot be negative');
-  }
-  
-  return errors;
-}
-
-/**
- * Validate portfolio entries array
- */
-export function validatePortfolioEntries(entries: ScenarioPortfolioEntry[]): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  if (entries.length === 0) {
-    errors.push('At least one portfolio entry is required');
-  }
-  
-  entries.forEach((entry, index) => {
-    const entryErrors = validatePortfolioEntry(entry);
-    entryErrors.forEach(error => {
-      errors.push(`Entry ${index + 1}: ${error}`);
-    });
-  });
-  
-  return {
-    valid: errors.length === 0,
-    errors
-  };
+  ];
 }
