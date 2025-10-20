@@ -47,6 +47,12 @@ def health() -> HealthResponse:
     )
 
 
+@app.get("/")
+def root():
+    """Simple root endpoint for testing"""
+    return {"message": "FastAPI backend is running!", "status": "ok"}
+
+
 @app.get("/test-db")
 def test_database():
     """
