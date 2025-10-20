@@ -185,7 +185,8 @@ const SimpleScenarioBuilding: React.FC = () => {
       });
 
       // Call backend API
-      const response = await fetch('http://127.0.0.1:8000/scenario/calculate', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '/api' : 'http://127.0.0.1:8000');
+      const response = await fetch(`${backendUrl}/scenario/calculate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
