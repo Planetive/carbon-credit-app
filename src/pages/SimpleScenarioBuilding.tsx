@@ -38,10 +38,27 @@ const SimpleScenarioBuilding: React.FC = () => {
 
   // Get portfolio data from BankPortfolio (passed via navigation state)
   const bankPortfolioData = location.state as PortfolioEntry | PortfolioEntry[] | undefined;
+  
+  // Check if we're coming back from results page with already converted data
+  const resultsPageData = location.state as { 
+    portfolioEntries?: ScenarioPortfolioEntry[], 
+    selectedScenario?: string 
+  } | undefined;
 
   useEffect(() => {
-    console.log('SimpleScenarioBuilding - Received bankPortfolioData:', bankPortfolioData);
+    console.log('SimpleScenarioBuilding - Received data:', { bankPortfolioData, resultsPageData });
     
+    // If coming back from results page with already converted portfolio data
+    if (resultsPageData?.portfolioEntries) {
+      console.log('SimpleScenarioBuilding - Using portfolio data from results page:', resultsPageData.portfolioEntries);
+      setPortfolioEntries(resultsPageData.portfolioEntries);
+      if (resultsPageData.selectedScenario) {
+        setSelectedScenario(resultsPageData.selectedScenario);
+      }
+      return;
+    }
+    
+    // Original logic for BankPortfolio data
     if (bankPortfolioData) {
       // Handle both single entry and array of entries
       const portfolioArray = Array.isArray(bankPortfolioData) ? bankPortfolioData : [bankPortfolioData];
@@ -68,7 +85,7 @@ const SimpleScenarioBuilding: React.FC = () => {
       console.log('SimpleScenarioBuilding - Using sample data (no portfolio data)');
       loadSampleData();
     }
-  }, [bankPortfolioData]);
+  }, [bankPortfolioData, resultsPageData]);
 
   const loadSampleData = () => {
     // Fallback to sample data if no portfolio data is available

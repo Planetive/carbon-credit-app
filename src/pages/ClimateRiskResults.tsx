@@ -380,7 +380,12 @@ const ClimateRiskResults: React.FC = () => {
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={() => navigate('/scenario-building')}
+                  onClick={() => navigate('/scenario-building', { 
+                    state: { 
+                      portfolioEntries: portfolioEntries,
+                      selectedScenario: selectedScenario 
+                    } 
+                  })}
                   className="w-full flex items-center justify-center space-x-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
