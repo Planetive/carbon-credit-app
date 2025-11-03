@@ -417,49 +417,7 @@ export class PortfolioClient {
     return rows;
   }
 
-  // Get loan type mappings for portfolio entries
-  static async getLoanTypeMappings(): Promise<Map<string, string>> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    const { data: calculationsData, error } = await supabase
-      .from('emission_calculations')
-      .select('counterparty_id, formula_id, results')
-      .eq('user_id', user.id)
-      .eq('calculation_type', 'finance'); // Only finance calculations have loan types
-
-    if (error) throw error;
-
-    const loanTypeMap = new Map<string, string>();
-    
-    calculationsData?.forEach(calc => {
-      if (calc.counterparty_id && calc.formula_id) {
-        // Try to get loan type from results first, fallback to formula_id
-        const loanType = calc.results?.loanType || calc.formula_id;
-        loanTypeMap.set(calc.counterparty_id, loanType);
-      }
-    });
-
-    return loanTypeMap;
-  }
-
-  // Portfolio Totals
-  static async getPortfolioTotals(): Promise<PortfolioTotals | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    const { data: totalsData, error } = await supabase
-      .from('v_user_portfolio_totals')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') return null; // No rows returned
-      throw error;
-    }
-    return totalsData as PortfolioTotals;
-  }
+  
 
   // Bulk operations for BankPortfolio
   static async createCounterpartyWithExposure(
