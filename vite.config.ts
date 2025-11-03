@@ -16,4 +16,22 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1500, // raise limit to avoid noisy warnings
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // split heavy libs so they don’t bloat the main chunk
+          html2canvas: ["html2canvas"],
+          jspdf: ["jspdf"],
+          vendor: [
+            "react",
+            "react-dom",
+            "react-router-dom",
+            "@tanstack/react-query",
+          ],
+        },
+      },
+    },
+  },
 }));
