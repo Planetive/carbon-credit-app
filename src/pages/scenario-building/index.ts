@@ -24,8 +24,7 @@ export {
 export {
   convertPortfolioToScenario,
   mapSectorToAssetClass,
-  calculateFinancedEmissions,
-  generateSamplePortfolio
+  calculateFinancedEmissions
 } from './dataUtils';
 
 export {

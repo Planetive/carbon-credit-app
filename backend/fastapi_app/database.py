@@ -62,7 +62,7 @@ def test_connection() -> bool:
 # Initialize connection on module import
 try:
     get_supabase_client()
-    print("✅ Database connection initialized successfully")
+    print("Database connection initialized successfully")
 except Exception as e:
-    print(f"⚠️  Database connection initialization failed: {e}")
+    print(f"Database connection initialization failed: {e}")
     print("   Make sure to set SUPABASE_SERVICE_ROLE_KEY environment variable")

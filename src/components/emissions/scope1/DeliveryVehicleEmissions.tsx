@@ -20,6 +20,7 @@ import {
 
 interface DeliveryVehicleEmissionsProps {
   onDataChange: (data: DeliveryVehicleRow[]) => void;
+  companyContext?: boolean; // Add company context prop
 }
 
 const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onDataChange }) => {

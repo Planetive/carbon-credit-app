@@ -24,7 +24,6 @@
 import { FormulaConfig } from '../types/formula';
 import { 
   COMMON_INPUTS, 
-  EMISSION_UNIT_OPTIONS,
   calculateAttributionFactor,
   calculateFinancedEmissions
 } from './sharedFormulaUtils';
@@ -44,25 +43,17 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
   name: 'Option 1a - Verified Country Emissions (Sovereign Debt)',
   description: 'Verified GHG emissions of the country, reported by the country to UNFCCC',
   dataQualityScore: 1,
-  category: 'sovereign_debt',
+  category: 'sovereign-debt',
   optionCode: '1a',
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     {
-      name: 'ppp_adjustment_factor',
-      label: 'PPP Adjustment Factor',
-      type: 'number',
-      required: true,
-      unit: 'ratio',
-      description: 'Purchasing Power Parity adjustment factor for the country'
-    },
-    {
-      name: 'gdp',
-      label: 'GDP (Gross Domestic Product)',
+      name: 'pp_adjusted_gdp',
+      label: 'PP-Adjusted GDP',
       type: 'number',
       required: true,
       unit: 'PKR',
-      description: 'Gross Domestic Product of the country in nominal terms'
+      description: 'Purchasing Power Parity-adjusted Gross Domestic Product (nominal GDP)'
     },
     {
       name: 'verified_country_emissions',
@@ -70,23 +61,18 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
       type: 'number',
       required: true,
       unit: 'tCO2e',
-      unitOptions: EMISSION_UNIT_OPTIONS,
-      description: 'Verified GHG emissions of the country, reported by the country to UNFCCC'
+      description: 'Verified GHG emissions of the country (auto-filled from questionnaire: Scope 1 + Scope 2 + Scope 3)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
-    const pppAdjustmentFactor = inputs.ppp_adjustment_factor;
-    const gdp = inputs.gdp;
+    const ppAdjustedGDP = inputs.pp_adjusted_gdp;
     const verifiedCountryEmissions = inputs.verified_country_emissions;
 
-    // Step 1: Calculate PPP-adjusted GDP
-    const pppAdjustedGDP = pppAdjustmentFactor * gdp;
+    // Calculate attribution factor using PP-adjusted GDP
+    const attributionFactor = outstandingAmount / ppAdjustedGDP;
 
-    // Step 2: Calculate attribution factor using PPP-adjusted GDP
-    const attributionFactor = outstandingAmount / pppAdjustedGDP;
-
-    // Step 3: Calculate financed emissions
+    // Calculate financed emissions
     const financedEmissions = attributionFactor * verifiedCountryEmissions;
 
     return {
@@ -97,24 +83,14 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
       methodology: 'PCAF Option 1a - Verified Country Emissions (Sovereign Debt)',
       calculationSteps: [
         {
-          step: 'PPP Adjustment Factor',
-          value: pppAdjustmentFactor,
-          formula: `PPP Adjustment Factor = ${pppAdjustmentFactor.toFixed(4)}`
-        },
-        {
-          step: 'GDP',
-          value: gdp,
-          formula: `GDP = $${gdp.toFixed(2)}`
-        },
-        {
-          step: 'PPP-adjusted GDP',
-          value: pppAdjustedGDP,
-          formula: `${pppAdjustmentFactor.toFixed(4)} × $${gdp.toFixed(2)} = $${pppAdjustedGDP.toFixed(2)}`
+          step: 'PP-Adjusted GDP',
+          value: ppAdjustedGDP,
+          formula: `PP-Adjusted GDP = $${ppAdjustedGDP.toFixed(2)}`
         },
         {
           step: 'Attribution Factor',
           value: attributionFactor,
-          formula: `${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          formula: `${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
           step: 'Verified Country Emissions',
@@ -124,18 +100,16 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)}) × ${verifiedCountryEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `(${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)}) × ${verifiedCountryEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
         }
       ],
       metadata: {
         companyType,
         optionCode: '1a',
-        category: 'sovereign_debt',
-        pppAdjustmentFactor,
-        gdp,
-        pppAdjustedGDP,
+        category: 'sovereign-debt',
+        ppAdjustedGDP,
         verifiedCountryEmissions,
-        formula: 'Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Verified country emissions_c'
+        formula: 'Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Verified country emissions_c'
       }
     };
   },
@@ -143,7 +117,7 @@ export const OPTION_1A_SOVEREIGN_DEBT: FormulaConfig = {
     'Highest data quality score (1)',
     'Requires verified GHG emissions data from UNFCCC',
     'Applicable to all scopes (1, 2, 3)',
-    'Formula: Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Verified country emissions_c'
+    'Formula: Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Verified country emissions_c'
   ]
 };
 
@@ -158,25 +132,17 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
   name: 'Option 1b - Unverified Country Emissions (Sovereign Debt)',
   description: 'Unverified GHG emissions of the country',
   dataQualityScore: 2,
-  category: 'sovereign_debt',
+  category: 'sovereign-debt',
   optionCode: '1b',
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     {
-      name: 'ppp_adjustment_factor',
-      label: 'PPP Adjustment Factor',
-      type: 'number',
-      required: true,
-      unit: 'ratio',
-      description: 'Purchasing Power Parity adjustment factor for the country'
-    },
-    {
-      name: 'gdp',
-      label: 'GDP (Gross Domestic Product)',
+      name: 'pp_adjusted_gdp',
+      label: 'PP-Adjusted GDP',
       type: 'number',
       required: true,
       unit: 'PKR',
-      description: 'Gross Domestic Product of the country in nominal terms'
+      description: 'Purchasing Power Parity-adjusted Gross Domestic Product (nominal GDP)'
     },
     {
       name: 'unverified_country_emissions',
@@ -184,23 +150,18 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
       type: 'number',
       required: true,
       unit: 'tCO2e',
-      unitOptions: EMISSION_UNIT_OPTIONS,
-      description: 'Unverified GHG emissions of the country'
+      description: 'Unverified GHG emissions of the country (auto-filled from questionnaire: Scope 1 + Scope 2 + Scope 3)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
-    const pppAdjustmentFactor = inputs.ppp_adjustment_factor;
-    const gdp = inputs.gdp;
+    const ppAdjustedGDP = inputs.pp_adjusted_gdp;
     const unverifiedCountryEmissions = inputs.unverified_country_emissions;
 
-    // Step 1: Calculate PPP-adjusted GDP
-    const pppAdjustedGDP = pppAdjustmentFactor * gdp;
+    // Calculate attribution factor using PP-adjusted GDP
+    const attributionFactor = outstandingAmount / ppAdjustedGDP;
 
-    // Step 2: Calculate attribution factor using PPP-adjusted GDP
-    const attributionFactor = outstandingAmount / pppAdjustedGDP;
-
-    // Step 3: Calculate financed emissions
+    // Calculate financed emissions
     const financedEmissions = attributionFactor * unverifiedCountryEmissions;
 
     return {
@@ -211,24 +172,14 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
       methodology: 'PCAF Option 1b - Unverified Country Emissions (Sovereign Debt)',
       calculationSteps: [
         {
-          step: 'PPP Adjustment Factor',
-          value: pppAdjustmentFactor,
-          formula: `PPP Adjustment Factor = ${pppAdjustmentFactor.toFixed(4)}`
-        },
-        {
-          step: 'GDP',
-          value: gdp,
-          formula: `GDP = $${gdp.toFixed(2)}`
-        },
-        {
-          step: 'PPP-adjusted GDP',
-          value: pppAdjustedGDP,
-          formula: `${pppAdjustmentFactor.toFixed(4)} × $${gdp.toFixed(2)} = $${pppAdjustedGDP.toFixed(2)}`
+          step: 'PP-Adjusted GDP',
+          value: ppAdjustedGDP,
+          formula: `PP-Adjusted GDP = $${ppAdjustedGDP.toFixed(2)}`
         },
         {
           step: 'Attribution Factor',
           value: attributionFactor,
-          formula: `${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          formula: `${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
           step: 'Unverified Country Emissions',
@@ -238,18 +189,16 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)}) × ${unverifiedCountryEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `(${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)}) × ${unverifiedCountryEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
         }
       ],
       metadata: {
         companyType,
         optionCode: '1b',
-        category: 'sovereign_debt',
-        pppAdjustmentFactor,
-        gdp,
-        pppAdjustedGDP,
+        category: 'sovereign-debt',
+        ppAdjustedGDP,
         unverifiedCountryEmissions,
-        formula: 'Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Unverified country emissions_c'
+        formula: 'Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Unverified country emissions_c'
       }
     };
   },
@@ -257,7 +206,7 @@ export const OPTION_1B_SOVEREIGN_DEBT: FormulaConfig = {
     'Good data quality score (2)',
     'Requires unverified GHG emissions data',
     'Applicable to all scopes (1, 2, 3)',
-    'Formula: Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Unverified country emissions_c'
+    'Formula: Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Unverified country emissions_c'
   ]
 };
 
@@ -272,60 +221,39 @@ export const OPTION_2A_SOVEREIGN_DEBT: FormulaConfig = {
   name: 'Option 2a - Energy Consumption Data (Sovereign Debt)',
   description: 'Primary physical activity data of the country\'s energy consumption (domestic generated and imported) by energy source plus any process emissions',
   dataQualityScore: 3,
-  category: 'sovereign_debt',
+  category: 'sovereign-debt',
   optionCode: '2a',
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     {
-      name: 'ppp_adjustment_factor',
-      label: 'PPP Adjustment Factor',
-      type: 'number',
-      required: true,
-      unit: 'ratio',
-      description: 'Purchasing Power Parity adjustment factor for the country'
-    },
-    {
-      name: 'gdp',
-      label: 'GDP (Gross Domestic Product)',
+      name: 'pp_adjusted_gdp',
+      label: 'PP-Adjusted GDP',
       type: 'number',
       required: true,
       unit: 'PKR',
-      description: 'Gross Domestic Product of the country in nominal terms'
+      description: 'Purchasing Power Parity-adjusted Gross Domestic Product (nominal GDP)'
     },
     {
-      name: 'energy_consumption',
-      label: 'Energy Consumption',
+      name: 'total_emission',
+      label: 'Total Emission',
       type: 'number',
       required: true,
-      unit: 'MWh',
-      description: 'Primary physical activity data of the country\'s energy consumption (domestic generated and imported) by energy source'
-    },
-    {
-      name: 'emission_factor',
-      label: 'Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/MWh',
-      description: 'Emission factors specific to the energy source'
+      unit: 'tCO2e',
+      description: 'Total emission = Energy Consumption × Emission Factor'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
-    const pppAdjustmentFactor = inputs.ppp_adjustment_factor;
-    const gdp = inputs.gdp;
-    const energyConsumption = inputs.energy_consumption;
-    const emissionFactor = inputs.emission_factor;
+    const ppAdjustedGDP = inputs.pp_adjusted_gdp;
+    const totalEmissions = inputs.total_emission; // Total emission = Energy Consumption × Emission Factor
 
-    // Step 1: Calculate PPP-adjusted GDP
-    const pppAdjustedGDP = pppAdjustmentFactor * gdp;
+    // Calculate attribution factor using PP-adjusted GDP
+    const attributionFactor = outstandingAmount / ppAdjustedGDP;
 
-    // Step 2: Calculate attribution factor using PPP-adjusted GDP
-    const attributionFactor = outstandingAmount / pppAdjustedGDP;
+    // Use total emissions directly (already calculated from Energy Consumption × Emission Factor)
+    const energyEmissions = totalEmissions;
 
-    // Step 3: Calculate emissions from energy consumption
-    const energyEmissions = energyConsumption * emissionFactor;
-
-    // Step 4: Calculate financed emissions
+    // Calculate financed emissions
     const financedEmissions = attributionFactor * energyEmissions;
 
     return {
@@ -336,60 +264,41 @@ export const OPTION_2A_SOVEREIGN_DEBT: FormulaConfig = {
       methodology: 'PCAF Option 2a - Energy Consumption Data (Sovereign Debt)',
       calculationSteps: [
         {
-          step: 'PPP Adjustment Factor',
-          value: pppAdjustmentFactor,
-          formula: `PPP Adjustment Factor = ${pppAdjustmentFactor.toFixed(4)}`
-        },
-        {
-          step: 'GDP',
-          value: gdp,
-          formula: `GDP = $${gdp.toFixed(2)}`
-        },
-        {
-          step: 'PPP-adjusted GDP',
-          value: pppAdjustedGDP,
-          formula: `${pppAdjustmentFactor.toFixed(4)} × $${gdp.toFixed(2)} = $${pppAdjustedGDP.toFixed(2)}`
+          step: 'PP-Adjusted GDP',
+          value: ppAdjustedGDP,
+          formula: `PP-Adjusted GDP = $${ppAdjustedGDP.toFixed(2)}`
         },
         {
           step: 'Attribution Factor',
           value: attributionFactor,
-          formula: `${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          formula: `${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Energy Consumption',
-          value: energyConsumption,
-          formula: `Energy Consumption = ${energyConsumption.toFixed(2)} MWh`
-        },
-        {
-          step: 'Energy Emissions',
-          value: energyEmissions,
-          formula: `${energyConsumption.toFixed(2)} × ${emissionFactor} = ${energyEmissions.toFixed(2)} tCO2e`
+          step: 'Total Emission',
+          value: totalEmissions,
+          formula: `Total Emission (Energy Consumption × Emission Factor) = ${totalEmissions.toFixed(2)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${pppAdjustedGDP.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `(${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
         }
       ],
       metadata: {
         companyType,
         optionCode: '2a',
-        category: 'sovereign_debt',
-        pppAdjustmentFactor,
-        gdp,
-        pppAdjustedGDP,
-        energyConsumption,
-        emissionFactor,
-        energyEmissions,
-        formula: 'Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Energy consumption_c × Emission factor'
+        category: 'sovereign-debt',
+        ppAdjustedGDP,
+        totalEmissions,
+        formula: 'Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Total emission_c'
       }
     };
   },
   notes: [
     'Fair data quality score (3)',
-    'Requires primary physical activity data and emission factors',
+    'Requires total emission data (Energy Consumption × Emission Factor)',
     'Applicable to scope 1 and 2 emissions only',
-    'Formula: Σ_c (Outstanding amount_c / (PPP-adjusted GDP_c)) × Energy consumption_c × Emission factor'
+    'Formula: Σ_c (Outstanding amount_c / (PP-adjusted GDP_c)) × Total emission_c'
   ]
 };
 

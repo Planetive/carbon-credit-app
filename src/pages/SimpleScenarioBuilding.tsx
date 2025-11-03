@@ -25,25 +25,38 @@ import {
   type PortfolioEntry,
   type ScenarioPortfolioEntry
 } from './scenario-building';
+import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
+import { useToast } from '@/hooks/use-toast';
 
 const SimpleScenarioBuilding: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [portfolioEntries, setPortfolioEntries] = useState<ScenarioPortfolioEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // Get navigation state - can be either direct data or wrapped in an object
+  const navState = location.state as any;
+  
   // Get portfolio data from BankPortfolio (passed via navigation state)
-  const bankPortfolioData = location.state as PortfolioEntry | PortfolioEntry[] | undefined;
+  // Can be direct array/object or nested in state.bankPortfolioData
+  const bankPortfolioData = navState?.bankPortfolioData || 
+    (Array.isArray(navState) ? navState : 
+     (navState && !navState.portfolioEntries ? navState : undefined));
   
   // Check if we're coming back from results page with already converted data
-  const resultsPageData = location.state as { 
-    portfolioEntries?: ScenarioPortfolioEntry[], 
-    selectedScenario?: string 
-  } | undefined;
+  const resultsPageData = navState?.portfolioEntries ? {
+    portfolioEntries: navState.portfolioEntries,
+    selectedScenario: navState.selectedScenario 
+  } : undefined;
+  
+  // Get referrer/source page to navigate back to
+  const referrer = navState?.referrer || '/bank-portfolio';
 
   useEffect(() => {
     console.log('SimpleScenarioBuilding - Received data:', { bankPortfolioData, resultsPageData });
@@ -55,6 +68,7 @@ const SimpleScenarioBuilding: React.FC = () => {
       if (resultsPageData.selectedScenario) {
         setSelectedScenario(resultsPageData.selectedScenario);
       }
+      setLoading(false); // Turn off loading when using results page data
       return;
     }
     
@@ -64,89 +78,153 @@ const SimpleScenarioBuilding: React.FC = () => {
       const portfolioArray = Array.isArray(bankPortfolioData) ? bankPortfolioData : [bankPortfolioData];
       
       console.log('SimpleScenarioBuilding - Portfolio array:', portfolioArray);
+      console.log('SimpleScenarioBuilding - Total portfolio entries:', portfolioArray.length);
       
-      if (portfolioArray.length > 0) {
-        // Convert BankPortfolio data to Scenario Building format
-        convertPortfolioToScenario(portfolioArray).then(convertedPortfolio => {
-          console.log('SimpleScenarioBuilding - Converted portfolio:', convertedPortfolio);
-          setPortfolioEntries(convertedPortfolio);
-        }).catch(error => {
-          console.error('Error converting portfolio:', error);
-          // Fallback to sample data on error
-          loadSampleData();
-        });
-      } else {
-        // Fallback to sample data
-        console.log('SimpleScenarioBuilding - Using sample data (empty portfolio)');
-        loadSampleData();
-      }
+      // Convert BankPortfolio data to Scenario Building format (including entries with 0 amount)
+      convertPortfolioToScenario(portfolioArray).then(convertedPortfolio => {
+        console.log('SimpleScenarioBuilding - Converted portfolio:', convertedPortfolio);
+        setPortfolioEntries(convertedPortfolio);
+        setLoading(false); // Turn off loading after conversion completes
+      }).catch(error => {
+        console.error('Error converting portfolio:', error);
+        // Fallback to loading real data from database on error
+        loadRealPortfolioData();
+      });
     } else {
-      // Fallback to sample data
-      console.log('SimpleScenarioBuilding - Using sample data (no portfolio data)');
-      loadSampleData();
+      // Load real portfolio data from database instead of using sample data
+      console.log('SimpleScenarioBuilding - Loading real portfolio data from database');
+      loadRealPortfolioData();
     }
   }, [bankPortfolioData, resultsPageData]);
 
-  const loadSampleData = () => {
-    // Fallback to sample data if no portfolio data is available
-    const samplePortfolio: PortfolioEntry[] = [
-      {
-        id: '1',
-        company: 'Acme Manufacturing Ltd.',
-        amount: 70000000000, // 70 billion PKR
-        counterparty: 'ACME001',
-        sector: 'Manufacturing',
-        geography: 'Pakistan',
-        probabilityOfDefault: 2.5,
-        lossGivenDefault: 45,
-        tenor: 36
-      },
-      {
-        id: '2',
-        company: 'Green Energy Corp.',
-        amount: 126000000000, // 126 billion PKR
-        counterparty: 'GREEN001',
-        sector: 'Energy',
-        geography: 'Pakistan',
-        probabilityOfDefault: 1.8,
-        lossGivenDefault: 40,
-        tenor: 60
-      },
-      {
-        id: '3',
-        company: 'Prime Retail Pvt.',
-        amount: 42000000000, // 42 billion PKR
-        counterparty: 'PRIME001',
-        sector: 'Retail',
-        geography: 'Pakistan',
-        probabilityOfDefault: 3.2,
-        lossGivenDefault: 50,
-        tenor: 24
-      },
-      {
-        id: '4',
-        company: 'Metro Real Estate',
-        amount: 84000000000, // 84 billion PKR
-        counterparty: 'METRO001',
-        sector: 'Real Estate',
-        geography: 'Pakistan',
-        probabilityOfDefault: 2.0,
-        lossGivenDefault: 35,
-        tenor: 48
+  const loadRealPortfolioData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('SimpleScenarioBuilding - Loading portfolio data from database...');
+      
+      // Verify authentication first
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User not authenticated. Please log in again.');
       }
-    ];
-    
-    convertPortfolioToScenario(samplePortfolio).then(convertedPortfolio => {
-      setPortfolioEntries(convertedPortfolio);
-    }).catch(error => {
-      console.error('Error converting sample portfolio:', error);
-      // Fallback to basic portfolio entries
-      setPortfolioEntries(samplePortfolio.map(entry => ({
-        ...entry,
-        assetClass: 'Business Loan',
-        financedEmissions: 0
-      })));
-    });
+      
+      console.log('SimpleScenarioBuilding - User authenticated:', user.id);
+      
+      // Load counterparties and exposures from database (same logic as BankPortfolio)
+      console.log('SimpleScenarioBuilding - Calling getCounterparties...');
+      const counterparties = await PortfolioClient.getCounterparties();
+      console.log('SimpleScenarioBuilding - Fetched counterparties:', counterparties?.length || 0);
+      
+      const exposures = await PortfolioClient.getExposures();
+      console.log('SimpleScenarioBuilding - Fetched exposures:', exposures?.length || 0);
+      
+      if (!counterparties || counterparties.length === 0) {
+        console.log('SimpleScenarioBuilding - No counterparties found in database');
+        setPortfolioEntries([]);
+        toast({
+          title: "No Portfolio Data",
+          description: "No companies found in your portfolio. Please add companies and complete finance emission calculations first.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      if (!exposures || exposures.length === 0) {
+        console.log('SimpleScenarioBuilding - No exposures found in database');
+        setPortfolioEntries([]);
+        toast({
+          title: "No Exposure Data",
+          description: "No exposure data found. Please add exposure information for your companies.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      // Get outstanding amounts from exposures table (same as BankPortfolio)
+      const counterpartyIds = counterparties.map(c => c.id);
+      console.log('SimpleScenarioBuilding - Fetching outstanding amounts for counterparties:', counterpartyIds);
+      
+      const outstandingAmounts = await PortfolioClient.getOutstandingAmountsForCounterparties(counterpartyIds);
+      console.log('SimpleScenarioBuilding - Fetched outstanding amounts for', outstandingAmounts.size, 'counterparties');
+      
+      // Combine counterparty and exposure data into PortfolioEntry format
+      const portfolioEntries: PortfolioEntry[] = counterparties
+        .map(counterparty => {
+          const exposure = exposures.find(e => e.counterparty_id === counterparty.id);
+          if (!exposure) return null;
+          
+          // Get outstanding amount from exposures table
+          const outstandingAmount = outstandingAmounts.get(counterparty.id) || exposure.amount_pkr || 0;
+          
+          // Include all entries, even with zero amount (indicates finance emission not calculated)
+          return {
+            id: exposure.exposure_id,
+            company: counterparty.name,
+            amount: outstandingAmount,
+            counterpartyType: counterparty.counterparty_type || 'SME',
+            counterpartyId: counterparty.id,
+            sector: counterparty.sector || 'N/A',
+            geography: counterparty.geography || 'N/A',
+            probabilityOfDefault: exposure.probability_of_default || 0,
+            lossGivenDefault: exposure.loss_given_default || 0,
+            tenor: exposure.tenor_months || 0
+          };
+        })
+        .filter(Boolean) as PortfolioEntry[];
+      
+      if (portfolioEntries.length === 0) {
+        console.log('SimpleScenarioBuilding - No portfolio entries found');
+        setPortfolioEntries([]);
+        toast({
+          title: "No Portfolio Data",
+          description: "No portfolio entries found. Please add companies to your portfolio.",
+          variant: "default"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      console.log('SimpleScenarioBuilding - Loaded portfolio entries from database:', portfolioEntries.length);
+      
+      // Convert to scenario format
+      console.log('SimpleScenarioBuilding - Converting portfolio to scenario format...');
+      try {
+        const convertedPortfolio = await convertPortfolioToScenario(portfolioEntries);
+        console.log('SimpleScenarioBuilding - Converted portfolio entries:', convertedPortfolio.length);
+        setPortfolioEntries(convertedPortfolio);
+      } catch (conversionError) {
+        console.error('Error converting portfolio to scenario format:', conversionError);
+        // If conversion fails, still set the entries so the page doesn't hang
+        // The entries won't have assetClass/financedEmissions but will display
+        const basicEntries = portfolioEntries.map(entry => ({
+          ...entry,
+          counterparty: entry.counterpartyType || 'N/A',
+          assetClass: 'Business Loans', // Default fallback
+          financedEmissions: 0 // Default fallback
+        }));
+        setPortfolioEntries(basicEntries as any);
+        toast({
+          title: "Conversion Warning",
+          description: "Loaded portfolio data but some calculations may be incomplete.",
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Error loading real portfolio data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load portfolio data. Please try again.');
+      setPortfolioEntries([]);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load portfolio data from database. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const runScenario = async () => {
@@ -172,17 +250,36 @@ const SimpleScenarioBuilding: React.FC = () => {
 
     try {
       // Transform portfolio entries for backend API
-      const backendPortfolioEntries = portfolioEntries.map(entry => ({
-        id: entry.id,
-        company: entry.company,
-        amount: entry.amount,
-        counterparty: entry.counterparty,
-        sector: entry.sector,
-        geography: entry.geography,
-        probability_of_default: entry.probabilityOfDefault,
-        loss_given_default: entry.lossGivenDefault,
-        tenor: entry.tenor
-      }));
+      const backendPortfolioEntries = portfolioEntries.map(entry => {
+        // Ensure counterparty field is set (fallback to counterpartyType if needed)
+        const counterparty = entry.counterparty || (entry as any).counterpartyType || 'N/A';
+        
+        // Ensure all required fields have valid values
+        const portfolioEntry = {
+          id: entry.id || 'unknown',
+          company: entry.company || 'Unknown Company',
+          amount: entry.amount || 0,
+          counterparty: counterparty,
+          sector: entry.sector || 'Other',
+          geography: entry.geography || 'N/A',
+          probability_of_default: entry.probabilityOfDefault || 0,
+          loss_given_default: entry.lossGivenDefault || 0,
+          tenor: entry.tenor || 0
+        };
+        
+        // Validate required fields before sending
+        if (!portfolioEntry.counterparty || portfolioEntry.counterparty === 'undefined') {
+          throw new Error(`Missing counterparty for entry: ${portfolioEntry.company}`);
+        }
+        if (!portfolioEntry.sector || portfolioEntry.sector === 'undefined') {
+          throw new Error(`Missing sector for entry: ${portfolioEntry.company}`);
+        }
+        if (!portfolioEntry.geography || portfolioEntry.geography === 'undefined') {
+          throw new Error(`Missing geography for entry: ${portfolioEntry.company}`);
+        }
+        
+        return portfolioEntry;
+      });
 
       // Map frontend scenario IDs to backend scenario types
       const scenarioTypeMap: { [key: string]: string } = {
@@ -201,32 +298,76 @@ const SimpleScenarioBuilding: React.FC = () => {
         backendScenarioType
       });
 
-      // Call backend API
+      // Call backend API with timeout
       const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '/api' : 'http://127.0.0.1:8000');
-      const response = await fetch(`${backendUrl}/scenario/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenario_type: backendScenarioType,
-          portfolio_entries: backendPortfolioEntries
-        })
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      let response;
+      try {
+        response = await fetch(`${backendUrl}/scenario/calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scenario_type: backendScenarioType,
+            portfolio_entries: backendPortfolioEntries
+          }),
+          signal: controller.signal
+        });
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. The backend may be slow or unresponsive. Please check if the backend server is running.');
+        }
+        throw error;
+      }
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        let errorMessage = 'Failed to calculate scenario';
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = await response.json();
-          errorMessage = errorData.detail || errorMessage;
+          // Handle different error response formats
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          } else if (Array.isArray(errorData.detail)) {
+            // FastAPI validation errors come as arrays
+            errorMessage = errorData.detail.map((err: any) => {
+              if (typeof err === 'string') return err;
+              if (err?.msg) return err.msg;
+              if (err?.loc && err?.msg) return `${err.loc.join('.')}: ${err.msg}`;
+              return JSON.stringify(err);
+            }).join(', ');
+          } else if (errorData.detail && typeof errorData.detail === 'object') {
+            errorMessage = JSON.stringify(errorData.detail);
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          }
         } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          // If we can't parse JSON, use the status message
+          console.error('Error parsing error response:', e);
         }
         throw new Error(errorMessage);
       }
 
-      const backendResults = await response.json();
+      let backendResults;
+      try {
+        backendResults = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing backend response:', parseError);
+        throw new Error('Invalid response from server. Please try again.');
+      }
+
+      // Validate backend results
+      if (!backendResults || !backendResults.results || !Array.isArray(backendResults.results)) {
+        throw new Error('Invalid response format from server. Expected results array.');
+      }
 
       // Transform backend results to frontend format
-      const sortedResults = backendResults.results.sort((a, b) => b.loss_increase - a.loss_increase);
+      // Sort by climate_adjusted_expected_loss (estimatedLoss) descending - highest risk first
+      const sortedResults = backendResults.results.sort((a, b) => b.climate_adjusted_expected_loss - a.climate_adjusted_expected_loss);
 
       const sectorBreakdown = backendResults.results.reduce((acc, result) => {
         if (!acc[result.sector]) {
@@ -241,12 +382,15 @@ const SimpleScenarioBuilding: React.FC = () => {
         return acc;
       }, {});
 
-      const sectorBreakdownArray = Object.values(sectorBreakdown).map((sector: any) => ({
-        sector: sector.sector,
-        amount: sector.amount,
-        percentage: (sector.amount / backendResults.total_exposure) * 100,
-        estimatedLoss: sector.estimatedLoss
-      }));
+      const sectorBreakdownArray = Object.values(sectorBreakdown)
+        .map((sector: any) => ({
+          sector: sector.sector,
+          amount: sector.amount,
+          percentage: (sector.amount / backendResults.total_exposure) * 100,
+          estimatedLoss: sector.estimatedLoss
+        }))
+        // Sort by estimatedLoss descending - highest risk first
+        .sort((a, b) => b.estimatedLoss - a.estimatedLoss);
 
       // Asset Class Breakdown - Use portfolio entries with proper asset class names
       const assetClassBreakdown = portfolioEntries.reduce((acc, entry) => {
@@ -267,12 +411,15 @@ const SimpleScenarioBuilding: React.FC = () => {
         return acc;
       }, {});
 
-      const assetClassBreakdownArray = Object.values(assetClassBreakdown).map((assetClass: any) => ({
-        assetClass: assetClass.assetClass,
-        amount: assetClass.amount,
-        percentage: (assetClass.amount / backendResults.total_exposure) * 100,
-        estimatedLoss: assetClass.estimatedLoss
-      }));
+      const assetClassBreakdownArray = Object.values(assetClassBreakdown)
+        .map((assetClass: any) => ({
+          assetClass: assetClass.assetClass,
+          amount: assetClass.amount,
+          percentage: (assetClass.amount / backendResults.total_exposure) * 100,
+          estimatedLoss: assetClass.estimatedLoss
+        }))
+        // Sort by estimatedLoss descending - highest risk first
+        .sort((a, b) => b.estimatedLoss - a.estimatedLoss);
 
       console.log('Asset Class Breakdown Debug:', {
         portfolioEntries: portfolioEntries.map(e => ({ company: e.company, assetClass: e.assetClass })),
@@ -331,18 +478,46 @@ const SimpleScenarioBuilding: React.FC = () => {
         }))
       };
 
-      // Navigate to results page with data
+      // Navigate to results page with data (pass referrer so we can navigate back correctly)
       navigate('/climate-risk-results', {
         state: {
           results,
           selectedScenario,
-          portfolioEntries
+          portfolioEntries,
+          referrer: referrer // Pass referrer to results page
         }
       });
       clearInterval(progressInterval);
     } catch (err) {
       console.error('Scenario calculation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to run scenario analysis');
+      
+      // Better error message extraction
+      let errorMessage = 'Failed to run scenario analysis';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object') {
+        // Try to extract message from error object
+        if ('message' in err && typeof err.message === 'string') {
+          errorMessage = err.message;
+        } else if ('detail' in err) {
+          if (typeof err.detail === 'string') {
+            errorMessage = err.detail;
+          } else {
+            errorMessage = JSON.stringify(err.detail);
+          }
+        } else {
+          errorMessage = JSON.stringify(err);
+        }
+      }
+      
+      setError(errorMessage);
+      toast({
+        title: "Calculation Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
       clearInterval(progressInterval);
     } finally {
       setIsRunning(false);
@@ -364,6 +539,23 @@ const SimpleScenarioBuilding: React.FC = () => {
 
 
   return (
+    <>
+      {/* Loading State */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="bg-white shadow-xl max-w-md">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Loading Portfolio Data</h3>
+                  <p className="text-sm text-gray-600">Fetching your portfolio data from the database...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -495,11 +687,11 @@ const SimpleScenarioBuilding: React.FC = () => {
             <div className="flex items-center justify-between space-x-6">
               <Button
                 variant="outline"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(referrer)}
                 className="flex items-center space-x-3 px-6 py-3 bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white hover:border-gray-300 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <ArrowLeft className="h-5 w-5" />
-                <span className="font-medium">Back to Portfolio</span>
+                <span className="font-medium">Back</span>
               </Button>
 
               <div className="flex-1 max-w-md">
@@ -599,6 +791,7 @@ const SimpleScenarioBuilding: React.FC = () => {
 
       </div>
     </div>
+    </>
   );
 };
 

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   ArrowLeft, 
   BarChart3, 
@@ -12,22 +13,27 @@ import {
   Download,
   FileText,
   PieChart,
-  Zap
+  Zap,
+  Eye
 } from 'lucide-react';
 import { type ScenarioResult } from './scenario-building/types';
 
 const ClimateRiskResults: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [openModal, setOpenModal] = useState<'topExposures' | 'sector' | 'assetClass' | null>(null);
   
   // Get results data from navigation state
   const results = location.state?.results as ScenarioResult | undefined;
   const selectedScenario = location.state?.selectedScenario as string | undefined;
   const portfolioEntries = location.state?.portfolioEntries || [];
+  const referrer = location.state?.referrer || '/bank-portfolio'; // Get referrer from navigation state
 
   // Redirect if no results data
   if (!results) {
-    navigate('/scenario-building');
+    navigate('/scenario-building', { 
+      state: { referrer: referrer } 
+    });
     return null;
   }
 
@@ -74,11 +80,11 @@ const ClimateRiskResults: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
-                onClick={() => navigate('/bank-portfolio')}
+                onClick={() => navigate(referrer)}
                 className="flex items-center space-x-2 px-4 py-2 bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white hover:border-gray-300 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span>Back to Portfolio</span>
+                <span>Back</span>
               </Button>
               <Button
                 onClick={handleExportReport}
@@ -233,7 +239,7 @@ const ClimateRiskResults: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {results.topExposures.slice(0, 4).map((exposure, index) => (
+                  {results.topExposures.slice(0, 10).map((exposure, index) => (
                     <div key={exposure.company || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -254,6 +260,44 @@ const ClimateRiskResults: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {results.topExposures.length > 10 && (
+                    <Dialog open={openModal === 'topExposures'} onOpenChange={(open) => setOpenModal(open ? 'topExposures' : null)}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full mt-2">
+                          <Eye className="h-4 w-4 mr-2" />
+                          See All ({results.topExposures.length} exposures)
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>All Risk Exposures ({results.topExposures.length} total)</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-2">
+                          {results.topExposures.map((exposure, index) => (
+                            <div key={exposure.company || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-bold text-red-600">{index + 1}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-900">{exposure.company}</div>
+                                  <div className="text-xs text-gray-600">{exposure.sector}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-red-600">
+                                  {formatCurrency(exposure.estimatedLoss || 0)}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {formatCurrency(exposure.amount || 0)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -268,7 +312,7 @@ const ClimateRiskResults: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {results.sectorBreakdown.slice(0, 4).map((sector, index) => (
+                  {results.sectorBreakdown.slice(0, 10).map((sector, index) => (
                     <div key={sector.sector} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
@@ -289,6 +333,44 @@ const ClimateRiskResults: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {results.sectorBreakdown.length > 10 && (
+                    <Dialog open={openModal === 'sector'} onOpenChange={(open) => setOpenModal(open ? 'sector' : null)}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full mt-2">
+                          <Eye className="h-4 w-4 mr-2" />
+                          See All ({results.sectorBreakdown.length} sectors)
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>All Sectors ({results.sectorBreakdown.length} total)</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-2">
+                          {results.sectorBreakdown.map((sector, index) => (
+                            <div key={sector.sector} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-bold text-purple-600">{index + 1}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-900">{sector.sector}</div>
+                                  <div className="text-xs text-gray-600">{(sector.percentage || 0).toFixed(1)}% of portfolio</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-red-600">
+                                  {formatCurrency(sector.estimatedLoss || 0)}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {formatCurrency(sector.amount || 0)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -303,7 +385,7 @@ const ClimateRiskResults: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {results.assetClassBreakdown.slice(0, 4).map((assetClass, index) => (
+                  {results.assetClassBreakdown.slice(0, 10).map((assetClass, index) => (
                     <div key={assetClass.assetClass} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -324,6 +406,44 @@ const ClimateRiskResults: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {results.assetClassBreakdown.length > 10 && (
+                    <Dialog open={openModal === 'assetClass'} onOpenChange={(open) => setOpenModal(open ? 'assetClass' : null)}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full mt-2">
+                          <Eye className="h-4 w-4 mr-2" />
+                          See All ({results.assetClassBreakdown.length} asset classes)
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>All Asset Classes ({results.assetClassBreakdown.length} total)</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-2">
+                          {results.assetClassBreakdown.map((assetClass, index) => (
+                            <div key={assetClass.assetClass} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-bold text-blue-600">{index + 1}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-gray-900">{assetClass.assetClass}</div>
+                                  <div className="text-xs text-gray-600">{(assetClass.percentage || 0).toFixed(1)}% of portfolio</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-red-600">
+                                  {formatCurrency(assetClass.estimatedLoss || 0)}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {formatCurrency(assetClass.amount || 0)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -383,7 +503,8 @@ const ClimateRiskResults: React.FC = () => {
                   onClick={() => navigate('/scenario-building', { 
                     state: { 
                       portfolioEntries: portfolioEntries,
-                      selectedScenario: selectedScenario 
+                      selectedScenario: selectedScenario,
+                      referrer: referrer // Preserve original referrer (e.g., Company Detail page)
                     } 
                   })}
                   className="w-full flex items-center justify-center space-x-2"

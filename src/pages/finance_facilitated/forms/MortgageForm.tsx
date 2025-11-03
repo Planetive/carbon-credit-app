@@ -23,6 +23,7 @@ export interface Property {
   estimatedEnergyConsumptionFromStatistics: number;
   estimatedEnergyConsumptionFromStatisticsUnit: string;
   floorArea: number;
+  totalEmission?: number; // For Option 2a: Total emission = Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor
 }
 
 interface MortgageFormProps {
@@ -66,8 +67,26 @@ export const MortgageForm: React.FC<MortgageFormProps> = ({
         'average_emission_factor': 'averageEmissionFactor',
         'estimated_energy_consumption_from_labels': 'estimatedEnergyConsumptionFromLabels',
         'estimated_energy_consumption_from_statistics': 'estimatedEnergyConsumptionFromStatistics',
-        'floor_area': 'floorArea'
+        'floor_area': 'floorArea',
+        'total_emission': 'totalEmission'
       };
+      
+      // For Option 1a, 1b, and 2a, filter out the old fields and only show total_emission
+      const isOption1a = selectedFormula.optionCode === '1a' && selectedFormula.category === 'mortgage';
+      const isOption1b = selectedFormula.optionCode === '1b' && selectedFormula.category === 'mortgage';
+      const isOption2a = selectedFormula.optionCode === '2a' && selectedFormula.category === 'mortgage';
+      
+      const fieldsToExclude1a1b = (isOption1a || isOption1b) ? 
+        ['actual_energy_consumption', 'supplier_specific_emission_factor', 'average_emission_factor'] : 
+        [];
+      const fieldsToExclude2a = isOption2a ? 
+        ['estimated_energy_consumption_from_labels', 'floor_area', 'average_emission_factor'] : 
+        [];
+      const fieldsToExclude = [...fieldsToExclude1a1b, ...fieldsToExclude2a];
+      
+      if (fieldsToExclude.includes(fieldName)) {
+        return null; // Don't render the old fields for Option 1a, 1b, or 2a
+      }
 
       const propertyFieldName = propertyFieldMap[fieldName] || fieldName as keyof Property;
       const fieldValue = property[propertyFieldName] || '';
@@ -77,6 +96,10 @@ export const MortgageForm: React.FC<MortgageFormProps> = ({
       const hasUnitOptions = input.unitOptions && input.unitOptions.length > 0;
       const unitFieldName = `${propertyFieldName}Unit` as keyof Property;
       const unitValue = property[unitFieldName] || input.unit || '';
+
+      // For total_emission in Options 1a, 1b, and 2a, mark it as auto-filled (read-only)
+      const isTotalEmissionField = fieldName === 'total_emission';
+      const isAutoFilled = isTotalEmissionField && (selectedFormula.optionCode === '1a' || selectedFormula.optionCode === '1b' || selectedFormula.optionCode === '2a');
 
       return (
         <div key={fieldName} className="space-y-2">
@@ -98,6 +121,8 @@ export const MortgageForm: React.FC<MortgageFormProps> = ({
                 onChange={(e) => onUpdateProperty(property.id, propertyFieldName, parseFloat(e.target.value) || 0)}
                 className="mt-1"
                 required={input.required}
+                disabled={isAutoFilled}
+                title={isAutoFilled ? input.description : undefined}
               />
             </div>
             {hasUnitOptions && (

@@ -347,7 +347,25 @@ class ScenarioEngine:
         """
         Calculate climate stress testing scenario
         
-        Formula: CAEL = Exposure × (Baseline PD × PD Multiplier) × (Baseline LGD + LGD Change)
+        Formulas follow the standard methodology:
+        
+        Baseline: EL₀ = EAD × PD₀ × LGD₀
+        
+        Transition: 
+        - PD_T = PD₀ × m_T
+        - LGD_T = LGD₀ + ΔLGD_T (absolute addition)
+        - EL_T = EAD × PD_T × LGD_T
+        
+        Physical:
+        - PD_P = PD₀ × m_P
+        - LGD_P = LGD₀ + ΔLGD_P (absolute addition)
+        - EL_P = EAD × PD_P × LGD_P
+        
+        Combined:
+        - m_C = m_T × m_P
+        - PD_C = PD₀ × m_C
+        - LGD_C = LGD₀ + ΔLGD_T + ΔLGD_P (sum of both changes)
+        - EL_C = EAD × PD_C × LGD_C
         """
         try:
             logger.info(f"Starting scenario calculation for {len(portfolio_entries)} entries with scenario type: {scenario_type}")
@@ -358,29 +376,43 @@ class ScenarioEngine:
             total_climate_adjusted_expected_loss = 0.0
             
             for i, entry in enumerate(portfolio_entries):
-                logger.info(f"Processing entry {i+1}: {entry.company} (Sector: {entry.sector}, Amount: {entry.amount})")
+                logger.debug(f"Processing entry {i+1}: {entry.company} (Sector: {entry.sector}, Amount: {entry.amount})")
                 # Get sector-specific multipliers
                 multipliers = self.get_sector_multipliers(entry.sector)
-                logger.info(f"  Using multipliers for {entry.sector}: {multipliers}")
+                logger.debug(f"  Using multipliers for {entry.sector}: {multipliers}")
                 
                 # Calculate PD multiplier based on scenario type
                 if scenario_type == "transition":
                     pd_multiplier = multipliers["transition_pd_multiplier"]
+                    # LGD_T = LGD₀ + ΔLGD_T (absolute addition)
+                    lgd_change_transition = multipliers["lgd_change"] / 100.0
+                    lgd_change_physical = 0.0
                 elif scenario_type == "physical":
                     pd_multiplier = multipliers["physical_pd_multiplier"]
+                    # LGD_P = LGD₀ + ΔLGD_P (absolute addition)
+                    lgd_change_transition = 0.0
+                    lgd_change_physical = multipliers["lgd_change"] / 100.0
                 elif scenario_type == "combined":
+                    # PD_C = PD₀ × m_T × m_P
                     pd_multiplier = multipliers["transition_pd_multiplier"] * multipliers["physical_pd_multiplier"]
+                    # LGD_C = LGD₀ + ΔLGD_T + ΔLGD_P (sum of both changes)
+                    lgd_change_transition = multipliers["lgd_change"] / 100.0
+                    lgd_change_physical = multipliers["lgd_change"] / 100.0
                 else:
                     raise ValueError(f"Invalid scenario type: {scenario_type}")
                 
                 # Convert percentages to decimals
                 baseline_pd_decimal = entry.probability_of_default / 100.0
                 baseline_lgd_decimal = entry.loss_given_default / 100.0
-                lgd_change_decimal = multipliers["lgd_change"] / 100.0
                 
                 # Calculate adjusted values
+                # PD Multiplier is applied multiplicatively: PD = PD₀ × m
                 adjusted_pd = baseline_pd_decimal * pd_multiplier
-                adjusted_lgd = baseline_lgd_decimal + lgd_change_decimal
+                
+                # LGD Change is applied as absolute addition (not percentage increase)
+                # Formula follows: LGD = LGD₀ + ΔLGD (for transition/physical)
+                # For combined: LGD_C = LGD₀ + ΔLGD_T + ΔLGD_P
+                adjusted_lgd = baseline_lgd_decimal + lgd_change_transition + lgd_change_physical
                 
                 # Ensure LGD doesn't exceed 100%
                 adjusted_lgd = min(adjusted_lgd, 1.0)

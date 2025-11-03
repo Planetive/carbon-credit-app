@@ -19,8 +19,8 @@ interface PortfolioEntry {
   id: string;
   company: string;
   amount: number;
-  counterparty: string;
-  counterpartyId?: string; // Add the UUID for database operations (optional for CSV uploads)
+  counterpartyType: string; // User-facing counterparty type
+  counterpartyId?: string; // UUID for database operations (optional for CSV uploads)
   sector: string;
   geography: string;
   probabilityOfDefault: number;
@@ -45,19 +45,13 @@ const BankPortfolio: React.FC = () => {
     return zeroPadId(max + 1);
   };
 
-  const zeroPadCounterparty = (num: number, width = 4) => num.toString().padStart(width, '0');
-  const getNextCounterparty = (): string => {
-    const numericCps = entries
-      .map(e => parseInt(e.counterparty, 10))
-      .filter(n => !isNaN(n));
-    const max = numericCps.length ? Math.max(...numericCps) : 0;
-    return zeroPadCounterparty(max + 1);
-  };
+  // No longer need counterparty code generation since we use UUIDs
   
   // Form state
   const [newCompany, setNewCompany] = useState('');
   const [newAmount, setNewAmount] = useState<number>(0);
   const [newCounterparty, setNewCounterparty] = useState('');
+  const [newCounterpartyType, setNewCounterpartyType] = useState('SME');
   const [newSector, setNewSector] = useState('');
   const [newGeography, setNewGeography] = useState('');
   const [newPD, setNewPD] = useState<number>(0);
@@ -74,37 +68,58 @@ const BankPortfolio: React.FC = () => {
     loadPortfolioData();
   }, []);
 
+  // Add refresh function to window for global access
+  useEffect(() => {
+    (window as any).refreshPortfolioData = loadPortfolioData;
+    return () => {
+      delete (window as any).refreshPortfolioData;
+    };
+  }, []);
+
   const loadPortfolioData = async () => {
     try {
       setLoading(true);
       const counterparties = await PortfolioClient.getCounterparties();
       const exposures = await PortfolioClient.getExposures();
       
+      // Get outstanding amounts from finance emission calculations
+      const counterpartyIds = counterparties.map(c => c.id);
+      console.log('Loading portfolio data for counterparties:', counterpartyIds);
+      
+      const outstandingAmounts = await PortfolioClient.getOutstandingAmountsForCounterparties(counterpartyIds);
+      console.log('Retrieved outstanding amounts:', outstandingAmounts);
+      
       // Combine counterparty and exposure data into PortfolioEntry format
-      const portfolioEntries: PortfolioEntry[] = counterparties.map(counterparty => {
-        const exposure = exposures.find(e => e.counterparty_id === counterparty.id);
-        if (!exposure) return null;
-        
-        return {
-          id: exposure.exposure_id,
-          company: counterparty.name,
-          amount: exposure.amount_pkr,
-          counterparty: counterparty.counterparty_code,
-          counterpartyId: counterparty.id, // Add the UUID
-          sector: counterparty.sector,
-          geography: counterparty.geography,
-          probabilityOfDefault: exposure.probability_of_default,
-          lossGivenDefault: exposure.loss_given_default,
-          tenor: exposure.tenor_months
-        };
-      }).filter(Boolean) as PortfolioEntry[];
+      const portfolioEntries: PortfolioEntry[] = counterparties
+        .map(counterparty => {
+          const exposure = exposures.find(e => e.counterparty_id === counterparty.id);
+          if (!exposure) return null;
+          
+          // Get outstanding amount from exposures table (fallback to exposure.amount_pkr if no outstanding amount)
+          const outstandingAmount = outstandingAmounts.get(counterparty.id) || exposure.amount_pkr || 0;
+          
+          // Include all entries, even with zero amount (indicates finance emission not calculated)
+          return {
+            id: exposure.exposure_id,
+            company: counterparty.name,
+            amount: outstandingAmount,
+            counterpartyType: counterparty.counterparty_type || 'SME',
+            counterpartyId: counterparty.id,
+            sector: counterparty.sector,
+            geography: counterparty.geography,
+            probabilityOfDefault: exposure.probability_of_default,
+            lossGivenDefault: exposure.loss_given_default,
+            tenor: exposure.tenor_months
+          };
+        })
+        .filter(Boolean) as PortfolioEntry[];
 
       setEntries(portfolioEntries);
     } catch (error) {
       console.error('Error loading portfolio data:', error);
       toast({
         title: "Error",
-        description: "Failed to load portfolio data",
+        description: "Failed to load portfolio data. Please ensure you have completed finance emission calculations for your companies.",
         variant: "destructive"
       });
     } finally {
@@ -120,7 +135,6 @@ const BankPortfolio: React.FC = () => {
 
   const addEntry = async () => {
     if (!newCompany.trim() || 
-        (Number(newAmount) || 0) <= 0 || 
         !newSector || 
         !newGeography || 
         (Number(newPD) || 0) <= 0 || 
@@ -130,20 +144,19 @@ const BankPortfolio: React.FC = () => {
     try {
       setSaving(true);
       
-      const counterpartyCode = getNextCounterparty();
       const exposureId = getNextId();
       
       // Create counterparty and exposure in database
       const { counterparty, exposure } = await PortfolioClient.createCounterpartyWithExposure(
         {
-          counterparty_code: counterpartyCode,
           name: newCompany.trim(),
           sector: newSector,
-          geography: newGeography
+          geography: newGeography,
+          counterparty_type: newCounterpartyType
         },
         {
           exposure_id: exposureId,
-          amount_pkr: Number(newAmount) || 0,
+          amount_pkr: 0, // Will be populated from finance emission calculations
           probability_of_default: Number(newPD) || 0,
           loss_given_default: Number(newLGD) || 0,
           tenor_months: Number(newTenor) || 0
@@ -154,9 +167,9 @@ const BankPortfolio: React.FC = () => {
       const newEntry: PortfolioEntry = {
         id: exposureId,
         company: newCompany.trim(),
-        amount: Number(newAmount) || 0,
-        counterparty: counterpartyCode,
-        counterpartyId: counterparty.id, // Add the UUID from the created counterparty
+        amount: 0, // Will be populated from finance emission calculations
+        counterpartyType: newCounterpartyType,
+        counterpartyId: counterparty.id,
         sector: newSector,
         geography: newGeography,
         probabilityOfDefault: Number(newPD) || 0,
@@ -170,6 +183,7 @@ const BankPortfolio: React.FC = () => {
       setNewCompany('');
       setNewAmount(0);
       setNewCounterparty('');
+      setNewCounterpartyType('SME');
       setNewSector('');
       setNewGeography('');
       setNewPD(0);
@@ -194,10 +208,10 @@ const BankPortfolio: React.FC = () => {
 
   const downloadTemplate = () => {
     const csvContent = [
-      'Company Name,Counterparty ID,Loan Amount (PKR),Sector,Geography,Probability of Default (%),Loss Given Default (%),Tenor (months)',
-      'National Steel Limited,0001,250000000,Manufacturing,Pakistan,2.5,45,36',
-      'Sunrise Power Pvt. Ltd.,0002,450000000,Energy,Pakistan,1.8,40,60',
-      'Metro Retail Holdings,0003,150000000,Retail,Pakistan,3.2,50,24'
+      'Company Name,Counterparty Type,Sector,Geography,Probability of Default (%),Loss Given Default (%),Tenor (months)',
+      'National Steel Limited,SME,Manufacturing,Pakistan,2.5,45,36',
+      'Sunrise Power Pvt. Ltd.,Corporate,Energy,Pakistan,1.8,40,60',
+      'Metro Retail Holdings,Retail,Retail,Pakistan,3.2,50,24'
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -217,8 +231,7 @@ const BankPortfolio: React.FC = () => {
     
     const requiredHeaders = [
       'Company Name',
-      'Counterparty ID', 
-      'Loan Amount (PKR)',
+      'Counterparty Type', 
       'Sector',
       'Geography',
       'Probability of Default (%)',
@@ -240,13 +253,7 @@ const BankPortfolio: React.FC = () => {
       const max = numericIds.length ? Math.max(...numericIds) : 0;
       return max;
     })();
-    let nextCpBase = (() => {
-      const numericCps = entriesStateRef()
-        .map(e => parseInt(e.counterparty, 10))
-        .filter(n => !isNaN(n));
-      const max = numericCps.length ? Math.max(...numericCps) : 0;
-      return max;
-    })();
+    // No longer need counterparty code generation for CSV parsing
     
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim());
@@ -259,8 +266,8 @@ const BankPortfolio: React.FC = () => {
       const entry: PortfolioEntry = {
         id: zeroPadId(nextIdBase),
         company: values[headers.indexOf('Company Name')] || '',
-        counterparty: zeroPadCounterparty(++nextCpBase),
-        amount: Number(values[headers.indexOf('Loan Amount (PKR)')]) || 0,
+        counterpartyType: values[headers.indexOf('Counterparty Type')] || 'SME',
+        amount: 0, // Will be populated from finance emission calculations
         sector: values[headers.indexOf('Sector')] || '',
         geography: values[headers.indexOf('Geography')] || '',
         probabilityOfDefault: Number(values[headers.indexOf('Probability of Default (%)')]) || 0,
@@ -269,7 +276,7 @@ const BankPortfolio: React.FC = () => {
       };
 
       // Validate required fields
-      if (!entry.company || !entry.counterparty || entry.amount <= 0 || !entry.sector || !entry.geography || entry.probabilityOfDefault <= 0 || entry.lossGivenDefault <= 0 || entry.tenor <= 0) {
+      if (!entry.company || !entry.counterpartyType || !entry.sector || !entry.geography || entry.probabilityOfDefault <= 0 || entry.lossGivenDefault <= 0 || entry.tenor <= 0) {
         throw new Error(`Row ${i + 1}: Missing or invalid required data`);
       }
 
@@ -314,12 +321,13 @@ const BankPortfolio: React.FC = () => {
     try {
       setSaving(true);
       
-      // Update counterparty data (name, sector, geography)
+      // Update counterparty data (name, sector, geography, counterparty_type)
       if (editingEntry.counterpartyId) {
         await PortfolioClient.updateCounterparty(editingEntry.counterpartyId, {
           name: editingEntry.company,
           sector: editingEntry.sector,
-          geography: editingEntry.geography
+          geography: editingEntry.geography,
+          counterparty_type: editingEntry.counterpartyType
         });
       }
       
@@ -330,7 +338,6 @@ const BankPortfolio: React.FC = () => {
       
       if (exposure) {
         await PortfolioClient.updateExposure(exposure.id, {
-          amount_pkr: editingEntry.amount,
           probability_of_default: editingEntry.probabilityOfDefault,
           loss_given_default: editingEntry.lossGivenDefault,
           tenor_months: editingEntry.tenor
@@ -412,7 +419,7 @@ const BankPortfolio: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
-          {/* Main list */}
+            {/* Main list */}
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -422,6 +429,12 @@ const BankPortfolio: React.FC = () => {
               <CardDescription>
                 List of companies and their loan amounts (PKR)
               </CardDescription>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 mt-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Note:</strong> Loan amounts are now automatically retrieved from your Finance Emission calculations. 
+                  Please ensure you have completed the Finance Emission form for each company to see their loan amounts.
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
               {/* Toolbar */}
@@ -458,7 +471,7 @@ const BankPortfolio: React.FC = () => {
                                 {e.company}
                                 </div>
                                 <div className="text-xs text-muted-foreground mb-3">
-                                  Counterparty: {e.counterparty}
+                                  Type: {e.counterpartyType}
                                 </div>
                                 
                                 {/* Left side details - Geography and Tenor */}
@@ -553,25 +566,22 @@ const BankPortfolio: React.FC = () => {
                 </div>
                 
                 <div>
-                  <Label htmlFor="counterparty">Counterparty ID *</Label>
-                  <Input
-                    id="counterparty"
-                    placeholder="e.g., SUNRISE001"
-                    value={newCounterparty}
-                    onChange={(e) => setNewCounterparty(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="amount">Loan Amount (PKR) *</Label>
-                  <FormattedNumberInput
-                    id="amount"
-                    placeholder="0"
-                    value={newAmount}
-                    onChange={setNewAmount}
-                    className="mt-1"
-                  />
+                  <Label htmlFor="counterparty-type">Counterparty Type *</Label>
+                  <Select value={newCounterpartyType} onValueChange={setNewCounterpartyType}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select counterparty type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SME">SME (Small & Medium Enterprise)</SelectItem>
+                      <SelectItem value="Retail">Retail</SelectItem>
+                      <SelectItem value="Corporate">Corporate</SelectItem>
+                      <SelectItem value="Sovereign">Sovereign</SelectItem>
+                      <SelectItem value="Bank">Bank</SelectItem>
+                      <SelectItem value="Insurance">Insurance</SelectItem>
+                      <SelectItem value="Asset_Management">Asset Management</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div>
@@ -946,24 +956,24 @@ const BankPortfolio: React.FC = () => {
                 </div>
                 
                 <div>
-                  <Label htmlFor="edit-counterparty">Counterparty ID *</Label>
-                  <Input
-                    id="edit-counterparty"
-                    value={editingEntry.counterparty}
-                    onChange={(e) => setEditingEntry({...editingEntry, counterparty: e.target.value})}
-                    className="mt-1"
-                  />
+                  <Label htmlFor="edit-counterparty-type">Counterparty Type *</Label>
+                  <Select value={editingEntry.counterpartyType} onValueChange={(value) => setEditingEntry({...editingEntry, counterpartyType: value})}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select counterparty type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SME">SME (Small & Medium Enterprise)</SelectItem>
+                      <SelectItem value="Retail">Retail</SelectItem>
+                      <SelectItem value="Corporate">Corporate</SelectItem>
+                      <SelectItem value="Sovereign">Sovereign</SelectItem>
+                      <SelectItem value="Bank">Bank</SelectItem>
+                      <SelectItem value="Insurance">Insurance</SelectItem>
+                      <SelectItem value="Asset_Management">Asset Management</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                <div>
-                  <Label htmlFor="edit-amount">Loan Amount (PKR) *</Label>
-                  <FormattedNumberInput
-                    id="edit-amount"
-                    value={editingEntry.amount}
-                    onChange={(value) => setEditingEntry({...editingEntry, amount: value})}
-                    className="mt-1"
-                  />
-                </div>
                 
                 <div>
                   <Label htmlFor="edit-sector">Sector *</Label>

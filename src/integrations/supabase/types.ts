@@ -1084,30 +1084,30 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          counterparty_code: string
           name: string
           sector: string
           geography: string
+          counterparty_type: string
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          counterparty_code: string
           name: string
           sector: string
           geography: string
+          counterparty_type: string
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          counterparty_code?: string
           name?: string
           sector?: string
           geography?: string
+          counterparty_type?: string
           created_at?: string
           updated_at?: string
         }
@@ -1344,6 +1344,96 @@ export interface Database {
             columns: ["questionnaire_id"]
             isOneToOne: false
             referencedRelation: "counterparty_questionnaires"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      finance_emission_calculations: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_id: string
+          outstanding_amount: number
+          calculation_type: 'finance_emission' | 'facilitated_emission'
+          formula_id: string
+          formula_name: string
+          company_type: 'listed' | 'unlisted'
+          total_assets: number | null
+          evic: number | null
+          total_equity_plus_debt: number | null
+          financed_emissions: number
+          attribution_factor: number | null
+          status: 'draft' | 'completed' | 'failed'
+          share_price: number | null
+          outstanding_shares: number | null
+          total_debt: number | null
+          total_equity: number | null
+          minority_interest: number | null
+          preferred_stock: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_id: string
+          outstanding_amount: number
+          calculation_type: 'finance_emission' | 'facilitated_emission'
+          formula_id: string
+          formula_name: string
+          company_type: 'listed' | 'unlisted'
+          total_assets?: number | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          financed_emissions: number
+          attribution_factor?: number | null
+          status: 'draft' | 'completed' | 'failed'
+          share_price?: number | null
+          outstanding_shares?: number | null
+          total_debt?: number | null
+          total_equity?: number | null
+          minority_interest?: number | null
+          preferred_stock?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_id?: string
+          outstanding_amount?: number
+          calculation_type?: 'finance_emission' | 'facilitated_emission'
+          formula_id?: string
+          formula_name?: string
+          company_type?: 'listed' | 'unlisted'
+          total_assets?: number | null
+          evic?: number | null
+          total_equity_plus_debt?: number | null
+          financed_emissions?: number
+          attribution_factor?: number | null
+          status?: 'draft' | 'completed' | 'failed'
+          share_price?: number | null
+          outstanding_shares?: number | null
+          total_debt?: number | null
+          total_equity?: number | null
+          minority_interest?: number | null
+          preferred_stock?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_emission_calculations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_emission_calculations_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
             referencedColumns: ["id"]
           }
         ]

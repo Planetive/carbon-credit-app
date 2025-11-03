@@ -58,33 +58,32 @@ export const OPTION_1A_MOTOR_VEHICLE: FormulaConfig = {
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {
-      name: 'fuel_consumption',
-      label: 'Fuel Consumption',
+      name: 'total_vehicle_emissions',
+      label: 'Total Vehicle Emissions',
       type: 'number',
       required: true,
-      unit: 'L',
-      description: 'Actual vehicle fuel consumption'
-    },
-    {
-      name: 'emission_factor',
-      label: 'Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/L',
-      description: 'Emission factor specific to the fuel type'
+      unit: 'tCO2e',
+      description: 'Total emissions calculated from all vehicles (auto-calculated from vehicle details)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const totalValueAtOrigination = inputs.total_value_at_origination;
-    const fuelConsumption = inputs.fuel_consumption;
-    const emissionFactor = inputs.emission_factor;
+    const totalVehicleEmissions = inputs.total_vehicle_emissions;
+
+    // Validate inputs to prevent division by zero
+    if (!totalValueAtOrigination || totalValueAtOrigination === 0) {
+      throw new Error('Total value at origination must be greater than 0');
+    }
+    if (!totalVehicleEmissions || totalVehicleEmissions === 0) {
+      throw new Error('Total vehicle emissions must be greater than 0');
+    }
 
     // Step 1: Calculate attribution factor
     const attributionFactor = outstandingAmount / totalValueAtOrigination;
 
-    // Step 2: Calculate emissions from fuel consumption
-    const vehicleEmissions = fuelConsumption * emissionFactor;
+    // Step 2: Use total vehicle emissions (already calculated from detailed vehicle data)
+    const vehicleEmissions = totalVehicleEmissions;
 
     // Step 3: Calculate financed emissions
     const financedEmissions = attributionFactor * vehicleEmissions;
@@ -99,7 +98,7 @@ export const OPTION_1A_MOTOR_VEHICLE: FormulaConfig = {
         {
           step: 'Total Value at Origination',
           value: totalValueAtOrigination,
-          formula: `Total Value at Origination = ${totalValueAtOrigination.toFixed(2)}`
+          formula: `Total Value at Origination = ${totalValueAtOrigination.toFixed(2)} PKR`
         },
         {
           step: 'Attribution Factor',
@@ -107,19 +106,14 @@ export const OPTION_1A_MOTOR_VEHICLE: FormulaConfig = {
           formula: `${outstandingAmount} / ${totalValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Fuel Consumption',
-          value: fuelConsumption,
-          formula: `Fuel Consumption = ${fuelConsumption.toFixed(2)} L`
-        },
-        {
-          step: 'Vehicle Emissions',
+          step: 'Total Vehicle Emissions',
           value: vehicleEmissions,
-          formula: `${fuelConsumption.toFixed(2)} × ${emissionFactor} = ${vehicleEmissions.toFixed(2)} tCO2e`
+          formula: `Total Vehicle Emissions = ${vehicleEmissions.toFixed(2)} tCO2e (calculated from detailed vehicle data)`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${totalValueAtOrigination.toFixed(2)}) × ${vehicleEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `(${outstandingAmount} / ${totalValueAtOrigination.toFixed(2)}) × ${vehicleEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -127,17 +121,16 @@ export const OPTION_1A_MOTOR_VEHICLE: FormulaConfig = {
         optionCode: '1a',
         category: 'motor_vehicle_loan',
         totalValueAtOrigination,
-        fuelConsumption,
-        emissionFactor,
+        totalVehicleEmissions,
         vehicleEmissions,
-        formula: 'Σ (Outstanding amount_v / Total value at origination_v) × Fuel consumption_v × Emission factor_f'
+        formula: 'Σ (Outstanding amount_v / Total value at origination_v) × Total vehicle emissions_v'
       }
     };
   },
   notes: [
     'Highest data quality score (1)',
-    'Primary data on actual vehicle fuel consumption',
-    'Formula: Σ (Outstanding amount_v / Total value at origination_v) × Fuel consumption_v × Emission factor_f'
+    'Primary data on actual vehicle fuel consumption calculated from detailed vehicle entries',
+    'Formula: Σ (Outstanding amount_v / Total value at origination_v) × Total vehicle emissions_v'
   ]
 };
 
@@ -165,42 +158,32 @@ export const OPTION_1B_MOTOR_VEHICLE: FormulaConfig = {
       description: 'The total amount of the motor vehicle loan when it was first approved or issued.'
     },
     {
-      name: 'distance_traveled',
-      label: 'Distance Traveled',
+      name: 'total_vehicle_emissions',
+      label: 'Total Vehicle Emissions',
       type: 'number',
       required: true,
-      unit: 'km',
-      description: 'The total distance the vehicle has traveled, measured in kilometers.'
-    },
-    {
-      name: 'efficiency',
-      label: 'Fuel Efficiency',
-      type: 'number',
-      required: true,
-      unit: 'L/km',
-      description: 'The amount of fuel the vehicle uses to travel one kilometer.'
-    },
-    {
-      name: 'emission_factor',
-      label: 'Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/L',
-      description: 'Emission factor specific to the fuel type'
+      unit: 'tCO2e',
+      description: 'Total emissions calculated from all vehicles (auto-calculated from vehicle details)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const totalValueAtOrigination = inputs.total_value_at_origination;
-    const distanceTraveled = inputs.distance_traveled;
-    const efficiency = inputs.efficiency;
-    const emissionFactor = inputs.emission_factor;
+    const totalVehicleEmissions = inputs.total_vehicle_emissions;
+
+    // Validate inputs to prevent division by zero
+    if (!totalValueAtOrigination || totalValueAtOrigination === 0) {
+      throw new Error('Total value at origination must be greater than 0');
+    }
+    if (!totalVehicleEmissions || totalVehicleEmissions === 0) {
+      throw new Error('Total vehicle emissions must be greater than 0');
+    }
 
     // Step 1: Calculate attribution factor
     const attributionFactor = outstandingAmount / totalValueAtOrigination;
 
-    // Step 2: Calculate emissions from distance traveled, efficiency, and emission factor
-    const vehicleEmissions = distanceTraveled * efficiency * emissionFactor;
+    // Step 2: Use total vehicle emissions (already calculated from detailed vehicle data)
+    const vehicleEmissions = totalVehicleEmissions;
 
     // Step 3: Calculate financed emissions
     const financedEmissions = attributionFactor * vehicleEmissions;

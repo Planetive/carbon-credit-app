@@ -21,9 +21,11 @@ import {
 
 interface FuelEmissionsProps {
   onDataChange: (data: FuelRow[]) => void;
+  companyContext?: boolean; // Add company context prop
+  counterpartyId?: string; // Add counterparty ID for company-specific data
 }
 
-const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange }) => {
+const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyContext = false, counterpartyId }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -43,11 +45,67 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange }) => {
     const loadExistingEntries = async () => {
       if (!user) return;
 
+      // Load company-specific data when in company context
+      if (companyContext && counterpartyId) {
+        console.log('Company context detected - loading company-specific fuel entries for:', counterpartyId);
+        
+        try {
+          // Load company-specific fuel entries
+          const { data: fuelData, error: fuelError } = await supabase
+            .from('scope1_fuel_entries')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('counterparty_id', counterpartyId)
+            .order('created_at', { ascending: false });
+
+          if (fuelError) throw fuelError;
+
+          const companyFuelRows = (fuelData || []).map(entry => ({
+            id: crypto.randomUUID(),
+            dbId: entry.id,
+            type: entry.fuel_type_group as FuelType,
+            fuel: entry.fuel,
+            unit: entry.unit,
+            quantity: entry.quantity,
+            factor: entry.factor,
+            emissions: entry.emissions,
+            isExisting: true,
+          }));
+
+          setExistingEntries(companyFuelRows);
+          setRows(companyFuelRows.length > 0 ? companyFuelRows : []);
+          onDataChange(companyFuelRows);
+          
+          console.log(`Loaded ${companyFuelRows.length} company-specific fuel entries`);
+        } catch (error) {
+          console.error('Error loading company fuel entries:', error);
+          // Fallback to blank form on error
+          setRows([]);
+          setExistingEntries([]);
+          onDataChange([]);
+        }
+        
+        setIsInitialLoad(false);
+        return;
+      }
+
+      // Skip loading data when in company context but no counterpartyId
+      if (companyContext && !counterpartyId) {
+        console.log('Company context detected but no counterpartyId - starting with blank fuel form');
+        setRows([]);
+        setExistingEntries([]);
+        onDataChange([]);
+        setIsInitialLoad(false);
+        return;
+      }
+
+      // Load personal data for individual use
       try {
         const { data: fuelData, error: fuelError } = await supabase
           .from('scope1_fuel_entries')
           .select('*')
           .eq('user_id', user.id)
+          .is('counterparty_id', null) // Only personal entries (no counterparty_id)
           .order('created_at', { ascending: false });
 
         if (fuelError) throw fuelError;
@@ -67,7 +125,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange }) => {
         setExistingEntries(existingFuelRows);
         setRows(existingFuelRows.length > 0 ? existingFuelRows : []);
 
-        setIsInitialLoad(false);
+        if (existingFuelRows.length > 0) {
+          onDataChange(existingFuelRows);
+        }
       } catch (error: any) {
         console.error('Error loading existing entries:', error);
         toast({ 
@@ -75,11 +135,13 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange }) => {
           description: "Failed to load existing entries", 
           variant: "destructive" 
         });
+      } finally {
+        setIsInitialLoad(false);
       }
     };
 
     loadExistingEntries();
-  }, [user, toast]);
+  }, [user, toast, companyContext, counterpartyId]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -170,6 +232,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange }) => {
     try {
       const payload = newEntries.map(v => ({
         user_id: user.id,
+        counterparty_id: companyContext ? counterpartyId : null, // Add counterparty_id for company entries
         fuel_type_group: v.type!,
         fuel: v.fuel!,
         unit: v.unit!,

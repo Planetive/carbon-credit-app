@@ -19,6 +19,8 @@ interface FacilitatedEmissionFormProps {
   corporateStructure?: string; // 'listed' or 'unlisted'
   hasEmissions?: string; // 'yes' or 'no'
   verificationStatus?: string; // 'verified' or 'unverified'
+  verifiedEmissions?: number; // Auto-calculated verified emissions from parent
+  unverifiedEmissions?: number; // Auto-calculated unverified emissions from parent
   onCalculationComplete?: (result: any) => void;
 }
 
@@ -40,6 +42,8 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   corporateStructure = 'listed',
   hasEmissions = '',
   verificationStatus = '',
+  verifiedEmissions = 0,
+  unverifiedEmissions = 0,
   onCalculationComplete
 }) => {
   const { toast } = useToast();
@@ -102,6 +106,19 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
             const dbCompanyType = questionnaire.corporate_structure === 'listed' ? 'listed' : 'unlisted';
             setCompanyType(dbCompanyType);
             
+            // Calculate total emissions from scope 1, 2, 3
+            const totalEmissions = (questionnaire.scope1_emissions || 0) + 
+                                 (questionnaire.scope2_emissions || 0) + 
+                                 (questionnaire.scope3_emissions || 0);
+            
+            console.log('Auto-fill debug:', {
+              scope1: questionnaire.scope1_emissions,
+              scope2: questionnaire.scope2_emissions,
+              scope3: questionnaire.scope3_emissions,
+              totalEmissions,
+              verificationStatus: questionnaire.verification_status
+            });
+            
             // Update form data with database values
             setFormData(prev => ({
               ...prev,
@@ -110,7 +127,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
               totalDebt: questionnaire.total_debt || 0,
               minorityInterest: questionnaire.minority_interest || 0,
               preferredStock: questionnaire.preferred_stock || 0,
-              totalEquity: questionnaire.total_equity || 0
+              totalEquity: questionnaire.total_equity || 0,
+              // Auto-fill emissions based on verification status
+              verifiedEmissions: questionnaire.verification_status === 'verified' ? totalEmissions : 0,
+              unverifiedEmissions: questionnaire.verification_status === 'unverified' ? totalEmissions : 0
             }));
           }
         }
@@ -119,7 +139,17 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
         const raw = sessionStorage.getItem('facilitatedFormState');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed?.formData) setFormData(prev => ({ ...prev, ...parsed.formData }));
+          if (parsed?.formData) {
+            setFormData(prev => {
+              const restored = { ...prev, ...parsed.formData };
+              // Preserve auto-filled emissions if they were set from questionnaire
+              if (prev.verifiedEmissions > 0 || prev.unverifiedEmissions > 0) {
+                restored.verifiedEmissions = prev.verifiedEmissions;
+                restored.unverifiedEmissions = prev.unverifiedEmissions;
+              }
+              return restored;
+            });
+          }
           if (parsed?.companyType) setCompanyType(parsed.companyType);
         }
       } catch (error) {
@@ -129,6 +159,29 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
     
     initializeForm();
   }, []);
+
+  // Auto-fill emissions from props (calculated by parent ESGWizard)
+  useEffect(() => {
+    console.log('🔍 FacilitatedEmissionForm - Auto-fill useEffect triggered:', {
+      hasEmissions,
+      verificationStatus,
+      verifiedEmissions,
+      unverifiedEmissions,
+      currentFormData: formData
+    });
+    
+    if (hasEmissions === 'yes' && (verifiedEmissions > 0 || unverifiedEmissions > 0)) {
+      setFormData(prev => {
+        const newData = {
+          ...prev,
+          verifiedEmissions: verifiedEmissions || prev.verifiedEmissions,
+          unverifiedEmissions: unverifiedEmissions || prev.unverifiedEmissions
+        };
+        console.log('🔍 FacilitatedEmissionForm - Auto-fill form data updated:', newData);
+        return newData;
+      });
+    }
+  }, [hasEmissions, verificationStatus, verifiedEmissions, unverifiedEmissions]);
 
   // Get available formulas based on selections (same logic as Finance Emission)
   const getAvailableFormulas = () => {
@@ -621,16 +674,22 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                 {/* Option 1a - Verified Emissions */}
                 {isInputRequired('verified_emissions') && (
                   <div>
-                    <Label htmlFor="verified-emissions">Verified GHG Emissions *</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="verified-emissions">Verified GHG Emissions *</Label>
+                      {hasEmissions === 'yes' && verificationStatus === 'verified' && (
+                        <span className="text-xs text-muted-foreground">(auto-filled)</span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <FormattedNumberInput
                         id="verified-emissions"
                         placeholder="0"
                         value={formData.verifiedEmissions || 0}
                         onChange={(value) => updateFormData('verifiedEmissions', value)}
+                        disabled={hasEmissions === 'yes' && verificationStatus === 'verified'}
                         className="mt-1"
                       />
-                      <Select value={formData.verifiedEmissionsUnit} onValueChange={(value) => updateFormData('verifiedEmissionsUnit', value)}>
+                      <Select value={formData.verifiedEmissionsUnit} onValueChange={(value) => updateFormData('verifiedEmissionsUnit', value)} disabled={hasEmissions === 'yes' && verificationStatus === 'verified'}>
                         <SelectTrigger className="w-32 mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -653,6 +712,9 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                   <div>
                     <div className="flex items-center gap-2">
                       <Label htmlFor="unverified-emissions">Unverified GHG Emissions *</Label>
+                      {hasEmissions === 'yes' && verificationStatus === 'unverified' && (
+                        <span className="text-xs text-muted-foreground">(auto-filled)</span>
+                      )}
                       <FieldTooltip content="Emissions data reported by the company but not yet verified by an external auditor." />
                     </div>
                     <div className="flex gap-2">
@@ -661,9 +723,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                         placeholder="0"
                         value={formData.unverifiedEmissions || 0}
                         onChange={(value) => updateFormData('unverifiedEmissions', value)}
+                        disabled={hasEmissions === 'yes' && verificationStatus === 'unverified'}
                         className="mt-1"
                       />
-                      <Select value={formData.unverifiedEmissionsUnit} onValueChange={(value) => updateFormData('unverifiedEmissionsUnit', value)}>
+                      <Select value={formData.unverifiedEmissionsUnit} onValueChange={(value) => updateFormData('unverifiedEmissionsUnit', value)} disabled={hasEmissions === 'yes' && verificationStatus === 'unverified'}>
                         <SelectTrigger className="w-32 mt-1">
                           <SelectValue />
                         </SelectTrigger>

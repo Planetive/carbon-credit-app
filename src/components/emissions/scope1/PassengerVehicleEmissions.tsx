@@ -20,9 +20,10 @@ import {
 
 interface PassengerVehicleEmissionsProps {
   onDataChange: (data: VehicleRow[]) => void;
+  companyContext?: boolean; // Add company context prop
 }
 
-const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ onDataChange }) => {
+const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ onDataChange, companyContext = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -80,6 +81,16 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
     const loadExistingEntries = async () => {
       if (!user) return;
 
+      // Skip loading data when in company context - start with blank form
+      if (companyContext) {
+        console.log('Company context detected - starting with blank passenger vehicle form');
+        setRows([]);
+        setExistingEntries([]);
+        onDataChange([]);
+        setIsInitialLoad(false);
+        return;
+      }
+
       try {
         const { data: vehicleData, error: vehicleError } = await supabase
           .from('scope1_passenger_vehicle_entries')
@@ -116,7 +127,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
     };
 
     loadExistingEntries();
-  }, [user, toast]);
+  }, [user, toast, companyContext]);
 
   // Notify parent of data changes
   useEffect(() => {

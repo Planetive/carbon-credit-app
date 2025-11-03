@@ -1,99 +1,123 @@
-# Carbon Credit Application - Admin Setup Guide
+# Carbon Credit Backend API
 
-## Service Role Key Configuration
+FastAPI backend service for the Carbon Credit Application, providing finance emission calculations, facilitated emission calculations, and climate risk scenario analysis.
 
-To fix the issue where admin cannot access user profile data (display_name, organization_name), you need to configure the Supabase Service Role Key.
+## 🚀 Features
 
-### Step 1: Get Your Service Role Key
+- **Finance Emission Calculator** - Calculate financed emissions using PCAF methodology
+- **Facilitated Emission Calculator** - Calculate facilitated emissions for various asset classes
+- **Climate Risk Scenario Analysis** - TCFD-compliant climate stress testing
+- **Portfolio Risk Assessment** - Dynamic risk calculations based on actual portfolio data
+- **Supabase Integration** - Database connectivity for portfolio and questionnaire data
 
-1. Go to your Supabase project dashboard
-2. Navigate to **Settings** → **API**
-3. Copy the **service_role** key (not the anon key)
+## 📋 API Endpoints
 
-### Step 2: Create Environment File
+### Health & Status
+- `GET /health` - Health check and database status
+- `GET /test-db` - Database connection test
+- `GET /docs` - Interactive API documentation (Swagger UI)
 
-Create a `.env` file in the root of your project (`carbon-credit-app/.env`) with the following content:
+### Finance Emissions
+- `POST /finance-emission` - Calculate financed emissions
 
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://yhticndmpvzczquivpfb.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlodGljbmRtcHZ6Y3pxdWl2cGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxMjc4OTksImV4cCI6MjA2NzcwMzg5OX0.Oj6E-LQPDcEE2j20kzF9CMSyzboFt7Y
+### Facilitated Emissions  
+- `POST /facilitated-emission` - Calculate facilitated emissions
 
-# IMPORTANT: Add your Supabase Service Role Key here for admin operations
-VITE_SUPABASE_SERVICE_ROLE_KEY=your_actual_service_role_key_here
-```
+### Climate Risk Analysis
+- `POST /scenario/calculate` - Calculate climate stress testing scenarios
 
-### Step 3: Restart Development Server
+## 🛠️ Setup
 
-After creating the `.env` file, restart your development server:
+### Prerequisites
+- Python 3.8+
+- Supabase Service Role Key
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd carbon-credit-backend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Update `.env` with your Supabase service role key:
+   ```env
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+   ```
+
+4. **Run the development server:**
+   ```bash
+   python start.py
+   # or
+   uvicorn fastapi_app.main:app --reload --port 8000
+   ```
+
+## 🌐 Deployment
+
+### Railway (Recommended)
+1. Connect your GitHub repository to Railway
+2. Set environment variables in Railway dashboard
+3. Deploy automatically on push
+
+### Render
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set build command: `pip install -r requirements.txt`
+4. Set start command: `uvicorn fastapi_app.main:app --host 0.0.0.0 --port $PORT`
+
+### Heroku
+1. Create a new Heroku app
+2. Set environment variables
+3. Deploy using Git
+
+## 📊 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key for database access | Yes |
+
+## 🧪 Testing
+
+Test the API endpoints:
 
 ```bash
-npm run dev
+# Health check
+curl http://localhost:8000/health
+
+# API documentation
+open http://localhost:8000/docs
 ```
 
-## Security Notes
+## 📁 Project Structure
 
-⚠️ **Important Security Considerations:**
+```
+carbon-credit-backend/
+├── fastapi_app/
+│   ├── main.py              # FastAPI application entry point
+│   ├── models.py            # Pydantic models for API
+│   ├── database.py          # Supabase database connection
+│   ├── calculation_engine.py # Finance/facilitated emission calculations
+│   ├── scenario_engine.py   # Climate risk scenario calculations
+│   └── ...                  # Configuration files for different asset classes
+├── requirements.txt         # Python dependencies
+├── start.py                # Development server startup script
+└── README.md               # This file
+```
 
-1. **Never commit the `.env` file** to version control
-2. The service role key bypasses Row Level Security (RLS) policies
-3. Only use this key for admin operations that need to access all user data
-4. In production, ensure the service role key is properly secured
+## 🔗 Frontend Integration
 
-## Alternative Solutions
+The frontend application should be configured to use this backend API. Update the frontend's API base URL to point to your deployed backend.
 
-If you prefer not to use the service role key, you can:
+## 📝 License
 
-1. **Modify RLS Policies**: Update the `profiles` table RLS policies to allow admin access
-2. **Create Admin Users**: Add specific admin user IDs to RLS policies
-3. **Use Database Functions**: Create PostgreSQL functions that bypass RLS
-
-## Admin Access URLs
-
-Once configured, you can access the admin panel at:
-
-- **Admin Login**: `http://localhost:8080/admin/login`
-- **Admin Dashboard**: `http://localhost:8080/admin/dashboard`
-- **Admin Scoring**: `http://localhost:8080/admin/score/{assessment_id}`
-
-## Troubleshooting
-
-### Issue: "Unknown User" or "Unknown Organization" still showing
-
-1. Check that the `.env` file is in the correct location
-2. Verify the service role key is correct
-3. Restart the development server
-4. Check browser console for any errors
-
-### Issue: Service role key not working
-
-1. Ensure the key starts with `eyJ...`
-2. Check that there are no extra spaces or characters
-3. Verify the key is from the correct Supabase project
-
-### Issue: Admin pages not loading
-
-1. Check that you're logged in as admin
-2. Clear browser localStorage and log in again
-3. Verify the admin routes are properly configured in `App.tsx`
-
-## Current Implementation Status
-
-✅ **Completed:**
-- Service role client configured in `client.ts`
-- Admin components using `adminSupabase` for profile data
-- Admin dashboard and scoring pages implemented
-- RLS bypass for admin operations
-
-🔄 **In Progress:**
-- Testing with actual service role key
-- Verification of all admin functionality
-
-## Database Schema
-
-The admin system works with these tables:
-- `esg_assessments`: User ESG assessment data
-- `esg_scores`: Admin scoring data
-- `profiles`: User profile information (display_name, organization_name)
-
-All admin operations now use the service role key to bypass RLS and access all data across these tables.
+This project is part of the Carbon Credit Application suite.

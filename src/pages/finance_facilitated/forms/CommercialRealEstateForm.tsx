@@ -19,8 +19,13 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
 }) => {
   // Fields that are already captured in the Financial Information section
   const duplicateFields = ['outstanding_amount'];
+  
+  // Filter out actual_energy_consumption and supplier_specific_emission_factor (replaced by total_emission)
+  const fieldsToExclude = ['actual_energy_consumption', 'supplier_specific_emission_factor'];
 
-  const filteredInputs = selectedFormula?.inputs.filter(input => !duplicateFields.includes(input.name)) || [];
+  const filteredInputs = selectedFormula?.inputs.filter(input => 
+    !duplicateFields.includes(input.name) && !fieldsToExclude.includes(input.name)
+  ) || [];
 
   if (filteredInputs.length === 0) return null;
 
@@ -63,6 +68,8 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                         onChange={(e) => onUpdateFormData(fieldName, parseFloat(e.target.value) || 0)}
                         className="mt-1"
                         required={input.required}
+                        disabled={input.name === 'total_emission' && formData[fieldName] > 0} // Disable if auto-filled from questionnaire
+                        title={input.name === 'total_emission' && formData[fieldName] > 0 ? 'Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)' : ''}
                       />
                     </div>
                     {input.unitOptions && (

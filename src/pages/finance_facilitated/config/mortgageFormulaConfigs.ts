@@ -58,41 +58,28 @@ export const OPTION_1A_MORTGAGE: FormulaConfig = {
       description: 'Property value at the time of mortgage origination'
     },
     {
-      name: 'actual_energy_consumption',
-      label: 'Actual Building Energy Consumption',
+      name: 'total_emission',
+      label: 'Total Emission',
       type: 'number',
       required: true,
-      unit: 'MWh',
-      description: 'Primary data on actual building energy consumption'
-    },
-    {
-      name: 'supplier_specific_emission_factor',
-      label: 'Supplier-Specific Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/MWh',
-      description: 'Supplier-specific emission factors specific to the energy source'
+      unit: 'tCO2e',
+      description: 'Total emission = Actual Building Energy Consumption × Supplier-Specific Emission Factor (auto-filled from questionnaire: Scope 1 + Scope 2 + Scope 3)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const propertyValueAtOrigination = inputs.property_value_at_origination;
-    const actualEnergyConsumption = inputs.actual_energy_consumption;
-    const supplierSpecificEmissionFactor = inputs.supplier_specific_emission_factor;
+    const totalEmissions = inputs.total_emission; // Total emission = Actual Building Energy Consumption × Supplier-Specific Emission Factor (auto-filled from questionnaire)
 
     // Step 1: Calculate attribution factor using Property Value at Origination
     const attributionFactor = outstandingAmount / propertyValueAtOrigination;
 
-    // Step 2: Calculate emissions from actual energy consumption
-    // For multiple properties, we use the total energy consumption and average emission factor
-    const energyEmissions = actualEnergyConsumption * supplierSpecificEmissionFactor;
-
-    // Step 3: Calculate financed emissions
-    const financedEmissions = attributionFactor * energyEmissions;
+    // Step 2: Calculate financed emissions using total emissions directly
+    const financedEmissions = attributionFactor * totalEmissions;
 
     return {
       attributionFactor,
-      emissionFactor: energyEmissions,
+      emissionFactor: totalEmissions,
       financedEmissions,
       dataQualityScore: 1,
       methodology: 'PCAF Option 1a - Supplier-Specific Emission Factors (Mortgage)',
@@ -108,14 +95,14 @@ export const OPTION_1A_MORTGAGE: FormulaConfig = {
           formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Energy Emissions',
-          value: energyEmissions,
-          formula: `${actualEnergyConsumption} × ${supplierSpecificEmissionFactor} = ${energyEmissions.toFixed(2)}`
+          step: 'Total Emission',
+          value: totalEmissions,
+          formula: `Total Emission (Actual Building Energy Consumption × Supplier-Specific Emission Factor) = ${totalEmissions.toFixed(2)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -123,16 +110,17 @@ export const OPTION_1A_MORTGAGE: FormulaConfig = {
         optionCode: '1a',
         category: 'mortgage',
         propertyValueAtOrigination,
-        energyEmissions,
-        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Actual energy consumption_b,e × Supplier specific emission factor_e'
+        totalEmissions,
+        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Actual Building Energy Consumption × Supplier-Specific Emission Factor)'
       }
     };
   },
   notes: [
     'Highest data quality score (1)',
-    'Requires supplier-specific emission factors and actual energy consumption data',
+    'Requires total emission data (Actual Building Energy Consumption × Supplier-Specific Emission Factor)',
+    'Total emission is auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)',
     'Applicable to scope 1 and 2 emissions only',
-    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Actual energy consumption_b,e × Supplier specific emission factor_e'
+    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Actual Building Energy Consumption × Supplier-Specific Emission Factor)'
   ]
 };
 
@@ -160,40 +148,28 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
       description: 'Property value at the time of mortgage origination'
     },
     {
-      name: 'actual_energy_consumption',
-      label: 'Actual Building Energy Consumption',
+      name: 'total_emission',
+      label: 'Total Emission',
       type: 'number',
       required: true,
-      unit: 'MWh',
-      description: 'Primary data on actual building energy consumption'
-    },
-    {
-      name: 'average_emission_factor',
-      label: 'Average Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/MWh',
-      description: 'Average emission factor for the energy source'
+      unit: 'tCO2e',
+      description: 'Total emission = Actual Building Energy Consumption × Average Emission Factor (auto-filled from questionnaire: Scope 1 + Scope 2 + Scope 3)'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const propertyValueAtOrigination = inputs.property_value_at_origination;
-    const actualEnergyConsumption = inputs.actual_energy_consumption;
-    const averageEmissionFactor = inputs.average_emission_factor;
+    const totalEmissions = inputs.total_emission; // Total emission = Actual Building Energy Consumption × Average Emission Factor (auto-filled from questionnaire)
 
     // Step 1: Calculate attribution factor using Property Value at Origination
     const attributionFactor = outstandingAmount / propertyValueAtOrigination;
 
-    // Step 2: Calculate emissions from actual energy consumption
-    const energyEmissions = actualEnergyConsumption * averageEmissionFactor;
-
-    // Step 3: Calculate financed emissions
-    const financedEmissions = attributionFactor * energyEmissions;
+    // Step 2: Calculate financed emissions using total emissions directly
+    const financedEmissions = attributionFactor * totalEmissions;
 
     return {
       attributionFactor,
-      emissionFactor: energyEmissions,
+      emissionFactor: totalEmissions,
       financedEmissions,
       dataQualityScore: 2,
       methodology: 'PCAF Option 1b - Average Emission Factors (Mortgage)',
@@ -209,14 +185,14 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
           formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Energy Emissions',
-          value: energyEmissions,
-          formula: `${actualEnergyConsumption} × ${averageEmissionFactor} = ${energyEmissions.toFixed(2)}`
+          step: 'Total Emission',
+          value: totalEmissions,
+          formula: `Total Emission (Actual Building Energy Consumption × Average Emission Factor) = ${totalEmissions.toFixed(2)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -224,16 +200,17 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
         optionCode: '1b',
         category: 'mortgage',
         propertyValueAtOrigination,
-        energyEmissions,
-        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Actual energy consumption_b,e × Average emission factor_e'
+        totalEmissions,
+        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Actual Building Energy Consumption × Average Emission Factor)'
       }
     };
   },
   notes: [
     'Good data quality score (2)',
-    'Requires actual energy consumption data and average emission factors',
+    'Requires total emission data (Actual Building Energy Consumption × Average Emission Factor)',
+    'Total emission is auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)',
     'Applicable to scope 1 and 2 emissions only',
-    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Actual energy consumption_b,e × Average emission factor_e'
+    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Actual Building Energy Consumption × Average Emission Factor)'
   ]
 };
 
@@ -261,52 +238,28 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
       description: 'Property value at the time of mortgage origination'
     },
     {
-      name: 'estimated_energy_consumption_from_labels',
-      label: 'Estimated Energy Consumption from Energy Labels',
+      name: 'total_emission',
+      label: 'Total Emission',
       type: 'number',
       required: true,
-      unit: 'MWh/m²',
-      description: 'Estimated building energy consumption per floor area based on official building energy labels'
-    },
-    {
-      name: 'floor_area',
-      label: 'Floor Area',
-      type: 'number',
-      required: true,
-      unit: 'm²',
-      description: 'Floor area financed'
-    },
-    {
-      name: 'average_emission_factor',
-      label: 'Average Emission Factor',
-      type: 'number',
-      required: true,
-      unit: 'tCO2e/MWh',
-      description: 'Average emission factors specific to the energy source'
+      unit: 'tCO2e',
+      description: 'Total emission = Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor'
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const propertyValueAtOrigination = inputs.property_value_at_origination;
-    const estimatedEnergyConsumptionFromLabels = inputs.estimated_energy_consumption_from_labels;
-    const floorArea = inputs.floor_area;
-    const averageEmissionFactor = inputs.average_emission_factor;
+    const totalEmissions = inputs.total_emission; // Total emission = Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor
 
     // Step 1: Calculate attribution factor using Property Value at Origination
     const attributionFactor = outstandingAmount / propertyValueAtOrigination;
 
-    // Step 2: Calculate total energy consumption from floor area and energy labels
-    const totalEnergyConsumption = estimatedEnergyConsumptionFromLabels * floorArea;
-
-    // Step 3: Calculate emissions from energy consumption
-    const energyEmissions = totalEnergyConsumption * averageEmissionFactor;
-
-    // Step 4: Calculate financed emissions
-    const financedEmissions = attributionFactor * energyEmissions;
+    // Step 2: Calculate financed emissions using total emissions directly
+    const financedEmissions = attributionFactor * totalEmissions;
 
     return {
       attributionFactor,
-      emissionFactor: energyEmissions,
+      emissionFactor: totalEmissions,
       financedEmissions,
       dataQualityScore: 3,
       methodology: 'PCAF Option 2a - Energy Labels Data (Mortgage)',
@@ -322,19 +275,14 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
           formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Total Energy Consumption',
-          value: totalEnergyConsumption,
-          formula: `${estimatedEnergyConsumptionFromLabels} × ${floorArea} = ${totalEnergyConsumption.toFixed(2)} MWh`
-        },
-        {
-          step: 'Energy Emissions',
-          value: energyEmissions,
-          formula: `${totalEnergyConsumption.toFixed(2)} × ${averageEmissionFactor} = ${energyEmissions.toFixed(2)}`
+          step: 'Total Emission',
+          value: totalEmissions,
+          formula: `Total Emission (Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor) = ${totalEmissions.toFixed(2)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `(${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -342,17 +290,16 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
         optionCode: '2a',
         category: 'mortgage',
         propertyValueAtOrigination,
-        totalEnergyConsumption,
-        energyEmissions,
-        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Estimated energy consumption from energy labels_b,e × Floor area_b × Average emission factor_e'
+        totalEmissions,
+        formula: 'Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor)'
       }
     };
   },
   notes: [
     'Fair data quality score (3)',
-    'Requires energy labels data, floor area, and average emission factors',
+    'Requires total emission data (Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor)',
     'Applicable to scope 1 and 2 emissions only',
-    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Estimated energy consumption from energy labels_b,e × Floor area_b × Average emission factor_e'
+    'Formula: Σ_{b,e} (Outstanding amount_b / Property value at origination_b) × Total emission_b (Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor)'
   ]
 };
 

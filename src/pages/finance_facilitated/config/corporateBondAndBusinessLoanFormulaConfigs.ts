@@ -295,20 +295,13 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       COMMON_INPUTS.total_assets,        // Total assets for attribution factor
       COMMON_INPUTS.evic,                // EVIC for financed emissions calculation
       {
-        name: 'energy_consumption',
-        label: 'Energy Consumption',
+        name: 'emissions',
+        label: 'Emissions',
         type: 'number',
         required: true,
-        unit: 'MWh',
-        description: 'Primary physical activity data for energy consumption'
-      },
-      {
-        name: 'emission_factor',
-        label: 'Emission Factor',
-        type: 'number',
-        required: true,
-        unit: 'tCO2e/MWh',
-        description: 'Emission factors specific to the energy source'
+        unit: 'tCO2e',
+        description: 'Total emissions (Energy Consumption × Emission Factor)',
+        tooltip: 'This represents the combined Energy Consumption × Emission Factor calculation'
       }
     ],
     /**
@@ -326,8 +319,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
      */
     calculate: (inputs, companyType) => {
       const outstandingAmount = inputs.outstanding_amount;
-      const energyConsumption = inputs.energy_consumption;
-      const emissionFactor = inputs.emission_factor;
+      const emissions = inputs.emissions; // This is already Energy Consumption × Emission Factor
       
       // Step 1: Calculate attribution factor (consistent across all formulas)
       const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
@@ -335,8 +327,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       // Step 2: Calculate EVIC for listed companies
       const evic = calculateEVIC(inputs);
       
-      // Step 3: Calculate energy-based emissions
-      const energyEmissions = energyConsumption * emissionFactor;
+      // Step 3: Use the pre-calculated emissions (Energy Consumption × Emission Factor)
+      const energyEmissions = emissions;
       
       // Step 4: Calculate financed emissions using EVIC as denominator
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, evic, energyEmissions);
@@ -359,9 +351,9 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
             formula: `${inputs.sharePrice} × ${inputs.outstandingShares} + ${inputs.totalDebt} + ${inputs.minorityInterest} + ${inputs.preferredStock} = ${evic.toFixed(2)}`
           },
           {
-            step: 'Energy Emissions',
+            step: 'Emissions',
             value: energyEmissions,
-            formula: `${energyConsumption} × ${emissionFactor} = ${energyEmissions.toFixed(2)}`
+            formula: `Emissions (Energy Consumption × Emission Factor) = ${energyEmissions.toFixed(2)}`
           },
           {
             step: 'Financed Emissions',
@@ -715,20 +707,13 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       COMMON_INPUTS.total_assets,        // Total assets for attribution factor
       COMMON_INPUTS.total_equity_plus_debt, // Total Equity + Debt for financed emissions calculation
       {
-        name: 'energy_consumption',
-        label: 'Energy Consumption',
+        name: 'emissions',
+        label: 'Emissions',
         type: 'number',
         required: true,
-        unit: 'MWh',
-        description: 'Primary physical activity data for energy consumption'
-      },
-      {
-        name: 'emission_factor',
-        label: 'Emission Factor',
-        type: 'number',
-        required: true,
-        unit: 'tCO2e/MWh',
-        description: 'Emission factors specific to the energy source'
+        unit: 'tCO2e',
+        description: 'Total emissions (Energy Consumption × Emission Factor)',
+        tooltip: 'This represents the combined Energy Consumption × Emission Factor calculation'
       }
     ],
     /**
@@ -746,8 +731,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
      */
     calculate: (inputs, companyType) => {
       const outstandingAmount = inputs.outstanding_amount;
-      const energyConsumption = inputs.energy_consumption;
-      const emissionFactor = inputs.emission_factor;
+      const emissions = inputs.emissions; // This is already Energy Consumption × Emission Factor
       
       // Step 1: Calculate attribution factor (consistent across all formulas)
       const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
@@ -755,8 +739,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       // Step 2: Calculate Total Equity + Debt for unlisted companies
       const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
       
-      // Step 3: Calculate energy-based emissions
-      const energyEmissions = energyConsumption * emissionFactor;
+      // Step 3: Use the pre-calculated emissions (Energy Consumption × Emission Factor)
+      const energyEmissions = emissions;
       
       // Step 4: Calculate financed emissions using Total Equity + Debt as denominator
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, totalEquityPlusDebt, energyEmissions);
@@ -774,7 +758,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
           'Total Equity + Debt Calculation',
           `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`,
           energyEmissions,
-          'Energy Emissions',
+          'Emissions',
           financedEmissions
         ),
         metadata: {

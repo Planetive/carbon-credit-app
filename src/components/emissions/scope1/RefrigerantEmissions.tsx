@@ -20,9 +20,10 @@ import {
 
 interface RefrigerantEmissionsProps {
   onDataChange: (data: RefrigerantRow[]) => void;
+  companyContext?: boolean; // Add company context prop
 }
 
-const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChange }) => {
+const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChange, companyContext = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -39,6 +40,16 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
   useEffect(() => {
     const loadExistingEntries = async () => {
       if (!user) return;
+
+      // Skip loading data when in company context - start with blank form
+      if (companyContext) {
+        console.log('Company context detected - starting with blank refrigerant form');
+        setRows([]);
+        setExistingEntries([]);
+        onDataChange([]);
+        setIsInitialLoad(false);
+        return;
+      }
 
       try {
         const { data: refrigerantData, error: refrigerantError } = await supabase
@@ -74,7 +85,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
     };
 
     loadExistingEntries();
-  }, [user, toast]);
+  }, [user, toast, companyContext]);
 
   // Notify parent of data changes
   useEffect(() => {

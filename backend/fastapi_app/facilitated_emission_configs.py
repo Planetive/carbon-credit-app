@@ -161,16 +161,14 @@ def _calculate_2a_facilitated_energy_listed(inputs: dict, company_type: str) -> 
     weighting_factor = inputs.get('weighting_factor', 0)
     energy_consumption = inputs.get('energy_consumption', 0)
     emission_factor = inputs.get('emission_factor', 0)
-    process_emissions = inputs.get('process_emissions', 0)
     evic = calculate_evic(inputs)
     attribution_factor = calculate_attribution_factor_listed(facilitated_amount, evic)
     energy_emissions = energy_consumption * emission_factor
-    total_emissions = energy_emissions + process_emissions
-    facilitated_emissions = (facilitated_amount / evic) * weighting_factor * total_emissions
+    facilitated_emissions = (facilitated_amount / evic) * weighting_factor * energy_emissions
     
     return {
         'attributionFactor': attribution_factor,
-        'emissionFactor': total_emissions,
+        'emissionFactor': energy_emissions,
         'financedEmissions': facilitated_emissions,
         'dataQualityScore': 3,
         'methodology': 'Option 2a - Energy Consumption Data (Facilitated - Listed)',
@@ -186,11 +184,6 @@ def _calculate_2a_facilitated_energy_listed(inputs: dict, company_type: str) -> 
                 'formula': f'{energy_consumption} × {emission_factor} = {energy_emissions:.2f} tCO2e'
             },
             {
-                'step': 'Total Emissions',
-                'value': total_emissions,
-                'formula': f'{energy_emissions} + {process_emissions} = {total_emissions:.2f} tCO2e'
-            },
-            {
                 'step': 'Attribution Factor',
                 'value': attribution_factor,
                 'formula': f'{facilitated_amount} / {evic} = {attribution_factor:.6f}'
@@ -198,7 +191,7 @@ def _calculate_2a_facilitated_energy_listed(inputs: dict, company_type: str) -> 
             {
                 'step': 'Facilitated Emissions',
                 'value': facilitated_emissions,
-                'formula': f'({facilitated_amount} / {evic}) × {weighting_factor} × {total_emissions} = {facilitated_emissions:.2f} tCO2e'
+                'formula': f'({facilitated_amount} / {evic}) × {weighting_factor} × {energy_emissions} = {facilitated_emissions:.2f} tCO2e'
             }
         ]
     }
@@ -209,16 +202,14 @@ def _calculate_2a_facilitated_energy_unlisted(inputs: dict, company_type: str) -
     weighting_factor = inputs.get('weighting_factor', 0)
     energy_consumption = inputs.get('energy_consumption', 0)
     emission_factor = inputs.get('emission_factor', 0)
-    process_emissions = inputs.get('process_emissions', 0)
     total_equity_plus_debt = calculate_total_equity_plus_debt(inputs)
     attribution_factor = calculate_attribution_factor_unlisted(facilitated_amount, total_equity_plus_debt)
     energy_emissions = energy_consumption * emission_factor
-    total_emissions = energy_emissions + process_emissions
-    facilitated_emissions = (facilitated_amount / total_equity_plus_debt) * weighting_factor * total_emissions
+    facilitated_emissions = (facilitated_amount / total_equity_plus_debt) * weighting_factor * energy_emissions
     
     return {
         'attributionFactor': attribution_factor,
-        'emissionFactor': total_emissions,
+        'emissionFactor': energy_emissions,
         'financedEmissions': facilitated_emissions,
         'dataQualityScore': 3,
         'methodology': 'Option 2a - Energy Consumption Data (Facilitated - Unlisted)',
@@ -234,11 +225,6 @@ def _calculate_2a_facilitated_energy_unlisted(inputs: dict, company_type: str) -
                 'formula': f'{energy_consumption} × {emission_factor} = {energy_emissions:.2f} tCO2e'
             },
             {
-                'step': 'Total Emissions',
-                'value': total_emissions,
-                'formula': f'{energy_emissions} + {process_emissions} = {total_emissions:.2f} tCO2e'
-            },
-            {
                 'step': 'Attribution Factor',
                 'value': attribution_factor,
                 'formula': f'{facilitated_amount} / {total_equity_plus_debt} = {attribution_factor:.6f}'
@@ -246,7 +232,7 @@ def _calculate_2a_facilitated_energy_unlisted(inputs: dict, company_type: str) -
             {
                 'step': 'Facilitated Emissions',
                 'value': facilitated_emissions,
-                'formula': f'({facilitated_amount} / {total_equity_plus_debt}) × {weighting_factor} × {total_emissions} = {facilitated_emissions:.2f} tCO2e'
+                'formula': f'({facilitated_amount} / {total_equity_plus_debt}) × {weighting_factor} × {energy_emissions} = {facilitated_emissions:.2f} tCO2e'
             }
         ]
     }

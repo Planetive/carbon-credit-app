@@ -31,6 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Bank portfolio management removed - keeping simple individual company approach
+
 # Initialize the calculation engines
 calculation_engine = CalculationEngine()
 scenario_engine = ScenarioEngine()

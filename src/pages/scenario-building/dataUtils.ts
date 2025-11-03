@@ -34,11 +34,15 @@ export async function convertPortfolioToScenario(
       financedEmissions
     });
     
+    // Map counterpartyType to counterparty if counterparty is not available
+    // Entries from BankPortfolio have counterpartyType, not counterparty
+    const counterparty = (entry as any).counterparty || (entry as any).counterpartyType || 'N/A';
+    
     return {
       id: entry.id,
       company: entry.company,
       amount: entry.amount,
-      counterparty: entry.counterparty,
+      counterparty: counterparty,
       sector: entry.sector,
       geography: entry.geography,
       probabilityOfDefault: entry.probabilityOfDefault,
@@ -81,67 +85,4 @@ export function mapSectorToAssetClass(sector: string): string {
 export function calculateFinancedEmissions(amount: number, sector: string): number {
   const sectorEmissions = DEFAULT_FINANCED_EMISSIONS_BY_SECTOR[sector] || 0.2;
   return (amount / 1000000) * sectorEmissions; // Convert to millions
-}
-
-/**
- * Generate sample portfolio data for testing
- */
-export function generateSamplePortfolio(): PortfolioEntry[] {
-  return [
-    {
-      id: '1',
-      company: 'Acme Manufacturing Ltd.',
-      amount: 70000000000, // 70 billion PKR
-      counterparty: 'ACME001',
-      sector: 'Manufacturing',
-      geography: 'Pakistan',
-      probabilityOfDefault: 2.5,
-      lossGivenDefault: 45,
-      tenor: 36
-    },
-    {
-      id: '2',
-      company: 'Green Energy Corp.',
-      amount: 126000000000, // 126 billion PKR
-      counterparty: 'GREEN001',
-      sector: 'Energy',
-      geography: 'Pakistan',
-      probabilityOfDefault: 1.8,
-      lossGivenDefault: 40,
-      tenor: 60
-    },
-    {
-      id: '3',
-      company: 'Prime Retail Pvt.',
-      amount: 42000000000, // 42 billion PKR
-      counterparty: 'PRIME001',
-      sector: 'Retail',
-      geography: 'Pakistan',
-      probabilityOfDefault: 3.2,
-      lossGivenDefault: 50,
-      tenor: 24
-    },
-    {
-      id: '4',
-      company: 'Tech Solutions Inc.',
-      amount: 28000000000, // 28 billion PKR
-      counterparty: 'TECH001',
-      sector: 'Technology',
-      geography: 'Pakistan',
-      probabilityOfDefault: 2.1,
-      lossGivenDefault: 35,
-      tenor: 48
-    },
-    {
-      id: '5',
-      company: 'AgriCorp Ltd.',
-      amount: 56000000000, // 56 billion PKR
-      counterparty: 'AGRI001',
-      sector: 'Agriculture',
-      geography: 'Pakistan',
-      probabilityOfDefault: 4.0,
-      lossGivenDefault: 55,
-      tenor: 18
-    }
-  ];
 }
