@@ -1,11 +1,22 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
+import { FieldTooltip } from "@/pages/finance_facilitated/components/FieldTooltip";
+import { SupplierAutocomplete } from "./SupplierAutocomplete";
+import { Supplier } from "./types";
+import { getAllVehicleTypes, VehicleType } from "./vehicleTypes";
+import { supabase } from "@/integrations/supabase/client";
+import { WasteMaterial, getAvailableDisposalMethods, getEmissionFactor, DisposalMethod, getAllWasteMaterials } from "./wasteTypes";
+import { getAllBusinessTravelTypes, BusinessTravelType } from "./businessTravelTypes";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { FACTORS, SCOPE2_FACTORS, VEHICLE_FACTORS, DELIVERY_VEHICLE_FACTORS, REFRIGERANT_FACTORS } from "../shared/EmissionFactors";
+import { useAuth } from "@/contexts/AuthContext";
+import LeasedAssetsSection from "./LeasedAssetsSection";
 
 type Props = {
   activeCategory: string;
@@ -13,8 +24,628 @@ type Props = {
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
 };
 
+// Vehicle type notes mapping (A, B, C explanations) - concise versions
+const getVehicleTypeNote = (vehicleType: string): string | null => {
+  const normalized = vehicleType.toLowerCase();
+  
+  if (normalized.includes('passenger car')) {
+    return "Automobiles used primarily to transport 12 people or less for personal travel, less than 8,500 lbs in gross vehicle weight.";
+  }
+  
+  if (normalized.includes('light-duty truck')) {
+    return "Vehicles that primarily transport passengers (SUVs, minivans) or light-weight cargo with special features like four-wheel drive. Gross vehicle weight normally around 8,500 pounds or less.";
+  }
+  
+  if (normalized.includes('medium') && normalized.includes('heavy-duty truck') || 
+      normalized.includes('heavy-duty truck') || 
+      (normalized.includes('medium') && normalized.includes('truck'))) {
+    return "Vehicles with gross vehicle weight more than 8,500 pounds, including single unit trucks, combination trucks, tractor-trailers, box trucks, service and utility trucks.";
+  }
+  
+  return null;
+};
+
+// Check if vehicle type has a note
+const hasVehicleTypeNote = (vehicleType: string): boolean => {
+  return getVehicleTypeNote(vehicleType) !== null;
+};
+
+// Get superscript for vehicle type
+const getVehicleTypeSuperscript = (vehicleType: string): string => {
+  const normalized = vehicleType.toLowerCase();
+  
+  if (normalized.includes('passenger car') || normalized.includes('passenger car a')) {
+    return 'A';
+  }
+  if (normalized.includes('light-duty truck') || normalized.includes('light-duty truck b')) {
+    return 'B';
+  }
+  if ((normalized.includes('medium') || normalized.includes('heavy-duty truck')) && normalized.includes('c')) {
+    return 'C';
+  }
+  
+  return '';
+};
+
+// Remove trailing A, B, C from vehicle type name
+const cleanVehicleTypeName = (vehicleType: string): string => {
+  // Remove trailing space and single letter (A, B, or C) at the end
+  return vehicleType.replace(/\s+[ABC]$/i, '').trim();
+};
+
 export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData }) => {
   const { toast } = useToast();
+  
+  // State for Purchased Goods & Services - row-based
+  interface PurchasedGoodsRow {
+    id: string;
+    supplier: Supplier | null;
+    amountSpent: number | undefined;
+    emissions: number | undefined;
+  }
+  const [purchasedGoodsRows, setPurchasedGoodsRows] = useState<PurchasedGoodsRow[]>([]);
+  
+  const newPurchasedGoodsRow = (): PurchasedGoodsRow => ({
+    id: `pgs-${Date.now()}-${Math.random()}`,
+    supplier: null,
+    amountSpent: undefined,
+    emissions: undefined,
+  });
+  
+  const addPurchasedGoodsRow = () => {
+    setPurchasedGoodsRows(prev => [...prev, newPurchasedGoodsRow()]);
+  };
+  
+  const removePurchasedGoodsRow = (id: string) => {
+    setPurchasedGoodsRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const updatePurchasedGoodsRow = (id: string, patch: Partial<PurchasedGoodsRow>) => {
+    setPurchasedGoodsRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      // Auto-calculate emissions: amountSpent * emission_factor
+      if (updated.supplier && typeof updated.amountSpent === 'number' && updated.amountSpent > 0) {
+        updated.emissions = updated.amountSpent * updated.supplier.emission_factor;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  // Sync purchased goods rows to emissionData
+  useEffect(() => {
+    const entries = purchasedGoodsRows
+      .filter(r => r.supplier && typeof r.amountSpent === 'number' && r.amountSpent > 0)
+      .map(r => ({
+        id: r.id,
+        category: 'purchased_goods_services' as const,
+        activity: `${r.supplier!.supplier_name} (${r.supplier!.code})`,
+        unit: 'PKR',
+        quantity: r.amountSpent!,
+        emissions: r.emissions || 0,
+      }));
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'purchased_goods_services'),
+        ...entries,
+      ]
+    }));
+  }, [purchasedGoodsRows, setEmissionData]);
+  
+  // State for Capital Goods - row-based
+  interface CapitalGoodsRow {
+    id: string;
+    supplier: Supplier | null;
+    amount: number | undefined;
+    emissions: number | undefined;
+  }
+  const [capitalGoodsRows, setCapitalGoodsRows] = useState<CapitalGoodsRow[]>([]);
+  
+  const newCapitalGoodsRow = (): CapitalGoodsRow => ({
+    id: `capg-${Date.now()}-${Math.random()}`,
+    supplier: null,
+    amount: undefined,
+    emissions: undefined,
+  });
+  
+  const addCapitalGoodsRow = () => setCapitalGoodsRows(prev => [...prev, newCapitalGoodsRow()]);
+  const removeCapitalGoodsRow = (id: string) => setCapitalGoodsRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateCapitalGoodsRow = (id: string, patch: Partial<CapitalGoodsRow>) => {
+    setCapitalGoodsRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      if (updated.supplier && typeof updated.amount === 'number' && updated.amount > 0) {
+        updated.emissions = updated.amount * updated.supplier.emission_factor;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = capitalGoodsRows
+      .filter(r => r.supplier && typeof r.amount === 'number' && r.amount > 0)
+      .map(r => ({
+        id: r.id,
+        category: 'capital_goods' as const,
+        activity: `${r.supplier!.supplier_name} (${r.supplier!.code})`,
+        unit: 'PKR',
+        quantity: r.amount!,
+        emissions: r.emissions || 0,
+      }));
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'capital_goods'),
+        ...entries,
+      ]
+    }));
+  }, [capitalGoodsRows, setEmissionData]);
+  
+  // Shared data for multiple categories
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+  const [wasteMaterials, setWasteMaterials] = useState<WasteMaterial[]>([]);
+  const [businessTravelTypes, setBusinessTravelTypes] = useState<BusinessTravelType[]>([]);
+  
+  // Row-based state for Upstream Transportation
+  interface UpstreamTransportRow {
+    id: string;
+    vehicleTypeId: string;
+    distance: number | undefined;
+    weight: number | undefined;
+    emissions: number | undefined;
+  }
+  const [upstreamTransportRows, setUpstreamTransportRows] = useState<UpstreamTransportRow[]>([]);
+  
+  const newUpstreamTransportRow = (): UpstreamTransportRow => ({
+    id: `ut-${Date.now()}-${Math.random()}`,
+    vehicleTypeId: '',
+    distance: undefined,
+    weight: undefined,
+    emissions: undefined,
+  });
+  
+  const addUpstreamTransportRow = () => setUpstreamTransportRows(prev => [...prev, newUpstreamTransportRow()]);
+  const removeUpstreamTransportRow = (id: string) => setUpstreamTransportRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateUpstreamTransportRow = (id: string, patch: Partial<UpstreamTransportRow>) => {
+    setUpstreamTransportRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
+      if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
+        updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = upstreamTransportRows
+      .filter(r => r.vehicleTypeId && typeof r.distance === 'number' && r.distance > 0 && typeof r.weight === 'number' && r.weight > 0)
+      .map(r => {
+        const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
+        return {
+          id: r.id,
+          category: 'upstream_transportation' as const,
+          activity: `${vehicleType?.vehicle_type || ''}`,
+          unit: 'kg',
+          quantity: r.weight!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'upstream_transportation'),
+        ...entries,
+      ]
+    }));
+  }, [upstreamTransportRows, vehicleTypes, setEmissionData]);
+  
+  // Row-based state for Downstream Transportation
+  interface DownstreamTransportRow {
+    id: string;
+    vehicleTypeId: string;
+    distance: number | undefined;
+    weight: number | undefined;
+    method: string;
+    packaging: string;
+    emissions: number | undefined;
+  }
+  const [downstreamTransportRows, setDownstreamTransportRows] = useState<DownstreamTransportRow[]>([]);
+  
+  const newDownstreamTransportRow = (): DownstreamTransportRow => ({
+    id: `dt-${Date.now()}-${Math.random()}`,
+    vehicleTypeId: '',
+    distance: undefined,
+    weight: undefined,
+    method: '',
+    packaging: '',
+    emissions: undefined,
+  });
+  
+  const addDownstreamTransportRow = () => setDownstreamTransportRows(prev => [...prev, newDownstreamTransportRow()]);
+  const removeDownstreamTransportRow = (id: string) => setDownstreamTransportRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateDownstreamTransportRow = (id: string, patch: Partial<DownstreamTransportRow>) => {
+    setDownstreamTransportRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
+      if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
+        updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = downstreamTransportRows
+      .filter(r => r.vehicleTypeId && typeof r.distance === 'number' && r.distance > 0 && typeof r.weight === 'number' && r.weight > 0)
+      .map(r => {
+        const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
+        return {
+          id: r.id,
+          category: 'downstream_transportation' as const,
+          activity: `${r.method || ''} | ${vehicleType?.vehicle_type || ''} | Packaging: ${r.packaging || ''}`,
+          unit: 'kg',
+          quantity: r.weight!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'downstream_transportation'),
+        ...entries,
+      ]
+    }));
+  }, [downstreamTransportRows, vehicleTypes, setEmissionData]);
+  
+  // Row-based state for Waste Generated
+  interface WasteGeneratedRow {
+    id: string;
+    materialId: string;
+    volume: number | undefined;
+    disposalMethod: DisposalMethod | "";
+    emissions: number | undefined;
+  }
+  const [wasteGeneratedRows, setWasteGeneratedRows] = useState<WasteGeneratedRow[]>([]);
+  
+  const newWasteGeneratedRow = (): WasteGeneratedRow => ({
+    id: `wg-${Date.now()}-${Math.random()}`,
+    materialId: '',
+    volume: undefined,
+    disposalMethod: '',
+    emissions: undefined,
+  });
+  
+  const addWasteGeneratedRow = () => setWasteGeneratedRows(prev => [...prev, newWasteGeneratedRow()]);
+  const removeWasteGeneratedRow = (id: string) => setWasteGeneratedRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateWasteGeneratedRow = (id: string, patch: Partial<WasteGeneratedRow>) => {
+    setWasteGeneratedRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const material = wasteMaterials.find(m => m.id === updated.materialId);
+      if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
+        const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
+        updated.emissions = factor !== null ? updated.volume * factor : undefined;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = wasteGeneratedRows
+      .filter(r => r.materialId && typeof r.volume === 'number' && r.volume > 0 && r.disposalMethod)
+      .map(r => {
+        const material = wasteMaterials.find(m => m.id === r.materialId);
+        return {
+          id: r.id,
+          category: 'waste_generated' as const,
+          activity: `${material?.[" Material "] || ''} | ${r.disposalMethod} | Volume: ${r.volume!.toFixed(2)} kg`,
+          unit: 'kg',
+          quantity: r.volume!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'waste_generated'),
+        ...entries,
+      ]
+    }));
+  }, [wasteGeneratedRows, wasteMaterials, setEmissionData]);
+  
+  // Row-based state for Business Travel
+  interface BusinessTravelRow {
+    id: string;
+    travelTypeId: string;
+    distance: number | undefined;
+    emissions: number | undefined;
+  }
+  const [businessTravelRows, setBusinessTravelRows] = useState<BusinessTravelRow[]>([]);
+  
+  const newBusinessTravelRow = (): BusinessTravelRow => ({
+    id: `bt-${Date.now()}-${Math.random()}`,
+    travelTypeId: '',
+    distance: undefined,
+    emissions: undefined,
+  });
+  
+  const addBusinessTravelRow = () => setBusinessTravelRows(prev => [...prev, newBusinessTravelRow()]);
+  const removeBusinessTravelRow = (id: string) => setBusinessTravelRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateBusinessTravelRow = (id: string, patch: Partial<BusinessTravelRow>) => {
+    setBusinessTravelRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
+      if (travelType && typeof updated.distance === 'number' && updated.distance > 0) {
+        let factorPerKm = travelType.co2_factor;
+        if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
+          factorPerKm = travelType.co2_factor / 1.60934;
+        }
+        updated.emissions = updated.distance * factorPerKm;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = businessTravelRows
+      .filter(r => r.travelTypeId && typeof r.distance === 'number' && r.distance > 0)
+      .map(r => {
+        const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
+        return {
+          id: r.id,
+          category: 'business_travel' as const,
+          activity: travelType?.vehicle_type || '',
+          unit: 'km',
+          quantity: r.distance!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'business_travel'),
+        ...entries,
+      ]
+    }));
+  }, [businessTravelRows, businessTravelTypes, setEmissionData]);
+  
+  // Row-based state for Employee Commuting
+  interface EmployeeCommutingRow {
+    id: string;
+    travelTypeId: string;
+    distance: number | undefined;
+    employees: number | undefined;
+    emissions: number | undefined;
+  }
+  const [employeeCommutingRows, setEmployeeCommutingRows] = useState<EmployeeCommutingRow[]>([]);
+  
+  const newEmployeeCommutingRow = (): EmployeeCommutingRow => ({
+    id: `ec-${Date.now()}-${Math.random()}`,
+    travelTypeId: '',
+    distance: undefined,
+    employees: undefined,
+    emissions: undefined,
+  });
+  
+  const addEmployeeCommutingRow = () => setEmployeeCommutingRows(prev => [...prev, newEmployeeCommutingRow()]);
+  const removeEmployeeCommutingRow = (id: string) => setEmployeeCommutingRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateEmployeeCommutingRow = (id: string, patch: Partial<EmployeeCommutingRow>) => {
+    setEmployeeCommutingRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
+      // Formula: employees * distance * emission_factor
+      if (travelType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.employees === 'number' && updated.employees > 0) {
+        let factorPerKm = travelType.co2_factor;
+        if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
+          factorPerKm = travelType.co2_factor / 1.60934;
+        }
+        updated.emissions = updated.employees * updated.distance * factorPerKm;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = employeeCommutingRows
+      .filter(r => r.travelTypeId && typeof r.distance === 'number' && r.distance > 0 && typeof r.employees === 'number' && r.employees > 0)
+      .map(r => {
+        const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
+        return {
+          id: r.id,
+          category: 'employee_commuting' as const,
+          activity: `${travelType?.vehicle_type || ''}${r.employees && r.employees > 0 ? ` | Employees: ${r.employees}` : ''}`,
+          unit: 'km',
+          quantity: r.distance!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'employee_commuting'),
+        ...entries,
+      ]
+    }));
+  }, [employeeCommutingRows, businessTravelTypes, setEmissionData]);
+  
+  // Row-based state for End of Life Treatment
+  interface EndOfLifeRow {
+    id: string;
+    materialId: string;
+    volume: number | undefined;
+    disposalMethod: DisposalMethod | "";
+    recycle: number | undefined;
+    composition: string;
+    emissions: number | undefined;
+  }
+  const [endOfLifeRows, setEndOfLifeRows] = useState<EndOfLifeRow[]>([]);
+  
+  const newEndOfLifeRow = (): EndOfLifeRow => ({
+    id: `eol-${Date.now()}-${Math.random()}`,
+    materialId: '',
+    volume: undefined,
+    disposalMethod: '',
+    recycle: undefined,
+    composition: '',
+    emissions: undefined,
+  });
+  
+  const addEndOfLifeRow = () => setEndOfLifeRows(prev => [...prev, newEndOfLifeRow()]);
+  const removeEndOfLifeRow = (id: string) => setEndOfLifeRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateEndOfLifeRow = (id: string, patch: Partial<EndOfLifeRow>) => {
+    setEndOfLifeRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      const material = wasteMaterials.find(m => m.id === updated.materialId);
+      if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
+        const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
+        updated.emissions = factor !== null ? updated.volume * factor : undefined;
+      } else {
+        updated.emissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = endOfLifeRows
+      .filter(r => r.materialId && typeof r.volume === 'number' && r.volume > 0 && r.disposalMethod)
+      .map(r => {
+        const material = wasteMaterials.find(m => m.id === r.materialId);
+        return {
+          id: r.id,
+          category: 'end_of_life_treatment' as const,
+          activity: `${material?.[" Material "] || ''} | ${r.disposalMethod} | Volume: ${r.volume!.toFixed(2)} kg${r.recycle && r.recycle > 0 ? ` | Recycle: ${r.recycle}%` : ''}${r.composition ? ` | Composition: ${r.composition}` : ''}`,
+          unit: 'kg',
+          quantity: r.volume!,
+          emissions: r.emissions || 0,
+        };
+      });
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'end_of_life_treatment'),
+        ...entries,
+      ]
+    }));
+  }, [endOfLifeRows, wasteMaterials, setEmissionData]);
+
+  // Load vehicle types when Upstream Transportation or Downstream Transportation category is active
+  useEffect(() => {
+    if (activeCategory === 'upstreamTransportation' || activeCategory === 'downstreamTransportation') {
+      const loadVehicleTypes = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const types = await getAllVehicleTypes();
+          if (types.length === 0) {
+            toast({
+              title: "No vehicle types found",
+              description: "The table appears to be empty or access is restricted.",
+              variant: "destructive"
+            });
+          }
+          setVehicleTypes(types);
+        } catch (error) {
+          console.error("Error loading vehicle types:", error);
+          toast({
+            title: "Error loading vehicle types",
+            description: "Could not load vehicle types from database.",
+            variant: "destructive"
+          });
+        }
+      };
+      loadVehicleTypes();
+    }
+  }, [activeCategory, toast]);
+
+  // Load waste materials when Waste Generated or End of Life Treatment category is active
+  useEffect(() => {
+    if (activeCategory === 'wasteGenerated' || activeCategory === 'endOfLifeTreatment') {
+      const loadWasteMaterials = async () => {
+        try {
+          const materials = await getAllWasteMaterials();
+          if (materials.length === 0) {
+            toast({
+              title: "No waste materials found",
+              description: "The table appears to be empty or access is restricted.",
+              variant: "destructive"
+            });
+          }
+          setWasteMaterials(materials);
+        } catch (error) {
+          console.error("Error loading waste materials:", error);
+          toast({
+            title: "Error loading waste materials",
+            description: "Could not load waste materials from database.",
+            variant: "destructive"
+          });
+        }
+      };
+      loadWasteMaterials();
+    }
+  }, [activeCategory, toast]);
+
+  // Load business travel types when Business Travel or Employee Commuting category is active
+  useEffect(() => {
+    if (activeCategory === 'businessTravel' || activeCategory === 'employeeCommuting') {
+      const loadBusinessTravelTypes = async () => {
+        try {
+          const types = await getAllBusinessTravelTypes();
+          if (types.length === 0) {
+            toast({
+              title: "No business travel types found",
+              description: "The table appears to be empty or access is restricted.",
+              variant: "destructive"
+            });
+          }
+          setBusinessTravelTypes(types);
+        } catch (error) {
+          console.error("Error loading business travel types:", error);
+          toast({
+            title: "Error loading business travel types",
+            description: "Could not load business travel types from database.",
+            variant: "destructive"
+          });
+        }
+      };
+      loadBusinessTravelTypes();
+    }
+  }, [activeCategory, toast]);
 
   const removeScope3Row = (rowId: string) => {
     setEmissionData(prev => ({
@@ -25,118 +656,79 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Purchased Goods & Services
   if (activeCategory === 'purchasedGoods') {
+    const totalEmissions = purchasedGoodsRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalAmount = purchasedGoodsRows.reduce((sum, r) => sum + (r.amountSpent || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Purchased Goods & Services Entries</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Purchased Goods & Services</h4>
             <p className="text-sm text-gray-600">Add your organization's purchased goods data</p>
           </div>
-          <Button
-            variant="default"
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            onClick={() => (document.getElementById('pgs-supplier') as HTMLInputElement)?.focus()}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addPurchasedGoodsRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label htmlFor="pgs-supplier">Supplier</Label>
-            <Input id="pgs-supplier" placeholder="e.g., ABC Supplies" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="pgs-quantity">Quantity (tonnes)</Label>
-            <Input id="pgs-quantity" type="number" min={0} step={0.01} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label>Transport Method</Label>
-            <Select onValueChange={(v) => ((document.getElementById('pgs-transport') as any)._value = v)}>
-              <SelectTrigger id="pgs-transport">
-                <SelectValue placeholder="Select method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sea">Sea</SelectItem>
-                <SelectItem value="air">Air</SelectItem>
-                <SelectItem value="truck">Truck</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="pgs-score">Sustainability Score</Label>
-            <Input id="pgs-score" type="number" min={0} max={100} step={1} placeholder="0-100" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <Label className="text-gray-500">Supplier</Label>
+          <Label className="text-gray-500">Amount Spent (PKR)</Label>
+          <Label className="text-gray-500">Emissions</Label>
         </div>
 
-        <div className="flex items-center justify-end mt-2">
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            onClick={() => {
-              const supplier = (document.getElementById('pgs-supplier') as any)?._value || (document.getElementById('pgs-supplier') as HTMLInputElement)?.value || '';
-              const qtyStr = (document.getElementById('pgs-quantity') as any)?._value || (document.getElementById('pgs-quantity') as HTMLInputElement)?.value || '0';
-              const transport = (document.getElementById('pgs-transport') as any)?._value || '';
-              const scoreStr = (document.getElementById('pgs-score') as any)?._value || (document.getElementById('pgs-score') as HTMLInputElement)?.value || '';
-
-              const materialTonnes = parseFloat(qtyStr) || 0;
-              const supplierScore = scoreStr === '' ? undefined : Number(scoreStr);
-              if (!supplier || !transport || materialTonnes <= 0) {
-                toast({ title: 'Missing info', description: 'Enter supplier, transport method, and positive quantity.' });
-                return;
-              }
-
-              setEmissionData(prev => ({
-                ...prev,
-                scope3: [
-                  ...prev.scope3,
-                  { id: `pgs-${Date.now()}`, category: 'purchased_goods_services', activity: `${supplier} | ${transport}`, unit: 'tonnes', quantity: materialTonnes, emissions: 0 }
-                ]
-              }));
-
-              const s = document.getElementById('pgs-supplier') as HTMLInputElement;
-              const q = document.getElementById('pgs-quantity') as HTMLInputElement;
-              const sc = document.getElementById('pgs-score') as HTMLInputElement;
-              if (s) s.value = '';
-              if (q) q.value = '';
-              if (sc) sc.value = '';
-              const t = document.getElementById('pgs-transport') as any; if (t) t._value = '';
-            }}
-          >
-            Add Entry
-          </Button>
-        </div>
-
-        {emissionData.scope3.filter(r => r.category === 'purchased_goods_services').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'purchased_goods_services').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} tonnes</div>
+        <div className="space-y-3">
+          {purchasedGoodsRows.map((r) => (
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div className="w-full">
+                <SupplierAutocomplete
+                  value={r.supplier}
+                  onSelect={(supplier) => updatePurchasedGoodsRow(r.id, { supplier })}
+                  placeholder="Search supplier..."
+                />
+              </div>
+              <div className="w-full">
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={r.amountSpent ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updatePurchasedGoodsRow(r.id, { amountSpent: undefined });
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0) {
+                        updatePurchasedGoodsRow(r.id, { amountSpent: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="Enter amount spent"
+                  className="w-full"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-gray-600 flex-1">
+                  {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}>
+                <Button variant="ghost" className="text-red-600" onClick={() => removePurchasedGoodsRow(r.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
 
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'purchased_goods_services');
-            const totalTonnes = rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Purchased Goods: <span className="font-semibold">{totalTonnes.toFixed(6)} tonnes</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Save className="h-4 w-4 mr-2" />
-                  {`Save Changes (${totalPending})`}
-                </Button>
-              </div>
-            );
-          })()}
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Amount: <span className="font-semibold">{totalAmount.toFixed(2)} PKR</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Purchased goods entries saved (frontend only for now).' })} disabled={purchasedGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${purchasedGoodsRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -144,214 +736,554 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Capital Goods
   if (activeCategory === 'capitalGoods') {
+    const totalEmissions = capitalGoodsRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalAmount = capitalGoodsRows.reduce((sum, r) => sum + (r.amount || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Capital Goods Entries</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Capital Goods</h4>
             <p className="text-sm text-gray-600">Record details for purchased capital goods</p>
           </div>
-          <Button
-            variant="default"
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            onClick={() => (document.getElementById('capg-equipment') as HTMLInputElement)?.focus()}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addCapitalGoodsRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <Label htmlFor="capg-equipment">Equipment Specifications</Label>
-            <Input id="capg-equipment" placeholder="Purchased equipment/asset" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <Label className="text-gray-500">Equipment</Label>
+          <Label className="text-gray-500">Amount (PKR)</Label>
+          <Label className="text-gray-500">Emissions</Label>
           </div>
-          <div>
-            <Label>Manufacturing Location</Label>
-            <Select onValueChange={(v) => ((document.getElementById('capg-country') as any)._value = v)}>
-              <SelectTrigger id="capg-country">
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pakistan">Pakistan</SelectItem>
-                <SelectItem value="United States">United States</SelectItem>
-                <SelectItem value="China">China</SelectItem>
-                <SelectItem value="India">India</SelectItem>
-                <SelectItem value="Germany">Germany</SelectItem>
-                <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Material Composition</Label>
-            <Select onValueChange={(v) => ((document.getElementById('capg-materials') as any)._value = v)}>
-              <SelectTrigger id="capg-materials">
-                <SelectValue placeholder="Select material" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Steel">Steel</SelectItem>
-                <SelectItem value="Aluminum">Aluminum</SelectItem>
-                <SelectItem value="Plastic">Plastic</SelectItem>
-                <SelectItem value="Copper">Copper</SelectItem>
-                <SelectItem value="Glass">Glass</SelectItem>
-                <SelectItem value="Concrete">Concrete</SelectItem>
-                <SelectItem value="Wood">Wood</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
+        <div className="space-y-3">
+          {capitalGoodsRows.map((r) => (
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div className="w-full">
+                <SupplierAutocomplete
+                  value={r.supplier}
+                  onSelect={(supplier) => updateCapitalGoodsRow(r.id, { supplier })}
+                  placeholder="Search equipment/supplier..."
+                />
+              </div>
+              <div className="w-full">
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={r.amount ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateCapitalGoodsRow(r.id, { amount: undefined });
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0) {
+                        updateCapitalGoodsRow(r.id, { amount: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="Enter amount"
+                  className="w-full"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-gray-600 flex-1">
+                  {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
         </div>
-
-        <div className="flex items-center justify-end mt-2">
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            onClick={() => {
-              const equipmentSpecs = (document.getElementById('capg-equipment') as any)?._value || (document.getElementById('capg-equipment') as HTMLInputElement)?.value || '';
-              const country = (document.getElementById('capg-country') as any)?._value || '';
-              const materials = (document.getElementById('capg-materials') as any)?._value || '';
-
-              if (!equipmentSpecs || !country || !materials) {
-                toast({ title: 'Missing info', description: 'Fill all Capital Goods fields before adding.' });
-                return;
-              }
-
-              setEmissionData(prev => ({
-                ...prev,
-                scope3: [
-                  ...prev.scope3,
-                  { id: `capg-${Date.now()}`, category: 'capital_goods', activity: `${equipmentSpecs} | ${country}`, unit: 'item', quantity: 1, emissions: 0 }
-                ]
-              }));
-
-              const e1 = document.getElementById('capg-equipment') as HTMLInputElement;
-              if (e1) e1.value = '';
-              const ids = ['capg-country','capg-materials'];
-              ids.forEach(id => { const el = document.getElementById(id) as any; if (el) el._value = ''; });
-            }}
-          >
-            Add Entry
-          </Button>
-        </div>
-
-        {emissionData.scope3.filter(r => r.category === 'capital_goods').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'capital_goods').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">1 item</div>
-                </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}>
+                <Button variant="ghost" className="text-red-600" onClick={() => removeCapitalGoodsRow(r.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+              </div>
             ))}
           </div>
-        )}
 
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'capital_goods');
-            const totalItems = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Capital Goods: <span className="font-semibold">{totalItems}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Capital goods saved (frontend only for now).' })} disabled={totalItems === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Amount: <span className="font-semibold">PKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Capital goods saved (frontend only for now).' })} disabled={capitalGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
                   <Save className="h-4 w-4 mr-2" />
-                  {`Save Changes (${totalItems})`}
+            {`Save Changes (${capitalGoodsRows.length})`}
                 </Button>
-              </div>
-            );
-          })()}
         </div>
       </div>
     );
   }
 
+  // Row-based state for Fuel & Energy Related Activities
+  interface FuelEnergyRow {
+    id: string;
+    extraction: string;
+    distance: number | undefined;
+    refining: string;
+  }
+  const [fuelEnergyRows, setFuelEnergyRows] = useState<FuelEnergyRow[]>([]);
+  
+  // Upstream Leased Assets state
+  const { user } = useAuth();
+  const [upstreamSelectedCategory, setUpstreamSelectedCategory] = useState<string>('');
+  
+  // Type definitions (used by both upstream and LeasedAssetsSection)
+  type FuelType = "Gaseous fuels" | "Liquid fuels" | "Solid fuels";
+  interface OtherSourceRow {
+    id: string;
+    type?: FuelType;
+    fuel?: string;
+    unit?: string;
+    quantity?: number;
+    factor?: number;
+    emissions?: number;
+  }
+  interface TransportRow {
+    id: string;
+    vehicleType: 'passenger' | 'delivery';
+    activity?: string;
+    vehicleTypeName?: string;
+    unit?: string;
+    distance?: number;
+    factor?: number;
+    emissions?: number;
+  }
+  interface RefrigerantRow {
+    id: string;
+    refrigerantType?: string;
+    quantity?: number;
+    factor?: number;
+    emissions?: number;
+  }
+  
+  // Upstream Leased Assets state (same structure as Downstream)
+  // Buildings & Facilities state
+  const [upstreamTotalKwh, setUpstreamTotalKwh] = useState<number | undefined>();
+  const [upstreamGridPct, setUpstreamGridPct] = useState<number | undefined>();
+  const [upstreamRenewablePct, setUpstreamRenewablePct] = useState<number | undefined>();
+  const [upstreamOtherPct, setUpstreamOtherPct] = useState<number | undefined>();
+  const [upstreamGridCountry, setUpstreamGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
+  const upstreamGridFactor = useMemo(() => upstreamGridCountry ? SCOPE2_FACTORS.GridCountries[upstreamGridCountry] : undefined, [upstreamGridCountry]);
+  const [upstreamOtherRows, setUpstreamOtherRows] = useState<OtherSourceRow[]>([]);
+  
+  // Transport & Logistics state
+  const [upstreamLeasedTransportRows, setUpstreamLeasedTransportRows] = useState<TransportRow[]>([]);
+  
+  // Equipment & Machinery state
+  const [upstreamEquipmentTotalKwh, setUpstreamEquipmentTotalKwh] = useState<number | undefined>();
+  const [upstreamEquipmentGridPct, setUpstreamEquipmentGridPct] = useState<number | undefined>();
+  const [upstreamEquipmentRenewablePct, setUpstreamEquipmentRenewablePct] = useState<number | undefined>();
+  const [upstreamEquipmentOtherPct, setUpstreamEquipmentOtherPct] = useState<number | undefined>();
+  const [upstreamEquipmentGridCountry, setUpstreamEquipmentGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
+  const upstreamEquipmentGridFactor = useMemo(() => upstreamEquipmentGridCountry ? SCOPE2_FACTORS.GridCountries[upstreamEquipmentGridCountry] : undefined, [upstreamEquipmentGridCountry]);
+  const [upstreamEquipmentOtherRows, setUpstreamEquipmentOtherRows] = useState<OtherSourceRow[]>([]);
+  const [upstreamEquipmentTransportRows, setUpstreamEquipmentTransportRows] = useState<TransportRow[]>([]);
+  
+  // Infrastructure & Utilities state
+  const [upstreamInfrastructureTotalKwh, setUpstreamInfrastructureTotalKwh] = useState<number | undefined>();
+  const [upstreamInfrastructureGridPct, setUpstreamInfrastructureGridPct] = useState<number | undefined>();
+  const [upstreamInfrastructureRenewablePct, setUpstreamInfrastructureRenewablePct] = useState<number | undefined>();
+  const [upstreamInfrastructureOtherPct, setUpstreamInfrastructureOtherPct] = useState<number | undefined>();
+  const [upstreamInfrastructureGridCountry, setUpstreamInfrastructureGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
+  const upstreamInfrastructureGridFactor = useMemo(() => upstreamInfrastructureGridCountry ? SCOPE2_FACTORS.GridCountries[upstreamInfrastructureGridCountry] : undefined, [upstreamInfrastructureGridCountry]);
+  const [upstreamInfrastructureOtherRows, setUpstreamInfrastructureOtherRows] = useState<OtherSourceRow[]>([]);
+  const [upstreamInfrastructureRefrigerantRows, setUpstreamInfrastructureRefrigerantRows] = useState<RefrigerantRow[]>([]);
+  
+  // Helper functions for Downstream Leased Assets
+  const fuelTypes = Object.keys(FACTORS) as FuelType[];
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
+  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
+  
+  const vehicleActivities = Object.keys(VEHICLE_FACTORS);
+  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(VEHICLE_FACTORS[activity]) : []);
+  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(VEHICLE_FACTORS[activity][vehicleType]) : []);
+  
+  const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
+  const deliveryTypesFor = (activity?: string) => (activity ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity]) : []);
+  const deliveryUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity][vehicleType]) : []);
+  
+  // Upstream Leased Assets calculations
+  // Buildings & Facilities calculations
+  const upstreamGridEmissions = useMemo(() => {
+    if (!upstreamTotalKwh || !upstreamGridPct || !upstreamGridFactor) return 0;
+    return Number(((upstreamGridPct / 100) * upstreamTotalKwh * upstreamGridFactor).toFixed(6));
+  }, [upstreamTotalKwh, upstreamGridPct, upstreamGridFactor]);
+  
+  const upstreamTotalOtherEmissions = useMemo(() => {
+    return upstreamOtherRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamOtherRows]);
+  
+  const upstreamComputedElectricityEmissions = useMemo(() => {
+    if (!upstreamTotalKwh) return 0;
+    const gridPart = upstreamGridPct && upstreamGridCountry && upstreamGridFactor ? (upstreamGridPct / 100) * upstreamTotalKwh * upstreamGridFactor : 0;
+    const renewablePart = upstreamRenewablePct ? 0 : 0;
+    let otherPart = 0;
+    if (upstreamOtherPct && upstreamOtherPct > 0 && upstreamOtherRows.length > 0) {
+      const sumOtherEmissions = upstreamOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+      otherPart = (upstreamOtherPct / 100) * upstreamTotalKwh * sumOtherEmissions;
+    }
+    return Number((gridPart + renewablePart + otherPart).toFixed(6));
+  }, [upstreamTotalKwh, upstreamGridPct, upstreamGridCountry, upstreamGridFactor, upstreamRenewablePct, upstreamOtherPct, upstreamOtherRows]);
+  
+  // Transport calculations
+  const updateUpstreamLeasedTransportRow = (id: string, updates: Partial<TransportRow>) => {
+    setUpstreamLeasedTransportRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...updates };
+      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        if (factor) {
+          updated.factor = factor;
+          updated.emissions = updated.distance * factor;
+        }
+      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        if (factor) {
+          updated.factor = factor;
+          updated.emissions = updated.distance * factor;
+        }
+      }
+      return updated;
+    }));
+  };
+  
+  const addUpstreamLeasedTransportRow = (type: 'passenger' | 'delivery') => {
+    setUpstreamLeasedTransportRows(prev => [...prev, {
+      id: `upstream-leased-transport-${Date.now()}-${Math.random()}`,
+      vehicleType: type,
+    }]);
+  };
+  
+  const removeUpstreamLeasedTransportRow = (id: string) => {
+    setUpstreamLeasedTransportRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const upstreamLeasedTotalTransportEmissions = useMemo(() => {
+    return upstreamLeasedTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamLeasedTransportRows]);
+  
+  // Equipment & Machinery calculations
+  const upstreamEquipmentGridEmissions = useMemo(() => {
+    if (!upstreamEquipmentTotalKwh || !upstreamEquipmentGridPct || !upstreamEquipmentGridFactor) return 0;
+    return Number(((upstreamEquipmentGridPct / 100) * upstreamEquipmentTotalKwh * upstreamEquipmentGridFactor).toFixed(6));
+  }, [upstreamEquipmentTotalKwh, upstreamEquipmentGridPct, upstreamEquipmentGridFactor]);
+  
+  const upstreamEquipmentTotalOtherEmissions = useMemo(() => {
+    return upstreamEquipmentOtherRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamEquipmentOtherRows]);
+  
+  const upstreamEquipmentComputedElectricityEmissions = useMemo(() => {
+    if (!upstreamEquipmentTotalKwh) return 0;
+    const gridPart = upstreamEquipmentGridPct && upstreamEquipmentGridCountry && upstreamEquipmentGridFactor ? (upstreamEquipmentGridPct / 100) * upstreamEquipmentTotalKwh * upstreamEquipmentGridFactor : 0;
+    const renewablePart = upstreamEquipmentRenewablePct ? 0 : 0;
+    let otherPart = 0;
+    if (upstreamEquipmentOtherPct && upstreamEquipmentOtherPct > 0 && upstreamEquipmentOtherRows.length > 0) {
+      const sumOtherEmissions = upstreamEquipmentOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+      otherPart = (upstreamEquipmentOtherPct / 100) * upstreamEquipmentTotalKwh * sumOtherEmissions;
+    }
+    return Number((gridPart + renewablePart + otherPart).toFixed(6));
+  }, [upstreamEquipmentTotalKwh, upstreamEquipmentGridPct, upstreamEquipmentGridCountry, upstreamEquipmentGridFactor, upstreamEquipmentRenewablePct, upstreamEquipmentOtherPct, upstreamEquipmentOtherRows]);
+  
+  const updateUpstreamEquipmentOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    setUpstreamEquipmentOtherRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next = { ...r, ...updates };
+      if (next.type && next.fuel && next.unit && typeof next.quantity === 'number') {
+        const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+        if (factor) {
+          next.factor = factor;
+          next.emissions = Number((next.quantity * next.factor).toFixed(6));
+        } else {
+          next.factor = undefined;
+          next.emissions = undefined;
+        }
+      } else {
+        next.factor = undefined;
+        next.emissions = undefined;
+      }
+      return next;
+    }));
+  };
+  
+  const addUpstreamEquipmentOtherRow = () => {
+    setUpstreamEquipmentOtherRows(prev => [...prev, {
+      id: `upstream-equipment-other-${Date.now()}-${Math.random()}`,
+    }]);
+  };
+  
+  const removeUpstreamEquipmentOtherRow = (id: string) => {
+    setUpstreamEquipmentOtherRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const updateUpstreamEquipmentTransportRow = (id: string, updates: Partial<TransportRow>) => {
+    setUpstreamEquipmentTransportRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...updates };
+      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        if (factor) {
+          updated.factor = factor;
+          updated.emissions = updated.distance * factor;
+        }
+      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        if (factor) {
+          updated.factor = factor;
+          updated.emissions = updated.distance * factor;
+        }
+      }
+      return updated;
+    }));
+  };
+  
+  const addUpstreamEquipmentTransportRow = (type: 'passenger' | 'delivery') => {
+    setUpstreamEquipmentTransportRows(prev => [...prev, {
+      id: `upstream-equipment-transport-${Date.now()}-${Math.random()}`,
+      vehicleType: type,
+    }]);
+  };
+  
+  const removeUpstreamEquipmentTransportRow = (id: string) => {
+    setUpstreamEquipmentTransportRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const upstreamEquipmentTotalTransportEmissions = useMemo(() => {
+    return upstreamEquipmentTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamEquipmentTransportRows]);
+  
+  const upstreamEquipmentTotalEmissions = useMemo(() => {
+    return upstreamEquipmentComputedElectricityEmissions + upstreamEquipmentTotalTransportEmissions;
+  }, [upstreamEquipmentComputedElectricityEmissions, upstreamEquipmentTotalTransportEmissions]);
+  
+  // Infrastructure & Utilities calculations
+  const upstreamInfrastructureGridEmissions = useMemo(() => {
+    if (!upstreamInfrastructureTotalKwh || !upstreamInfrastructureGridPct || !upstreamInfrastructureGridFactor) return 0;
+    return Number(((upstreamInfrastructureGridPct / 100) * upstreamInfrastructureTotalKwh * upstreamInfrastructureGridFactor).toFixed(6));
+  }, [upstreamInfrastructureTotalKwh, upstreamInfrastructureGridPct, upstreamInfrastructureGridFactor]);
+  
+  const upstreamInfrastructureTotalOtherEmissions = useMemo(() => {
+    return upstreamInfrastructureOtherRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamInfrastructureOtherRows]);
+  
+  const upstreamInfrastructureComputedElectricityEmissions = useMemo(() => {
+    if (!upstreamInfrastructureTotalKwh) return 0;
+    const gridPart = upstreamInfrastructureGridPct && upstreamInfrastructureGridCountry && upstreamInfrastructureGridFactor ? (upstreamInfrastructureGridPct / 100) * upstreamInfrastructureTotalKwh * upstreamInfrastructureGridFactor : 0;
+    const renewablePart = upstreamInfrastructureRenewablePct ? 0 : 0;
+    let otherPart = 0;
+    if (upstreamInfrastructureOtherPct && upstreamInfrastructureOtherPct > 0 && upstreamInfrastructureOtherRows.length > 0) {
+      const sumOtherEmissions = upstreamInfrastructureOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+      otherPart = (upstreamInfrastructureOtherPct / 100) * upstreamInfrastructureTotalKwh * sumOtherEmissions;
+    }
+    return Number((gridPart + renewablePart + otherPart).toFixed(6));
+  }, [upstreamInfrastructureTotalKwh, upstreamInfrastructureGridPct, upstreamInfrastructureGridCountry, upstreamInfrastructureGridFactor, upstreamInfrastructureRenewablePct, upstreamInfrastructureOtherPct, upstreamInfrastructureOtherRows]);
+  
+  const updateUpstreamInfrastructureOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    setUpstreamInfrastructureOtherRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next = { ...r, ...updates };
+      if (next.type && next.fuel && next.unit && typeof next.quantity === 'number') {
+        const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+        if (factor) {
+          next.factor = factor;
+          next.emissions = Number((next.quantity * next.factor).toFixed(6));
+        } else {
+          next.factor = undefined;
+          next.emissions = undefined;
+        }
+      } else {
+        next.factor = undefined;
+        next.emissions = undefined;
+      }
+      return next;
+    }));
+  };
+  
+  const addUpstreamInfrastructureOtherRow = () => {
+    setUpstreamInfrastructureOtherRows(prev => [...prev, {
+      id: `upstream-infrastructure-other-${Date.now()}-${Math.random()}`,
+    }]);
+  };
+  
+  const removeUpstreamInfrastructureOtherRow = (id: string) => {
+    setUpstreamInfrastructureOtherRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const updateUpstreamInfrastructureRefrigerantRow = (id: string, updates: Partial<RefrigerantRow>) => {
+    setUpstreamInfrastructureRefrigerantRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next = { ...r, ...updates };
+      if (next.refrigerantType) {
+        const factor = REFRIGERANT_FACTORS[next.refrigerantType];
+        next.factor = typeof factor === 'number' ? factor : undefined;
+      } else {
+        next.factor = undefined;
+      }
+      if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
+        next.emissions = Number((next.quantity * next.factor).toFixed(6));
+      } else {
+        next.emissions = undefined;
+      }
+      return next;
+    }));
+  };
+  
+  const addUpstreamInfrastructureRefrigerantRow = () => {
+    setUpstreamInfrastructureRefrigerantRows(prev => [...prev, {
+      id: `upstream-infrastructure-refrigerant-${Date.now()}-${Math.random()}`,
+    }]);
+  };
+  
+  const removeUpstreamInfrastructureRefrigerantRow = (id: string) => {
+    setUpstreamInfrastructureRefrigerantRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const upstreamInfrastructureTotalRefrigerantEmissions = useMemo(() => {
+    return upstreamInfrastructureRefrigerantRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  }, [upstreamInfrastructureRefrigerantRows]);
+  
+  const upstreamInfrastructureTotalEmissions = useMemo(() => {
+    return upstreamInfrastructureComputedElectricityEmissions + upstreamInfrastructureTotalRefrigerantEmissions;
+  }, [upstreamInfrastructureComputedElectricityEmissions, upstreamInfrastructureTotalRefrigerantEmissions]);
+  
+  // Upstream helper functions
+  const updateUpstreamOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    setUpstreamOtherRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next: OtherSourceRow = { ...r, ...updates };
+      if (next.type && next.fuel && next.unit) {
+        const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+        next.factor = typeof factor === 'number' ? factor : undefined;
+      }
+      if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
+        next.emissions = Number((next.quantity * next.factor).toFixed(6));
+      } else {
+        next.emissions = undefined;
+      }
+      return next;
+    }));
+  };
+  
+  const addUpstreamOtherRow = () => {
+    setUpstreamOtherRows(prev => [...prev, { id: crypto.randomUUID() }]);
+  };
+  
+  const removeUpstreamOtherRow = (id: string) => {
+    setUpstreamOtherRows(prev => prev.filter(r => r.id !== id));
+  };
+  
+  const newFuelEnergyRow = (): FuelEnergyRow => ({
+    id: `fera-${Date.now()}-${Math.random()}`,
+    extraction: '',
+    distance: undefined,
+    refining: '',
+  });
+  
+  const addFuelEnergyRow = () => setFuelEnergyRows(prev => [...prev, newFuelEnergyRow()]);
+  const removeFuelEnergyRow = (id: string) => setFuelEnergyRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateFuelEnergyRow = (id: string, patch: Partial<FuelEnergyRow>) => {
+    setFuelEnergyRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  };
+  
+  useEffect(() => {
+    const entries = fuelEnergyRows
+      .filter(r => r.extraction && r.refining && typeof r.distance === 'number' && r.distance >= 0)
+      .map(r => ({
+        id: r.id,
+        category: 'fuel_energy_activities' as const,
+        activity: r.extraction,
+        unit: 'km',
+        quantity: r.distance!,
+        emissions: 0,
+      }));
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'fuel_energy_activities'),
+        ...entries,
+      ]
+    }));
+  }, [fuelEnergyRows, setEmissionData]);
+
   // Fuel & Energy Related Activities
   if (activeCategory === 'fuelEnergyActivities') {
+    const totalDistance = fuelEnergyRows.reduce((sum, r) => sum + (r.distance || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Fuel & Energy Related Activities</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Fuel & Energy Related Activities</h4>
             <p className="text-sm text-gray-600">Capture upstream fuel and energy details</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('fera-upstream') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addFuelEnergyRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label>Upstream Emissions Data</Label>
-            <Select onValueChange={(v) => ((document.getElementById('fera-upstream') as any)._value = v)}>
-              <SelectTrigger id="fera-upstream">
-                <SelectValue placeholder="Yes/No" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+          <Label className="text-gray-500">Extraction</Label>
+          <Label className="text-gray-500">Distance (km)</Label>
+          <Label className="text-gray-500">Refining</Label>
+          <Label className="text-gray-500">Actions</Label>
           </div>
-          <div>
-            <Label htmlFor="fera-extraction">Extraction Methods</Label>
-            <Input id="fera-extraction" placeholder="e.g., drilling, mining" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+
+        <div className="space-y-3">
+          {fuelEnergyRows.map((r) => (
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div className="w-full">
+                <Input
+                  value={r.extraction}
+                  onChange={(e) => updateFuelEnergyRow(r.id, { extraction: e.target.value })}
+                  placeholder="e.g., drilling, mining"
+                  className="w-full"
+                />
           </div>
-          <div>
-            <Label htmlFor="fera-distance">Transportation Distance (km)</Label>
-            <Input id="fera-distance" type="number" min={0} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="fera-refining">Refining Processes</Label>
-            <Input id="fera-refining" placeholder="Methods used to refine fuel" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
+              <div className="w-full">
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={r.distance ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateFuelEnergyRow(r.id, { distance: undefined });
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0) {
+                        updateFuelEnergyRow(r.id, { distance: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="Enter distance"
+                  className="w-full"
+                />
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const upstream = (document.getElementById('fera-upstream') as any)?._value || '';
-            const extraction = (document.getElementById('fera-extraction') as any)?._value || (document.getElementById('fera-extraction') as HTMLInputElement)?.value || '';
-            const distanceStr = (document.getElementById('fera-distance') as any)?._value || (document.getElementById('fera-distance') as HTMLInputElement)?.value || '0';
-            const refining = (document.getElementById('fera-refining') as any)?._value || (document.getElementById('fera-refining') as HTMLInputElement)?.value || '';
-            const distanceKm = parseFloat(distanceStr) || 0;
-            if (!upstream || !extraction || !refining || distanceKm < 0) {
-              toast({ title: 'Missing info', description: 'Fill all fields and provide a non-negative distance.' });
-              return;
-            }
-            setEmissionData(prev => ({
-              ...prev,
-              scope3: [...prev.scope3, { id: `fera-${Date.now()}`, category: 'fuel_energy_activities', activity: `${upstream === 'yes' ? 'Upstream data: Yes' : 'Upstream data: No'} | ${extraction}`, unit: 'km', quantity: distanceKm, emissions: 0 }]
-            }));
-            ['fera-upstream','fera-extraction','fera-distance','fera-refining'].forEach(id => {
-              const el = document.getElementById(id) as any; if (!el) return; if (id === 'fera-distance') el.value = ''; else el._value = '';
-            });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'fuel_energy_activities').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'fuel_energy_activities').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} km</div>
+              <div className="w-full">
+                <Input
+                  value={r.refining}
+                  onChange={(e) => updateFuelEnergyRow(r.id, { refining: e.target.value })}
+                  placeholder="Refining processes"
+                  className="w-full"
+                />
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+              <Button variant="ghost" className="text-red-600" onClick={() => removeFuelEnergyRow(r.id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
               </div>
             ))}
           </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'fuel_energy_activities');
-            const totalKm = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Transport Distance: <span className="font-semibold">{totalKm.toFixed(1)} km</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Fuel & Energy activities saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Distance: <span className="font-semibold">{totalDistance.toFixed(1)} km</span>
               </div>
-            );
-          })()}
+          <Button onClick={() => toast({ title: 'Saved', description: 'Fuel & Energy activities saved (frontend only for now).' })} disabled={fuelEnergyRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${fuelEnergyRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -359,88 +1291,144 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Upstream Transportation
   if (activeCategory === 'upstreamTransportation') {
+    const totalEmissions = upstreamTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalWeight = upstreamTransportRows.reduce((sum, r) => sum + (r.weight || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Upstream Transportation</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Upstream Transportation</h4>
             <p className="text-sm text-gray-600">Transport modes, distances, vehicle types, fuel use</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('ut-mode') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addUpstreamTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label>Transportation Mode</Label>
-            <Select onValueChange={(v) => ((document.getElementById('ut-mode') as any)._value = v)}>
-              <SelectTrigger id="ut-mode"><SelectValue placeholder="Select mode" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="truck">Truck</SelectItem>
-                <SelectItem value="rail">Rail</SelectItem>
-                <SelectItem value="ship">Ship</SelectItem>
-              </SelectContent>
-            </Select>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+          <Label className="text-gray-500">Vehicle Type</Label>
+          <Label className="text-gray-500">Distance (km)</Label>
+          <Label className="text-gray-500">Weight (kg)</Label>
+          <Label className="text-gray-500">Emissions</Label>
           </div>
-          <div>
-            <Label htmlFor="ut-distance">Distance (km)</Label>
-            <Input id="ut-distance" type="number" min={0} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label>Vehicle Type</Label>
-            <Select onValueChange={(v) => ((document.getElementById('ut-vehicle') as any)._value = v)}>
-              <SelectTrigger id="ut-vehicle"><SelectValue placeholder="Select vehicle" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="semi-truck">Semi-truck</SelectItem>
-                <SelectItem value="electric-van">Electric van</SelectItem>
-                <SelectItem value="diesel-truck">Diesel truck</SelectItem>
-                <SelectItem value="rail-freight">Rail freight</SelectItem>
-                <SelectItem value="container-ship">Container ship</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="ut-fuel">Fuel Consumption</Label>
-            <Input id="ut-fuel" placeholder="e.g., 120 L or kWh" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-        </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const mode = (document.getElementById('ut-mode') as any)?._value || '';
-            const distStr = (document.getElementById('ut-distance') as any)?._value || (document.getElementById('ut-distance') as HTMLInputElement)?.value || '0';
-            const vehicle = (document.getElementById('ut-vehicle') as any)?._value || '';
-            const fuel = (document.getElementById('ut-fuel') as any)?._value || (document.getElementById('ut-fuel') as HTMLInputElement)?.value || '';
-            const km = parseFloat(distStr) || 0;
-            if (!mode || !vehicle || !fuel || km < 0) { toast({ title: 'Missing info', description: 'Select mode, vehicle, enter non-negative distance and fuel.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `ut-${Date.now()}`, category: 'upstream_transportation', activity: `${mode} | ${vehicle} | Fuel: ${fuel}`, unit: 'km', quantity: km, emissions: 0 }] }));
-            ['ut-mode','ut-distance','ut-vehicle','ut-fuel'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (id === 'ut-distance' || id==='ut-fuel') el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'upstream_transportation').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'upstream_transportation').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} km</div>
-                </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'upstream_transportation');
-            const totalKm = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
+
+        <div className="space-y-3">
+          {upstreamTransportRows.map((r) => {
+            const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
             return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Distance: <span className="font-semibold">{totalKm.toFixed(1)} km</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Upstream transportation saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full flex items-center gap-2">
+                  <Select
+                    value={r.vehicleTypeId}
+                    onValueChange={(v) => updateUpstreamTransportRow(r.id, { vehicleTypeId: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select vehicle type" />
+                    </SelectTrigger>
+              <SelectContent>
+                      {vehicleTypes.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        vehicleTypes.map((vehicle) => {
+                          const superscript = getVehicleTypeSuperscript(vehicle.vehicle_type);
+                          const cleanedName = cleanVehicleTypeName(vehicle.vehicle_type);
+                          return (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {cleanedName}
+                              {superscript && <sup className="text-xs ml-1">{superscript}</sup>}
+                            </SelectItem>
+                          );
+                        })
+                      )}
+              </SelectContent>
+            </Select>
+                  {r.vehicleTypeId && (() => {
+                    const selectedVehicle = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
+                    const note = selectedVehicle ? getVehicleTypeNote(selectedVehicle.vehicle_type) : null;
+                    if (note) {
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="flex-shrink-0">
+                                <Info className="h-4 w-4 text-teal-600 hover:text-teal-700" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">{note}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    }
+                    return null;
+                  })()}
+          </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.distance ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateUpstreamTransportRow(r.id, { distance: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateUpstreamTransportRow(r.id, { distance: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter distance"
+                    className="w-full"
+                  />
+          </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.weight ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateUpstreamTransportRow(r.id, { weight: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateUpstreamTransportRow(r.id, { weight: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter weight"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
+                </div>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamTransportRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+              </div>
               </div>
             );
-          })()}
+          })}
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Weight: <span className="font-semibold">{totalWeight.toFixed(2)} kg</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Upstream transportation saved (frontend only for now).' })} disabled={upstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${upstreamTransportRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -448,86 +1436,122 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Waste Generated
   if (activeCategory === 'wasteGenerated') {
+    const totalEmissions = wasteGeneratedRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalVolume = wasteGeneratedRows.reduce((sum, r) => sum + (r.volume || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Waste Generated</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Waste Generated</h4>
             <p className="text-sm text-gray-600">Record waste types, volumes, and disposal methods</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('wg-type') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addWasteGeneratedRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label>Waste Type</Label>
-            <Select onValueChange={(v) => ((document.getElementById('wg-type') as any)._value = v)}>
-              <SelectTrigger id="wg-type"><SelectValue placeholder="Select type" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="solid">Solid</SelectItem>
-                <SelectItem value="hazardous">Hazardous</SelectItem>
-                <SelectItem value="recyclables">Recyclables</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="wg-volume">Total Waste Volume (tonnes)</Label>
-            <Input id="wg-volume" type="number" min={0} step={0.01} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label>Disposal Method</Label>
-            <Select onValueChange={(v) => ((document.getElementById('wg-disposal') as any)._value = v)}>
-              <SelectTrigger id="wg-disposal"><SelectValue placeholder="Select method" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="landfill">Landfill</SelectItem>
-                <SelectItem value="incineration">Incineration</SelectItem>
-                <SelectItem value="composting">Composting</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="wg-recycling">Recycling Rate (%)</Label>
-            <Input id="wg-recycling" type="number" min={0} max={100} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+          <Label className="text-gray-500">Material</Label>
+          <Label className="text-gray-500">Volume (kg)</Label>
+          <Label className="text-gray-500">Disposal Method</Label>
+          <Label className="text-gray-500">Emissions</Label>
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const type = (document.getElementById('wg-type') as any)?._value || '';
-            const volumeStr = (document.getElementById('wg-volume') as any)?._value || (document.getElementById('wg-volume') as HTMLInputElement)?.value || '0';
-            const disposal = (document.getElementById('wg-disposal') as any)?._value || '';
-            const rateStr = (document.getElementById('wg-recycling') as any)?._value || (document.getElementById('wg-recycling') as HTMLInputElement)?.value || '0';
-            const volumeTonnes = parseFloat(volumeStr) || 0; const recyclingRate = parseFloat(rateStr) || 0;
-            if (!type || !disposal || volumeTonnes < 0 || recyclingRate < 0 || recyclingRate > 100) { toast({ title: 'Missing/invalid info', description: 'Select type, disposal, non-negative volume, and 0–100% recycling rate.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `wg-${Date.now()}`, category: 'waste_generated', activity: `${type} | ${disposal} | Recycle: ${recyclingRate}%`, unit: 'tonnes', quantity: volumeTonnes, emissions: 0 }] }));
-            ['wg-type','wg-volume','wg-disposal','wg-recycling'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (id==='wg-volume' || id==='wg-recycling') el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'waste_generated').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'waste_generated').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} tonnes</div>
-                </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'waste_generated');
-            const totalTonnes = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
+
+        <div className="space-y-3">
+          {wasteGeneratedRows.map((r) => {
+            const material = wasteMaterials.find(m => m.id === r.materialId);
+            const availableMethods = getAvailableDisposalMethods(material || null);
             return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Waste: <span className="font-semibold">{totalTonnes.toFixed(2)} tonnes</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Waste entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
-              </div>
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full">
+                  <Select
+                    value={r.materialId}
+                    onValueChange={(v) => {
+                      updateWasteGeneratedRow(r.id, { materialId: v, disposalMethod: '' });
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select material" />
+                    </SelectTrigger>
+              <SelectContent>
+                      {wasteMaterials.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        wasteMaterials.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m[" Material "] || "Unknown"}
+                          </SelectItem>
+                        ))
+                      )}
+              </SelectContent>
+            </Select>
+          </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.volume ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateWasteGeneratedRow(r.id, { volume: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateWasteGeneratedRow(r.id, { volume: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter volume"
+                    className="w-full"
+                  />
+          </div>
+                <div className="w-full">
+                  <Select
+                    value={r.disposalMethod}
+                    onValueChange={(v) => updateWasteGeneratedRow(r.id, { disposalMethod: v as DisposalMethod })}
+                    disabled={!material || availableMethods.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+              <SelectContent>
+                      {availableMethods.length === 0 ? (
+                        <SelectItem value="none" disabled>Select material first</SelectItem>
+                      ) : (
+                        availableMethods.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))
+                      )}
+              </SelectContent>
+            </Select>
+          </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
+          </div>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeWasteGeneratedRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+        </div>
+        </div>
             );
-          })()}
+          })}
+                </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Volume: <span className="font-semibold">{totalVolume.toFixed(2)} kg</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+              </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Waste generated entries saved (frontend only for now).' })} disabled={wasteGeneratedRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${wasteGeneratedRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -535,85 +1559,96 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Business Travel
   if (activeCategory === 'businessTravel') {
+    const totalEmissions = businessTravelRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalDistance = businessTravelRows.reduce((sum, r) => sum + (r.distance || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Business Travel</h3>
-            <p className="text-sm text-gray-600">Travel modes, distance, nights, and commute data</p>
+            <h4 className="text-lg font-semibold text-gray-900">Business Travel</h4>
+            <p className="text-sm text-gray-600">Travel modes, distance, and emissions</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('bt-mode') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addBusinessTravelRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label>Travel Mode</Label>
-            <Select onValueChange={(v) => ((document.getElementById('bt-mode') as any)._value = v)}>
-              <SelectTrigger id="bt-mode"><SelectValue placeholder="Select mode" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="air">Air</SelectItem>
-                <SelectItem value="rail">Rail</SelectItem>
-                <SelectItem value="rental-car">Rental car</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="bt-distance">Distance (km)</Label>
-            <Input id="bt-distance" type="number" min={0} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="bt-nights">Accommodation Nights</Label>
-            <Input id="bt-nights" type="number" min={0} step={1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label>Employee Commute Data</Label>
-            <Select onValueChange={(v) => ((document.getElementById('bt-commute') as any)._value = v)}>
-              <SelectTrigger id="bt-commute"><SelectValue placeholder="Yes/No" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <Label className="text-gray-500">Travel Mode</Label>
+          <Label className="text-gray-500">Distance (km)</Label>
+          <Label className="text-gray-500">Emissions</Label>
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const mode = (document.getElementById('bt-mode') as any)?._value || '';
-            const distStr = (document.getElementById('bt-distance') as any)?._value || (document.getElementById('bt-distance') as HTMLInputElement)?.value || '0';
-            const nightsStr = (document.getElementById('bt-nights') as any)?._value || (document.getElementById('bt-nights') as HTMLInputElement)?.value || '0';
-            const commute = (document.getElementById('bt-commute') as any)?._value || '';
-            const km = parseFloat(distStr) || 0; const nights = parseInt(nightsStr || '0', 10) || 0;
-            if (!mode || !commute || km < 0 || nights < 0) { toast({ title: 'Missing/invalid info', description: 'Select travel mode, commute yes/no, non-negative distance and nights.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `bt-${Date.now()}`, category: 'business_travel', activity: `${mode} | Nights: ${nights} | Commute: ${commute}`, unit: 'km', quantity: km, emissions: 0 }] }));
-            ['bt-mode','bt-distance','bt-nights','bt-commute'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (id==='bt-distance' || id==='bt-nights') el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'business_travel').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'business_travel').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} km</div>
-                </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'business_travel');
-            const totalKm = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
+
+        <div className="space-y-3">
+          {businessTravelRows.map((r) => {
+            const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
             return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Distance: <span className="font-semibold">{totalKm.toFixed(1)} km</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Business travel entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
-              </div>
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full">
+                  <Select
+                    value={r.travelTypeId}
+                    onValueChange={(v) => updateBusinessTravelRow(r.id, { travelTypeId: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select travel mode" />
+                    </SelectTrigger>
+              <SelectContent>
+                      {businessTravelTypes.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        businessTravelTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            {type.vehicle_type}
+                          </SelectItem>
+                        ))
+                      )}
+              </SelectContent>
+            </Select>
+          </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.distance ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateBusinessTravelRow(r.id, { distance: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateBusinessTravelRow(r.id, { distance: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter distance"
+                    className="w-full"
+                  />
+          </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO₂e` : '-'}
+          </div>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeBusinessTravelRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+        </div>
+        </div>
             );
-          })()}
+          })}
+                </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Distance: <span className="font-semibold">{totalDistance.toFixed(2)} km</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO₂e</span>
+              </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Business travel entries saved (frontend only for now).' })} disabled={businessTravelRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${businessTravelRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -621,166 +1656,604 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Employee Commuting
   if (activeCategory === 'employeeCommuting') {
+    const totalEmissions = employeeCommutingRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalDistance = employeeCommutingRows.reduce((sum, r) => sum + (r.distance || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Employee Commuting</h3>
-            <p className="text-sm text-gray-600">Modes, distance, WFH %, employees, carpooling</p>
+            <h4 className="text-lg font-semibold text-gray-900">Employee Commuting</h4>
+            <p className="text-sm text-gray-600">Travel modes, distance, and number of employees</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('ec-mode') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addEmployeeCommutingRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
-            <Label>Transportation Mode</Label>
-            <Select onValueChange={(v) => ((document.getElementById('ec-mode') as any)._value = v)}>
-              <SelectTrigger id="ec-mode"><SelectValue placeholder="Select mode" /></SelectTrigger>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+          <Label className="text-gray-500">Travel Mode</Label>
+          <Label className="text-gray-500">Distance (km)</Label>
+          <Label className="text-gray-500">Employees</Label>
+          <Label className="text-gray-500">Emissions</Label>
+        </div>
+
+        <div className="space-y-3">
+          {employeeCommutingRows.map((r) => {
+            const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
+            return (
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full">
+                  <Select
+                    value={r.travelTypeId}
+                    onValueChange={(v) => updateEmployeeCommutingRow(r.id, { travelTypeId: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select travel mode" />
+                    </SelectTrigger>
               <SelectContent>
-                <SelectItem value="car">Car</SelectItem>
-                <SelectItem value="bus">Bus</SelectItem>
-                <SelectItem value="train">Train</SelectItem>
-                <SelectItem value="bicycle">Bicycle</SelectItem>
-                <SelectItem value="walk">Walk</SelectItem>
+                      {businessTravelTypes.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        businessTravelTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            {type.vehicle_type}
+                          </SelectItem>
+                        ))
+                      )}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="ec-distance">Distance Traveled (km)</Label>
-            <Input id="ec-distance" type="number" min={0} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="ec-wfh">Work-from-home (%)</Label>
-            <Input id="ec-wfh" type="number" min={0} max={100} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="ec-employees">No. of Employees</Label>
-            <Input id="ec-employees" type="number" min={0} step={1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="ec-carpool">Carpooling Rate (%)</Label>
-            <Input id="ec-carpool" type="number" min={0} max={100} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-        </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const mode = (document.getElementById('ec-mode') as any)?._value || '';
-            const distStr = (document.getElementById('ec-distance') as any)?._value || (document.getElementById('ec-distance') as HTMLInputElement)?.value || '0';
-            const wfhStr = (document.getElementById('ec-wfh') as any)?._value || (document.getElementById('ec-wfh') as HTMLInputElement)?.value || '0';
-            const empStr = (document.getElementById('ec-employees') as any)?._value || (document.getElementById('ec-employees') as HTMLInputElement)?.value || '0';
-            const carpoolStr = (document.getElementById('ec-carpool') as any)?._value || (document.getElementById('ec-carpool') as HTMLInputElement)?.value || '0';
-            const km = parseFloat(distStr) || 0; const wfh = parseFloat(wfhStr) || 0; const employees = parseInt(empStr || '0', 10) || 0; const carpool = parseFloat(carpoolStr) || 0;
-            if (!mode || km < 0 || wfh < 0 || wfh > 100 || employees < 0 || carpool < 0 || carpool > 100) { toast({ title: 'Missing/invalid info', description: 'Select mode and enter valid non-negative numbers; percentages between 0–100.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `ec-${Date.now()}`, category: 'employee_commuting', activity: `${mode} | WFH: ${wfh}% | Emp: ${employees} | Carpool: ${carpool}%`, unit: 'km', quantity: km, emissions: 0 }] }));
-            ['ec-mode','ec-distance','ec-wfh','ec-employees','ec-carpool'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (['ec-distance','ec-wfh','ec-employees','ec-carpool'].includes(id)) el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'employee_commuting').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'employee_commuting').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} km</div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.distance ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateEmployeeCommutingRow(r.id, { distance: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateEmployeeCommutingRow(r.id, { distance: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter distance"
+                    className="w-full"
+                  />
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'employee_commuting');
-            const totalKm = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Commute Distance: <span className="font-semibold">{totalKm.toFixed(1)} km</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Employee commuting entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
-              </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={r.employees ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateEmployeeCommutingRow(r.id, { employees: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateEmployeeCommutingRow(r.id, { employees: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="No. of employees"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO₂e` : '-'}
+        </div>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeEmployeeCommutingRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+        </div>
+                </div>
             );
-          })()}
+          })}
+              </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Distance: <span className="font-semibold">{totalDistance.toFixed(2)} km</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO₂e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Employee commuting entries saved (frontend only for now).' })} disabled={employeeCommutingRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${employeeCommutingRows.length})`}
+          </Button>
         </div>
       </div>
     );
   }
-  // Upstream Leased Assets
+  // Upstream Leased Assets - Category-based implementation (same as Downstream)
   if (activeCategory === 'upstreamLeasedAssets') {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Upstream Leased Assets</h3>
-            <p className="text-sm text-gray-600">Asset types, lease duration, energy, maintenance</p>
+            <h4 className="text-lg font-semibold text-gray-900">Upstream Leased Assets</h4>
+            <p className="text-sm text-gray-600">Asset categories, energy consumption, tenant activities</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('ula-asset') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
-          </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        
+        {/* Category Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <Label>Asset Type</Label>
-            <Select onValueChange={(v) => ((document.getElementById('ula-asset') as any)._value = v)}>
-              <SelectTrigger id="ula-asset"><SelectValue placeholder="Select asset" /></SelectTrigger>
+            <Label>Category</Label>
+            <Select value={upstreamSelectedCategory} onValueChange={setUpstreamSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="office">Office</SelectItem>
-                <SelectItem value="warehouse">Warehouse</SelectItem>
-                <SelectItem value="heavy-machinery">Heavy machinery</SelectItem>
-                <SelectItem value="vehicle-fleet">Vehicle fleet</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="buildings">Buildings & Facilities</SelectItem>
+                <SelectItem value="transport">Transport & Logistics</SelectItem>
+                <SelectItem value="equipment">Equipment & Machinery</SelectItem>
+                <SelectItem value="infrastructure">Infrastructure & Utilities</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        {/* Buildings & Facilities Form (Scope 2 Electricity) */}
+        {upstreamSelectedCategory === 'buildings' && (
+          <div className="space-y-6 border-t pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">Buildings & Facilities - Electricity Consumption</h4>
+                <p className="text-sm text-gray-600">Enter electricity consumption data for leased buildings</p>
+              </div>
+            </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="md:col-span-1">
+                <Label>Total electricity consumption (kWh)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="999999999999.999999"
+                  value={upstreamTotalKwh ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setUpstreamTotalKwh(undefined);
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0 && numValue <= 999999999999.999999) {
+                        setUpstreamTotalKwh(numValue);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., 120000"
+                />
+              </div>
+          <div>
+                <Label>Grid Energy (%)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="100"
+                  value={upstreamGridPct ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setUpstreamGridPct(undefined);
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0 && numValue <= 100) {
+                        setUpstreamGridPct(numValue);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., 60"
+                />
+              </div>
+              <div>
+                <Label>Renewable Energy (%)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="100"
+                  value={upstreamRenewablePct ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setUpstreamRenewablePct(undefined);
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0 && numValue <= 100) {
+                        setUpstreamRenewablePct(numValue);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., 30"
+                />
+              </div>
+              <div>
+                <Label>Other sources (%)</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="100"
+                  value={upstreamOtherPct ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setUpstreamOtherPct(undefined);
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0 && numValue <= 100) {
+                        setUpstreamOtherPct(numValue);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., 10"
+                />
+              </div>
+            </div>
+
+            {/* Grid sources section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <h3 className="text-lg font-medium mb-4">Grid sources</h3>
+                <Label>Electricity provider country</Label>
+                <Select value={upstreamGridCountry} onValueChange={v => setUpstreamGridCountry(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+              <SelectContent>
+                    <SelectItem value="UAE">UAE</SelectItem>
+                    <SelectItem value="Pakistan">Pakistan</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="ula-duration">Lease Duration</Label>
-            <Input id="ula-duration" placeholder="e.g., 24 months" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+                <Label>Grid emission factor</Label>
+                <Input value={upstreamGridFactor ?? ''} readOnly placeholder="Auto" />
           </div>
           <div>
-            <Label htmlFor="ula-energy">Energy Consumption</Label>
-            <Input id="ula-energy" placeholder="e.g., 12,000 kWh/year" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+                <Label>Grid emissions</Label>
+                <Input
+                  readOnly
+                  value={upstreamGridEmissions || ''}
+                />
           </div>
-          <div>
-            <Label htmlFor="ula-maintenance">Maintenance Practices</Label>
-            <Input id="ula-maintenance" placeholder="" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-        </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const asset = (document.getElementById('ula-asset') as any)?._value || '';
-            const duration = (document.getElementById('ula-duration') as any)?._value || (document.getElementById('ula-duration') as HTMLInputElement)?.value || '';
-            const energy = (document.getElementById('ula-energy') as any)?._value || (document.getElementById('ula-energy') as HTMLInputElement)?.value || '';
-            const maintenance = (document.getElementById('ula-maintenance') as any)?._value || (document.getElementById('ula-maintenance') as HTMLInputElement)?.value || '';
-            if (!asset || !duration || !energy || !maintenance) { toast({ title: 'Missing info', description: 'Fill all leased asset fields before adding.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `ula-${Date.now()}`, category: 'upstream_leased_assets', activity: `${asset} | ${duration} | ${energy}`, unit: 'asset', quantity: 1, emissions: 0 }] }));
-            ['ula-asset','ula-duration','ula-energy','ula-maintenance'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (['ula-duration','ula-energy','ula-maintenance'].includes(id)) el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'upstream_leased_assets').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'upstream_leased_assets').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">1 asset</div>
+              {upstreamGridPct && upstreamGridPct > 0 && (
+                <div className="md:col-span-3 text-gray-700 font-medium">
+                  Grid sources emissions: <span className="font-semibold">{upstreamGridEmissions.toFixed(6)} kg CO2e</span>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+              )}
+            </div>
+
+            {/* Other sources section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Other sources</h3>
+                <Button onClick={addUpstreamOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" /> Add Row
+                </Button>
               </div>
-            ))}
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <Label className="text-gray-500">Type</Label>
+                <Label className="text-gray-500">Fuel</Label>
+                <Label className="text-gray-500">Unit</Label>
+                <Label className="text-gray-500">Quantity</Label>
+                <div />
+              </div>
+
+              <div className="space-y-3">
+                {upstreamOtherRows.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    No other sources added yet. Click "Add Row" to add one.
+                  </div>
+                ) : (
+                  upstreamOtherRows.map(r => (
+                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                      <Select
+                        value={r.type}
+                        onValueChange={v => updateUpstreamOtherRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fuelTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={r.fuel}
+                        onValueChange={v => updateUpstreamOtherRow(r.id, { fuel: v, unit: undefined })}
+                        disabled={!r.type}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select fuel" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fuelsFor(r.type).map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={r.unit}
+                        onValueChange={v => updateUpstreamOtherRow(r.id, { unit: v })}
+                        disabled={!r.type || !r.fuel}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unitsFor(r.type, r.fuel).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        max="999999999999.999999"
+                        value={r.quantity ?? ''}
+                        onChange={e => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            updateUpstreamOtherRow(r.id, { quantity: undefined });
+                          } else {
+                            const numValue = Number(value);
+                            if (numValue >= 0 && numValue <= 999999999999.999999) {
+                              updateUpstreamOtherRow(r.id, { quantity: numValue });
+                            }
+                          }
+                        }}
+                        placeholder="Enter quantity"
+                      />
+
+                      <div className="flex items-center gap-2 justify-end">
+                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamOtherRow(r.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="text-gray-700 font-medium">
+                Other sources emissions: <span className="font-semibold">{upstreamTotalOtherEmissions.toFixed(6)} kg CO2e</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-gray-900 font-medium">
+                Total electricity emissions: <span className="font-semibold">{upstreamComputedElectricityEmissions.toFixed(6)} kg CO2e</span>
+              </div>
+              <Button onClick={() => toast({ title: 'Saved', description: 'Upstream Buildings & Facilities data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Save className="h-4 w-4 mr-2" /> Save
+              </Button>
+            </div>
           </div>
         )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'upstream_leased_assets');
-            const totalItems = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Leased Assets: <span className="font-semibold">{totalItems}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Upstream leased assets saved (frontend only for now).' })} disabled={totalItems === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalItems})`}</Button>
-              </div>
-            );
-          })()}
+        
+        {/* Transport & Logistics Form (Passenger + Delivery Vehicles) */}
+        {upstreamSelectedCategory === 'transport' && (
+          <div className="space-y-6 border-t pt-6">
+            <div className="flex items-center justify-between">
+          <div>
+                <h4 className="text-lg font-semibold text-gray-900">Transport & Logistics</h4>
+                <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased transport assets</p>
+          </div>
+              <div className="flex gap-2">
+                <Button onClick={() => addUpstreamLeasedTransportRow('passenger')} className="bg-teal-600 hover:bg-teal-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />Add Passenger Vehicle
+                </Button>
+                <Button onClick={() => addUpstreamLeasedTransportRow('delivery')} className="bg-teal-600 hover:bg-teal-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />Add Delivery Vehicle
+                </Button>
         </div>
+        </div>
+
+            {/* Passenger Vehicles */}
+            {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'passenger').length > 0 && (
+              <div className="space-y-4">
+                <h5 className="text-md font-semibold text-gray-800">Passenger Vehicles</h5>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Label className="text-gray-500">Activity</Label>
+                  <Label className="text-gray-500">Type</Label>
+                  <Label className="text-gray-500">Unit</Label>
+                  <Label className="text-gray-500">Distance</Label>
+                </div>
+                <div className="space-y-3">
+                  {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'passenger').map((r) => (
+                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                      <Select 
+                        value={r.activity} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select activity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehicleActivities.map(activity => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select 
+                        value={r.vehicleTypeName} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
+                        disabled={!r.activity}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehicleTypesFor(r.activity).map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select 
+                        value={r.unit} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { unit: v })} 
+                        disabled={!r.activity || !r.vehicleTypeName}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          max="999999999999.999999"
+                          value={r.distance ?? ''} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              updateUpstreamLeasedTransportRow(r.id, { distance: undefined });
+                            } else {
+                              const numValue = Number(value);
+                              if (numValue >= 0 && numValue <= 999999999999.999999) {
+                                updateUpstreamLeasedTransportRow(r.id, { distance: numValue });
+                              }
+                            }
+                          }} 
+                          placeholder="Enter distance"
+                          className="flex-1"
+                        />
+                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamLeasedTransportRow(r.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+              </div>
+            ))}
+                </div>
+          </div>
+        )}
+
+            {/* Delivery Vehicles */}
+            {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'delivery').length > 0 && (
+              <div className="space-y-4">
+                <h5 className="text-md font-semibold text-gray-800">Delivery Vehicles</h5>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Label className="text-gray-500">Activity</Label>
+                  <Label className="text-gray-500">Type</Label>
+                  <Label className="text-gray-500">Unit</Label>
+                  <Label className="text-gray-500">Distance</Label>
+              </div>
+                <div className="space-y-3">
+                  {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'delivery').map((r) => (
+                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                      <Select 
+                        value={r.activity} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select activity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deliveryActivities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select 
+                        value={r.vehicleTypeName} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
+                        disabled={!r.activity}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deliveryTypesFor(r.activity).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <Select 
+                        value={r.unit} 
+                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { unit: v })} 
+                        disabled={!r.activity || !r.vehicleTypeName}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deliveryUnitsFor(r.activity, r.vehicleTypeName).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          max="999999999999.999999"
+                          value={r.distance ?? ''} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              updateUpstreamLeasedTransportRow(r.id, { distance: undefined });
+                            } else {
+                              const numValue = Number(value);
+                              if (numValue >= 0 && numValue <= 999999999999.999999) {
+                                updateUpstreamLeasedTransportRow(r.id, { distance: numValue });
+                              }
+                            }
+                          }} 
+                          placeholder="Enter distance"
+                          className="flex-1"
+                        />
+                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamLeasedTransportRow(r.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+        </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="text-gray-900 font-medium">
+                Total transport emissions: <span className="font-semibold">{upstreamLeasedTotalTransportEmissions.toFixed(6)} kg CO2e</span>
+              </div>
+              <Button onClick={() => toast({ title: 'Saved', description: 'Upstream Transport & Logistics data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Save className="h-4 w-4 mr-2" /> Save
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Equipment & Machinery and Infrastructure & Utilities sections would follow the same pattern as Downstream */}
+        {/* For brevity, I'll add placeholders that can be expanded */}
+        {upstreamSelectedCategory === 'equipment' && (
+          <div className="space-y-6 border-t pt-6">
+            <div className="text-center py-8 text-gray-500">
+              Equipment & Machinery form - Same structure as Downstream (to be implemented)
+            </div>
+          </div>
+        )}
+        
+        {upstreamSelectedCategory === 'infrastructure' && (
+          <div className="space-y-6 border-t pt-6">
+            <div className="text-center py-8 text-gray-500">
+              Infrastructure & Utilities form - Same structure as Downstream (to be implemented)
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -800,11 +2273,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div>
-            <Label htmlFor="inv-portfolio">Investment Portfolio</Label>
+            <Label htmlFor="inv-portfolio" className="flex items-center gap-1">Investment Portfolio <FieldTooltip content="Breakdown of portfolio" /></Label>
             <Input id="inv-portfolio" placeholder="Enter portfolio details" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="inv-emissions">Investee Company Emissions Data</Label>
+            <Label htmlFor="inv-emissions" className="flex items-center gap-1">Investee Company Emissions Data <FieldTooltip content="Reported Scope 1 & 2 emissions" /></Label>
             <Input id="inv-emissions" placeholder="Enter reported emissions data" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
         </div>
@@ -818,14 +2291,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           }}>Add Entry</Button>
         </div>
         {emissionData.scope3.filter(r => r.category === 'investments').length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {emissionData.scope3.filter(r => r.category === 'investments').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
+              <div key={row.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                <div className="md:col-span-3">
                   <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">Investee emissions recorded</div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeScope3Row(row.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -848,22 +2324,43 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Downstream Transportation
   if (activeCategory === 'downstreamTransportation') {
+    const totalEmissions = downstreamTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalWeight = downstreamTransportRows.reduce((sum, r) => sum + (r.weight || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Downstream Transportation</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Downstream Transportation</h4>
             <p className="text-sm text-gray-600">Distribution methods, distance, vehicles, packaging</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('dt-method') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addDownstreamTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <Label>Product Distribution Method</Label>
-            <Select onValueChange={(v) => ((document.getElementById('dt-method') as any)._value = v)}>
-              <SelectTrigger id="dt-method"><SelectValue placeholder="Select method" /></SelectTrigger>
+
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center">
+          <Label className="text-gray-500">Method</Label>
+          <Label className="text-gray-500">Vehicle Type</Label>
+          <Label className="text-gray-500">Distance (km)</Label>
+          <Label className="text-gray-500">Weight (kg)</Label>
+          <Label className="text-gray-500">Packaging</Label>
+          <Label className="text-gray-500">Emissions</Label>
+        </div>
+
+        <div className="space-y-3">
+          {downstreamTransportRows.map((r) => {
+            const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
+            return (
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full">
+                  <Select
+                    value={r.method}
+                    onValueChange={(v) => updateDownstreamTransportRow(r.id, { method: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
               <SelectContent>
                 <SelectItem value="logistics">Logistics provider</SelectItem>
                 <SelectItem value="direct-shipment">Direct shipment</SelectItem>
@@ -871,27 +2368,103 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="dt-distance">Transportation Distance (km)</Label>
-            <Input id="dt-distance" type="number" min={0} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label>Vehicle Type</Label>
-            <Select onValueChange={(v) => ((document.getElementById('dt-vehicle') as any)._value = v)}>
-              <SelectTrigger id="dt-vehicle"><SelectValue placeholder="Select vehicle" /></SelectTrigger>
+                <div className="w-full flex items-center gap-2">
+                  <Select
+                    value={r.vehicleTypeId}
+                    onValueChange={(v) => updateDownstreamTransportRow(r.id, { vehicleTypeId: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select vehicle type" />
+                    </SelectTrigger>
               <SelectContent>
-                <SelectItem value="truck">Truck</SelectItem>
-                <SelectItem value="van">Van</SelectItem>
-                <SelectItem value="electric-truck">Electric truck</SelectItem>
-                <SelectItem value="ship">Ship</SelectItem>
-                <SelectItem value="rail">Rail</SelectItem>
+                      {vehicleTypes.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        vehicleTypes.map((vehicle) => {
+                          const superscript = getVehicleTypeSuperscript(vehicle.vehicle_type);
+                          const cleanedName = cleanVehicleTypeName(vehicle.vehicle_type);
+                          return (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {cleanedName}
+                              {superscript && <sup className="text-xs ml-1">{superscript}</sup>}
+                            </SelectItem>
+                          );
+                        })
+                      )}
               </SelectContent>
             </Select>
+                  {r.vehicleTypeId && (() => {
+                    const selectedVehicle = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
+                    const note = selectedVehicle ? getVehicleTypeNote(selectedVehicle.vehicle_type) : null;
+                    if (note) {
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="flex-shrink-0">
+                                <Info className="h-4 w-4 text-teal-600 hover:text-teal-700" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">{note}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    }
+                    return null;
+                  })()}
           </div>
-          <div>
-            <Label>Packaging Materials</Label>
-            <Select onValueChange={(v) => ((document.getElementById('dt-packaging') as any)._value = v)}>
-              <SelectTrigger id="dt-packaging"><SelectValue placeholder="Select material" /></SelectTrigger>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.distance ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateDownstreamTransportRow(r.id, { distance: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateDownstreamTransportRow(r.id, { distance: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter distance"
+                    className="w-full"
+                  />
+                </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.weight ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateDownstreamTransportRow(r.id, { weight: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateDownstreamTransportRow(r.id, { weight: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter weight"
+                    className="w-full"
+                  />
+                </div>
+                <div className="w-full">
+                  <Select
+                    value={r.packaging}
+                    onValueChange={(v) => updateDownstreamTransportRow(r.id, { packaging: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select material" />
+                    </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cardboard">Cardboard</SelectItem>
                 <SelectItem value="plastic">Plastic</SelectItem>
@@ -901,44 +2474,28 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               </SelectContent>
             </Select>
           </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const method = (document.getElementById('dt-method') as any)?._value || '';
-            const distStr = (document.getElementById('dt-distance') as any)?._value || (document.getElementById('dt-distance') as HTMLInputElement)?.value || '0';
-            const vehicle = (document.getElementById('dt-vehicle') as any)?._value || '';
-            const packaging = (document.getElementById('dt-packaging') as any)?._value || '';
-            const km = parseFloat(distStr) || 0;
-            if (!method || !vehicle || !packaging || km < 0) { toast({ title: 'Missing/invalid info', description: 'Select method, vehicle, packaging and non-negative distance.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `dt-${Date.now()}`, category: 'downstream_transportation', activity: `${method} | ${vehicle} | ${packaging}`, unit: 'km', quantity: km, emissions: 0 }] }));
-            ['dt-method','dt-distance','dt-vehicle','dt-packaging'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (id==='dt-distance') el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeDownstreamTransportRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
         </div>
-        {emissionData.scope3.filter(r => r.category === 'downstream_transportation').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'downstream_transportation').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">{row.quantity} km</div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'downstream_transportation');
-            const totalKm = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Distance: <span className="font-semibold">{totalKm.toFixed(1)} km</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Downstream transportation saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
-              </div>
             );
-          })()}
+          })}
+              </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Weight: <span className="font-semibold">{totalWeight.toFixed(2)} kg</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'Downstream transportation saved (frontend only for now).' })} disabled={downstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${downstreamTransportRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -957,45 +2514,37 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             <Plus className="h-4 w-4 mr-2" /> Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div>
-            <Label>Product Lifecycle Data</Label>
-            <Select onValueChange={(v) => ((document.getElementById('psp-lifecycle') as any)._value = v)}>
-              <SelectTrigger id="psp-lifecycle"><SelectValue placeholder="Yes/No" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="psp-transform">Material Transformations</Label>
+            <Label htmlFor="psp-transform" className="flex items-center gap-1">Material Transformations <FieldTooltip content="Physical/chemical changes in products" /></Label>
             <Input id="psp-transform" placeholder="Describe transformations" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="psp-energy">Energy Consumption</Label>
+            <Label htmlFor="psp-energy" className="flex items-center gap-1">Energy Consumption <FieldTooltip content="Energy used to process products" /></Label>
             <Input id="psp-energy" placeholder="e.g., kWh or fuel usage" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
         </div>
         <div className="flex items-center justify-end mt-2">
           <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const lifecycle = (document.getElementById('psp-lifecycle') as any)?._value || '';
             const transform = (document.getElementById('psp-transform') as any)?._value || (document.getElementById('psp-transform') as HTMLInputElement)?.value || '';
             const energy = (document.getElementById('psp-energy') as any)?._value || (document.getElementById('psp-energy') as HTMLInputElement)?.value || '';
-            if (!lifecycle || !transform || !energy) { toast({ title: 'Missing info', description: 'Select lifecycle and enter transformations and energy.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `psp-${Date.now()}`, category: 'processing_sold_products', activity: `Lifecycle: ${lifecycle} | ${transform}`, unit: 'entry', quantity: 1, emissions: 0 }] }));
-            ['psp-lifecycle','psp-transform','psp-energy'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (['psp-transform','psp-energy'].includes(id)) el.value=''; else el._value=''; });
+            if (!transform || !energy) { toast({ title: 'Missing info', description: 'Enter transformations and energy.' }); return; }
+            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `psp-${Date.now()}`, category: 'processing_sold_products', activity: `${transform}`, unit: 'entry', quantity: 1, emissions: 0 }] }));
+            ['psp-transform','psp-energy'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; el.value=''; });
           }}>Add Entry</Button>
         </div>
         {emissionData.scope3.filter(r => r.category === 'processing_sold_products').length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {emissionData.scope3.filter(r => r.category === 'processing_sold_products').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
+              <div key={row.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                <div className="md:col-span-3">
                   <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">Energy captured</div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeScope3Row(row.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -1031,15 +2580,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <Label htmlFor="usp-specs">Product Specifications</Label>
+            <Label htmlFor="usp-specs" className="flex items-center gap-1">Product Specifications <FieldTooltip content="Technical details of products" /></Label>
             <Input id="usp-specs" placeholder="Enter specifications" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="usp-usage">Expected Usage Patterns</Label>
+            <Label htmlFor="usp-usage" className="flex items-center gap-1">Expected Usage Patterns <FieldTooltip content="Typical usage scenario" /></Label>
             <Input id="usp-usage" placeholder="e.g., hours/day or cycles" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="usp-energy">Energy Consumption During Use</Label>
+            <Label htmlFor="usp-energy" className="flex items-center gap-1">Energy Consumption During Use <FieldTooltip content="Total lifetime energy consumed" /></Label>
             <Input id="usp-energy" placeholder="e.g., kWh/year" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
         </div>
@@ -1054,14 +2603,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           }}>Add Entry</Button>
         </div>
         {emissionData.scope3.filter(r => r.category === 'use_of_sold_products').length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {emissionData.scope3.filter(r => r.category === 'use_of_sold_products').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
+              <div key={row.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                <div className="md:col-span-3">
                   <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">Energy during use recorded</div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeScope3Row(row.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -1084,142 +2636,162 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // End-of-Life Treatment
   if (activeCategory === 'endOfLifeTreatment') {
+    const totalEmissions = endOfLifeRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+    const totalVolume = endOfLifeRows.reduce((sum, r) => sum + (r.volume || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">End-of-Life Treatment</h3>
+            <h4 className="text-lg font-semibold text-gray-900">End-of-Life Treatment</h4>
             <p className="text-sm text-gray-600">Disposal methods, recycling potential, materials</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('eol-method') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addEndOfLifeRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <Label>Product Disposal Method</Label>
-            <Select onValueChange={(v) => ((document.getElementById('eol-method') as any)._value = v)}>
-              <SelectTrigger id="eol-method"><SelectValue placeholder="Select method" /></SelectTrigger>
+
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center">
+          <Label className="text-gray-500">Material</Label>
+          <Label className="text-gray-500">Volume (kg)</Label>
+          <Label className="text-gray-500">Disposal Method</Label>
+          <Label className="text-gray-500">Recycle (%)</Label>
+          <Label className="text-gray-500">Composition</Label>
+          <Label className="text-gray-500">Emissions</Label>
+        </div>
+
+        <div className="space-y-3">
+          {endOfLifeRows.map((r) => {
+            const material = wasteMaterials.find(m => m.id === r.materialId);
+            const availableMethods = getAvailableDisposalMethods(material || null);
+            return (
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center p-4 rounded-lg bg-gray-50">
+                <div className="w-full">
+                  <Select
+                    value={r.materialId}
+                    onValueChange={(v) => {
+                      updateEndOfLifeRow(r.id, { materialId: v, disposalMethod: '' });
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select material" />
+                    </SelectTrigger>
               <SelectContent>
-                <SelectItem value="landfill">Landfill</SelectItem>
-                <SelectItem value="incineration">Incineration</SelectItem>
-                <SelectItem value="recycling">Recycling</SelectItem>
+                      {wasteMaterials.length === 0 ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        wasteMaterials.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m[" Material "] || "Unknown"}
+                          </SelectItem>
+                        ))
+                      )}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label htmlFor="eol-recycle">Recycling Potential (%)</Label>
-            <Input id="eol-recycle" type="number" min={0} max={100} step={0.1} placeholder="0" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={r.volume ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateEndOfLifeRow(r.id, { volume: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0) {
+                          updateEndOfLifeRow(r.id, { volume: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Enter volume"
+                    className="w-full"
+                  />
           </div>
-          <div>
-            <Label htmlFor="eol-materials">Material Composition</Label>
-            <Input id="eol-materials" placeholder="Enter materials" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
+                <div className="w-full">
+                  <Select
+                    value={r.disposalMethod}
+                    onValueChange={(v) => updateEndOfLifeRow(r.id, { disposalMethod: v as DisposalMethod })}
+                    disabled={!material || availableMethods.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMethods.length === 0 ? (
+                        <SelectItem value="none" disabled>Select material first</SelectItem>
+                      ) : (
+                        availableMethods.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
           </div>
+                <div className="w-full">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max="100"
+                    value={r.recycle ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateEndOfLifeRow(r.id, { recycle: undefined });
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0 && numValue <= 100) {
+                          updateEndOfLifeRow(r.id, { recycle: numValue });
+                        }
+                      }
+                    }}
+                    placeholder="Recycle %"
+                    className="w-full"
+                  />
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const method = (document.getElementById('eol-method') as any)?._value || '';
-            const recycleStr = (document.getElementById('eol-recycle') as any)?._value || (document.getElementById('eol-recycle') as HTMLInputElement)?.value || '0';
-            const materials = (document.getElementById('eol-materials') as any)?._value || (document.getElementById('eol-materials') as HTMLInputElement)?.value || '';
-            const recycle = parseFloat(recycleStr) || 0;
-            if (!method || !materials || recycle < 0 || recycle > 100) { toast({ title: 'Missing/invalid info', description: 'Select disposal method, enter materials and 0–100% recycling potential.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `eol-${Date.now()}`, category: 'end_of_life_treatment', activity: `${method} | Recycle: ${recycle}% | ${materials}`, unit: 'entry', quantity: 1, emissions: 0 }] }));
-            ['eol-method','eol-recycle','eol-materials'].forEach(id => { const el = document.getElementById(id) as any; if (!el) return; if (['eol-recycle','eol-materials'].includes(id)) el.value=''; else el._value=''; });
-          }}>Add Entry</Button>
+                <div className="w-full">
+                  <Input
+                    value={r.composition}
+                    onChange={(e) => updateEndOfLifeRow(r.id, { composition: e.target.value })}
+                    placeholder="Enter materials"
+                    className="w-full"
+                  />
         </div>
-        {emissionData.scope3.filter(r => r.category === 'end_of_life_treatment').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'end_of_life_treatment').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">Recorded end-of-life treatment</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-gray-600 flex-1">
+                    {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeEndOfLifeRow(r.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
               </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'end_of_life_treatment');
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total EoL Entries: <span className="font-semibold">{totalPending}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'End-of-life entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
               </div>
             );
-          })()}
+          })}
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Volume: <span className="font-semibold">{totalVolume.toFixed(2)} kg</span> | 
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
+          </div>
+          <Button onClick={() => toast({ title: 'Saved', description: 'End-of-life entries saved (frontend only for now).' })} disabled={endOfLifeRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save Changes (${endOfLifeRows.length})`}
+          </Button>
         </div>
       </div>
     );
   }
 
-  // Downstream Leased Assets
+  // Downstream Leased Assets - Category-based implementation
   if (activeCategory === 'downstreamLeasedAssets') {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Downstream Leased Assets</h3>
-            <p className="text-sm text-gray-600">Asset types, energy consumption, tenant activities</p>
-          </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('dla-asset') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-          <div>
-            <Label htmlFor="dla-asset">Asset Types</Label>
-            <Input id="dla-asset" placeholder="Enter asset types" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="dla-energy">Energy Consumption</Label>
-            <Input id="dla-energy" placeholder="e.g., kWh/year" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="dla-tenant">Tenant Activities</Label>
-            <Input id="dla-tenant" placeholder="Enter tenant activities" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-        </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const asset = (document.getElementById('dla-asset') as any)?._value || (document.getElementById('dla-asset') as HTMLInputElement)?.value || '';
-            const energy = (document.getElementById('dla-energy') as any)?._value || (document.getElementById('dla-energy') as HTMLInputElement)?.value || '';
-            const tenant = (document.getElementById('dla-tenant') as any)?._value || (document.getElementById('dla-tenant') as HTMLInputElement)?.value || '';
-            if (!asset || !energy || !tenant) { toast({ title: 'Missing info', description: 'Enter asset types, energy consumption, and tenant activities.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `dla-${Date.now()}`, category: 'downstream_leased_assets', activity: `${asset} | ${energy} | ${tenant}`, unit: 'asset', quantity: 1, emissions: 0 }] }));
-            ['dla-asset','dla-energy','dla-tenant'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value=''; });
-          }}>Add Entry</Button>
-        </div>
-        {emissionData.scope3.filter(r => r.category === 'downstream_leased_assets').length > 0 && (
-          <div className="space-y-2">
-            {emissionData.scope3.filter(r => r.category === 'downstream_leased_assets').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">1 asset</div>
-                </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'downstream_leased_assets');
-            const totalItems = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Downstream Leased Assets: <span className="font-semibold">{totalItems}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Downstream leased assets saved (frontend only for now).' })} disabled={totalItems === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalItems})`}</Button>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
-    );
+    return <LeasedAssetsSection type="downstream" />;
   }
 
   // Franchises
@@ -1237,15 +2809,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <Label htmlFor="fr-details">Franchise Details</Label>
+            <Label htmlFor="fr-details" className="flex items-center gap-1">Franchise Details <FieldTooltip content="Information about the franchise" /></Label>
             <Input id="fr-details" placeholder="Enter franchise info" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="fr-ops">Operational Practices</Label>
+            <Label htmlFor="fr-ops" className="flex items-center gap-1">Operational Practices <FieldTooltip content="Operational practices followed by the franchise" /></Label>
             <Input id="fr-ops" placeholder="Describe ops practices" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
           <div>
-            <Label htmlFor="fr-energy">Energy Consumption</Label>
+            <Label htmlFor="fr-energy" className="flex items-center gap-1">Energy Consumption <FieldTooltip content="Energy consumed in franchise operations" /></Label>
             <Input id="fr-energy" placeholder="e.g., kWh/year" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
           </div>
         </div>
@@ -1260,14 +2832,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           }}>Add Entry</Button>
         </div>
         {emissionData.scope3.filter(r => r.category === 'franchises').length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {emissionData.scope3.filter(r => r.category === 'franchises').map(row => (
-              <div key={row.id} className="flex items-center gap-3 p-3 border rounded-md bg-white">
-                <div className="flex-1">
+              <div key={row.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                <div className="md:col-span-3">
                   <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                  <div className="text-xs text-gray-600">Energy captured</div>
                 </div>
-                <Button variant="outline" size="icon" onClick={() => removeScope3Row(row.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="text-red-600" onClick={() => removeScope3Row(row.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

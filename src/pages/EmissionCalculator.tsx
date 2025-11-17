@@ -55,8 +55,9 @@ const EmissionCalculator = () => {
   const [expandedScopes, setExpandedScopes] = useState<{[key: string]: boolean}>({
     scope1: true,
     scope2: true,
-    scope3: false
+    scope3: true
   });
+  const [scope3GroupsExpanded, setScope3GroupsExpanded] = useState<{ upstream: boolean; downstream: boolean }>({ upstream: false, downstream: false });
   const [scope3QuestionnaireCompleted, setScope3QuestionnaireCompleted] = useState(false);
   const [scope3CalculationMode, setScope3CalculationMode] = useState<'lca' | 'manual' | null>(null);
   const [emissionData, setEmissionData] = useState<EmissionData>({
@@ -414,21 +415,23 @@ const EmissionCalculator = () => {
       icon: Factory,
       description: 'Value chain emissions',
       categories: [
-        { id: 'purchasedGoods', title: 'Purchased Goods & Services', icon: Truck, description: 'Upstream purchased goods and services' },
-        { id: 'capitalGoods', title: 'Capital Goods', icon: Factory, description: 'Purchased capital goods and equipment' },
-        { id: 'fuelEnergyActivities', title: 'Fuel & Energy Related Activities', icon: Flame, description: 'Upstream fuel and energy related activities' },
-        { id: 'upstreamTransportation', title: 'Upstream Transportation', icon: Truck, description: 'Transport of fuels/materials before processing' },
-        { id: 'wasteGenerated', title: 'Waste Generated', icon: Factory, description: 'Waste generated in operations' },
-        { id: 'businessTravel', title: 'Business Travel', icon: Car, description: 'Employee business travel' },
-        { id: 'employeeCommuting', title: 'Employee Commuting', icon: Car, description: 'Daily commute to workplace' },
-        { id: 'upstreamLeasedAssets', title: 'Upstream Leased Assets', icon: Building2, description: 'Leased assets upstream of operations' }
-        ,{ id: 'investments', title: 'Investments', icon: Building2, description: 'Financed emissions from investments' }
-        ,{ id: 'downstreamTransportation', title: 'Downstream Transportation', icon: Truck, description: 'Distribution of sold products' }
-        ,{ id: 'processingSoldProducts', title: 'Processing of Sold Products', icon: Factory, description: 'Processing activities by third parties' }
-        ,{ id: 'useOfSoldProducts', title: 'Use of Sold Products', icon: Factory, description: 'Emissions from product use phase' }
-        ,{ id: 'endOfLifeTreatment', title: 'End-of-Life Treatment', icon: Factory, description: 'End-of-life processing and disposal' }
-        ,{ id: 'downstreamLeasedAssets', title: 'Downstream Leased Assets', icon: Building2, description: 'Leased assets downstream (tenants)' }
-        ,{ id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations' }
+        // Upstream emissions (1-8)
+        { id: 'purchasedGoods', title: 'Purchased Goods & Services', icon: Truck, description: 'Upstream purchased goods and services', group: 'upstream' },
+        { id: 'capitalGoods', title: 'Capital Goods', icon: Factory, description: 'Purchased capital goods and equipment', group: 'upstream' },
+        { id: 'fuelEnergyActivities', title: 'Fuel & Energy Related Activities', icon: Flame, description: 'Upstream fuel and energy related activities', group: 'upstream' },
+        { id: 'upstreamTransportation', title: 'Upstream Transportation', icon: Truck, description: 'Transport of fuels/materials before processing', group: 'upstream' },
+        { id: 'wasteGenerated', title: 'Waste Generated', icon: Factory, description: 'Waste generated in operations', group: 'upstream' },
+        { id: 'businessTravel', title: 'Business Travel', icon: Car, description: 'Employee business travel', group: 'upstream' },
+        { id: 'employeeCommuting', title: 'Employee Commuting', icon: Car, description: 'Daily commute to workplace', group: 'upstream' },
+        { id: 'upstreamLeasedAssets', title: 'Upstream Leased Assets', icon: Building2, description: 'Leased assets upstream of operations', group: 'upstream' },
+        // Downstream emissions (9-15)
+        { id: 'investments', title: 'Investments', icon: Building2, description: 'Financed emissions from investments', group: 'downstream' },
+        { id: 'downstreamTransportation', title: 'Downstream Transportation', icon: Truck, description: 'Distribution of sold products', group: 'downstream' },
+        { id: 'processingSoldProducts', title: 'Processing of Sold Products', icon: Factory, description: 'Processing activities by third parties', group: 'downstream' },
+        { id: 'useOfSoldProducts', title: 'Use of Sold Products', icon: Factory, description: 'Emissions from product use phase', group: 'downstream' },
+        { id: 'endOfLifeTreatment', title: 'End-of-Life Treatment', icon: Factory, description: 'End-of-life processing and disposal', group: 'downstream' },
+        { id: 'downstreamLeasedAssets', title: 'Downstream Leased Assets', icon: Building2, description: 'Leased assets downstream (tenants)', group: 'downstream' },
+        { id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations', group: 'downstream' }
       ]
     }
   ];
@@ -589,20 +592,86 @@ const EmissionCalculator = () => {
                 {/* Categories */}
                 {expandedScopes[scope.id] && (
                   <div className="ml-6 mt-1 space-y-1">
-                    {scope.categories.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => handleCategoryClick(scope.id, category.id)}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                          activeScope === scope.id && activeCategory === category.id
-                            ? 'bg-teal-50 text-teal-700 border-l-2 border-teal-500'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        <category.icon className="h-4 w-4" />
-                        <span>{category.title}</span>
-                      </button>
-                    ))}
+                    {scope.id !== 'scope3' ? (
+                      // Default rendering for scope1 and scope2
+                      scope.categories.map((category) => (
+                        <button
+                          key={category.id}
+                          onClick={() => handleCategoryClick(scope.id, category.id)}
+                          className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                            activeScope === scope.id && activeCategory === category.id
+                              ? 'bg-teal-50 text-teal-700 border-l-2 border-teal-500'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <category.icon className="h-4 w-4" />
+                          <span>{category.title}</span>
+                        </button>
+                      ))
+                    ) : (
+                      // Grouped rendering for scope3
+                      <div className="space-y-3">
+                        {/* Upstream Group */}
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setScope3GroupsExpanded(prev => ({ ...prev, upstream: !prev.upstream }))}
+                            className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700/90 hover:bg-teal-50 rounded"
+                          >
+                            <span>Upstream emissions</span>
+                            {scope3GroupsExpanded.upstream ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          </button>
+                          {scope3GroupsExpanded.upstream && (
+                            <div className="mt-1">
+                              {scope.categories.filter((c:any) => c.group === 'upstream').map((category:any) => (
+                                <button
+                                  key={category.id}
+                                  onClick={() => handleCategoryClick(scope.id, category.id)}
+                                  className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                    activeScope === scope.id && activeCategory === category.id
+                                      ? 'bg-teal-50 text-teal-700 border-l-2 border-teal-500'
+                                      : 'text-gray-600 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <category.icon className="h-4 w-4" />
+                                  <span>{category.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Downstream Group */}
+                        <div className="pt-2 border-t border-gray-200/70">
+                          <button
+                            type="button"
+                            onClick={() => setScope3GroupsExpanded(prev => ({ ...prev, downstream: !prev.downstream }))}
+                            className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-purple-700/90 hover:bg-purple-50 rounded"
+                          >
+                            <span>Downstream emissions</span>
+                            {scope3GroupsExpanded.downstream ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          </button>
+                          {scope3GroupsExpanded.downstream && (
+                            <div className="mt-1">
+                              {scope.categories.filter((c:any) => c.group === 'downstream').map((category:any) => (
+                                <button
+                                  key={category.id}
+                                  onClick={() => handleCategoryClick(scope.id, category.id)}
+                                  className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                                    activeScope === scope.id && activeCategory === category.id
+                                      ? 'bg-teal-50 text-teal-700 border-l-2 border-teal-500'
+                                      : 'text-gray-600 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <category.icon className="h-4 w-4" />
+                                  <span>{category.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -704,7 +773,7 @@ const EmissionCalculator = () => {
           )}
 
           {activeScope === 'scope3' && (
-            <div className="max-w-4xl" key={`scope3-${resetKey}`}>
+            <div className="w-full" key={`scope3-${resetKey}`}>
               <Card className="bg-white border border-gray-200">
                 <CardContent className="p-6">
                   {!scope3QuestionnaireCompleted ? (

@@ -148,7 +148,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
     if (!isInitialLoad) {
       onDataChange(rows);
     }
-  }, [rows, isInitialLoad, onDataChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, isInitialLoad]);
 
   // Row management functions
   const addRow = () => setRows(prev => [...prev, newFuelRow()]);
