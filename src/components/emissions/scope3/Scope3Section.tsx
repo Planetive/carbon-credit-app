@@ -259,8 +259,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     vehicleTypeId: string;
     distance: number | undefined;
     weight: number | undefined;
-    method: string;
-    packaging: string;
     emissions: number | undefined;
   }
   const [downstreamTransportRows, setDownstreamTransportRows] = useState<DownstreamTransportRow[]>([]);
@@ -270,8 +268,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     vehicleTypeId: '',
     distance: undefined,
     weight: undefined,
-    method: '',
-    packaging: '',
     emissions: undefined,
   });
   
@@ -300,7 +296,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         return {
           id: r.id,
           category: 'downstream_transportation' as const,
-          activity: `${r.method || ''} | ${vehicleType?.vehicle_type || ''} | Packaging: ${r.packaging || ''}`,
+          activity: `${vehicleType?.vehicle_type || ''} | Distance: ${r.distance} km | Weight: ${r.weight} kg`,
           unit: 'kg',
           quantity: r.weight!,
           emissions: r.emissions || 0,
@@ -671,15 +667,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <Label className="text-gray-500">Supplier</Label>
-          <Label className="text-gray-500">Amount Spent (PKR)</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Supplier</Label>
+          <Label className="text-gray-500 font-medium">Amount Spent (PKR)</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {purchasedGoodsRows.map((r) => (
-            <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-4 rounded-lg bg-gray-50">
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
               <div className="w-full">
                 <SupplierAutocomplete
                   value={r.supplier}
@@ -708,11 +704,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                   className="w-full"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-gray-600 flex-1">
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-700 font-medium flex-1">
                   {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
                 </div>
-                <Button variant="ghost" className="text-red-600" onClick={() => removePurchasedGoodsRow(r.id)}>
+                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removePurchasedGoodsRow(r.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -751,15 +747,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <Label className="text-gray-500">Equipment</Label>
-          <Label className="text-gray-500">Amount (PKR)</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Equipment</Label>
+          <Label className="text-gray-500 font-medium">Amount (PKR)</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
           </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {capitalGoodsRows.map((r) => (
-            <div key={r.id} className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center p-4 rounded-lg bg-gray-50">
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
               <div className="w-full">
                 <SupplierAutocomplete
                   value={r.supplier}
@@ -788,11 +784,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                   className="w-full"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-gray-600 flex-1">
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-700 font-medium flex-1">
                   {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
         </div>
-                <Button variant="ghost" className="text-red-600" onClick={() => removeCapitalGoodsRow(r.id)}>
+                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeCapitalGoodsRow(r.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -840,7 +836,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   }
   interface TransportRow {
     id: string;
-    vehicleType: 'passenger' | 'delivery';
     activity?: string;
     vehicleTypeName?: string;
     unit?: string;
@@ -895,12 +890,35 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
   
   const vehicleActivities = Object.keys(VEHICLE_FACTORS);
-  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(VEHICLE_FACTORS[activity]) : []);
-  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(VEHICLE_FACTORS[activity][vehicleType]) : []);
-  
   const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
-  const deliveryTypesFor = (activity?: string) => (activity ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity]) : []);
-  const deliveryUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity][vehicleType]) : []);
+  // Combine all activities into one list
+  const allActivities = [...vehicleActivities, ...deliveryActivities];
+  
+  // Helper to determine if activity is passenger or delivery
+  const isPassengerActivity = (activity?: string) => activity ? vehicleActivities.includes(activity) : false;
+  const isDeliveryActivity = (activity?: string) => activity ? deliveryActivities.includes(activity) : false;
+  
+  // Get vehicle types based on activity (auto-detect passenger or delivery)
+  const vehicleTypesFor = (activity?: string) => {
+    if (!activity) return [];
+    if (isPassengerActivity(activity)) {
+      return Object.keys(VEHICLE_FACTORS[activity] || {});
+    } else if (isDeliveryActivity(activity)) {
+      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity] || {});
+    }
+    return [];
+  };
+  
+  // Get units based on activity and vehicle type (auto-detect passenger or delivery)
+  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => {
+    if (!activity || !vehicleType) return [];
+    if (isPassengerActivity(activity)) {
+      return Object.keys(VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+    } else if (isDeliveryActivity(activity)) {
+      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+    }
+    return [];
+  };
   
   // Upstream Leased Assets calculations
   // Buildings & Facilities calculations
@@ -925,32 +943,42 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     return Number((gridPart + renewablePart + otherPart).toFixed(6));
   }, [upstreamTotalKwh, upstreamGridPct, upstreamGridCountry, upstreamGridFactor, upstreamRenewablePct, upstreamOtherPct, upstreamOtherRows]);
   
-  // Transport calculations
+  // Transport calculations - These functions are no longer needed since upstream now uses LeasedAssetsSection component
+  // Keeping them for backward compatibility but they won't be used
   const updateUpstreamLeasedTransportRow = (id: string, updates: Partial<TransportRow>) => {
     setUpstreamLeasedTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
-      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+      
+      // Calculate emissions - auto-detect which factor table to use based on activity
+      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        let factor: number | undefined;
+        
+        if (isPassengerActivity(updated.activity)) {
+          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        } else if (isDeliveryActivity(updated.activity)) {
+          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        }
+        
         if (factor) {
           updated.factor = factor;
           updated.emissions = updated.distance * factor;
+        } else {
+          updated.factor = undefined;
+          updated.emissions = undefined;
         }
-      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
-        if (factor) {
-          updated.factor = factor;
-          updated.emissions = updated.distance * factor;
-        }
+      } else {
+        updated.factor = undefined;
+        updated.emissions = undefined;
       }
+      
       return updated;
     }));
   };
   
-  const addUpstreamLeasedTransportRow = (type: 'passenger' | 'delivery') => {
+  const addUpstreamLeasedTransportRow = () => {
     setUpstreamLeasedTransportRows(prev => [...prev, {
       id: `upstream-leased-transport-${Date.now()}-${Math.random()}`,
-      vehicleType: type,
     }]);
   };
   
@@ -1019,27 +1047,36 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     setUpstreamEquipmentTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
-      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+      
+      // Calculate emissions - auto-detect which factor table to use based on activity
+      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        let factor: number | undefined;
+        
+        if (isPassengerActivity(updated.activity)) {
+          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        } else if (isDeliveryActivity(updated.activity)) {
+          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        }
+        
         if (factor) {
           updated.factor = factor;
           updated.emissions = updated.distance * factor;
+        } else {
+          updated.factor = undefined;
+          updated.emissions = undefined;
         }
-      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
-        if (factor) {
-          updated.factor = factor;
-          updated.emissions = updated.distance * factor;
-        }
+      } else {
+        updated.factor = undefined;
+        updated.emissions = undefined;
       }
+      
       return updated;
     }));
   };
   
-  const addUpstreamEquipmentTransportRow = (type: 'passenger' | 'delivery') => {
+  const addUpstreamEquipmentTransportRow = () => {
     setUpstreamEquipmentTransportRows(prev => [...prev, {
       id: `upstream-equipment-transport-${Date.now()}-${Math.random()}`,
-      vehicleType: type,
     }]);
   };
   
@@ -1222,16 +1259,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
-          <Label className="text-gray-500">Extraction</Label>
-          <Label className="text-gray-500">Distance (km)</Label>
-          <Label className="text-gray-500">Refining</Label>
-          <Label className="text-gray-500">Actions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Extraction</Label>
+          <Label className="text-gray-500 font-medium">Distance (km)</Label>
+          <Label className="text-gray-500 font-medium">Refining</Label>
+          <Label className="text-gray-500 font-medium">Actions</Label>
           </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {fuelEnergyRows.map((r) => (
-            <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
               <div className="w-full">
                 <Input
                   value={r.extraction}
@@ -1269,7 +1306,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                   className="w-full"
                 />
                 </div>
-              <Button variant="ghost" className="text-red-600" onClick={() => removeFuelEnergyRow(r.id)}>
+              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeFuelEnergyRow(r.id)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
               </div>
@@ -1306,18 +1343,18 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
-          <Label className="text-gray-500">Vehicle Type</Label>
-          <Label className="text-gray-500">Distance (km)</Label>
-          <Label className="text-gray-500">Weight (kg)</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Vehicle Type</Label>
+          <Label className="text-gray-500 font-medium">Distance (km)</Label>
+          <Label className="text-gray-500 font-medium">Weight (kg)</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
           </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {upstreamTransportRows.map((r) => {
             const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full flex items-center gap-2">
                   <Select
                     value={r.vehicleTypeId}
@@ -1407,11 +1444,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     className="w-full"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
                 </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamTransportRow(r.id)}>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeUpstreamTransportRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
               </div>
@@ -1451,19 +1488,19 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
-          <Label className="text-gray-500">Material</Label>
-          <Label className="text-gray-500">Volume (kg)</Label>
-          <Label className="text-gray-500">Disposal Method</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Material</Label>
+          <Label className="text-gray-500 font-medium">Volume (kg)</Label>
+          <Label className="text-gray-500 font-medium">Disposal Method</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {wasteGeneratedRows.map((r) => {
             const material = wasteMaterials.find(m => m.id === r.materialId);
             const availableMethods = getAvailableDisposalMethods(material || null);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full">
                   <Select
                     value={r.materialId}
@@ -1530,11 +1567,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               </SelectContent>
             </Select>
           </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
           </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeWasteGeneratedRow(r.id)}>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeWasteGeneratedRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
         </div>
@@ -1574,17 +1611,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <Label className="text-gray-500">Travel Mode</Label>
-          <Label className="text-gray-500">Distance (km)</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Travel Mode</Label>
+          <Label className="text-gray-500 font-medium">Distance (km)</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {businessTravelRows.map((r) => {
             const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full">
                   <Select
                     value={r.travelTypeId}
@@ -1627,11 +1664,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     className="w-full"
                   />
           </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO₂e` : '-'}
           </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeBusinessTravelRow(r.id)}>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeBusinessTravelRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
         </div>
@@ -1671,18 +1708,18 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
-          <Label className="text-gray-500">Travel Mode</Label>
-          <Label className="text-gray-500">Distance (km)</Label>
-          <Label className="text-gray-500">Employees</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Travel Mode</Label>
+          <Label className="text-gray-500 font-medium">Distance (km)</Label>
+          <Label className="text-gray-500 font-medium">Employees</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {employeeCommutingRows.map((r) => {
             const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full">
                   <Select
                     value={r.travelTypeId}
@@ -1746,11 +1783,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     className="w-full"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO₂e` : '-'}
         </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeEmployeeCommutingRow(r.id)}>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeEmployeeCommutingRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
         </div>
@@ -1774,488 +1811,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   }
   // Upstream Leased Assets - Category-based implementation (same as Downstream)
   if (activeCategory === 'upstreamLeasedAssets') {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-lg font-semibold text-gray-900">Upstream Leased Assets</h4>
-            <p className="text-sm text-gray-600">Asset categories, energy consumption, tenant activities</p>
-          </div>
-        </div>
-        
-        {/* Category Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <Label>Category</Label>
-            <Select value={upstreamSelectedCategory} onValueChange={setUpstreamSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="buildings">Buildings & Facilities</SelectItem>
-                <SelectItem value="transport">Transport & Logistics</SelectItem>
-                <SelectItem value="equipment">Equipment & Machinery</SelectItem>
-                <SelectItem value="infrastructure">Infrastructure & Utilities</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        {/* Buildings & Facilities Form (Scope 2 Electricity) */}
-        {upstreamSelectedCategory === 'buildings' && (
-          <div className="space-y-6 border-t pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900">Buildings & Facilities - Electricity Consumption</h4>
-                <p className="text-sm text-gray-600">Enter electricity consumption data for leased buildings</p>
-              </div>
-            </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="md:col-span-1">
-                <Label>Total electricity consumption (kWh)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  max="999999999999.999999"
-                  value={upstreamTotalKwh ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setUpstreamTotalKwh(undefined);
-                    } else {
-                      const numValue = Number(value);
-                      if (numValue >= 0 && numValue <= 999999999999.999999) {
-                        setUpstreamTotalKwh(numValue);
-                      }
-                    }
-                  }}
-                  placeholder="e.g., 120000"
-                />
-              </div>
-          <div>
-                <Label>Grid Energy (%)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  max="100"
-                  value={upstreamGridPct ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setUpstreamGridPct(undefined);
-                    } else {
-                      const numValue = Number(value);
-                      if (numValue >= 0 && numValue <= 100) {
-                        setUpstreamGridPct(numValue);
-                      }
-                    }
-                  }}
-                  placeholder="e.g., 60"
-                />
-              </div>
-              <div>
-                <Label>Renewable Energy (%)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  max="100"
-                  value={upstreamRenewablePct ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setUpstreamRenewablePct(undefined);
-                    } else {
-                      const numValue = Number(value);
-                      if (numValue >= 0 && numValue <= 100) {
-                        setUpstreamRenewablePct(numValue);
-                      }
-                    }
-                  }}
-                  placeholder="e.g., 30"
-                />
-              </div>
-              <div>
-                <Label>Other sources (%)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  max="100"
-                  value={upstreamOtherPct ?? ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setUpstreamOtherPct(undefined);
-                    } else {
-                      const numValue = Number(value);
-                      if (numValue >= 0 && numValue <= 100) {
-                        setUpstreamOtherPct(numValue);
-                      }
-                    }
-                  }}
-                  placeholder="e.g., 10"
-                />
-              </div>
-            </div>
-
-            {/* Grid sources section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div>
-                <h3 className="text-lg font-medium mb-4">Grid sources</h3>
-                <Label>Electricity provider country</Label>
-                <Select value={upstreamGridCountry} onValueChange={v => setUpstreamGridCountry(v as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-              <SelectContent>
-                    <SelectItem value="UAE">UAE</SelectItem>
-                    <SelectItem value="Pakistan">Pakistan</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-                <Label>Grid emission factor</Label>
-                <Input value={upstreamGridFactor ?? ''} readOnly placeholder="Auto" />
-          </div>
-          <div>
-                <Label>Grid emissions</Label>
-                <Input
-                  readOnly
-                  value={upstreamGridEmissions || ''}
-                />
-          </div>
-              {upstreamGridPct && upstreamGridPct > 0 && (
-                <div className="md:col-span-3 text-gray-700 font-medium">
-                  Grid sources emissions: <span className="font-semibold">{upstreamGridEmissions.toFixed(6)} kg CO2e</span>
-                </div>
-              )}
-            </div>
-
-            {/* Other sources section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Other sources</h3>
-                <Button onClick={addUpstreamOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" /> Add Row
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <Label className="text-gray-500">Type</Label>
-                <Label className="text-gray-500">Fuel</Label>
-                <Label className="text-gray-500">Unit</Label>
-                <Label className="text-gray-500">Quantity</Label>
-                <div />
-              </div>
-
-              <div className="space-y-3">
-                {upstreamOtherRows.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 text-sm">
-                    No other sources added yet. Click "Add Row" to add one.
-                  </div>
-                ) : (
-                  upstreamOtherRows.map(r => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                      <Select
-                        value={r.type}
-                        onValueChange={v => updateUpstreamOtherRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fuelTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={r.fuel}
-                        onValueChange={v => updateUpstreamOtherRow(r.id, { fuel: v, unit: undefined })}
-                        disabled={!r.type}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select fuel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fuelsFor(r.type).map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={r.unit}
-                        onValueChange={v => updateUpstreamOtherRow(r.id, { unit: v })}
-                        disabled={!r.type || !r.fuel}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {unitsFor(r.type, r.fuel).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="999999999999.999999"
-                        value={r.quantity ?? ''}
-                        onChange={e => {
-                          const value = e.target.value;
-                          if (value === '') {
-                            updateUpstreamOtherRow(r.id, { quantity: undefined });
-                          } else {
-                            const numValue = Number(value);
-                            if (numValue >= 0 && numValue <= 999999999999.999999) {
-                              updateUpstreamOtherRow(r.id, { quantity: numValue });
-                            }
-                          }
-                        }}
-                        placeholder="Enter quantity"
-                      />
-
-                      <div className="flex items-center gap-2 justify-end">
-                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamOtherRow(r.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="text-gray-700 font-medium">
-                Other sources emissions: <span className="font-semibold">{upstreamTotalOtherEmissions.toFixed(6)} kg CO2e</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="text-gray-900 font-medium">
-                Total electricity emissions: <span className="font-semibold">{upstreamComputedElectricityEmissions.toFixed(6)} kg CO2e</span>
-              </div>
-              <Button onClick={() => toast({ title: 'Saved', description: 'Upstream Buildings & Facilities data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
-                <Save className="h-4 w-4 mr-2" /> Save
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {/* Transport & Logistics Form (Passenger + Delivery Vehicles) */}
-        {upstreamSelectedCategory === 'transport' && (
-          <div className="space-y-6 border-t pt-6">
-            <div className="flex items-center justify-between">
-          <div>
-                <h4 className="text-lg font-semibold text-gray-900">Transport & Logistics</h4>
-                <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased transport assets</p>
-          </div>
-              <div className="flex gap-2">
-                <Button onClick={() => addUpstreamLeasedTransportRow('passenger')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />Add Passenger Vehicle
-                </Button>
-                <Button onClick={() => addUpstreamLeasedTransportRow('delivery')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />Add Delivery Vehicle
-                </Button>
-        </div>
-        </div>
-
-            {/* Passenger Vehicles */}
-            {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'passenger').length > 0 && (
-              <div className="space-y-4">
-                <h5 className="text-md font-semibold text-gray-800">Passenger Vehicles</h5>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Label className="text-gray-500">Activity</Label>
-                  <Label className="text-gray-500">Type</Label>
-                  <Label className="text-gray-500">Unit</Label>
-                  <Label className="text-gray-500">Distance</Label>
-                </div>
-                <div className="space-y-3">
-                  {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'passenger').map((r) => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                      <Select 
-                        value={r.activity} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select activity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicleActivities.map(activity => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.vehicleTypeName} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
-                        disabled={!r.activity}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicleTypesFor(r.activity).map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.unit} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { unit: v })} 
-                        disabled={!r.activity || !r.vehicleTypeName}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          type="number" 
-                          step="any" 
-                          min="0"
-                          max="999999999999.999999"
-                          value={r.distance ?? ''} 
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '') {
-                              updateUpstreamLeasedTransportRow(r.id, { distance: undefined });
-                            } else {
-                              const numValue = Number(value);
-                              if (numValue >= 0 && numValue <= 999999999999.999999) {
-                                updateUpstreamLeasedTransportRow(r.id, { distance: numValue });
-                              }
-                            }
-                          }} 
-                          placeholder="Enter distance"
-                          className="flex-1"
-                        />
-                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamLeasedTransportRow(r.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-              </div>
-            ))}
-                </div>
-          </div>
-        )}
-
-            {/* Delivery Vehicles */}
-            {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'delivery').length > 0 && (
-              <div className="space-y-4">
-                <h5 className="text-md font-semibold text-gray-800">Delivery Vehicles</h5>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Label className="text-gray-500">Activity</Label>
-                  <Label className="text-gray-500">Type</Label>
-                  <Label className="text-gray-500">Unit</Label>
-                  <Label className="text-gray-500">Distance</Label>
-              </div>
-                <div className="space-y-3">
-                  {upstreamLeasedTransportRows.filter(r => r.vehicleType === 'delivery').map((r) => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                      <Select 
-                        value={r.activity} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select activity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryActivities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.vehicleTypeName} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
-                        disabled={!r.activity}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryTypesFor(r.activity).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.unit} 
-                        onValueChange={(v) => updateUpstreamLeasedTransportRow(r.id, { unit: v })} 
-                        disabled={!r.activity || !r.vehicleTypeName}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryUnitsFor(r.activity, r.vehicleTypeName).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          type="number" 
-                          step="any" 
-                          min="0"
-                          max="999999999999.999999"
-                          value={r.distance ?? ''} 
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '') {
-                              updateUpstreamLeasedTransportRow(r.id, { distance: undefined });
-                            } else {
-                              const numValue = Number(value);
-                              if (numValue >= 0 && numValue <= 999999999999.999999) {
-                                updateUpstreamLeasedTransportRow(r.id, { distance: numValue });
-                              }
-                            }
-                          }} 
-                          placeholder="Enter distance"
-                          className="flex-1"
-                        />
-                        <Button variant="ghost" className="text-red-600" onClick={() => removeUpstreamLeasedTransportRow(r.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-        </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="text-gray-900 font-medium">
-                Total transport emissions: <span className="font-semibold">{upstreamLeasedTotalTransportEmissions.toFixed(6)} kg CO2e</span>
-              </div>
-              <Button onClick={() => toast({ title: 'Saved', description: 'Upstream Transport & Logistics data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
-                <Save className="h-4 w-4 mr-2" /> Save
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {/* Equipment & Machinery and Infrastructure & Utilities sections would follow the same pattern as Downstream */}
-        {/* For brevity, I'll add placeholders that can be expanded */}
-        {upstreamSelectedCategory === 'equipment' && (
-          <div className="space-y-6 border-t pt-6">
-            <div className="text-center py-8 text-gray-500">
-              Equipment & Machinery form - Same structure as Downstream (to be implemented)
-            </div>
-          </div>
-        )}
-        
-        {upstreamSelectedCategory === 'infrastructure' && (
-          <div className="space-y-6 border-t pt-6">
-            <div className="text-center py-8 text-gray-500">
-              Infrastructure & Utilities form - Same structure as Downstream (to be implemented)
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    return <LeasedAssetsSection type="upstream" />;
   }
 
   // Investments
@@ -2332,42 +1888,25 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-lg font-semibold text-gray-900">Downstream Transportation</h4>
-            <p className="text-sm text-gray-600">Distribution methods, distance, vehicles, packaging</p>
+            <p className="text-sm text-gray-600">Vehicle types, distance, and weight for downstream transportation</p>
           </div>
           <Button onClick={addDownstreamTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center">
-          <Label className="text-gray-500">Method</Label>
-          <Label className="text-gray-500">Vehicle Type</Label>
-          <Label className="text-gray-500">Distance (km)</Label>
-          <Label className="text-gray-500">Weight (kg)</Label>
-          <Label className="text-gray-500">Packaging</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Vehicle Type</Label>
+          <Label className="text-gray-500 font-medium">Distance (km)</Label>
+          <Label className="text-gray-500 font-medium">Weight (kg)</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {downstreamTransportRows.map((r) => {
             const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center p-4 rounded-lg bg-gray-50">
-                <div className="w-full">
-                  <Select
-                    value={r.method}
-                    onValueChange={(v) => updateDownstreamTransportRow(r.id, { method: v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="logistics">Logistics provider</SelectItem>
-                <SelectItem value="direct-shipment">Direct shipment</SelectItem>
-                <SelectItem value="third-party">Third-party distribution</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full flex items-center gap-2">
                   <Select
                     value={r.vehicleTypeId}
@@ -2457,32 +1996,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     className="w-full"
                   />
                 </div>
-                <div className="w-full">
-                  <Select
-                    value={r.packaging}
-                    onValueChange={(v) => updateDownstreamTransportRow(r.id, { packaging: v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select material" />
-                    </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cardboard">Cardboard</SelectItem>
-                <SelectItem value="plastic">Plastic</SelectItem>
-                <SelectItem value="paper">Paper</SelectItem>
-                <SelectItem value="wood">Wood</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
-        </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeDownstreamTransportRow(r.id)}>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeDownstreamTransportRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
-        </div>
                 </div>
+              </div>
             );
           })}
               </div>
@@ -2651,21 +2173,21 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center">
-          <Label className="text-gray-500">Material</Label>
-          <Label className="text-gray-500">Volume (kg)</Label>
-          <Label className="text-gray-500">Disposal Method</Label>
-          <Label className="text-gray-500">Recycle (%)</Label>
-          <Label className="text-gray-500">Composition</Label>
-          <Label className="text-gray-500">Emissions</Label>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Material</Label>
+          <Label className="text-gray-500 font-medium">Volume (kg)</Label>
+          <Label className="text-gray-500 font-medium">Disposal Method</Label>
+          <Label className="text-gray-500 font-medium">Recycle (%)</Label>
+          <Label className="text-gray-500 font-medium">Composition</Label>
+          <Label className="text-gray-500 font-medium">Emissions</Label>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {endOfLifeRows.map((r) => {
             const material = wasteMaterials.find(m => m.id === r.materialId);
             const availableMethods = getAvailableDisposalMethods(material || null);
             return (
-              <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-6 items-center p-4 rounded-lg bg-gray-50">
+              <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="w-full">
                   <Select
                     value={r.materialId}
@@ -2762,11 +2284,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     className="w-full"
                   />
         </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-600 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-700 font-medium flex-1">
                     {r.emissions !== undefined ? `${r.emissions.toFixed(2)} kg CO2e` : '-'}
                 </div>
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeEndOfLifeRow(r.id)}>
+                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeEndOfLifeRow(r.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
               </div>

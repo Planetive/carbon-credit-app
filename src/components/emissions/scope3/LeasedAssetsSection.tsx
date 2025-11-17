@@ -26,7 +26,6 @@ interface OtherSourceRow {
 
 interface TransportRow {
   id: string;
-  vehicleType: 'passenger' | 'delivery';
   activity?: string;
   vehicleTypeName?: string;
   unit?: string;
@@ -87,12 +86,35 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
   
   const vehicleActivities = Object.keys(VEHICLE_FACTORS);
-  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(VEHICLE_FACTORS[activity]) : []);
-  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(VEHICLE_FACTORS[activity][vehicleType]) : []);
-  
   const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
-  const deliveryTypesFor = (activity?: string) => (activity ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity]) : []);
-  const deliveryUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity][vehicleType]) : []);
+  // Combine all activities into one list
+  const allActivities = [...vehicleActivities, ...deliveryActivities];
+  
+  // Helper to determine if activity is passenger or delivery
+  const isPassengerActivity = (activity?: string) => activity ? vehicleActivities.includes(activity) : false;
+  const isDeliveryActivity = (activity?: string) => activity ? deliveryActivities.includes(activity) : false;
+  
+  // Get vehicle types based on activity (auto-detect passenger or delivery)
+  const vehicleTypesFor = (activity?: string) => {
+    if (!activity) return [];
+    if (isPassengerActivity(activity)) {
+      return Object.keys(VEHICLE_FACTORS[activity] || {});
+    } else if (isDeliveryActivity(activity)) {
+      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity] || {});
+    }
+    return [];
+  };
+  
+  // Get units based on activity and vehicle type (auto-detect passenger or delivery)
+  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => {
+    if (!activity || !vehicleType) return [];
+    if (isPassengerActivity(activity)) {
+      return Object.keys(VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+    } else if (isDeliveryActivity(activity)) {
+      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+    }
+    return [];
+  };
   
   // Buildings & Facilities calculations
   const gridEmissions = useMemo(() => {
@@ -213,29 +235,35 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
       
-      // Calculate emissions
-      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+      // Calculate emissions - auto-detect which factor table to use based on activity
+      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        let factor: number | undefined;
+        
+        if (isPassengerActivity(updated.activity)) {
+          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        } else if (isDeliveryActivity(updated.activity)) {
+          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        }
+        
         if (factor) {
           updated.factor = factor;
           updated.emissions = updated.distance * factor;
+        } else {
+          updated.factor = undefined;
+          updated.emissions = undefined;
         }
-      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
-        if (factor) {
-          updated.factor = factor;
-          updated.emissions = updated.distance * factor;
-        }
+      } else {
+        updated.factor = undefined;
+        updated.emissions = undefined;
       }
       
       return updated;
     }));
   };
-  
-  const addTransportRow = (type: 'passenger' | 'delivery') => {
+
+  const addTransportRow = () => {
     setTransportRows(prev => [...prev, {
       id: `transport-${Date.now()}-${Math.random()}`,
-      vehicleType: type,
     }]);
   };
   
@@ -280,29 +308,35 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
       
-      // Calculate emissions
-      if (updated.vehicleType === 'passenger' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+      // Calculate emissions - auto-detect which factor table to use based on activity
+      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+        let factor: number | undefined;
+        
+        if (isPassengerActivity(updated.activity)) {
+          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        } else if (isDeliveryActivity(updated.activity)) {
+          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+        }
+        
         if (factor) {
           updated.factor = factor;
           updated.emissions = updated.distance * factor;
+        } else {
+          updated.factor = undefined;
+          updated.emissions = undefined;
         }
-      } else if (updated.vehicleType === 'delivery' && updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
-        const factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
-        if (factor) {
-          updated.factor = factor;
-          updated.emissions = updated.distance * factor;
-        }
+      } else {
+        updated.factor = undefined;
+        updated.emissions = undefined;
       }
       
       return updated;
     }));
   };
-  
-  const addEquipmentTransportRow = (type: 'passenger' | 'delivery') => {
+
+  const addEquipmentTransportRow = () => {
     setEquipmentTransportRows(prev => [...prev, {
       id: `equipment-transport-${Date.now()}-${Math.random()}`,
-      vehicleType: type,
     }]);
   };
   
@@ -643,7 +677,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
         </div>
       )}
       
-      {/* Transport & Logistics Form (Passenger + Delivery Vehicles) */}
+      {/* Transport & Logistics Form (Combined Passenger + Delivery Vehicles) */}
       {selectedCategory === 'transport' && (
         <div className="space-y-6 border-t pt-6">
           <div className="flex items-center justify-between">
@@ -651,29 +685,23 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               <h4 className="text-lg font-semibold text-gray-900">Transport & Logistics</h4>
               <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased transport assets</p>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={() => addTransportRow('passenger')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                <Plus className="h-4 w-4 mr-2" />Add Passenger Vehicle
-              </Button>
-              <Button onClick={() => addTransportRow('delivery')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                <Plus className="h-4 w-4 mr-2" />Add Delivery Vehicle
-              </Button>
-            </div>
+            <Button onClick={addTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />Add Vehicle
+            </Button>
           </div>
 
-          {/* Passenger Vehicles */}
-          {transportRows.filter(r => r.vehicleType === 'passenger').length > 0 && (
+          {/* Combined Vehicles List */}
+          {transportRows.length > 0 && (
             <div className="space-y-4">
-              <h5 className="text-md font-semibold text-gray-800">Passenger Vehicles</h5>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Label className="text-gray-500">Activity</Label>
-                <Label className="text-gray-500">Type</Label>
-                <Label className="text-gray-500">Unit</Label>
-                <Label className="text-gray-500">Distance</Label>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+                <Label className="text-gray-500 font-medium">Activity</Label>
+                <Label className="text-gray-500 font-medium">Type</Label>
+                <Label className="text-gray-500 font-medium">Unit</Label>
+                <Label className="text-gray-500 font-medium">Distance</Label>
               </div>
               <div className="space-y-3">
-                {transportRows.filter(r => r.vehicleType === 'passenger').map((r) => (
-                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                {transportRows.map((r) => (
+                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
                     <Select 
                       value={r.activity} 
                       onValueChange={(v) => updateTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
@@ -682,7 +710,9 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                         <SelectValue placeholder="Select activity" />
                       </SelectTrigger>
                       <SelectContent>
-                        {vehicleActivities.map(activity => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}
+                        {allActivities.map(activity => (
+                          <SelectItem key={activity} value={activity}>{activity}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
@@ -733,89 +763,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                         placeholder="Enter distance"
                         className="flex-1"
                       />
-                      <Button variant="ghost" className="text-red-600" onClick={() => removeTransportRow(r.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Delivery Vehicles */}
-          {transportRows.filter(r => r.vehicleType === 'delivery').length > 0 && (
-            <div className="space-y-4">
-              <h5 className="text-md font-semibold text-gray-800">Delivery Vehicles</h5>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Label className="text-gray-500">Activity</Label>
-                <Label className="text-gray-500">Type</Label>
-                <Label className="text-gray-500">Unit</Label>
-                <Label className="text-gray-500">Distance</Label>
-              </div>
-              <div className="space-y-3">
-                {transportRows.filter(r => r.vehicleType === 'delivery').map((r) => (
-                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                    <Select 
-                      value={r.activity} 
-                      onValueChange={(v) => updateTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select activity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deliveryActivities.map(activity => <SelectItem key={activity} value={activity}>{activity}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-
-                    <Select 
-                      value={r.vehicleTypeName} 
-                      onValueChange={(v) => updateTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
-                      disabled={!r.activity}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deliveryTypesFor(r.activity).map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-
-                    <Select 
-                      value={r.unit} 
-                      onValueChange={(v) => updateTransportRow(r.id, { unit: v })} 
-                      disabled={!r.activity || !r.vehicleTypeName}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deliveryUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        type="number" 
-                        step="any" 
-                        min="0"
-                        max="999999999999.999999"
-                        value={r.distance ?? ''} 
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === '') {
-                            updateTransportRow(r.id, { distance: undefined });
-                          } else {
-                            const numValue = Number(value);
-                            if (numValue >= 0 && numValue <= 999999999999.999999) {
-                              updateTransportRow(r.id, { distance: numValue });
-                            }
-                          }
-                        }} 
-                        placeholder="Enter distance"
-                        className="flex-1"
-                      />
-                      <Button variant="ghost" className="text-red-600" onClick={() => removeTransportRow(r.id)}>
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeTransportRow(r.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1084,29 +1032,23 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                 <h4 className="text-lg font-semibold text-gray-900">Equipment & Machinery - Transport</h4>
                 <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased equipment</p>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={() => addEquipmentTransportRow('passenger')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" /> Add Passenger Vehicle
-                </Button>
-                <Button onClick={() => addEquipmentTransportRow('delivery')} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" /> Add Delivery Vehicle
-                </Button>
-              </div>
+              <Button onClick={addEquipmentTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Plus className="h-4 w-4 mr-2" /> Add Vehicle
+              </Button>
             </div>
 
-            {/* Passenger Vehicles */}
-            {equipmentTransportRows.filter(r => r.vehicleType === 'passenger').length > 0 && (
+            {/* Combined Vehicles List */}
+            {equipmentTransportRows.length > 0 && (
               <div className="space-y-4">
-                <h5 className="text-md font-semibold text-gray-800">Passenger Vehicles</h5>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Label className="text-gray-500">Activity</Label>
-                  <Label className="text-gray-500">Type</Label>
-                  <Label className="text-gray-500">Unit</Label>
-                  <Label className="text-gray-500">Distance</Label>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+                  <Label className="text-gray-500 font-medium">Activity</Label>
+                  <Label className="text-gray-500 font-medium">Type</Label>
+                  <Label className="text-gray-500 font-medium">Unit</Label>
+                  <Label className="text-gray-500 font-medium">Distance</Label>
                 </div>
                 <div className="space-y-3">
-                  {equipmentTransportRows.filter(r => r.vehicleType === 'passenger').map((r) => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+                  {equipmentTransportRows.map((r) => (
+                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
                       <Select 
                         value={r.activity} 
                         onValueChange={(v) => updateEquipmentTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
@@ -1115,33 +1057,35 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                           <SelectValue placeholder="Select activity" />
                         </SelectTrigger>
                         <SelectContent>
-                          {vehicleActivities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                          {allActivities.map(activity => (
+                            <SelectItem key={activity} value={activity}>{activity}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
 
                       <Select 
                         value={r.vehicleTypeName} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { vehicleTypeName: v, unit: undefined })}
+                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
                         disabled={!r.activity}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {vehicleTypesFor(r.activity).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          {vehicleTypesFor(r.activity).map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                         </SelectContent>
                       </Select>
 
                       <Select 
                         value={r.unit} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { unit: v })}
+                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { unit: v })} 
                         disabled={!r.activity || !r.vehicleTypeName}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                         <SelectContent>
-                          {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                         </SelectContent>
                       </Select>
 
@@ -1166,89 +1110,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                           placeholder="Enter distance"
                           className="flex-1"
                         />
-                        <Button variant="ghost" className="text-red-600" onClick={() => removeEquipmentTransportRow(r.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Delivery Vehicles */}
-            {equipmentTransportRows.filter(r => r.vehicleType === 'delivery').length > 0 && (
-              <div className="space-y-4">
-                <h5 className="text-md font-semibold text-gray-800">Delivery Vehicles</h5>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Label className="text-gray-500">Activity</Label>
-                  <Label className="text-gray-500">Type</Label>
-                  <Label className="text-gray-500">Unit</Label>
-                  <Label className="text-gray-500">Distance</Label>
-                </div>
-                <div className="space-y-3">
-                  {equipmentTransportRows.filter(r => r.vehicleType === 'delivery').map((r) => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                      <Select 
-                        value={r.activity} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select activity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryActivities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.vehicleTypeName} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { vehicleTypeName: v, unit: undefined })}
-                        disabled={!r.activity}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryTypesFor(r.activity).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <Select 
-                        value={r.unit} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { unit: v })}
-                        disabled={!r.activity || !r.vehicleTypeName}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deliveryUnitsFor(r.activity, r.vehicleTypeName).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          type="number" 
-                          step="any" 
-                          min="0"
-                          max="999999999999.999999"
-                          value={r.distance ?? ''} 
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '') {
-                              updateEquipmentTransportRow(r.id, { distance: undefined });
-                            } else {
-                              const numValue = Number(value);
-                              if (numValue >= 0 && numValue <= 999999999999.999999) {
-                                updateEquipmentTransportRow(r.id, { distance: numValue });
-                              }
-                            }
-                          }} 
-                          placeholder="Enter distance"
-                          className="flex-1"
-                        />
-                        <Button variant="ghost" className="text-red-600" onClick={() => removeEquipmentTransportRow(r.id)}>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeEquipmentTransportRow(r.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
