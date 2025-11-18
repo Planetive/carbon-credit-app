@@ -14,6 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Leaf, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { isCompanyUser } from "@/utils/roleUtils";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +36,11 @@ const Login = () => {
 
   // Only redirect if user is authenticated
   if (user && !authLoading) {
-    navigate("/dashboard");
+    if (isCompanyUser(user)) {
+      navigate("/dashboard");
+    } else {
+      navigate("/explore");
+    }
     return null;
   }
 
@@ -57,7 +62,9 @@ const Login = () => {
           title: "Welcome back!",
           description: "You've been signed in successfully.",
         });
-        navigate("/dashboard");
+        // Redirect based on user role - but we need to wait for user to be set
+        // The auth state change will handle the redirect via Index page
+        navigate("/");
       }
     } catch (error: any) {
       toast({

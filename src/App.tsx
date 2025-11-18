@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { CompanyProtectedRoute } from "@/components/CompanyProtectedRoute";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import Footer from "@/components/ui/Footer";
@@ -80,66 +81,66 @@ const AppRoutes = () => {
         <Route path="/confirm-email" element={<ConfirmEmail />} />
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <Dashboard2 />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/dashboard-legacy" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <Dashboard />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/dashboard2" element={<Navigate to="/dashboard" replace />} />
           <Route path="/ai-advisor" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <AIAdvisor />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           {/* Hide project wizard entry point; keep route for legacy if needed */}
           <Route path="/project-wizard" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectWizard />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/bank-portfolio" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <BankPortfolio />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/bank-portfolio/:id" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <CompanyDetail />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/scenario-building" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <SimpleScenarioBuilding />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/climate-risk-results" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ClimateRiskResults />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/project-results" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectResults />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/reports" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectReports />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/drafts" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectDrafts />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/project/:id" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectDetails />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/explore" element={
             <ProtectedRoute>
@@ -172,77 +173,77 @@ const AppRoutes = () => {
             </ProtectedRoute>
           } />
           <Route path="/emission-calculator" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <EmissionCalculator />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/emission-history" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <EmissionHistory />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/emission-results" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <EmissionResults />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           {/* Removed /onboarding route - now using /finance-emission for both flows */}
           <Route path="/finance-emission" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <IntegratedFinanceEmission />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/ccus-management-strategy/:country" element={
-            <ProtectedRoute>            
+            <CompanyProtectedRoute>            
             <CCUSManagementStrategy />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
             } />
           <Route path="/filtered-projects" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <FilteredProjects />
-            </ProtectedRoute>            
+            </CompanyProtectedRoute>            
             } />
           <Route path="/project-table" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectTable />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/project-cards" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ProjectCards />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/contact-submissions" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ContactSubmissions />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/esg-health-check" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ESGHealthCheck />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
           <Route path="/esg-results" element={
-            <ProtectedRoute>
+            <CompanyProtectedRoute>
               <ESGResults />
-            </ProtectedRoute>
+            </CompanyProtectedRoute>
           } />
         </Route>
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="/filtered-projects-landing" element={
-          <ProtectedRoute>
+          <CompanyProtectedRoute>
             <FilteredProjectsLanding />
-          </ProtectedRoute>
+          </CompanyProtectedRoute>
         } />
         <Route path="/filtered-ccus-projects" element={ 
-          <ProtectedRoute>
+          <CompanyProtectedRoute>
             <FilteredCCUSProjects />
-          </ProtectedRoute>
+          </CompanyProtectedRoute>
         } />
         <Route path="/filtered-methodologies" element={
-          <ProtectedRoute>
+          <CompanyProtectedRoute>
             <FilteredMethodologies />
-          </ProtectedRoute>
+          </CompanyProtectedRoute>
         } />
 
         

@@ -1,8 +1,15 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
+import { isCompanyUser, isRestrictedRoute } from "@/utils/roleUtils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const navLinks = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -73,10 +80,13 @@ const AppHeader = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Determine logo link destination based on user role
+  const logoLink = isCompanyUser(user) ? "/dashboard" : "/explore";
+
   return (
     <header className="w-full bg-white shadow-sm py-4 px-4 md:px-8 flex items-center justify-between z-50 relative">
       {/* Logo */}
-      <Link to="/dashboard" className="h-10 md:h-14 flex items-center hover:opacity-80 transition-opacity">
+      <Link to={logoLink} className="h-10 md:h-14 flex items-center hover:opacity-80 transition-opacity">
         <img 
           src="/logoo.png"
           alt="ReThink Carbon Logo"
@@ -86,16 +96,52 @@ const AppHeader = () => {
 
       {/* Desktop Navigation */}
       <nav className="hidden md:flex gap-6 text-gray-600">
-        {navLinks.map(({ to, label, icon: Icon }) => (
-          <Link
-            key={to}
-            to={to}
-            className={`hover:text-primary flex items-center gap-1 transition-colors ${location.pathname.startsWith(to) ? 'text-primary font-semibold' : ''}`}
-          >
-            <Icon className="h-5 w-5" />
-            {label}
-          </Link>
-        ))}
+        <TooltipProvider>
+          {navLinks.map(({ to, label, icon: Icon }) => {
+            const isRestricted = isRestrictedRoute(to);
+            const hasAccess = isCompanyUser(user);
+            const isLocked = isRestricted && !hasAccess;
+
+            const linkContent = (
+              <div className={`flex items-center gap-1 transition-colors ${
+                isLocked 
+                  ? 'text-gray-400 cursor-not-allowed opacity-60' 
+                  : location.pathname.startsWith(to) 
+                    ? 'text-primary font-semibold' 
+                    : 'hover:text-primary'
+              }`}>
+                <Icon className="h-5 w-5" />
+                {label}
+                {isLocked && <Lock className="h-4 w-4 ml-1" />}
+              </div>
+            );
+
+            if (isLocked) {
+              return (
+                <Tooltip key={to}>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-not-allowed">
+                      {linkContent}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>This feature is only available for company users</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return (
+              <Link
+                key={to}
+                to={to}
+                className="flex items-center gap-1"
+              >
+                {linkContent}
+              </Link>
+            );
+          })}
+        </TooltipProvider>
       </nav>
 
       {/* Desktop Logout */}
@@ -144,21 +190,52 @@ const AppHeader = () => {
           {/* Mobile Navigation Links */}
           <nav className="flex-1 p-4">
             <div className="space-y-2">
-              {navLinks.map(({ to, label, icon: Icon }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                    location.pathname.startsWith(to) 
-                      ? 'bg-primary text-white' 
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Icon className="h-5 w-5" />
-                  {label}
-                </Link>
-              ))}
+              <TooltipProvider>
+                {navLinks.map(({ to, label, icon: Icon }) => {
+                  const isRestricted = isRestrictedRoute(to);
+                  const hasAccess = isCompanyUser(user);
+                  const isLocked = isRestricted && !hasAccess;
+
+                  const linkContent = (
+                    <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                      isLocked
+                        ? 'text-gray-400 cursor-not-allowed opacity-60 bg-gray-50'
+                        : location.pathname.startsWith(to) 
+                          ? 'bg-primary text-white' 
+                          : 'text-gray-600 hover:bg-gray-100'
+                    }`}>
+                      <Icon className="h-5 w-5" />
+                      {label}
+                      {isLocked && <Lock className="h-4 w-4 ml-auto" />}
+                    </div>
+                  );
+
+                  if (isLocked) {
+                    return (
+                      <Tooltip key={to}>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-not-allowed">
+                            {linkContent}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>This feature is only available for company users</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={to}
+                      to={to}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {linkContent}
+                    </Link>
+                  );
+                })}
+              </TooltipProvider>
             </div>
           </nav>
 
