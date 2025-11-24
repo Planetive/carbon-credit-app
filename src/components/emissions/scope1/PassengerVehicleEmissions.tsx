@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Trash2, Save, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,9 +22,10 @@ import {
 interface PassengerVehicleEmissionsProps {
   onDataChange: (data: VehicleRow[]) => void;
   companyContext?: boolean; // Add company context prop
+  onSaveAndNext?: () => void;
 }
 
-const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ onDataChange, companyContext = false }) => {
+const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ onDataChange, companyContext = false, onSaveAndNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -32,7 +34,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [hoveredInfo, setHoveredInfo] = useState<{value: string, description: string, position: {x: number, y: number}} | null>(null);
+  const [hoveredInfo, setHoveredInfo] = useState<{value: string, description: string, position: {x: number, y: number}, side: 'left' | 'right'} | null>(null);
 
   // Computed values
   const vehicleActivities = Object.keys(VEHICLE_FACTORS);
@@ -255,6 +257,9 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
+      // Navigate to next category
+      onSaveAndNext?.();
+
       // Reload data
       const { data: newData } = await supabase
         .from('scope1_passenger_vehicle_entries')
@@ -343,10 +348,35 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
                       value={type}
                       onMouseEnter={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
+                        const tooltipWidth = 320;
+                        const spacing = 10;
+                        const viewportWidth = window.innerWidth;
+                        
+                        // Position to the right of the item by default
+                        let x = rect.right + spacing;
+                        let side: 'left' | 'right' = 'right';
+                        
+                        // Strict limit: never go beyond 70% of viewport width
+                        const maxX = viewportWidth * 0.7;
+                        if (x > maxX) {
+                          x = maxX;
+                        }
+                        
+                        // If tooltip would overflow, position to the left
+                        if (x + tooltipWidth > viewportWidth - 10) {
+                          x = rect.left - tooltipWidth - spacing;
+                          side = 'left';
+                          // Keep within bounds
+                          if (x < 10) {
+                            x = 10;
+                          }
+                        }
+                        
                         setHoveredInfo({
                           value: type,
                           description: vehicleTypeDescriptions[type] || "Vehicle type information",
-                          position: { x: rect.right + 10, y: rect.top }
+                          position: { x, y: rect.top },
+                          side
                         });
                       }}
                       onMouseLeave={() => setHoveredInfo(null)}
@@ -411,9 +441,9 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
       </div>
 
       {/* Beautiful Hover Popup */}
-      {hoveredInfo && (
+      {hoveredInfo && createPortal(
         <div 
-          className="fixed z-[9999] pointer-events-none animate-in fade-in-0 zoom-in-95 duration-200"
+          className="fixed z-[100] pointer-events-none animate-in fade-in-0 zoom-in-95 duration-200"
           style={{
             left: `${hoveredInfo.position.x}px`,
             top: `${hoveredInfo.position.y}px`,
@@ -430,10 +460,20 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
               </div>
             </div>
             {/* Arrow pointing to the dropdown option */}
-            <div className="absolute -left-2 top-4 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
-            <div className="absolute -left-3 top-4 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-200"></div>
+            {hoveredInfo.side === 'right' ? (
+              <>
+                <div className="absolute -left-2 top-4 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-white"></div>
+                <div className="absolute -left-3 top-4 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-gray-200"></div>
+              </>
+            ) : (
+              <>
+                <div className="absolute -right-2 top-4 w-0 h-0 border-t-8 border-b-8 border-l-8 border-transparent border-l-white"></div>
+                <div className="absolute -right-3 top-4 w-0 h-0 border-t-8 border-b-8 border-l-8 border-transparent border-l-gray-200"></div>
+              </>
+            )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="flex items-center justify-between pt-4 border-t">
@@ -451,7 +491,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
               className="bg-teal-600 hover:bg-teal-700 text-white"
             >
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save Changes (${totalPending})`}
+              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
             </Button>
           );
         })()}
@@ -461,3 +501,4 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
 };
 
 export default PassengerVehicleEmissions;
+
