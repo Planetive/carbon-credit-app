@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FormulaConfig } from '@/types/formula';
+import { FormulaConfig } from '../types/formula';
 import { FieldTooltip } from '../components/FieldTooltip';
 
 interface SovereignDebtFormProps {

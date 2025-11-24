@@ -32,7 +32,7 @@ const Dashboard2 = () => {
   const [profileMissing, setProfileMissing] = useState(false);
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
-  const [displayName, setDisplayName] = useState<string>("");
+  const [organizationName, setOrganizationName] = useState<string>("");
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
@@ -50,7 +50,7 @@ const Dashboard2 = () => {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, display_name")
+        .select("id, organization_name")
         .eq("user_id", user.id)
         .single();
       if (!data || error) {
@@ -58,10 +58,10 @@ const Dashboard2 = () => {
       } else {
         setProfileMissing(false);
       }
-      if (data && data.display_name) {
-        setDisplayName(data.display_name);
+      if (data && data.organization_name) {
+        setOrganizationName(data.organization_name);
       } else {
-        setDisplayName("");
+        setOrganizationName("");
       }
 
       // Onboarding completion check removed
@@ -324,16 +324,6 @@ const Dashboard2 = () => {
     <div className="min-h-screen bg-white flex">
       {/* Left Sidebar */}
       <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <span className="font-semibold text-gray-900">Carbon Credit</span>
-          </div>
-        </div>
-
         {/* Sidebar Navigation */}
         <div className="flex-1 p-4">
           <nav className="space-y-1">
@@ -357,38 +347,6 @@ const Dashboard2 = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {activeSection === 'overview' ? 'Company Overview' : 
-                 sidebarItems.find(item => item.id === activeSection)?.title || 'Dashboard'}
-              </h1>
-              <p className="text-gray-600 mt-1">
-                {activeSection === 'overview' ? 
-                  `Welcome back, ${displayName || 'User'}! Here's your organization's sustainability overview.` :
-                  'Manage your carbon credit projects and explore global opportunities'
-                }
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <Info className="h-4 w-4 mr-2" />
-                Help
-              </Button>
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-              <Button variant="outline" size="sm" onClick={signOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </header>
-
         {/* Main Content */}
         <main className="flex-1 p-6 bg-gray-50">
           {activeSection === 'overview' ? (
@@ -397,7 +355,7 @@ const Dashboard2 = () => {
               <div className="mb-8">
                 <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg p-6 text-white">
                   <h2 className="text-2xl font-bold mb-2">
-                    {displayName ? `Welcome back, ${displayName}! 👋` : "Welcome to your Dashboard!"}
+                    {organizationName ? `Welcome back, ${organizationName}! 👋` : "Welcome to your Dashboard!"}
                   </h2>
                   <p className="text-teal-100">
                     Track your organization's sustainability progress and carbon footprint

@@ -591,7 +591,8 @@ const BankPortfolio: React.FC = () => {
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Oil & Gas (Upstream, Midstream, Downstream)">Oil & Gas (Upstream, Midstream, Downstream)</SelectItem>
+                      <SelectItem value="Oil & Gas">Oil & Gas</SelectItem>
+                      <SelectItem value="Exploration and Production (E&P)">Exploration and Production (E&P)</SelectItem>
                       <SelectItem value="Coal Mining">Coal Mining</SelectItem>
                       <SelectItem value="Power Generation – Fossil Fuel">Power Generation – Fossil Fuel</SelectItem>
                       <SelectItem value="Power Generation – Renewable">Power Generation – Renewable</SelectItem>
@@ -982,7 +983,8 @@ const BankPortfolio: React.FC = () => {
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Oil & Gas (Upstream, Midstream, Downstream)">Oil & Gas (Upstream, Midstream, Downstream)</SelectItem>
+                      <SelectItem value="Oil & Gas">Oil & Gas</SelectItem>
+                      <SelectItem value="Exploration and Production (E&P)">Exploration and Production (E&P)</SelectItem>
                       <SelectItem value="Coal Mining">Coal Mining</SelectItem>
                       <SelectItem value="Power Generation – Fossil Fuel">Power Generation – Fossil Fuel</SelectItem>
                       <SelectItem value="Power Generation – Renewable">Power Generation – Renewable</SelectItem>

@@ -22,9 +22,10 @@ const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh
 
 interface HeatSteamEmissionsProps {
   onTotalChange?: (total: number) => void;
+  onSaveAndNext?: () => void;
 }
 
-const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange }) => {
+const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, onSaveAndNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -129,6 +130,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange }
       }
 
       toast({ title: "Saved", description: "Heat & Steam saved." });
+      onSaveAndNext?.();
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -222,7 +224,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange }
           Total heat & steam emissions: <span className="font-semibold">{totalHeatEmissions.toFixed(6)} kg CO2e</span>
         </div>
         <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
-          <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save'}
+          <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save and Next'}
         </Button>
       </div>
     </div>

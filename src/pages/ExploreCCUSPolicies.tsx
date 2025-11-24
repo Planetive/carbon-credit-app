@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
 // Add a normalization function for country names
@@ -261,10 +263,26 @@ const ExploreCCUSPolicies = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex flex-col">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 relative">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-cyan-200/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="mb-6 text-teal-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-300"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
         
-        <h1 className="text-2xl font-bold mb-6">Explore CCUS Policies in Different Regions</h1>
+        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">Explore CCUS Policies in Different Regions</h1>
+        <p className="text-gray-600 mb-6">Select a country to view detailed CCUS policies and regulatory landscapes</p>
         {loading ? (
           <div>Loading...</div>
         ) : (
@@ -276,8 +294,7 @@ const ExploreCCUSPolicies = () => {
               return (
                 <Card
                   key={country}
-                  // className={`bg-white/80 cursor-pointer transition-shadow hover:shadow-lg hover:scale-105 hover:bg-teal-50 relative`}
-                  className="bg-white/80 cursor-pointer relative transition-all duration-500 ease-in-out hover:shadow-lg hover:scale-105 hover:bg-teal-50"
+                  className="bg-white/90 backdrop-blur-sm border-teal-200/50 cursor-pointer relative transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-teal-300 shadow-md"
 
                   onClick={() => navigate(`/ccus-management-strategy/${encodeURIComponent(country)}`)}
                 >

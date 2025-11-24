@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,6 +15,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  ComposedChart,
+  Line,
+  Scatter
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,20 +31,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ComposedChart,
-  Line,
-  Scatter
-} from "recharts";
-import { Filter } from "lucide-react";
-import { ArrowRight } from "lucide-react";
+import { Search, Filter, Database, Globe, MapPin, Building2, CheckCircle2, ArrowRight, ArrowLeft } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -52,6 +49,7 @@ const colorScale = [
   "#006064", // 250-499
   "#00363a", // >=500 (very dark teal)
 ];
+
 function getColor(count: number) {
   if (count >= 500) return colorScale[7];
   if (count >= 250) return colorScale[6];
@@ -63,6 +61,7 @@ function getColor(count: number) {
   if (count >= 1) return colorScale[0];
   return "#EEE";
 }
+
 function normalizeCountryName(name: string) {
   if (!name) return "";
   const map: Record<string, string> = {
@@ -112,12 +111,14 @@ const ExploreCCUSProjects = () => {
   const [sectors, setSectors] = useState<string[]>([]);
   const [fates, setFates] = useState<string[]>([]);
   const [filtersLoading, setFiltersLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Multi-select filter state
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [selectedFates, setSelectedFates] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Project data
   const [projects, setProjects] = useState<any[]>([]);
@@ -125,18 +126,10 @@ const ExploreCCUSProjects = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Chart data
-  const [typeData, setTypeData] = useState<{ type: string; count: number }[]>(
-    []
-  );
-  const [countryData, setCountryData] = useState<
-    { country: string; count: number }[]
-  >([]);
-  const [sectorData, setSectorData] = useState<
-    { sector: string; count: number }[]
-  >([]);
-  const [statusData, setStatusData] = useState<
-    { status: string; count: number }[]
-  >([]);
+  const [typeData, setTypeData] = useState<{ type: string; count: number }[]>([]);
+  const [countryData, setCountryData] = useState<{ country: string; count: number }[]>([]);
+  const [sectorData, setSectorData] = useState<{ sector: string; count: number }[]>([]);
+  const [statusData, setStatusData] = useState<{ status: string; count: number }[]>([]);
 
   // Helper function to fetch all unique values for a column in batches
   async function fetchAllUniqueColumnValues(column: string): Promise<string[]> {
@@ -178,7 +171,7 @@ const ExploreCCUSProjects = () => {
         setSectors(await fetchAllUniqueColumnValues("Sector"));
         setFates(await fetchAllUniqueColumnValues("Fate of carbon"));
       } catch (e) {
-        // Optionally, you can set an error state here
+        console.error("Error fetching filter options:", e);
       } finally {
         setFiltersLoading(false);
       }
@@ -204,7 +197,7 @@ const ExploreCCUSProjects = () => {
     while (keepFetching) {
       let query: any = supabase
         .from("ccus_projects")
-        .select("*")
+        .select("*", { count: 'exact' })
         .range(from, to);
       if (filters.countries && filters.countries.length > 0)
         query = query.in("Country or economy", filters.countries);
@@ -215,10 +208,10 @@ const ExploreCCUSProjects = () => {
       if (filters.fates && filters.fates.length > 0)
         query = query.in("Fate of carbon", filters.fates);
 
-      const { data, error }: { data: any[]; error: any } = await query;
+      const { data, error, count }: { data: any[]; error: any; count: number | null } = await query;
       if (error) throw error;
       allRows = allRows.concat(data || []);
-      if (!data || data.length < BATCH_SIZE) {
+      if (!data || data.length < BATCH_SIZE || (count !== null && allRows.length >= count)) {
         keepFetching = false;
       } else {
         from += BATCH_SIZE;
@@ -228,7 +221,7 @@ const ExploreCCUSProjects = () => {
     return allRows;
   }
 
-  // Fetch filtered projects whenever filters change (using batching)
+  // Fetch filtered projects whenever filters change
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -249,14 +242,26 @@ const ExploreCCUSProjects = () => {
       });
   }, [selectedCountries, selectedStatuses, selectedSectors, selectedFates]);
 
-  // Aggregate chart data whenever projects change
+  // Filter projects by search query
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects;
+    const query = searchQuery.toLowerCase();
+    return projects.filter((p) => {
+      const name = String(p["Project name"] || "").toLowerCase();
+      const country = String(p["Country or economy"] || "").toLowerCase();
+      const sector = String(p["Sector"] || "").toLowerCase();
+      return name.includes(query) || country.includes(query) || sector.includes(query);
+    });
+  }, [projects, searchQuery]);
+
+  // Aggregate chart data whenever filtered projects change
   useEffect(() => {
-    // Project type distribution
     const typeMap = new Map<string, number>();
     const countryMap = new Map<string, number>();
     const sectorMap = new Map<string, number>();
     const statusMap = new Map<string, number>();
-    projects.forEach((p) => {
+    
+    filteredProjects.forEach((p) => {
       const type = p["Project type"];
       if (type) {
         typeMap.set(type, (typeMap.get(type) || 0) + 1);
@@ -274,6 +279,7 @@ const ExploreCCUSProjects = () => {
         statusMap.set(status, (statusMap.get(status) || 0) + 1);
       }
     });
+    
     setTypeData(
       Array.from(typeMap.entries())
         .map(([type, count]) => ({ type, count }))
@@ -294,314 +300,423 @@ const ExploreCCUSProjects = () => {
         .map(([status, count]) => ({ status, count }))
         .sort((a, b) => b.count - a.count)
     );
-  }, [projects]);
+  }, [filteredProjects]);
 
-  // Multi-select dropdown component
-  function MultiSelectDropdown({
-    options,
-    selected,
-    setSelected,
-    placeholder,
-    loadingLabel = "Loading...",
-  }: {
-    options: string[];
-    selected: string[];
-    setSelected: (v: string[]) => void;
-    placeholder: string;
-    loadingLabel?: string;
-  }) {
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border border-blue-300 bg-blue-50 text-blue-900 font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 hover:bg-blue-100 disabled:opacity-60 disabled:cursor-not-allowed ${filtersLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
-            disabled={filtersLoading}
-          >
-            <Filter className="w-4 h-4 text-blue-500" />
-            {filtersLoading
-              ? loadingLabel
-              : selected.length === 0
-                ? placeholder
-                : selected.length === 1
-                  ? selected[0]
-                  : `${selected.length} selected`}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 max-h-72 overflow-y-auto p-2">
-          <div className="flex flex-col gap-1">
-            <button
-              type="button"
-              className={`px-3 py-1 rounded-full text-sm font-semibold border ${selected.length === 0 ? 'bg-blue-200 text-blue-900 border-blue-300' : 'bg-white text-blue-700 border-blue-200'} mb-1 transition`}
-              onClick={() => setSelected([])}
-            >
-              All
-            </button>
-            {options.map((option) => (
-              <div key={option} className="flex items-center gap-2 py-1">
-                <Checkbox
-                  id={`option-${option}`}
-                  checked={selected.includes(option)}
-                  onCheckedChange={(checked) => {
-                    if (checked) setSelected([...selected, option]);
-                    else setSelected(selected.filter((t) => t !== option));
-                  }}
-                />
-                <label
-                  htmlFor={`option-${option}`}
-                  className="cursor-pointer select-none text-blue-900"
-                >
-                  {option}
-                </label>
-              </div>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  }
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = filteredProjects.length;
+    const operational = filteredProjects.filter(p => String(p["Project Status"] || "").toLowerCase().includes("operational")).length;
+    const uniqueCountries = new Set(filteredProjects.map(p => p["Country or economy"]).filter(Boolean)).size;
+    const uniqueSectors = new Set(filteredProjects.map(p => p["Sector"]).filter(Boolean)).size;
 
-  // Custom label for type bars
-  const TypeBarLabel = (props: any) => {
-    const { x, y, width, height, payload } = props;
-    if (!payload || !payload.type) return null;
-    return (
-      <text
-        x={x + width + 8}
-        y={y + height / 2}
-        dy={4}
-        fontSize={14}
-        fill="#222"
-        textAnchor="start"
-      >
-        {payload.type}
-      </text>
-    );
-  };
+    return { total, operational, uniqueCountries, uniqueSectors };
+  }, [filteredProjects]);
+
+  const pieColors = [
+    "#14b8a6", "#0d9488", "#10b981", "#059669", "#06b6d4", "#0891b2",
+    "#22c55e", "#16a34a", "#34d399", "#2dd4bf", "#5eead4", "#6ee7b7",
+    "#7dd3fc", "#a5f3fc", "#20bfa9", "#17817b", "#ffc658", "#ff8042"
+  ];
 
   // Compute project count by country for the map
   const countryProjectCounts = React.useMemo(() => {
     const map = new Map<string, number>();
-    projects.forEach((p) => {
+    filteredProjects.forEach((p) => {
       const country = normalizeCountryName(p["Country or economy"]);
       if (country) {
         map.set(country, (map.get(country) || 0) + 1);
       }
     });
     return map;
-  }, [projects]);
+  }, [filteredProjects]);
 
-  const pieColors = [
-    "#20bfa9", // teal
-    "#17817b", // deep teal
-    "#ffc658", // gold
-    "#ff8042", // orange
-    "#a28fd0", // soft purple
-    "#82ca9d", // green
-    "#b6e880", // light green
-    "#d8854f", // muted orange
-    "#e28743", // muted gold
-    "#8dd1e1", // light teal
-    "#e2e2e2", // light gray
-    "#b2b2b2", // gray
-    "#c2f784", // lime
-    "#f7c784", // peach
-    "#b0b0b0", // muted gray
-    "#d0ed57", // yellow-green
-    "#f4e285", // pale yellow
-    "#b0d0e2", // pale blue
-    "#c0c0c0", // silver
-    "#e0e0e0", // very light gray
-  ];
-
-  // Custom Tooltip for Lollipop Chart
-  const CustomLollipopTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 rounded shadow text-sm">
-          <div className="font-semibold mb-1">Sector: {label}</div>
-          <div className="text-teal-600 font-medium">Count: {payload[0].value} projects</div>
-        </div>
-      );
-    }
-    return null;
-  };
+  if (loading || filtersLoading) {
+    return <LoadingScreen message="Loading CCUS Database" subMessage="Fetching project data and analytics..." />;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex flex-col">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Explore CCUS Projects</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8 animate-in fade-in duration-500">
           <Button
-            onClick={() => navigate('/explore/ccus-policies')}
-            variant="default"
-            size="lg"
-            className="transition-all duration-200 shadow-md hover:shadow-xl hover:bg-green-600 hover:text-white flex items-center gap-2"
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="mb-6 text-teal-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-300"
           >
-            View CCUS Policies
-            <ArrowRight className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
           </Button>
-        </div>
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-8">
-          <MultiSelectDropdown
-            options={countries}
-            selected={selectedCountries}
-            setSelected={setSelectedCountries}
-            placeholder="Country or economy"
-            loadingLabel="Loading..."
-          />
-          <MultiSelectDropdown
-            options={statuses}
-            selected={selectedStatuses}
-            setSelected={setSelectedStatuses}
-            placeholder="Project Status"
-            loadingLabel="Loading..."
-          />
-          <MultiSelectDropdown
-            options={sectors}
-            selected={selectedSectors}
-            setSelected={setSelectedSectors}
-            placeholder="Sector"
-            loadingLabel="Loading..."
-          />
-          <MultiSelectDropdown
-            options={fates}
-            selected={selectedFates}
-            setSelected={setSelectedFates}
-            placeholder="Fate of carbon"
-            loadingLabel="Loading..."
-          />
-        </div>
-        {/* Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
-          {/* Projects by Type */}
-          <div>
-            <h2 className="font-semibold mb-2">Projects by Type</h2>
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(300, typeData.length * 30)}
+          <div className="mb-4">
+            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+              CCUS Database
+            </h1>
+            <p className="text-gray-600 text-lg">Explore Carbon Capture, Utilization, and Storage projects worldwide</p>
+          </div>
+          <div className="flex gap-4">
+            <Button
+              onClick={() => navigate('/explore/ccus-policies')}
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex-1 sm:flex-initial"
             >
-              <BarChart data={typeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis
-                  dataKey="type"
-                  type="category"
-                  width={200}
-                  tick={{ fontSize: 14, fill: "#222", fontWeight: "bold" }}
-                  interval={0}
-                />
-                <Tooltip />
-                <Bar dataKey="count" fill="#00bfae" label={<TypeBarLabel />} />
-              </BarChart>
-            </ResponsiveContainer>
+              View CCUS Policies
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            <Button
+              onClick={() =>
+                navigate("/explore/ccus-projects/details", {
+                  state: { projects: filteredProjects },
+                })
+              }
+              disabled={filteredProjects.length === 0}
+              className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-initial"
+            >
+              View Project Details
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Projects</p>
+                  <p className="text-3xl font-bold text-teal-600 transition-all duration-300">{stats.total}</p>
+                </div>
+                <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Database className="w-6 h-6 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-emerald-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.15s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Operational</p>
+                  <p className="text-3xl font-bold text-emerald-600 transition-all duration-300">{stats.operational}</p>
+                </div>
+                <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.2s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Countries</p>
+                  <p className="text-3xl font-bold text-cyan-600 transition-all duration-300">{stats.uniqueCountries}</p>
+                </div>
+                <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Globe className="w-6 h-6 text-cyan-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-lime-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.25s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Sectors</p>
+                  <p className="text-3xl font-bold text-lime-600 transition-all duration-300">{stats.uniqueSectors}</p>
+                </div>
+                <div className="w-12 h-12 bg-lime-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Building2 className="w-6 h-6 text-lime-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search */}
+        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
+                <Input
+                  placeholder="Search projects by name, country, or sector..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 border-teal-200 focus:border-teal-400 transition-all duration-300 focus:ring-2 focus:ring-teal-200"
+                />
+              </div>
+
+              <Popover open={showFilters} onOpenChange={setShowFilters}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="border-teal-200 hover:bg-teal-50 transition-all duration-300 hover:scale-105">
+                    <Filter className="w-4 h-4 mr-2 transition-transform duration-300" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                    Filters
+                    {(selectedCountries.length > 0 || selectedStatuses.length > 0 || selectedSectors.length > 0 || selectedFates.length > 0) && (
+                      <Badge className="ml-2 bg-teal-500 animate-in fade-in duration-300">
+                        {selectedCountries.length + selectedStatuses.length + selectedSectors.length + selectedFates.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
+                    <div>
+                      <p className="font-semibold mb-2 text-sm">Country</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {countries.map(country => (
+                          <div key={country} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`country-${country}`}
+                              checked={selectedCountries.includes(country)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCountries([...selectedCountries, country]);
+                                } else {
+                                  setSelectedCountries(selectedCountries.filter(c => c !== country));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`country-${country}`} className="text-sm cursor-pointer">{country}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-2 text-sm">Status</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {statuses.map(status => (
+                          <div key={status} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`status-${status}`}
+                              checked={selectedStatuses.includes(status)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedStatuses([...selectedStatuses, status]);
+                                } else {
+                                  setSelectedStatuses(selectedStatuses.filter(s => s !== status));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`status-${status}`} className="text-sm cursor-pointer">{status}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-2 text-sm">Sector</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {sectors.map(sector => (
+                          <div key={sector} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`sector-${sector}`}
+                              checked={selectedSectors.includes(sector)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedSectors([...selectedSectors, sector]);
+                                } else {
+                                  setSelectedSectors(selectedSectors.filter(s => s !== sector));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`sector-${sector}`} className="text-sm cursor-pointer">{sector}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-2 text-sm">Fate of Carbon</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {fates.map(fate => (
+                          <div key={fate} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`fate-${fate}`}
+                              checked={selectedFates.includes(fate)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedFates([...selectedFates, fate]);
+                                } else {
+                                  setSelectedFates(selectedFates.filter(f => f !== fate));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`fate-${fate}`} className="text-sm cursor-pointer">{fate}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {(selectedCountries.length > 0 || selectedStatuses.length > 0 || selectedSectors.length > 0 || selectedFates.length > 0) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCountries([]);
+                          setSelectedStatuses([]);
+                          setSelectedSectors([]);
+                          setSelectedFates([]);
+                        }}
+                        className="w-full text-red-600 hover:text-red-700"
+                      >
+                        Clear All Filters
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Projects by Type */}
+          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
+            <CardHeader>
+              <CardTitle className="text-lg">Projects by Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={Math.max(350, typeData.length * 35)}>
+                <BarChart data={typeData} layout="vertical" className="animate-in fade-in duration-500">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis type="number" />
+                  <YAxis
+                    dataKey="type"
+                    type="category"
+                    width={150}
+                    tick={{ fontSize: 12, fill: "#666" }}
+                    interval={0}
+                  />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#14b8a6" animationBegin={0} animationDuration={800} animationEasing="ease-out" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           {/* Projects by Status Pie Chart */}
-          <div>
-            <h2 className="font-semibold mb-2">Projects by Status</h2>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  dataKey="count"
-                  nameKey="status"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={110}
-                  labelLine
+          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.5s' }}>
+            <CardHeader>
+              <CardTitle className="text-lg">Projects by Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={Math.max(350, typeData.length * 35)}>
+                <PieChart className="animate-in fade-in duration-500">
+                  <Pie
+                    data={statusData}
+                    dataKey="count"
+                    nameKey="status"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={Math.min(120, Math.max(350, typeData.length * 35) / 3)}
+                    labelLine={false}
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  >
+                    {statusData.map((entry, idx) => (
+                      <Cell
+                        key={`cell-status-${idx}`}
+                        fill={pieColors[idx % pieColors.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Projects by Sector - Full Width */}
+          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500 lg:col-span-2" style={{ animationDelay: '0.6s' }}>
+            <CardHeader>
+              <CardTitle className="text-lg">Projects by Sector</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 35)}>
+                <ComposedChart
+                  layout="vertical"
+                  data={sectorData}
+                  margin={{ top: 16, right: 32, left: 32, bottom: 16 }}
+                  className="animate-in fade-in duration-500"
                 >
-                  {statusData.map((entry, idx) => (
-                    <Cell
-                      key={`cell-status-${idx}`}
-                      fill={pieColors[idx % pieColors.length]}
-                    />
-                  ))}
-                </Pie>
-                <RechartsTooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Projects by Sector (Lollipop Chart) */}
-          <div>
-            <h2 className="font-semibold mb-2">Projects by Sector</h2>
-            <ResponsiveContainer width="100%" height={Math.max(300, sectorData.length * 32)}>
-              <ComposedChart
-                layout="vertical"
-                data={sectorData}
-                margin={{ top: 16, right: 32, left: 32, bottom: 16 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" hide />
-                <YAxis 
-                  type="category" 
-                  dataKey="sector" 
-                  width={80}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 rounded shadow text-sm">
-                          <div className="font-semibold mb-1">Sector: {label}</div>
-                          <div className="text-teal-600 font-medium">Count: {payload[0].value} projects</div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Line 
-                  dataKey="count" 
-                  stroke="#20bfa9" 
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Scatter 
-                  dataKey="count" 
-                  fill="#20bfa9" 
-                  r={8}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis type="number" />
+                  <YAxis 
+                    type="category" 
+                    dataKey="sector" 
+                    width={120}
+                    tick={{ fontSize: 12, fill: "#666" }}
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white p-3 rounded shadow text-sm">
+                            <div className="font-semibold mb-1">Sector: {label}</div>
+                            <div className="text-teal-600 font-medium">Count: {payload[0].value} projects</div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Line 
+                    dataKey="count" 
+                    stroke="#14b8a6" 
+                    strokeWidth={2}
+                    dot={false}
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                  <Scatter 
+                    dataKey="count" 
+                    fill="#14b8a6" 
+                    r={8}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </div>
-        {/* View Details Button */}
-        <div className="mb-8 flex justify-end">
-          <Button
-            onClick={() =>
-              navigate("/explore/ccus-projects/details", {
-                state: { projects },
-              })
-            }
-            disabled={loading || projects.length === 0}
-          >
-            View Details
-          </Button>
-        </div>
-        {/* Map section with project counts by country */}
-        <div className="mb-8">
-          <h2 className="font-semibold mb-2">Project Locations (Map)</h2>
-          <div
-            className="responsive-map-container"
-            style={{
-              width: "100%",
-              maxWidth: "1200px",
-              aspectRatio: "2.5/1",
-              margin: "0 auto",
-              background: "none",
-              position: "relative",
-              minHeight: "300px",
-              overflow: "visible",
-            }}
-          >
-            <MapWithProjectCounts countryData={countryData} />
-          </div>
-        </div>
-        {/* Project Cards */}
-        {/* Removed project cards grid as per user request */}
+
+
+        {/* Map section */}
+        <Card className="mb-8 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.8s' }}>
+          <CardHeader>
+            <CardTitle className="text-xl">Project Locations</CardTitle>
+            <Badge variant="outline" className="text-sm w-fit mt-2">
+              {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="responsive-map-container"
+              style={{
+                width: "100%",
+                maxWidth: "1200px",
+                aspectRatio: "2.5/1",
+                margin: "0 auto",
+                background: "none",
+                position: "relative",
+                minHeight: "300px",
+                overflow: "visible",
+              }}
+            >
+              <MapWithProjectCounts countryData={countryData} />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -619,10 +734,11 @@ function MapWithProjectCounts({
     y: number;
     content: string;
   } | null>(null);
-  // Normalize country names in the data
+  
   const countryCountMap = Object.fromEntries(
     countryData.map((d) => [normalizeCountryName(d.country), d.count])
   );
+  
   return (
     <div style={{ position: "relative" }}>
       <ComposableMap
@@ -635,22 +751,19 @@ function MapWithProjectCounts({
           {({ geographies }) =>
             geographies.map((geo) => {
               const originalCountryName = geo.properties.name;
-              const normalizedCountryName =
-                normalizeCountryName(originalCountryName);
+              const normalizedCountryName = normalizeCountryName(originalCountryName);
               let count = 0;
               if (countryCountMap[normalizedCountryName]) {
                 count = countryCountMap[normalizedCountryName];
               } else {
                 const match = Object.keys(countryCountMap).find(
-                  (key) =>
-                    key.toLowerCase() === normalizedCountryName.toLowerCase()
+                  (key) => key.toLowerCase() === normalizedCountryName.toLowerCase()
                 );
                 if (match) {
                   count = countryCountMap[match];
                 } else {
                   const directMatch = Object.keys(countryCountMap).find(
-                    (key) =>
-                      key.toLowerCase() === originalCountryName.toLowerCase()
+                    (key) => key.toLowerCase() === originalCountryName.toLowerCase()
                   );
                   if (directMatch) {
                     count = countryCountMap[directMatch];
@@ -668,9 +781,7 @@ function MapWithProjectCounts({
                     setTooltip({
                       x: e.clientX,
                       y: e.clientY,
-                      content: `${originalCountryName}: ${count} project${
-                        count === 1 ? "" : "s"
-                      }`,
+                      content: `${originalCountryName}: ${count} project${count === 1 ? "" : "s"}`,
                     });
                   }}
                   onMouseLeave={() => setTooltip(null)}
@@ -719,7 +830,7 @@ function MapWithProjectCounts({
             fontWeight: "bold",
             fontSize: 15,
             marginBottom: 8,
-            background: "#3066be",
+            background: "#14b8a6",
             color: "#fff",
             padding: "2px 8px",
             borderRadius: 3,
@@ -728,90 +839,29 @@ function MapWithProjectCounts({
           PROJECT COUNT
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[0],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>&lt; 25</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[1],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>25 - 49</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[2],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>50 - 74</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[3],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>75 - 99</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[4],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>100 - 249</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[5],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>250 - 499</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 22,
-                height: 18,
-                background: colorScale[6],
-                border: "1px solid #bbb",
-                display: "inline-block",
-              }}
-            ></div>
-            <span style={{ fontSize: 14 }}>&gt;= 500</span>
-          </div>
+          {[
+            { color: colorScale[0], label: "< 10" },
+            { color: colorScale[1], label: "10 - 24" },
+            { color: colorScale[2], label: "25 - 49" },
+            { color: colorScale[3], label: "50 - 74" },
+            { color: colorScale[4], label: "75 - 99" },
+            { color: colorScale[5], label: "100 - 249" },
+            { color: colorScale[6], label: "250 - 499" },
+            { color: colorScale[7], label: ">= 500" },
+          ].map((item, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 22,
+                  height: 18,
+                  background: item.color,
+                  border: "1px solid #bbb",
+                  display: "inline-block",
+                }}
+              ></div>
+              <span style={{ fontSize: 14 }}>{item.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

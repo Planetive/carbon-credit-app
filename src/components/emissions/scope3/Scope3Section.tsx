@@ -22,6 +22,7 @@ type Props = {
   activeCategory: string;
   emissionData: EmissionData;
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
+  onSaveAndNext?: () => void;
 };
 
 // Vehicle type notes mapping (A, B, C explanations) - concise versions
@@ -73,7 +74,7 @@ const cleanVehicleTypeName = (vehicleType: string): string => {
   return vehicleType.replace(/\s+[ABC]$/i, '').trim();
 };
 
-export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData }) => {
+export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData, onSaveAndNext }) => {
   const { toast } = useToast();
   
   // State for Purchased Goods & Services - row-based
@@ -497,6 +498,65 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }));
   }, [employeeCommutingRows, businessTravelTypes, setEmissionData]);
   
+  // Row-based state for Investments
+  interface InvestmentRow {
+    id: string;
+    companyName: string;
+    emissions: number | undefined;
+    percentage: number | undefined;
+    calculatedEmissions: number | undefined;
+  }
+  const [investmentRows, setInvestmentRows] = useState<InvestmentRow[]>([]);
+  
+  const newInvestmentRow = (): InvestmentRow => ({
+    id: `inv-${Date.now()}-${Math.random()}`,
+    companyName: '',
+    emissions: undefined,
+    percentage: undefined,
+    calculatedEmissions: undefined,
+  });
+  
+  const addInvestmentRow = () => setInvestmentRows(prev => [...prev, newInvestmentRow()]);
+  const removeInvestmentRow = (id: string) => setInvestmentRows(prev => prev.filter(r => r.id !== id));
+  
+  const updateInvestmentRow = (id: string, patch: Partial<InvestmentRow>) => {
+    setInvestmentRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...patch };
+      // Calculate emissions based on ownership percentage
+      if (typeof updated.emissions === 'number' && updated.emissions >= 0 && 
+          typeof updated.percentage === 'number' && updated.percentage >= 0 && updated.percentage <= 100) {
+        updated.calculatedEmissions = (updated.emissions * updated.percentage) / 100;
+      } else {
+        updated.calculatedEmissions = undefined;
+      }
+      return updated;
+    }));
+  };
+  
+  useEffect(() => {
+    const entries = investmentRows
+      .filter(r => r.companyName && typeof r.emissions === 'number' && r.emissions >= 0 && 
+                   typeof r.percentage === 'number' && r.percentage >= 0 && r.percentage <= 100)
+      .map(r => ({
+        id: r.id,
+        category: 'investments' as const,
+        activity: `${r.companyName} (${r.percentage}% owned)`,
+        unit: 'tCO₂e',
+        quantity: r.percentage!,
+        factor: r.emissions!,
+        emissions: r.calculatedEmissions || 0,
+      }));
+    
+    setEmissionData(prev => ({
+      ...prev,
+      scope3: [
+        ...prev.scope3.filter(r => r.category !== 'investments'),
+        ...entries,
+      ]
+    }));
+  }, [investmentRows, setEmissionData]);
+  
   // Row-based state for End of Life Treatment
   interface EndOfLifeRow {
     id: string;
@@ -721,9 +781,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Amount: <span className="font-semibold">{totalAmount.toFixed(2)} PKR</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
           </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Purchased goods entries saved (frontend only for now).' })} disabled={purchasedGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Purchased goods entries saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={purchasedGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${purchasedGoodsRows.length})`}
+            {`Save and Next (${purchasedGoodsRows.length})`}
           </Button>
         </div>
       </div>
@@ -801,9 +864,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Amount: <span className="font-semibold">PKR {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
           </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Capital goods saved (frontend only for now).' })} disabled={capitalGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Capital goods saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={capitalGoodsRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
                   <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${capitalGoodsRows.length})`}
+            {`Save and Next (${capitalGoodsRows.length})`}
                 </Button>
         </div>
       </div>
@@ -1317,9 +1383,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           <div className="text-gray-700 font-medium">
             Total Distance: <span className="font-semibold">{totalDistance.toFixed(1)} km</span>
               </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Fuel & Energy activities saved (frontend only for now).' })} disabled={fuelEnergyRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Fuel & Energy activities saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={fuelEnergyRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${fuelEnergyRows.length})`}
+            {`Save and Next (${fuelEnergyRows.length})`}
           </Button>
         </div>
       </div>
@@ -1462,9 +1531,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Weight: <span className="font-semibold">{totalWeight.toFixed(2)} kg</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
           </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Upstream transportation saved (frontend only for now).' })} disabled={upstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Upstream transportation saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={upstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${upstreamTransportRows.length})`}
+            {`Save and Next (${upstreamTransportRows.length})`}
           </Button>
         </div>
       </div>
@@ -1585,9 +1657,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Volume: <span className="font-semibold">{totalVolume.toFixed(2)} kg</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
               </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Waste generated entries saved (frontend only for now).' })} disabled={wasteGeneratedRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Waste generated entries saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={wasteGeneratedRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${wasteGeneratedRows.length})`}
+            {`Save and Next (${wasteGeneratedRows.length})`}
           </Button>
         </div>
       </div>
@@ -1682,9 +1757,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Distance: <span className="font-semibold">{totalDistance.toFixed(2)} km</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO₂e</span>
               </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Business travel entries saved (frontend only for now).' })} disabled={businessTravelRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Business travel entries saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={businessTravelRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${businessTravelRows.length})`}
+            {`Save and Next (${businessTravelRows.length})`}
           </Button>
         </div>
       </div>
@@ -1801,9 +1879,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Distance: <span className="font-semibold">{totalDistance.toFixed(2)} km</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO₂e</span>
           </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Employee commuting entries saved (frontend only for now).' })} disabled={employeeCommutingRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Employee commuting entries saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={employeeCommutingRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${employeeCommutingRows.length})`}
+            {`Save and Next (${employeeCommutingRows.length})`}
           </Button>
         </div>
       </div>
@@ -1816,63 +1897,104 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Investments
   if (activeCategory === 'investments') {
+    const totalEmissions = investmentRows.reduce((sum, r) => sum + (r.calculatedEmissions || 0), 0);
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Investments</h3>
+            <h4 className="text-lg font-semibold text-gray-900">Investments</h4>
             <p className="text-sm text-gray-600">Investment portfolio and investee emissions</p>
           </div>
-          <Button variant="default" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => (document.getElementById('inv-portfolio') as HTMLInputElement)?.focus()}>
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
+          <Button onClick={addInvestmentRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Plus className="h-4 w-4 mr-2" />Add New Entry
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-          <div>
-            <Label htmlFor="inv-portfolio" className="flex items-center gap-1">Investment Portfolio <FieldTooltip content="Breakdown of portfolio" /></Label>
-            <Input id="inv-portfolio" placeholder="Enter portfolio details" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
-          <div>
-            <Label htmlFor="inv-emissions" className="flex items-center gap-1">Investee Company Emissions Data <FieldTooltip content="Reported Scope 1 & 2 emissions" /></Label>
-            <Input id="inv-emissions" placeholder="Enter reported emissions data" onChange={(e) => (e.currentTarget as any)._value = e.target.value} />
-          </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+          <Label className="text-gray-500 font-medium">Investee Company Name</Label>
+          <Label className="text-gray-500 font-medium">Emissions Data (tCO₂e)</Label>
+          <Label className="text-gray-500 font-medium">Ownership (%)</Label>
+          <Label className="text-gray-500 font-medium">Calculated Emissions</Label>
         </div>
-        <div className="flex items-center justify-end mt-2">
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
-            const portfolio = (document.getElementById('inv-portfolio') as any)?._value || (document.getElementById('inv-portfolio') as HTMLInputElement)?.value || '';
-            const emissions = (document.getElementById('inv-emissions') as any)?._value || (document.getElementById('inv-emissions') as HTMLInputElement)?.value || '';
-            if (!portfolio || !emissions) { toast({ title: 'Missing info', description: 'Enter portfolio and investee emissions data.' }); return; }
-            setEmissionData(prev => ({ ...prev, scope3: [...prev.scope3, { id: `inv-${Date.now()}`, category: 'investments', activity: `${portfolio}`, unit: 'entry', quantity: 1, emissions: 0 }] }));
-            ['inv-portfolio','inv-emissions'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value=''; });
-          }}>Add Entry</Button>
+
+        <div className="space-y-4">
+          {investmentRows.map((r) => (
+            <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200">
+              <div className="w-full">
+                <Input
+                  value={r.companyName}
+                  onChange={(e) => updateInvestmentRow(r.id, { companyName: e.target.value })}
+                  placeholder="Enter company name"
+                  className="w-full"
+                />
+              </div>
+              <div className="w-full">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={r.emissions ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateInvestmentRow(r.id, { emissions: undefined });
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0) {
+                        updateInvestmentRow(r.id, { emissions: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="Enter emissions"
+                  className="w-full"
+                />
+              </div>
+              <div className="w-full">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={r.percentage ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateInvestmentRow(r.id, { percentage: undefined });
+                    } else {
+                      const numValue = Number(value);
+                      if (numValue >= 0 && numValue <= 100) {
+                        updateInvestmentRow(r.id, { percentage: numValue });
+                      }
+                    }
+                  }}
+                  placeholder="Enter percentage"
+                  className="w-full"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-700 font-medium flex-1">
+                  {r.calculatedEmissions !== undefined ? `${r.calculatedEmissions.toFixed(2)} tCO₂e` : '-'}
+                </div>
+                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => removeInvestmentRow(r.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
-        {emissionData.scope3.filter(r => r.category === 'investments').length > 0 && (
-          <div className="space-y-3">
-            {emissionData.scope3.filter(r => r.category === 'investments').map(row => (
-              <div key={row.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
-                <div className="md:col-span-3">
-                  <div className="text-sm font-medium text-gray-900">{row.activity}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" className="text-red-600" onClick={() => removeScope3Row(row.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-gray-700 font-medium">
+            Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} tCO₂e</span>
           </div>
-        )}
-        <div className="pt-4 border-t">
-          {(() => {
-            const rows = emissionData.scope3.filter(r => r.category === 'investments');
-            const totalPending = rows.length;
-            return (
-              <div className="flex items-center justify-between">
-                <div className="text-gray-700 font-medium">Total Investment Entries: <span className="font-semibold">{totalPending}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Investment entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
-              </div>
-            );
-          })()}
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Investment entries saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={investmentRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" />
+            {`Save and Next (${investmentRows.length})`}
+          </Button>
         </div>
       </div>
     );
@@ -2014,9 +2136,12 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             Total Weight: <span className="font-semibold">{totalWeight.toFixed(2)} kg</span> | 
             Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
           </div>
-          <Button onClick={() => toast({ title: 'Saved', description: 'Downstream transportation saved (frontend only for now).' })} disabled={downstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => {
+            toast({ title: 'Saved', description: 'Downstream transportation saved (frontend only for now).' });
+            onSaveAndNext?.();
+          }} disabled={downstreamTransportRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${downstreamTransportRows.length})`}
+            {`Save and Next (${downstreamTransportRows.length})`}
           </Button>
         </div>
       </div>
@@ -2078,7 +2203,10 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             return (
               <div className="flex items-center justify-between">
                 <div className="text-gray-700 font-medium">Total Processing Entries: <span className="font-semibold">{totalPending}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Processing of sold products saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
+                <Button onClick={() => {
+                  toast({ title: 'Saved', description: 'Processing of sold products saved (frontend only for now).' });
+                  onSaveAndNext?.();
+                }} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save and Next (${totalPending})`}</Button>
               </div>
             );
           })()}
@@ -2147,7 +2275,10 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             return (
               <div className="flex items-center justify-between">
                 <div className="text-gray-700 font-medium">Total Use Entries: <span className="font-semibold">{totalPending}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Use of sold products saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
+                <Button onClick={() => {
+                  toast({ title: 'Saved', description: 'Use of sold products saved (frontend only for now).' });
+                  onSaveAndNext?.();
+                }} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save and Next (${totalPending})`}</Button>
               </div>
             );
           })()}
@@ -2304,7 +2435,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </div>
           <Button onClick={() => toast({ title: 'Saved', description: 'End-of-life entries saved (frontend only for now).' })} disabled={endOfLifeRows.length === 0} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Save className="h-4 w-4 mr-2" />
-            {`Save Changes (${endOfLifeRows.length})`}
+            {`Save and Next (${endOfLifeRows.length})`}
           </Button>
         </div>
       </div>
@@ -2376,7 +2507,10 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             return (
               <div className="flex items-center justify-between">
                 <div className="text-gray-700 font-medium">Total Franchise Entries: <span className="font-semibold">{totalPending}</span></div>
-                <Button onClick={() => toast({ title: 'Saved', description: 'Franchise entries saved (frontend only for now).' })} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save Changes (${totalPending})`}</Button>
+                <Button onClick={() => {
+                  toast({ title: 'Saved', description: 'Franchise entries saved (frontend only for now).' });
+                  onSaveAndNext?.();
+                }} disabled={totalPending === 0} className="bg-teal-600 hover:bg-teal-700 text-white"><Save className="h-4 w-4 mr-2" />{`Save and Next (${totalPending})`}</Button>
               </div>
             );
           })()}

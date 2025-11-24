@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -10,13 +10,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navLinks = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
   { to: "/explore", label: "Explore", icon: Compass },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/drafts", label: "Drafts", icon: FileText },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const AppHeader = () => {
@@ -144,14 +152,55 @@ const AppHeader = () => {
         </TooltipProvider>
       </nav>
 
-      {/* Desktop Logout */}
-      <button
-        onClick={handleLogout}
-        className="hidden md:flex items-center gap-1 text-gray-500 hover:text-red-500 font-semibold ml-6"
-        title="Logout"
-      >
-        <LogOut className="h-5 w-5" /> Logout
-      </button>
+      {/* Desktop Profile Dropdown */}
+      <div className="hidden md:flex items-center ml-6">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+              <Avatar className="h-9 w-9 border-2 border-teal-500">
+                <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || "User"} />
+                <AvatarFallback className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-semibold">
+                  {user?.email?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <ChevronDown className="h-4 w-4 text-gray-600" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User"}
+                </p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/dashboard" className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/settings" className="cursor-pointer">
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Logout</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Mobile Menu Button */}
       <button
@@ -239,8 +288,40 @@ const AppHeader = () => {
             </div>
           </nav>
 
-          {/* Mobile Logout */}
+          {/* Mobile Profile Section */}
           <div className="p-4 border-t border-gray-200">
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
+              <Avatar className="h-10 w-10 border-2 border-teal-500">
+                <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || "User"} />
+                <AvatarFallback className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-semibold">
+                  {user?.email?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User"}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/dashboard"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-3 w-full p-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors mb-2"
+            >
+              <User className="h-5 w-5" />
+              Profile
+            </Link>
+            <Link
+              to="/settings"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-3 w-full p-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors mb-2"
+            >
+              <SettingsIcon className="h-5 w-5" />
+              Settings
+            </Link>
             <button
               onClick={() => {
                 handleLogout();

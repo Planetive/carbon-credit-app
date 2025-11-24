@@ -17,7 +17,7 @@ const Dashboard = () => {
   const [profileMissing, setProfileMissing] = useState(false);
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
-  const [displayName, setDisplayName] = useState<string>("");
+  const [organizationName, setOrganizationName] = useState<string>("");
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
@@ -29,7 +29,7 @@ const Dashboard = () => {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, display_name")
+        .select("id, organization_name")
         .eq("user_id", user.id)
         .single();
       if (!data || error) {
@@ -37,10 +37,10 @@ const Dashboard = () => {
       } else {
         setProfileMissing(false);
       }
-      if (data && data.display_name) {
-        setDisplayName(data.display_name);
+      if (data && data.organization_name) {
+        setOrganizationName(data.organization_name);
       } else {
-        setDisplayName("");
+        setOrganizationName("");
       }
     };
     checkProfile();
@@ -231,7 +231,7 @@ const Dashboard = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="mb-4 md:mb-0">
               <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-teal-800">
-                {displayName ? `Welcome back, ${displayName} ! 👋` : "Hello"}
+                {organizationName ? `Welcome back, ${organizationName} ! 👋` : "Hello"}
               </h1>
               <p className="mt-2 text-sm sm:text-base md:text-xl text-gray-700">
                 Manage your carbon credit projects and explore global opportunities

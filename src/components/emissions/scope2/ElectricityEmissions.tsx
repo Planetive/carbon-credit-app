@@ -28,9 +28,10 @@ const getGridFactor = (country?: 'UAE' | 'Pakistan') => (country ? SCOPE2_FACTOR
 
 interface ElectricityEmissionsProps { 
   onTotalChange?: (total: number) => void;
+  onSaveAndNext?: () => void;
 }
 
-const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChange }) => {
+const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChange, onSaveAndNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -288,6 +289,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
       }
 
       toast({ title: "Saved", description: "Scope 2 electricity data saved." });
+      onSaveAndNext?.();
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -540,7 +542,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
           Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
         </div>
         <Button onClick={saveAll} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
-          <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save'}
+          <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save and Next'}
         </Button>
       </div>
     </div>

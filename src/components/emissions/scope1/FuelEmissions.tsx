@@ -23,9 +23,10 @@ interface FuelEmissionsProps {
   onDataChange: (data: FuelRow[]) => void;
   companyContext?: boolean; // Add company context prop
   counterpartyId?: string; // Add counterparty ID for company-specific data
+  onSaveAndNext?: () => void;
 }
 
-const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyContext = false, counterpartyId }) => {
+const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyContext = false, counterpartyId, onSaveAndNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -271,6 +272,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
+      // Navigate to next category
+      onSaveAndNext?.();
+
       // Reload data
       const { data: newData } = await supabase
         .from('scope1_fuel_entries')
@@ -418,7 +422,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
               className="bg-teal-600 hover:bg-teal-700 text-white"
             >
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save Changes (${totalPending})`}
+              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
             </Button>
           );
         })()}

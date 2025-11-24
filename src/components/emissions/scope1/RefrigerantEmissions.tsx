@@ -21,9 +21,10 @@ import {
 interface RefrigerantEmissionsProps {
   onDataChange: (data: RefrigerantRow[]) => void;
   companyContext?: boolean; // Add company context prop
+  onSaveAndNext?: () => void;
 }
 
-const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChange, companyContext = false }) => {
+const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChange, companyContext = false, onSaveAndNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -209,6 +210,9 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
+      // Navigate to next category
+      onSaveAndNext?.();
+
       // Reload data
       const { data: newData } = await supabase
         .from('scope1_refrigerant_entries')
@@ -327,7 +331,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
               className="bg-teal-600 hover:bg-teal-700 text-white"
             >
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save Changes (${totalPending})`}
+              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
             </Button>
           );
         })()}
