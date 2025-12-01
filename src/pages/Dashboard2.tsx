@@ -170,37 +170,162 @@ const Dashboard2 = () => {
         setHasAnyEmissions(false);
       }
 
-      // Fetch Finance Emission calculations
+      // Fetch and aggregate all Finance Emission calculations across all portfolios
+      // Check both finance_emission_calculations and emission_calculations tables
       try {
-        const { data: financeData, error: financeError } = await supabase
+        // First, let's see what's actually in the database - query all records for this user
+        const { data: allFinanceRecords, error: allFinanceError } = await supabase
           .from('finance_emission_calculations')
           .select('*')
-          .eq('user_id', user.id)
-          .eq('calculation_type', 'finance_emission')
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .eq('user_id', user.id);
 
-        if (!financeError && financeData && financeData.length > 0) {
-          setFinanceEmissionData(financeData[0]);
+        console.log('🔍 Dashboard - All finance_emission_calculations for user:', allFinanceRecords?.length || 0, 'records');
+        if (allFinanceRecords && allFinanceRecords.length > 0) {
+          console.log('📋 Sample record:', allFinanceRecords[0]);
         }
-      } catch (_) {
+
+        // Query finance_emission_calculations table - filter by calculation_type
+        const { data: financeData1, error: financeError1 } = await supabase
+          .from('finance_emission_calculations')
+          .select('financed_emissions, status, counterparty_id, calculation_type')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'finance_emission');
+
+        // Query emission_calculations table
+        const { data: financeData2, error: financeError2 } = await supabase
+          .from('emission_calculations')
+          .select('financed_emissions, status, counterparty_id, calculation_type')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'finance');
+
+        console.log('🔍 Dashboard - Finance query results:');
+        console.log('  finance_emission_calculations:', financeData1?.length || 0, 'records', financeError1 || 'no error');
+        console.log('  emission_calculations:', financeData2?.length || 0, 'records', financeError2 || 'no error');
+        
+        if (financeError1) console.error('Error fetching finance emissions from finance_emission_calculations:', financeError1);
+        if (financeError2) console.error('Error fetching finance emissions from emission_calculations:', financeError2);
+
+        // Filter out failed status manually
+        const validFinanceData1 = (financeData1 || []).filter(r => r.status !== 'failed');
+        const validFinanceData2 = (financeData2 || []).filter(r => r.status !== 'failed');
+
+        // Combine results from both tables
+        const allFinanceData = [
+          ...validFinanceData1,
+          ...validFinanceData2
+        ];
+
+        if (allFinanceData.length > 0) {
+          console.log('✅ Finance emission data found:', allFinanceData.length, 'records');
+          console.log('📊 Finance data details:', allFinanceData);
+          // Sum all finance emissions from all companies
+          const totalFinanceEmissions = allFinanceData.reduce((sum, record) => {
+            const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
+            console.log('  Adding:', emissions, 'from', record.calculation_type, 'counterparty:', record.counterparty_id);
+            return sum + emissions;
+          }, 0);
+          
+          console.log('💰 Total finance emissions:', totalFinanceEmissions);
+          
+          if (totalFinanceEmissions > 0) {
+            setFinanceEmissionData({
+              financed_emissions: totalFinanceEmissions,
+              total_companies: allFinanceData.length
+            });
+          } else {
+            console.log('⚠️ Total is 0, setting to null');
+            setFinanceEmissionData(null);
+          }
+        } else {
+          console.log('❌ No finance emission data found for user:', user.id);
+          console.log('   Checked tables: finance_emission_calculations, emission_calculations');
+          // If we found records in the all query but not in the filtered query, there might be a data issue
+          if (allFinanceRecords && allFinanceRecords.length > 0) {
+            console.log('⚠️ Found', allFinanceRecords.length, 'records but none matched calculation_type filter');
+            console.log('   Available calculation_types:', [...new Set(allFinanceRecords.map(r => r.calculation_type))]);
+          }
+          setFinanceEmissionData(null);
+        }
+      } catch (error) {
+        console.error('💥 Exception fetching finance emissions:', error);
         setFinanceEmissionData(null);
       }
 
-      // Fetch Facilitated Emission calculations
+      // Fetch and aggregate all Facilitated Emission calculations across all portfolios
+      // Check both finance_emission_calculations and emission_calculations tables
       try {
-        const { data: facilitatedData, error: facilitatedError } = await supabase
+        // First, let's see what's actually in the database - query all records for this user
+        const { data: allFacilitatedRecords, error: allFacilitatedError } = await supabase
           .from('finance_emission_calculations')
           .select('*')
-          .eq('user_id', user.id)
-          .eq('calculation_type', 'facilitated_emission')
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .eq('user_id', user.id);
 
-        if (!facilitatedError && facilitatedData && facilitatedData.length > 0) {
-          setFacilitatedEmissionData(facilitatedData[0]);
+        console.log('🔍 Dashboard - All finance_emission_calculations for user (facilitated check):', allFacilitatedRecords?.length || 0, 'records');
+
+        // Query finance_emission_calculations table - filter by calculation_type
+        const { data: facilitatedData1, error: facilitatedError1 } = await supabase
+          .from('finance_emission_calculations')
+          .select('financed_emissions, status, counterparty_id, calculation_type')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'facilitated_emission');
+
+        // Query emission_calculations table
+        const { data: facilitatedData2, error: facilitatedError2 } = await supabase
+          .from('emission_calculations')
+          .select('financed_emissions, status, counterparty_id, calculation_type')
+          .eq('user_id', user.id)
+          .eq('calculation_type', 'facilitated');
+
+        console.log('🔍 Dashboard - Facilitated query results:');
+        console.log('  finance_emission_calculations:', facilitatedData1?.length || 0, 'records', facilitatedError1 || 'no error');
+        console.log('  emission_calculations:', facilitatedData2?.length || 0, 'records', facilitatedError2 || 'no error');
+        
+        if (facilitatedError1) console.error('Error fetching facilitated emissions from finance_emission_calculations:', facilitatedError1);
+        if (facilitatedError2) console.error('Error fetching facilitated emissions from emission_calculations:', facilitatedError2);
+
+        // Filter out failed status manually
+        const validFacilitatedData1 = (facilitatedData1 || []).filter(r => r.status !== 'failed');
+        const validFacilitatedData2 = (facilitatedData2 || []).filter(r => r.status !== 'failed');
+
+        // Combine results from both tables
+        const allFacilitatedData = [
+          ...validFacilitatedData1,
+          ...validFacilitatedData2
+        ];
+
+        if (allFacilitatedData.length > 0) {
+          console.log('✅ Facilitated emission data found:', allFacilitatedData.length, 'records');
+          console.log('📊 Facilitated data details:', allFacilitatedData);
+          // Sum all facilitated emissions from all companies
+          const totalFacilitatedEmissions = allFacilitatedData.reduce((sum, record) => {
+            const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
+            console.log('  Adding:', emissions, 'from', record.calculation_type, 'counterparty:', record.counterparty_id);
+            return sum + emissions;
+          }, 0);
+          
+          console.log('💰 Total facilitated emissions:', totalFacilitatedEmissions);
+          
+          if (totalFacilitatedEmissions > 0) {
+            setFacilitatedEmissionData({
+              financed_emissions: totalFacilitatedEmissions,
+              total_companies: allFacilitatedData.length
+            });
+          } else {
+            console.log('⚠️ Total is 0, setting to null');
+            setFacilitatedEmissionData(null);
+          }
+        } else {
+          console.log('❌ No facilitated emission data found for user:', user.id);
+          console.log('   Checked tables: finance_emission_calculations, emission_calculations');
+          // If we found records in the all query but not in the filtered query, there might be a data issue
+          if (allFacilitatedRecords && allFacilitatedRecords.length > 0) {
+            console.log('⚠️ Found', allFacilitatedRecords.length, 'records but none matched calculation_type filter');
+            console.log('   Available calculation_types:', [...new Set(allFacilitatedRecords.map(r => r.calculation_type))]);
+          }
+          setFacilitatedEmissionData(null);
         }
-      } catch (_) {
+      } catch (error) {
+        console.error('💥 Exception fetching facilitated emissions:', error);
         setFacilitatedEmissionData(null);
       }
 

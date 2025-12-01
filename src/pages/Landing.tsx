@@ -208,14 +208,12 @@ const Landing = () => {
                   className="absolute inset-0 w-full h-full object-contain"
                 />
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white">
-                <span className="bg-gradient-to-r from-green-800 to-green-700 bg-clip-text text-transparent">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '0.02em' }}>
                   ReThink Carbon
-                </span>
               </h1>
             </div>
-            <p className="text-lg sm:text-xl md:text-2xl text-gray-200 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4">
-              Transforming the future of Carbon markets
+            <p className="text-lg sm:text-xl md:text-2xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, letterSpacing: '0.01em' }}>
+              Transforming the future of Carbon markets with sophistication and authority
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
               <Button

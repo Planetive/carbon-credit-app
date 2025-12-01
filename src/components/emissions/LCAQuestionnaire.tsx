@@ -7,7 +7,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
-import { CheckCircle2, ArrowRight, ArrowLeft, Edit2, Factory, Zap, XCircle, ArrowUpDown, TrendingUp, Calculator } from "lucide-react";
+import { CheckCircle2, ArrowRight, ArrowLeft, Edit2, Factory, Zap, XCircle, ArrowUpDown, TrendingUp, Calculator, RotateCcw } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface LCAQuestionnaireProps {
   emissionData: EmissionData;
@@ -17,6 +29,8 @@ interface LCAQuestionnaireProps {
   onInitialAnswer?: (hasLCA: boolean) => void;
   onSwitchToManual?: () => void;
   showHeader?: boolean;
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
 const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
@@ -27,8 +41,11 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
   onInitialAnswer,
   onSwitchToManual,
   showHeader = true,
+  companyContext = false,
+  counterpartyId,
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   // If showing initial question, start at -1, otherwise start at 0
   const [currentStep, setCurrentStep] = useState(showInitialQuestion ? -1 : 0);
@@ -40,6 +57,16 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [editingScope, setEditingScope] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  
+  // Track database IDs for each scope
+  const [lcaDbIds, setLcaDbIds] = useState<{
+    scope1?: string;
+    scope2?: string;
+    scope3Upstream?: string;
+    scope3Downstream?: string;
+  }>({});
 
   useEffect(() => {
     setIsMounted(true);
@@ -52,18 +79,89 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
     }
   }, [currentStep, showSummary]);
 
-  // Load existing data if available
+  // Load existing LCA data from database
   useEffect(() => {
-    const scope1LCA = emissionData.scope3.find(r => r.category === 'lca_scope1');
-    const scope2LCA = emissionData.scope3.find(r => r.category === 'lca_scope2');
-    const scope3UpstreamLCA = emissionData.scope3.find(r => r.category === 'lca_upstream');
-    const scope3DownstreamLCA = emissionData.scope3.find(r => r.category === 'lca_downstream');
+    const loadExistingLCA = async () => {
+      if (!user) return;
 
-    if (scope1LCA) setScope1Emissions(scope1LCA.emissions || '');
-    if (scope2LCA) setScope2Emissions(scope2LCA.emissions || '');
-    if (scope3UpstreamLCA) setScope3Upstream(scope3UpstreamLCA.emissions || '');
-    if (scope3DownstreamLCA) setScope3Downstream(scope3DownstreamLCA.emissions || '');
-  }, []);
+      // Skip loading data when in company context - start with blank form
+      if (companyContext && !counterpartyId) {
+        return;
+      }
+
+      try {
+        let query = supabase
+          .from('scope3_lca_entries')
+          .select('*')
+          .eq('user_id', user.id);
+
+        // Filter by counterparty_id if in company context
+        if (companyContext && counterpartyId) {
+          query = query.eq('counterparty_id', counterpartyId);
+        } else {
+          // Only personal entries (no counterparty_id)
+          query = query.is('counterparty_id', null);
+        }
+
+        const { data: lcaData, error } = await query.order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (lcaData && lcaData.length > 0) {
+          const dbIds: typeof lcaDbIds = {};
+          
+          lcaData.forEach(entry => {
+            const scopeType = entry.scope_type;
+            if (scopeType === 'scope1') {
+              setScope1Emissions(entry.emissions);
+              dbIds.scope1 = entry.id;
+            } else if (scopeType === 'scope2') {
+              setScope2Emissions(entry.emissions);
+              dbIds.scope2 = entry.id;
+            } else if (scopeType === 'scope3_upstream') {
+              setScope3Upstream(entry.emissions);
+              dbIds.scope3Upstream = entry.id;
+            } else if (scopeType === 'scope3_downstream') {
+              setScope3Downstream(entry.emissions);
+              dbIds.scope3Downstream = entry.id;
+            }
+          });
+
+          setLcaDbIds(dbIds);
+
+          // Also update emissionData
+          setEmissionData(prev => ({
+            ...prev,
+            scope1: {
+              fuel: [],
+              refrigerant: [],
+              passengerVehicle: [],
+              deliveryVehicle: [],
+            },
+            scope2: [],
+            scope3: [
+              ...prev.scope3.filter(r => !r.category?.startsWith('lca_')),
+              ...lcaData.map(entry => ({
+                id: entry.id,
+                dbId: entry.id,
+                category: `lca_${entry.scope_type.replace('scope3_', '')}` as any,
+                activity: `LCA: ${entry.scope_type === 'scope1' ? 'Scope 1' : entry.scope_type === 'scope2' ? 'Scope 2' : entry.scope_type === 'scope3_upstream' ? 'Scope 3 Upstream' : 'Scope 3 Downstream'} Emissions`,
+                unit: entry.unit,
+                quantity: entry.emissions,
+                emissions: entry.emissions,
+                isExisting: true,
+              }))
+            ]
+          }));
+        }
+      } catch (error: any) {
+        console.error('Error loading LCA data:', error);
+        // Don't show error toast on initial load, just continue with empty form
+      }
+    };
+
+    loadExistingLCA();
+  }, [user, companyContext, counterpartyId]);
 
   const handleInitialAnswer = (answer: boolean) => {
     setIsAnimating(true);
@@ -119,7 +217,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
     },
   ];
 
-  const handleStepSubmit = (stepIndex: number) => {
+  const handleStepSubmit = async (stepIndex: number) => {
     const step = steps[stepIndex];
     const value = parseFloat(String(step.value)) || 0;
     
@@ -133,24 +231,86 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
     }
 
     setIsAnimating(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsAnimating(false);
       if (stepIndex < steps.length - 1) {
         setCurrentStep(stepIndex + 1);
       } else {
         // Save all data and show summary
-        saveAllData();
+        await saveAllData();
         setShowSummary(true);
       }
     }, 400);
   };
 
-  const saveAllData = () => {
+  const saveAllData = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
+      return;
+    }
+
     const scope1 = parseFloat(String(scope1Emissions)) || 0;
     const scope2 = parseFloat(String(scope2Emissions)) || 0;
     const upstream = parseFloat(String(scope3Upstream)) || 0;
     const downstream = parseFloat(String(scope3Downstream)) || 0;
 
+    setSaving(true);
+    try {
+      const entries = [
+        { scope_type: 'scope1', emissions: scope1, dbId: lcaDbIds.scope1 },
+        { scope_type: 'scope2', emissions: scope2, dbId: lcaDbIds.scope2 },
+        { scope_type: 'scope3_upstream', emissions: upstream, dbId: lcaDbIds.scope3Upstream },
+        { scope_type: 'scope3_downstream', emissions: downstream, dbId: lcaDbIds.scope3Downstream },
+      ];
+
+      const newEntries = entries.filter(e => !e.dbId && e.emissions > 0);
+      const existingEntries = entries.filter(e => e.dbId && e.emissions > 0);
+
+      // Insert new entries
+      if (newEntries.length > 0) {
+        const payload = newEntries.map(e => ({
+          user_id: user.id,
+          counterparty_id: companyContext ? counterpartyId : null,
+          scope_type: e.scope_type,
+          emissions: e.emissions,
+          unit: 'kg CO2e',
+          calculation_mode: 'direct_lca',
+        }));
+
+        const { data: insertedData, error: insertError } = await supabase
+          .from('scope3_lca_entries')
+          .insert(payload)
+          .select('id, scope_type');
+
+        if (insertError) throw insertError;
+
+        // Update dbIds with newly inserted IDs
+        if (insertedData) {
+          const newDbIds = { ...lcaDbIds };
+          insertedData.forEach(entry => {
+            if (entry.scope_type === 'scope1') newDbIds.scope1 = entry.id;
+            else if (entry.scope_type === 'scope2') newDbIds.scope2 = entry.id;
+            else if (entry.scope_type === 'scope3_upstream') newDbIds.scope3Upstream = entry.id;
+            else if (entry.scope_type === 'scope3_downstream') newDbIds.scope3Downstream = entry.id;
+          });
+          setLcaDbIds(newDbIds);
+        }
+      }
+
+      // Update existing entries
+      if (existingEntries.length > 0) {
+        const updates = existingEntries.map(e => 
+          supabase
+            .from('scope3_lca_entries')
+            .update({ emissions: e.emissions })
+            .eq('id', e.dbId!)
+        );
+        const results = await Promise.all(updates);
+        const updateError = results.find(r => r.error)?.error;
+        if (updateError) throw updateError;
+      }
+
+      // Update emissionData
     setEmissionData(prev => ({
       ...prev,
       scope1: {
@@ -162,38 +322,16 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
       scope2: [],
       scope3: [
         ...prev.scope3.filter(r => !r.category?.startsWith('lca_')),
-        {
-          id: 'lca-scope1',
-          category: 'lca_scope1',
-          activity: 'LCA: Scope 1 Emissions',
+          ...entries.map(e => ({
+            id: e.dbId || crypto.randomUUID(),
+            dbId: e.dbId,
+            category: `lca_${e.scope_type.replace('scope3_', '')}` as any,
+            activity: `LCA: ${e.scope_type === 'scope1' ? 'Scope 1' : e.scope_type === 'scope2' ? 'Scope 2' : e.scope_type === 'scope3_upstream' ? 'Scope 3 Upstream' : 'Scope 3 Downstream'} Emissions`,
           unit: 'kg CO2e',
-          quantity: scope1,
-          emissions: scope1,
-        },
-        {
-          id: 'lca-scope2',
-          category: 'lca_scope2',
-          activity: 'LCA: Scope 2 Emissions',
-          unit: 'kg CO2e',
-          quantity: scope2,
-          emissions: scope2,
-        },
-        {
-          id: 'lca-scope3-upstream',
-          category: 'lca_upstream',
-          activity: 'LCA: Scope 3 Upstream Emissions',
-          unit: 'kg CO2e',
-          quantity: upstream,
-          emissions: upstream,
-        },
-        {
-          id: 'lca-scope3-downstream',
-          category: 'lca_downstream',
-          activity: 'LCA: Scope 3 Downstream Emissions',
-          unit: 'kg CO2e',
-          quantity: downstream,
-          emissions: downstream,
-        }
+            quantity: e.emissions,
+            emissions: e.emissions,
+            isExisting: !!e.dbId,
+          }))
       ]
     }));
 
@@ -201,6 +339,75 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
       title: 'LCA Data Saved',
       description: 'All emissions data has been saved successfully.',
     });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save LCA data',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      // Delete all LCA entries from database
+      let deleteQuery = supabase
+        .from('scope3_lca_entries')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (companyContext && counterpartyId) {
+        deleteQuery = deleteQuery.eq('counterparty_id', counterpartyId);
+      } else {
+        deleteQuery = deleteQuery.is('counterparty_id', null);
+      }
+
+      const { error } = await deleteQuery;
+      if (error) throw error;
+
+      // Reset all state
+      setScope1Emissions('');
+      setScope2Emissions('');
+      setScope3Upstream('');
+      setScope3Downstream('');
+      setLcaDbIds({});
+      setShowSummary(false);
+      setCurrentStep(-1); // Always go back to initial question
+      setEditingScope(null);
+
+      // Clear emissionData
+      setEmissionData(prev => ({
+        ...prev,
+        scope1: {
+          fuel: [],
+          refrigerant: [],
+          passengerVehicle: [],
+          deliveryVehicle: [],
+        },
+        scope2: [],
+        scope3: prev.scope3.filter(r => !r.category?.startsWith('lca_')),
+      }));
+
+      toast({
+        title: 'Reset Complete',
+        description: 'All LCA data has been cleared. You can start over.',
+      });
+
+      setShowResetDialog(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reset LCA data',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = (scopeId: string) => {
@@ -353,11 +560,22 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
           </Card>
         </div>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         <div 
-          className="flex justify-center pt-4 animate-in fade-in duration-700"
+          className="flex flex-col sm:flex-row justify-center gap-4 pt-4 animate-in fade-in duration-700"
           style={{ animationDelay: '1s' }}
         >
+          <Button
+            onClick={() => setShowResetDialog(true)}
+            variant="outline"
+            className="px-8 py-6 text-lg font-semibold rounded-xl border-2 border-red-300 hover:border-red-400 text-red-600 hover:text-red-700 hover:bg-red-50 shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105"
+            disabled={saving}
+          >
+            <div className="flex items-center gap-3">
+              <RotateCcw className="h-5 w-5" />
+              <span>Reset & Start Over</span>
+            </div>
+          </Button>
           <Button
             onClick={() => {
               navigate('/dashboard');
@@ -371,6 +589,29 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
             </div>
           </Button>
         </div>
+
+        {/* Reset Confirmation Dialog */}
+        <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset LCA Data?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete all your LCA emissions data and reset the questionnaire. 
+                You will need to start from the beginning. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleReset}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={saving}
+              >
+                {saving ? 'Resetting...' : 'Yes, Reset All Data'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -533,10 +774,10 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
             </div>
           </Button>
           <Button
-            onClick={() => {
+            onClick={async () => {
               if (isEditing) {
                 // Save and return to summary
-                saveAllData();
+                await saveAllData();
                 setEditingScope(null);
                 setShowSummary(true);
                 toast({
@@ -547,7 +788,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                 handleStepSubmit(currentStep);
               }
             }}
-            disabled={currentStepData.value === '' || parseFloat(String(currentStepData.value)) < 0}
+            disabled={saving || currentStepData.value === '' || parseFloat(String(currentStepData.value)) < 0}
             className={`flex-1 bg-gradient-to-r ${currentStepData.color} hover:opacity-90 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
           >
             <div className="flex items-center justify-center gap-3">

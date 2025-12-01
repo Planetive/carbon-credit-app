@@ -1531,6 +1531,232 @@ export interface Database {
           }
         ]
       }
+      // --- Custom Scope 3 tables (manually added for typing) ---
+      scope3_upstream_transportation: {
+        Row: {
+          id: string
+          user_id: string
+          counterparty_id: string | null
+          vehicle_type_id: string
+          vehicle_type_name: string | null
+          distance: number | null
+          weight: number | null
+          emission_factor: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          counterparty_id?: string | null
+          vehicle_type_id: string
+          vehicle_type_name?: string | null
+          distance: number
+          weight: number
+          emission_factor?: number | null
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          counterparty_id?: string | null
+          vehicle_type_id?: string
+          vehicle_type_name?: string | null
+          distance?: number
+          weight?: number
+          emission_factor?: number | null
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      scope3_downstream_transportation: {
+        Row: {
+          id: string | number
+          user_id: string
+          counterparty_id: string | null
+          vehicle_type_id: string
+          vehicle_type_name: string | null
+          distance: number | null
+          weight: number | null
+          emission_factor: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | number
+          user_id: string
+          counterparty_id?: string | null
+          vehicle_type_id: string
+          vehicle_type_name?: string | null
+          distance: number
+          weight: number
+          emission_factor?: number | null
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string | number
+          user_id?: string
+          counterparty_id?: string | null
+          vehicle_type_id?: string
+          vehicle_type_name?: string | null
+          distance?: number
+          weight?: number
+          emission_factor?: number | null
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      scope3_waste_generated: {
+        Row: {
+          id: string | number
+          user_id: string
+          counterparty_id: string | null
+          material_id: string
+          material_name: string | null
+          volume: number | null
+          disposal_method: string | null
+          emission_factor: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | number
+          user_id: string
+          counterparty_id?: string | null
+          material_id: string
+          material_name?: string | null
+          volume: number
+          disposal_method: string
+          emission_factor?: number | null
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string | number
+          user_id?: string
+          counterparty_id?: string | null
+          material_id?: string
+          material_name?: string | null
+          volume?: number
+          disposal_method?: string
+          emission_factor?: number | null
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      scope3_business_travel: {
+        Row: {
+          id: string | number
+          user_id: string
+          counterparty_id: string | null
+          travel_type_id: string
+          distance: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | number
+          user_id: string
+          counterparty_id?: string | null
+          travel_type_id: string
+          distance: number
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string | number
+          user_id?: string
+          counterparty_id?: string | null
+          travel_type_id?: string
+          distance?: number
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      scope3_employee_commuting: {
+        Row: {
+          id: string | number
+          user_id: string
+          counterparty_id: string | null
+          travel_type_id: string
+          distance: number | null
+          number_of_employees: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | number
+          user_id: string
+          counterparty_id?: string | null
+          travel_type_id: string
+          distance: number
+          number_of_employees: number
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string | number
+          user_id?: string
+          counterparty_id?: string | null
+          travel_type_id?: string
+          distance?: number
+          number_of_employees?: number
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      scope3_end_of_life_treatment: {
+        Row: {
+          id: string | number
+          user_id: string
+          counterparty_id: string | null
+          material_id: string
+          material_name: string | null
+          volume: number | null
+          disposal_method: string | null
+          recycle_percentage: number | null
+          composition: string | null
+          emission_factor: number | null
+          emissions: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | number
+          user_id: string
+          counterparty_id?: string | null
+          material_id: string
+          material_name?: string | null
+          volume: number
+          disposal_method: string
+          recycle_percentage?: number | null
+          composition?: string | null
+          emission_factor?: number | null
+          emissions: number
+          created_at?: string
+        }
+        Update: {
+          id?: string | number
+          user_id?: string
+          counterparty_id?: string | null
+          material_id?: string
+          material_name?: string | null
+          volume?: number
+          disposal_method?: string
+          recycle_percentage?: number | null
+          composition?: string | null
+          emission_factor?: number | null
+          emissions?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_user_portfolio_totals: {

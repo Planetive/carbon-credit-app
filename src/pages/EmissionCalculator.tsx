@@ -988,63 +988,168 @@ const EmissionCalculator = () => {
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300">
                 <CardContent className="p-8">
                       {activeCategory === 'purchasedGoods' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'capitalGoods' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'fuelEnergyActivities' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'upstreamTransportation' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'wasteGenerated' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'businessTravel' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'employeeCommuting' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'upstreamLeasedAssets' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'investments' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'downstreamTransportation' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'processingSoldProducts' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'useOfSoldProducts' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'endOfLifeTreatment' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'downstreamLeasedAssets' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
 
                       {activeCategory === 'franchises' && (
-                        <Scope3Section activeCategory={activeCategory} emissionData={emissionData} setEmissionData={setEmissionData} onSaveAndNext={navigateToNextCategory} />
+                        <Scope3Section 
+                          activeCategory={activeCategory} 
+                          emissionData={emissionData} 
+                          setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
                       )}
                 </CardContent>
               </Card>
