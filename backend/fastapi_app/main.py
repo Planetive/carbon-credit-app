@@ -14,6 +14,7 @@ from .scenario_engine import ScenarioEngine
 from .database import test_connection, get_supabase_client
 from .finance_models import CompanyType
 import logging
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -22,10 +23,31 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Finance Emission Service", version="0.1.0")
 
-# Allow local dev from typical ports; tighten in prod
+# CORS configuration - allow frontend domain and local development
+# When allow_credentials=True, you cannot use allow_origins=["*"]
+# Must specify exact origins
+# Can be overridden with ALLOWED_ORIGINS environment variable (comma-separated)
+default_origins = [
+    "https://www.rethinkcarbon.io",
+    "https://rethinkcarbon.io",
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:3000",  # Alternative dev port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+
+# Get allowed origins from environment variable or use defaults
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+else:
+    allowed_origins = default_origins
+
+logger.info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
