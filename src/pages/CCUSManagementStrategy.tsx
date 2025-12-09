@@ -28,6 +28,9 @@ function normalizeCountryName(name: string) {
     "Canada": "Canada",
     "Australia": "Australia",
     "South Africa": "South Africa",
+    "United States": "United States",
+    "USA": "United States",
+    "US": "United States",
   };
   return map[name.trim()] || name.trim();
 }
@@ -49,18 +52,68 @@ function getCountryCode(country: string) {
 // Helper to render text as a list if it contains bullet points or newlines
 function renderTextAsListOrParagraph(text: string | null) {
   if (!text) return <span className="text-gray-500">N/A</span>;
-  if (text.includes('•')) {
-    const lines = text
-      .split('•')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-    return (
-      <ul className="list-disc pl-6 space-y-2 text-gray-700">
-        {lines.map((line, idx) => <li key={idx} className="leading-relaxed">{line}</li>)}
-      </ul>
-    );
-  }
-  return <p className="text-gray-700 leading-relaxed">{text}</p>;
+  
+  // Split by double newlines to separate sections
+  const sections = text.split(/\n\s*\n/).filter(section => section.trim().length > 0);
+  
+  return (
+    <div className="space-y-4 text-gray-700">
+      {sections.map((section, sectionIdx) => {
+        const trimmedSection = section.trim();
+        
+        // Check if section starts with a letter followed by a period (a., b., c., etc.)
+        const isSectionHeader = /^[a-z]\.\s/.test(trimmedSection);
+        
+        if (isSectionHeader) {
+          // Split section header from content
+          const lines = trimmedSection.split('\n');
+          const header = lines[0];
+          const content = lines.slice(1).join('\n').trim();
+          
+          return (
+            <div key={sectionIdx} className="space-y-2">
+              <p className="font-semibold text-gray-900 leading-relaxed">{header}</p>
+              {content && content.includes('•') ? (
+                <ul className="list-disc pl-6 space-y-2 text-gray-700">
+                  {content
+                    .split('•')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map((line, idx) => (
+                      <li key={idx} className="leading-relaxed">{line}</li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="text-gray-700 leading-relaxed pl-4">{content}</p>
+              )}
+            </div>
+          );
+        }
+        
+        // If section contains bullet points, render as list
+        if (trimmedSection.includes('•')) {
+          const lines = trimmedSection
+            .split('•')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+          return (
+            <ul key={sectionIdx} className="list-disc pl-6 space-y-2 text-gray-700">
+              {lines.map((line, idx) => (
+                <li key={idx} className="leading-relaxed">{line}</li>
+              ))}
+            </ul>
+          );
+        }
+        
+        // Otherwise render as paragraph
+        return (
+          <p key={sectionIdx} className="text-gray-700 leading-relaxed">
+            {trimmedSection}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 const statusColors: Record<string, { bg: string; text: string; icon: any }> = {

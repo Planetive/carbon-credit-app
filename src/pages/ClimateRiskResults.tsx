@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, 
   BarChart3, 
@@ -17,11 +18,15 @@ import {
   Eye
 } from 'lucide-react';
 import { type ScenarioResult } from './scenario-building/types';
+import { exportClimateRiskReport, exportTCFDReport } from '@/utils/climateRiskPDFExport';
 
 const ClimateRiskResults: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [openModal, setOpenModal] = useState<'topExposures' | 'sector' | 'assetClass' | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isExportingTCFD, setIsExportingTCFD] = useState(false);
   
   // Get results data from navigation state
   const results = location.state?.results as ScenarioResult | undefined;
@@ -50,9 +55,48 @@ const ClimateRiskResults: React.FC = () => {
     return new Intl.NumberFormat('en-US').format(num);
   };
 
-  const handleExportReport = () => {
-    // TODO: Implement PDF export functionality
-    console.log('Exporting TCFD report...');
+  const handleExportReport = async () => {
+    if (!results) return;
+    
+    setIsExporting(true);
+    try {
+      await exportClimateRiskReport(results, portfolioEntries, selectedScenario);
+      toast({
+        title: 'Report Generated',
+        description: 'Climate Risk Report has been downloaded successfully.',
+      });
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to generate report. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportTCFDReport = async () => {
+    if (!results) return;
+    
+    setIsExportingTCFD(true);
+    try {
+      await exportTCFDReport(results, portfolioEntries, selectedScenario);
+      toast({
+        title: 'TCFD Report Generated',
+        description: 'TCFD Climate Risk Disclosure Report has been downloaded successfully.',
+      });
+    } catch (error) {
+      console.error('Error exporting TCFD report:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to generate TCFD report. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExportingTCFD(false);
+    }
   };
 
 
@@ -64,7 +108,7 @@ const ClimateRiskResults: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg">
                 <BarChart3 className="h-8 w-8 text-white" />
               </div>
               <div>
@@ -88,10 +132,11 @@ const ClimateRiskResults: React.FC = () => {
               </Button>
               <Button
                 onClick={handleExportReport}
-                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isExporting}
+                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Download className="h-4 w-4" />
-                <span>Export Report</span>
+                <span>{isExporting ? 'Generating...' : 'Export Report'}</span>
               </Button>
             </div>
           </div>
@@ -492,11 +537,12 @@ const ClimateRiskResults: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button 
-                  onClick={handleExportReport}
-                  className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  onClick={handleExportTCFDReport}
+                  disabled={isExportingTCFD}
+                  className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white"
                 >
                   <FileText className="h-4 w-4" />
-                  <span>Export TCFD Report</span>
+                  <span>{isExportingTCFD ? 'Generating...' : 'Export TCFD Report'}</span>
                 </Button>
                 <Button 
                   variant="outline"

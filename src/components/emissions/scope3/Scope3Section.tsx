@@ -75,6 +75,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     id: `psp-${Date.now()}-${Math.random()}`,
     processingActivity: '',
     factorType: undefined,
+    combustionType: undefined,
+    stationaryMainFuelType: undefined,
+    stationarySubFuelType: undefined,
+    stationaryCo2Factor: undefined,
+    stationaryUnit: undefined,
+    mobileFuelType: undefined,
+    mobileKgCo2PerUnit: undefined,
+    mobileUnit: undefined,
+    heatSteamType: undefined,
+    heatSteamKgCo2e: undefined,
+    heatSteamUnit: undefined,
     type: undefined,
     fuel: undefined,
     unit: undefined,
@@ -95,11 +106,47 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     energyConsumption: '',
     quantity: undefined,
     emissions: undefined,
+    combustionType: undefined,
+    stationaryMainFuelType: undefined,
+    stationarySubFuelType: undefined,
+    stationaryCo2Factor: undefined,
+    stationaryUnit: undefined,
+    mobileFuelType: undefined,
+    mobileKgCo2PerUnit: undefined,
+    mobileUnit: undefined,
+    stationaryQuantity: undefined,
+    mobileQuantity: undefined,
+    hybridFuelType: undefined,
+    hybridFuel: undefined,
+    hybridFuelUnit: undefined,
+    hybridFuelQuantity: undefined,
+    hybridFuelFactor: undefined,
+    hybridFuelEmissions: undefined,
+    hybridTotalKwh: undefined,
+    hybridGridPct: undefined,
+    hybridRenewablePct: undefined,
+    hybridOtherPct: undefined,
+    hybridGridCountry: undefined,
+    hybridOtherSources: [],
+    electricityTotalKwh: undefined,
+    electricityGridPct: undefined,
+    electricityRenewablePct: undefined,
+    electricityOtherPct: undefined,
+    electricityGridCountry: undefined,
+    electricityOtherSources: [],
+    refrigerantType: undefined,
+    refrigerantFactor: undefined,
+    coolingRefrigerantQuantity: undefined,
+    gasMachineryFuelType: undefined,
+    gasMachineryFuel: undefined,
+    gasMachineryUnit: undefined,
+    gasMachineryQuantity: undefined,
+    gasMachineryFactor: undefined,
   });
 
   // Reset state when switching away from downstream products
   useEffect(() => {
-    if (activeCategory !== 'processingSoldProducts' && activeCategory !== 'useOfSoldProducts') {
+    if (activeCategory !== 'processingUseOfSoldProducts') {
       setProductType(null);
       setProcessingRows([]);
       setUseRows([]);
@@ -111,6 +158,359 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [wasteMaterials, setWasteMaterials] = useState<WasteMaterial[]>([]);
   const [businessTravelTypes, setBusinessTravelTypes] = useState<BusinessTravelType[]>([]);
+  
+  // Combustion tables data
+  const [stationaryCombustionData, setStationaryCombustionData] = useState<Array<{
+    id: string | number;
+    'Main Fuel Type': string;
+    'Sub Fuel Type': string;
+    'CO2 Factor': number;
+    'Units': string;
+  }>>([]);
+  const [mobileCombustionData, setMobileCombustionData] = useState<Array<{
+    id: string | number;
+    'FuelType': string;
+    'kg CO2 per unit': number;
+    'Unit': string;
+  }>>([]);
+  
+  // Heat and Steam data
+  const [heatSteamData, setHeatSteamData] = useState<Array<{
+    id: string | number;
+    'Type': string;
+    'Unit': string;
+    'kg CO₂e': number;
+  }>>([]);
+  
+  // Load combustion tables data
+  useEffect(() => {
+    const loadCombustionData = async () => {
+      if (activeCategory !== 'processingUseOfSoldProducts') return;
+      
+      try {
+        // Try different possible table names
+        let stationaryData: any = null;
+        let stationaryError: any = null;
+        
+        // Try with space first (most likely based on user's image)
+        let result = await supabase
+          .from('Stationary Combustion' as any)
+          .select('*', { count: 'exact' });
+        
+        console.log('Query result for "Stationary Combustion":', {
+          data: result.data,
+          error: result.error,
+          count: result.count,
+          status: result.status,
+          statusText: result.statusText
+        });
+        
+        // If we get a count but no data, that's strange
+        if (result.count !== null && result.count > 0 && (!result.data || result.data.length === 0)) {
+          console.error('INCONSISTENCY: Count says', result.count, 'rows but data array is empty!');
+        }
+        
+        if (result.error) {
+          console.log('Tried "Stationary Combustion", got error:', result.error);
+          // Try with quotes around table name
+          result = await supabase
+            .from('"Stationary Combustion"' as any)
+            .select('*', { count: 'exact' });
+          
+          if (result.error) {
+            console.log('Tried quoted "Stationary Combustion", got error:', result.error);
+            // Try with underscore
+            result = await supabase
+              .from('stationary_combustion' as any)
+              .select('*', { count: 'exact' });
+            
+            if (result.error) {
+              console.log('Tried "stationary_combustion", got error:', result.error);
+              // Try camelCase
+              result = await supabase
+                .from('StationaryCombustion' as any)
+                .select('*', { count: 'exact' });
+            }
+          }
+        }
+        
+        stationaryData = result.data;
+        stationaryError = result.error;
+        
+        // If no error but no data, check if it's an RLS issue
+        if (!stationaryError && (!stationaryData || stationaryData.length === 0)) {
+          console.warn('Query succeeded but returned 0 rows. Possible causes:');
+          console.warn('1. Table is empty - add some test data');
+          console.warn('2. RLS policies are blocking access - check Supabase RLS settings');
+          console.warn('3. Table name might be in a different schema');
+          
+          // Try a count query to see if RLS is the issue
+          const countResult = await supabase
+            .from('Stationary Combustion' as any)
+            .select('*', { count: 'exact', head: true });
+          
+          console.log('Count query result:', countResult);
+          if (countResult.count !== null && countResult.count > 0) {
+            console.error('RLS ISSUE DETECTED: Table has', countResult.count, 'rows but SELECT returns 0. RLS policies are blocking access!');
+            toast({
+              title: "RLS Policy Issue",
+              description: `Table has ${countResult.count} rows but RLS is blocking access. Please check Supabase RLS policies for "Stationary Combustion" table.`,
+              variant: "destructive",
+            });
+          } else if (countResult.count === 0) {
+            console.warn('Table is empty - no rows found');
+            toast({
+              title: "Empty Table",
+              description: "The Stationary Combustion table is empty. Please add data to the table.",
+              variant: "default",
+            });
+          }
+        }
+        
+        if (stationaryError) {
+          console.error('Stationary Combustion error:', stationaryError);
+          console.error('Error details:', JSON.stringify(stationaryError, null, 2));
+          // Don't throw, just log - might be RLS or empty table
+          toast({
+            title: "Warning",
+            description: `Could not load Stationary Combustion data: ${stationaryError.message || 'Unknown error'}. Check if table has data and RLS policies.`,
+            variant: "destructive",
+          });
+        }
+        
+        console.log('Stationary Combustion data received:', stationaryData);
+        console.log('Number of rows:', stationaryData?.length);
+        console.log('First row sample:', stationaryData?.[0]);
+        if (stationaryData?.[0]) {
+          console.log('Available keys in first row:', Object.keys(stationaryData[0]));
+          console.log('First row values:', stationaryData[0]);
+        } else {
+          console.warn('No data returned from Stationary Combustion table. Check:');
+          console.warn('1. Does the table have any rows?');
+          console.warn('2. Are RLS policies blocking access?');
+          console.warn('3. Is the table name correct?');
+        }
+        
+        // Handle different possible column name formats
+        // Note: Column name is "Sub FuelType" (no space) according to Supabase
+        const formattedStationary = (stationaryData || []).map((row: any) => {
+          // Try all possible column name variations
+          const mainFuelType = row['Main Fuel Type'] || row['main fuel type'] || row.main_fuel_type || row['main_fuel_type'] || row['MainFuelType'] || row.mainFuelType;
+          // Note: Supabase shows "Sub FuelType" (no space between Sub and FuelType)
+          const subFuelType = row['Sub FuelType'] || row['Sub Fuel Type'] || row['sub fueltype'] || row['sub fuel type'] || row.sub_fuel_type || row['sub_fuel_type'] || row['SubFuelType'] || row.subFuelType;
+          const co2Factor = row['CO2 Factor'] || row['co2 factor'] || row.co2_factor || row['co2_factor'] || row['CO2Factor'] || row.co2Factor;
+          const units = row['Units'] || row['units'] || row.units || row['units'] || row.unit || row['unit'] || row.Unit;
+          
+          return {
+            id: row.id || row.ID || row.Id,
+            'Main Fuel Type': mainFuelType,
+            'Sub Fuel Type': subFuelType, // We'll use this as the key internally
+            'CO2 Factor': typeof co2Factor === 'number' ? co2Factor : parseFloat(co2Factor) || 0,
+            'Units': units,
+          };
+        }).filter(row => row['Main Fuel Type']); // Filter out rows without main fuel type
+        
+        console.log('Formatted Stationary data:', formattedStationary);
+        console.log('Unique Main Fuel Types:', Array.from(new Set(formattedStationary.map(d => d['Main Fuel Type']))));
+        setStationaryCombustionData(formattedStationary as Array<{
+          id: string | number;
+          'Main Fuel Type': string;
+          'Sub Fuel Type': string;
+          'CO2 Factor': number;
+          'Units': string;
+        }>);
+        
+        // Load Mobile Combustion table (table name: "Mobile Combustion")
+        let mobileResult = await supabase
+          .from('Mobile Combustion' as any)
+          .select('*', { count: 'exact' });
+        
+        console.log('Query result for "Mobile Combustion":', {
+          data: mobileResult.data,
+          error: mobileResult.error,
+          count: mobileResult.count,
+          status: mobileResult.status,
+          statusText: mobileResult.statusText
+        });
+        
+        // If we get a count but no data, that's strange
+        if (mobileResult.count !== null && mobileResult.count > 0 && (!mobileResult.data || mobileResult.data.length === 0)) {
+          console.error('INCONSISTENCY: Count says', mobileResult.count, 'rows but data array is empty!');
+        }
+        
+        if (mobileResult.error) {
+          console.log('Tried "Mobile Combustion", got error:', mobileResult.error);
+          // Try with quotes around table name
+          mobileResult = await supabase
+            .from('"Mobile Combustion"' as any)
+            .select('*', { count: 'exact' });
+          
+          if (mobileResult.error) {
+            console.log('Tried quoted "Mobile Combustion", got error:', mobileResult.error);
+            // Try with underscore
+            mobileResult = await supabase
+              .from('mobile_combustion' as any)
+              .select('*', { count: 'exact' });
+            
+            if (mobileResult.error) {
+              console.log('Tried "mobile_combustion", got error:', mobileResult.error);
+              // Try camelCase
+              mobileResult = await supabase
+                .from('MobileCombustion' as any)
+                .select('*', { count: 'exact' });
+            }
+          }
+        }
+        
+        const mobileData = mobileResult.data;
+        const mobileError = mobileResult.error;
+        
+        // If no error but no data, check what's happening
+        if (!mobileError && (!mobileData || mobileData.length === 0)) {
+          console.warn('Query succeeded but returned 0 rows.');
+          console.warn('Count from query:', mobileResult.count);
+          
+          if (mobileResult.count === 0) {
+            console.warn('Table is empty - no rows found in "Mobile Combustion" table');
+            toast({
+              title: "Empty Table",
+              description: "The Mobile Combustion table is empty. Please add at least one row with data in Supabase.",
+              variant: "default",
+            });
+          } else if (mobileResult.count !== null && mobileResult.count > 0) {
+            console.error('INCONSISTENCY: Count says', mobileResult.count, 'rows exist but data array is empty!');
+            toast({
+              title: "Data Access Issue",
+              description: `Table has ${mobileResult.count} rows but cannot retrieve them. Check table permissions.`,
+              variant: "destructive",
+            });
+          } else {
+            console.warn('Count is null - unable to determine row count');
+          }
+        }
+        
+        if (mobileError) {
+          console.error('Mobile Combustion error:', mobileError);
+          console.error('Error details:', JSON.stringify(mobileError, null, 2));
+          toast({
+            title: "Warning",
+            description: `Could not load Mobile Combustion data: ${mobileError.message || 'Unknown error'}. Check if table has data and RLS policies.`,
+            variant: "destructive",
+          });
+        }
+        
+        console.log('Mobile Combustion data received:', mobileData);
+        console.log('Number of rows:', mobileData?.length);
+        console.log('First row sample:', mobileData?.[0]);
+        if (mobileData?.[0]) {
+          console.log('Available keys in first row:', Object.keys(mobileData[0]));
+          console.log('First row values:', mobileData[0]);
+        } else {
+          console.warn('No data returned from Mobile Combustion table. Check:');
+          console.warn('1. Does the table have any rows?');
+          console.warn('2. Are RLS policies blocking access?');
+          console.warn('3. Is the table name correct?');
+        }
+        
+        // Handle different possible column name formats
+        // Actual column names from Supabase: "Fuel Type" (with space), "kg CO2 per unit", "Unit"
+        const formattedMobile = (mobileData || []).map((row: any) => {
+          // Try all possible column name variations - note: actual is "Fuel Type" with space (check this first!)
+          const fuelType = row['Fuel Type'] || row['FuelType'] || row.fuel_type || row['fuel_type'] || row.fuelType || row['fuelType'];
+          const kgCo2PerUnit = row['kg CO2 per unit'] || row['kg co2 per unit'] || row.kg_co2_per_unit || row['kg_co2_per_unit'] || row.kgCo2PerUnit;
+          const unit = row['Unit'] || row.unit || row['unit'] || row.Unit;
+          
+          console.log('Processing row:', { fuelType, kgCo2PerUnit, unit, rawRow: row });
+          
+          return {
+            id: row.id || row.ID || row.Id,
+            'FuelType': fuelType, // We'll use FuelType as the key internally for consistency
+            'kg CO2 per unit': typeof kgCo2PerUnit === 'number' ? kgCo2PerUnit : parseFloat(kgCo2PerUnit) || 0,
+            'Unit': unit,
+          };
+        }).filter(row => row['FuelType'] && row['FuelType'].trim() !== ''); // Filter out rows without fuel type
+        
+        console.log('Formatted Mobile data:', formattedMobile);
+        console.log('Unique Fuel Types:', Array.from(new Set(formattedMobile.map(d => d['FuelType']))));
+        setMobileCombustionData(formattedMobile as Array<{
+          id: string | number;
+          'FuelType': string;
+          'kg CO2 per unit': number;
+          'Unit': string;
+        }>);
+      } catch (error: any) {
+        console.error('Error loading combustion data:', error);
+        toast({
+          title: "Error",
+          description: `Failed to load combustion data: ${error.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadCombustionData();
+  }, [activeCategory, toast]);
+  
+  // Load Heat and Steam data
+  useEffect(() => {
+    const loadHeatSteamData = async () => {
+      if (activeCategory !== 'processingUseOfSoldProducts') return;
+      
+      try {
+        const { data: heatSteamData, error: heatSteamError } = await supabase
+          .from('heat and steam' as any)
+          .select('*', { count: 'exact' });
+        
+        console.log('Query result for "heat and steam":', {
+          data: heatSteamData,
+          error: heatSteamError,
+          count: heatSteamData?.length
+        });
+        
+        if (heatSteamError) {
+          console.error('Heat and Steam error:', heatSteamError);
+          toast({
+            title: "Warning",
+            description: `Could not load Heat and Steam data: ${heatSteamError.message || 'Unknown error'}`,
+            variant: "destructive",
+          });
+        }
+        
+        if (heatSteamData && heatSteamData.length > 0) {
+          console.log('Heat and Steam data received:', heatSteamData);
+          console.log('First row sample:', heatSteamData[0]);
+          console.log('Available keys in first row:', Object.keys(heatSteamData[0]));
+          
+          // Format the data - handle different possible column name formats
+          const formatted = heatSteamData.map((row: any) => ({
+            id: row.id || row.ID || row.Id,
+            'Type': row['Type'] || row.type || row['type'],
+            'Unit': row['Unit'] || row.unit || row['unit'],
+            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || 0),
+          }));
+          
+          console.log('Formatted Heat and Steam data:', formatted);
+          setHeatSteamData(formatted as Array<{
+            id: string | number;
+            'Type': string;
+            'Unit': string;
+            'kg CO₂e': number;
+          }>);
+        } else {
+          console.warn('No Heat and Steam data found');
+        }
+      } catch (error: any) {
+        console.error('Error loading heat and steam data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load heat and steam data",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadHeatSteamData();
+  }, [activeCategory, toast]);
   
   // Row-based state for Upstream Transportation
   const [upstreamTransportRows, setUpstreamTransportRows] = useState<UpstreamTransportRow[]>([]);
@@ -1877,7 +2277,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   // NOTE: Additional inline Downstream Transportation UI has been replaced by DownstreamTransportationSection
 
   // Processing of Sold Products / Use of Sold Products
-  if (activeCategory === 'processingSoldProducts' || activeCategory === 'useOfSoldProducts') {
+  if (activeCategory === 'processingUseOfSoldProducts') {
     const handleProductTypeSelect = (type: 'intermediate' | 'final') => {
       setIsAnimating(true);
       setTimeout(() => {
@@ -1903,7 +2303,31 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         if (r.id !== id) return r;
         const next: ProcessingSoldProductsRow = { ...r, ...patch };
 
-        // --- Fuel emissions ---
+        let fuelEmissions: number | undefined;
+
+        // --- Combustion emissions (for Heating, melting, smelting) ---
+        if (next.processingActivity === 'Heating, melting, smelting') {
+          if (next.combustionType === 'stationary') {
+            // Use Stationary Combustion data
+            next.stationaryCo2Factor = next.stationaryCo2Factor || undefined;
+            if (typeof next.quantity === 'number' && typeof next.stationaryCo2Factor === 'number') {
+              fuelEmissions = next.quantity * next.stationaryCo2Factor;
+            }
+          } else if (next.combustionType === 'mobile') {
+            // Use Mobile Combustion data
+            next.mobileKgCo2PerUnit = next.mobileKgCo2PerUnit || undefined;
+            if (typeof next.quantity === 'number' && typeof next.mobileKgCo2PerUnit === 'number') {
+              fuelEmissions = next.quantity * next.mobileKgCo2PerUnit;
+            }
+          }
+        } else if (next.processingActivity === 'Drying / Curing / Kilns') {
+          // --- Heat and Steam emissions (for Drying / Curing / Kilns) ---
+          next.heatSteamKgCo2e = next.heatSteamKgCo2e || undefined;
+          if (typeof next.quantity === 'number' && typeof next.heatSteamKgCo2e === 'number') {
+            fuelEmissions = next.quantity * next.heatSteamKgCo2e;
+          }
+        } else {
+          // --- Regular Fuel emissions (for other activities) ---
         if (next.type && next.fuel && next.unit) {
           const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
           next.factor = typeof factor === 'number' ? factor : undefined;
@@ -1911,9 +2335,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           next.factor = undefined;
         }
 
-        let fuelEmissions: number | undefined;
         if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
           fuelEmissions = next.quantity * next.factor;
+          }
         }
 
         // --- Electricity emissions (similar to Scope 2) ---
@@ -2014,15 +2438,50 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       mapRowToEntry: (r) => {
         if (!r.processingActivity) return null;
 
+        // Check for combustion emissions (Heating, melting, smelting)
+        const hasCombustion = r.processingActivity === 'Heating, melting, smelting' && 
+          r.combustionType && 
+          typeof r.quantity === "number" && r.quantity > 0 &&
+          ((r.combustionType === 'stationary' && r.stationaryCo2Factor !== undefined) ||
+           (r.combustionType === 'mobile' && r.mobileKgCo2PerUnit !== undefined));
+        
+        // Check for heat and steam emissions (Drying / Curing / Kilns)
+        const hasHeatSteam = r.processingActivity === 'Drying / Curing / Kilns' &&
+          r.heatSteamType &&
+          typeof r.quantity === "number" && r.quantity > 0 &&
+          r.heatSteamKgCo2e !== undefined;
+        
+        // Check for regular fuel emissions
         const hasFuel =
           !!r.type && !!r.fuel && !!r.unit && typeof r.quantity === "number" && r.quantity > 0;
+        
+        // Check for electricity
         const hasElectricity = typeof r.totalKwh === "number" && r.totalKwh > 0;
 
-        if (!hasFuel && !hasElectricity) return null;
+        if (!hasCombustion && !hasHeatSteam && !hasFuel && !hasElectricity) return null;
 
-        // Prefer fuel details for unit/quantity if present, otherwise electricity
-        const unit = hasFuel ? r.unit || "entry" : hasElectricity ? "kWh" : "entry";
-        const quantity = hasFuel ? (r.quantity || 1) : hasElectricity ? (r.totalKwh || 1) : 1;
+        // Determine unit and quantity based on what's available
+        let unit = "entry";
+        let quantity = 1;
+        
+        if (hasCombustion) {
+          if (r.combustionType === 'stationary') {
+            unit = r.stationaryUnit || "entry";
+            quantity = r.quantity || 1;
+          } else if (r.combustionType === 'mobile') {
+            unit = r.mobileUnit || "entry";
+            quantity = r.quantity || 1;
+          }
+        } else if (hasHeatSteam) {
+          unit = r.heatSteamUnit || "kWh";
+          quantity = r.quantity || 1;
+        } else if (hasFuel) {
+          unit = r.unit || "entry";
+          quantity = r.quantity || 1;
+        } else if (hasElectricity) {
+          unit = "kWh";
+          quantity = r.totalKwh || 1;
+        }
 
         return {
           id: r.id,
@@ -2040,17 +2499,60 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       category: "use_of_sold_products",
       rows: useRows,
       enabled: productType === "final",
-      mapRowToEntry: (r) =>
-        r.processingActivity && r.energyConsumption
-          ? {
+      mapRowToEntry: (r) => {
+        if (!r.processingActivity) return null;
+
+        // Check for combustion emissions (Internal combustion engine vehicles)
+        const hasCombustion = r.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' && 
+          ((typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0 && r.stationaryCo2Factor !== undefined) ||
+           (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0 && r.mobileKgCo2PerUnit !== undefined));
+
+        // Check for hybrid vehicle emissions (fuel or electricity)
+        const hasHybridFuel = r.processingActivity === 'Hybrid vehicles' &&
+          r.hybridFuelType && r.hybridFuel && r.hybridFuelUnit &&
+          typeof r.hybridFuelQuantity === "number" && r.hybridFuelQuantity > 0 &&
+          r.hybridFuelFactor !== undefined;
+        
+        const hasHybridElectricity = r.processingActivity === 'Hybrid vehicles' &&
+          typeof r.hybridTotalKwh === "number" && r.hybridTotalKwh > 0;
+
+        // For other activities, require energyConsumption
+        const hasOtherData = r.energyConsumption && r.energyConsumption.trim() !== '';
+
+        if (!hasCombustion && !hasHybridFuel && !hasHybridElectricity && !hasOtherData) return null;
+
+        // Determine unit and quantity based on what's available
+        let unit = "entry";
+        let quantity = 1;
+        
+        if (hasCombustion) {
+          if (typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0) {
+            unit = r.stationaryUnit || "entry";
+            quantity = r.stationaryQuantity || 1;
+          } else if (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0) {
+            unit = r.mobileUnit || "entry";
+            quantity = r.mobileQuantity || 1;
+          }
+        } else if (hasHybridFuel) {
+          unit = r.hybridFuelUnit || "entry";
+          quantity = r.hybridFuelQuantity || 1;
+        } else if (hasHybridElectricity) {
+          unit = "kWh";
+          quantity = r.hybridTotalKwh || 1;
+        } else {
+          unit = "entry";
+          quantity = r.quantity || 1;
+        }
+
+        return {
             id: r.id,
               category: "use_of_sold_products",
             activity: r.processingActivity,
-              unit: "entry",
-            quantity: r.quantity || 1,
+          unit,
+          quantity,
             emissions: r.emissions || 0,
-            }
-          : null,
+        };
+      },
       setEmissionData,
     });
 
@@ -2147,15 +2649,33 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                           'Machining / cutting / shaping',
                           'Mixing / blending (mechanical)',
                           'Forging / Foundry operations',
+                          'Material forming (molding, extrusion)',
+                          'Textile processing (dyeing, washing)',
                         ];
 
                         const shouldKeepElectricity = electricityAllowedActivities.includes(value);
+                        const isHeatingMelting = value === 'Heating, melting, smelting';
+                        const isDryingCuringKilns = value === 'Drying / Curing / Kilns';
 
                         updateProcessingRow(row.id, {
                           processingActivity: value,
-                          type: undefined,
-                          fuel: undefined,
-                          unit: undefined,
+                          // Clear combustion fields if not Heating, melting, smelting
+                          combustionType: isHeatingMelting ? row.combustionType : undefined,
+                          stationaryMainFuelType: isHeatingMelting ? row.stationaryMainFuelType : undefined,
+                          stationarySubFuelType: isHeatingMelting ? row.stationarySubFuelType : undefined,
+                          stationaryCo2Factor: isHeatingMelting ? row.stationaryCo2Factor : undefined,
+                          stationaryUnit: isHeatingMelting ? row.stationaryUnit : undefined,
+                          mobileFuelType: isHeatingMelting ? row.mobileFuelType : undefined,
+                          mobileKgCo2PerUnit: isHeatingMelting ? row.mobileKgCo2PerUnit : undefined,
+                          mobileUnit: isHeatingMelting ? row.mobileUnit : undefined,
+                          // Clear heat and steam fields if not Drying / Curing / Kilns
+                          heatSteamType: isDryingCuringKilns ? row.heatSteamType : undefined,
+                          heatSteamKgCo2e: isDryingCuringKilns ? row.heatSteamKgCo2e : undefined,
+                          heatSteamUnit: isDryingCuringKilns ? row.heatSteamUnit : undefined,
+                          // Clear regular fuel fields if Heating, melting, smelting or Drying / Curing / Kilns (uses special tables instead)
+                          type: (isHeatingMelting || isDryingCuringKilns) ? undefined : undefined,
+                          fuel: (isHeatingMelting || isDryingCuringKilns) ? undefined : undefined,
+                          unit: (isHeatingMelting || isDryingCuringKilns) ? undefined : undefined,
                           quantity: undefined,
                           factor: undefined,
                           emissions: undefined,
@@ -2191,8 +2711,366 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           </div>
                 </div>
 
-                {/* Fuel Table - shown only when a processing activity is selected that can use fuel */}
+                {/* Combustion Type Selection for Heating, melting, smelting */}
+                {row.processingActivity === 'Heating, melting, smelting' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Combustion Type</h4>
+                    <div className="mb-4">
+                      <Label className="flex items-center gap-1 mb-2">
+                        Select Combustion Type <FieldTooltip content="Choose between Stationary or Mobile Combustion" />
+                      </Label>
+                      <Select 
+                        value={row.combustionType || ''} 
+                        onValueChange={(value) => {
+                          updateProcessingRow(row.id, { 
+                            combustionType: value as 'stationary' | 'mobile',
+                            // Clear all combustion-related fields
+                            stationaryMainFuelType: undefined,
+                            stationarySubFuelType: undefined,
+                            stationaryCo2Factor: undefined,
+                            stationaryUnit: undefined,
+                            mobileFuelType: undefined,
+                            mobileKgCo2PerUnit: undefined,
+                            mobileUnit: undefined,
+                            quantity: undefined,
+                            emissions: undefined,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select combustion type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="stationary">Stationary Combustion</SelectItem>
+                          <SelectItem value="mobile">Mobile Combustion</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Stationary Combustion Fields */}
+                    {row.combustionType === 'stationary' && (
+                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
+                        {/* Debug info - remove in production */}
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {stationaryCombustionData.length} rows | 
+                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Main Fuel Type <FieldTooltip content="Select main fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationaryMainFuelType || ''} 
+                              onValueChange={(value) => {
+                                updateProcessingRow(row.id, { 
+                                  stationaryMainFuelType: value,
+                                  stationarySubFuelType: undefined,
+                                  stationaryCo2Factor: undefined,
+                                  stationaryUnit: undefined,
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select main fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  (() => {
+                                    const mainFuelTypes = Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean)));
+                                    console.log('Main Fuel Types for dropdown:', mainFuelTypes);
+                                    if (mainFuelTypes.length === 0) {
+                                      return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
+                                    }
+                                    return mainFuelTypes.map(mainType => (
+                                      <SelectItem key={mainType} value={mainType}>{mainType}</SelectItem>
+                                    ));
+                                  })()
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Sub Fuel Type <FieldTooltip content="Select sub fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationarySubFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = stationaryCombustionData.find(
+                                  d => d['Main Fuel Type'] === row.stationaryMainFuelType && d['Sub Fuel Type'] === value
+                                );
+                                console.log('Selected sub fuel type:', selected);
+                                updateProcessingRow(row.id, { 
+                                  stationarySubFuelType: value,
+                                  stationaryCo2Factor: selected?.['CO2 Factor'],
+                                  stationaryUnit: selected?.['Units'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                              disabled={!row.stationaryMainFuelType}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select sub fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData
+                                  .filter(d => d['Main Fuel Type'] === row.stationaryMainFuelType)
+                                  .map(d => {
+                                    const subType = d['Sub Fuel Type'];
+                                    return (
+                                      <SelectItem key={subType} value={subType}>
+                                        {subType}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.stationaryUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateProcessingRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.stationarySubFuelType}
+                            />
+                          </div>
+                        </div>
+                        {row.stationaryCo2Factor !== undefined && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            CO2 Factor: <span className="font-semibold">{row.stationaryCo2Factor.toFixed(6)}</span>
+                          </div>
+                        )}
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mobile Combustion Fields */}
+                    {row.combustionType === 'mobile' && (
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
+                        {/* Debug info - remove in production */}
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {mobileCombustionData.length} rows | 
+                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Fuel Type <FieldTooltip content="Select fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.mobileFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = mobileCombustionData.find(d => d['FuelType'] === value);
+                                console.log('Selected fuel type:', selected);
+                                updateProcessingRow(row.id, { 
+                                  mobileFuelType: value,
+                                  mobileKgCo2PerUnit: selected?.['kg CO2 per unit'],
+                                  mobileUnit: selected?.['Unit'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mobileCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  (() => {
+                                    const fuelTypes = mobileCombustionData.map(d => d['FuelType']).filter(Boolean);
+                                    console.log('Fuel Types for dropdown:', fuelTypes);
+                                    if (fuelTypes.length === 0) {
+                                      return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
+                                    }
+                                    return fuelTypes.map(fuelType => (
+                                      <SelectItem key={fuelType} value={fuelType}>
+                                        {fuelType}
+                                      </SelectItem>
+                                    ));
+                                  })()
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              kg CO2 per Unit <FieldTooltip content="CO2 emission factor" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileKgCo2PerUnit !== undefined ? row.mobileKgCo2PerUnit.toFixed(6) : ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateProcessingRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.mobileFuelType}
+                            />
+                          </div>
+                        </div>
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Heat and Steam Selection for Drying / Curing / Kilns */}
+                {row.processingActivity === 'Drying / Curing / Kilns' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Heat and Steam Details</h4>
+                    {/* Debug info - remove in production */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                        Data loaded: {heatSteamData.length} rows
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Heat and Steam Type <FieldTooltip content="Select heat and steam type" />
+                        </Label>
+                        <Select 
+                          value={row.heatSteamType || ''} 
+                          onValueChange={(value) => {
+                            const selected = heatSteamData.find(d => d['Type'] === value);
+                            console.log('Selected heat and steam type:', selected);
+                            updateProcessingRow(row.id, { 
+                              heatSteamType: value,
+                              heatSteamKgCo2e: selected?.['kg CO₂e'],
+                              heatSteamUnit: selected?.['Unit'],
+                              quantity: undefined,
+                              emissions: undefined,
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select heat and steam type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {heatSteamData.length === 0 ? (
+                              <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                            ) : (
+                              heatSteamData.map(d => (
+                                <SelectItem key={d['Type']} value={d['Type']}>
+                                  {d['Type']}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Unit <FieldTooltip content="Unit of measurement" />
+                        </Label>
+                        <Input
+                          type="text"
+                          value={row.heatSteamUnit || ''}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Quantity (kWh) <FieldTooltip content="Enter quantity in kWh" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="Enter quantity"
+                          value={row.quantity ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateProcessingRow(row.id, { quantity: value });
+                          }}
+                          disabled={!row.heatSteamType}
+                        />
+                      </div>
+                    </div>
+                    {row.heatSteamKgCo2e !== undefined && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        CO₂e Factor: <span className="font-semibold">{row.heatSteamKgCo2e.toFixed(6)} kg CO₂e/kWh</span>
+                      </div>
+                    )}
+                    {row.emissions !== undefined && (
+                      <div className="mt-2 text-sm text-gray-700 font-medium">
+                        Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO₂e</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Fuel Table - shown only when a processing activity is selected that can use fuel (but not Heating, melting, smelting or Drying / Curing / Kilns) */}
                 {row.processingActivity &&
+                 row.processingActivity !== 'Heating, melting, smelting' &&
+                 row.processingActivity !== 'Drying / Curing / Kilns' &&
                  row.processingActivity !== 'Machining / cutting / shaping' &&
                  row.processingActivity !== 'Mixing / blending (mechanical)' && (
                   <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
@@ -2304,7 +3182,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                 {/* Electricity Factor - Full Scope 2 Electricity Form */}
                 {(row.processingActivity === 'Machining / cutting / shaping' ||
                   row.processingActivity === 'Mixing / blending (mechanical)' ||
-                  row.processingActivity === 'Forging / Foundry operations') && (
+                  row.processingActivity === 'Forging / Foundry operations' ||
+                  row.processingActivity === 'Material forming (molding, extrusion)' ||
+                  row.processingActivity === 'Textile processing (dyeing, washing)') && (
                   <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
                     <h4 className="text-sm font-semibold text-gray-900 mb-3">Electricity Details</h4>
                     
@@ -2584,6 +3464,340 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     // Use of Sold Products Form (Final)
     if (productType === 'final') {
+      // Helper function to get grid factor
+      const getGridFactor = (country?: 'UAE' | 'Pakistan') => (country ? SCOPE2_FACTORS.GridCountries?.[country] : undefined);
+
+      // Update function for use rows (with combustion and hybrid calculations)
+      const updateUseRow = (id: string, patch: Partial<UseOfSoldProductsRow>) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== id) return r;
+          const next: UseOfSoldProductsRow = { ...r, ...patch };
+
+          let emissions: number | undefined;
+
+          // --- Combustion emissions (for Internal combustion engine vehicles, Sold fuels, Boilers) ---
+          if (
+            next.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' ||
+            next.processingActivity === 'Sold fuels (LPG, petrol, diesel)' ||
+            next.processingActivity === 'Boilers, stoves, heaters (gas-based)'
+          ) {
+            // For Internal combustion engine vehicles, calculate both stationary and mobile
+          if (next.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)') {
+              // Calculate stationary emissions
+              let stationaryEmissions: number | undefined;
+              if (typeof next.stationaryQuantity === 'number' && typeof next.stationaryCo2Factor === 'number') {
+                stationaryEmissions = next.stationaryQuantity * next.stationaryCo2Factor;
+              }
+              
+              // Calculate mobile emissions
+              let mobileEmissions: number | undefined;
+              if (typeof next.mobileQuantity === 'number' && typeof next.mobileKgCo2PerUnit === 'number') {
+                mobileEmissions = next.mobileQuantity * next.mobileKgCo2PerUnit;
+              }
+              
+              // Total emissions = stationary + mobile (if both are present)
+              const totalEmissions =
+                (typeof stationaryEmissions === 'number' ? stationaryEmissions : 0) +
+                (typeof mobileEmissions === 'number' ? mobileEmissions : 0);
+              
+              emissions =
+                typeof stationaryEmissions === 'number' || typeof mobileEmissions === 'number'
+                  ? Number(totalEmissions.toFixed(6))
+                  : undefined;
+            } else {
+              // For other activities, use the original logic with combustionType
+            if (next.combustionType === 'stationary') {
+              // Use Stationary Combustion data
+              next.stationaryCo2Factor = next.stationaryCo2Factor || undefined;
+              if (typeof next.quantity === 'number' && typeof next.stationaryCo2Factor === 'number') {
+                emissions = next.quantity * next.stationaryCo2Factor;
+              }
+            } else if (next.combustionType === 'mobile') {
+              // Use Mobile Combustion data
+              next.mobileKgCo2PerUnit = next.mobileKgCo2PerUnit || undefined;
+              if (typeof next.quantity === 'number' && typeof next.mobileKgCo2PerUnit === 'number') {
+                emissions = next.quantity * next.mobileKgCo2PerUnit;
+                }
+              }
+            }
+          } else if (next.processingActivity === 'Hybrid vehicles') {
+            // --- Hybrid vehicles: Scope 1 fuel emissions ---
+            let fuelEmissions: number | undefined;
+            if (next.hybridFuelType && next.hybridFuel && next.hybridFuelUnit) {
+              const factor = FACTORS[next.hybridFuelType]?.[next.hybridFuel]?.[next.hybridFuelUnit];
+              next.hybridFuelFactor = typeof factor === 'number' ? factor : undefined;
+            } else {
+              next.hybridFuelFactor = undefined;
+            }
+
+            if (typeof next.hybridFuelQuantity === 'number' && typeof next.hybridFuelFactor === 'number') {
+              fuelEmissions = next.hybridFuelQuantity * next.hybridFuelFactor;
+              next.hybridFuelEmissions = Number(fuelEmissions.toFixed(6));
+            } else {
+              next.hybridFuelEmissions = undefined;
+            }
+
+            // --- Hybrid vehicles: Scope 2 electricity emissions ---
+            let electricityEmissions: number | undefined;
+            if (next.hybridTotalKwh) {
+              const gridFactor = getGridFactor(next.hybridGridCountry);
+              const gridPart = next.hybridGridPct && gridFactor ? (next.hybridGridPct / 100) * next.hybridTotalKwh * gridFactor : 0;
+              const renewablePart = 0; // Renewable is always 0
+              const otherEmissions = (next.hybridOtherSources || []).reduce((sum, s) => sum + (s.emissions || 0), 0);
+              const otherPart =
+                next.hybridOtherPct && next.hybridOtherPct > 0
+                  ? (next.hybridOtherPct / 100) * next.hybridTotalKwh * (otherEmissions / (next.hybridTotalKwh || 1))
+                  : 0;
+              electricityEmissions = gridPart + renewablePart + otherPart;
+            }
+
+            // Total emissions = fuel + electricity (whichever are present)
+            const totalEmissions =
+              (typeof fuelEmissions === 'number' ? fuelEmissions : 0) +
+              (typeof electricityEmissions === 'number' ? electricityEmissions : 0);
+
+            emissions =
+              typeof fuelEmissions === 'number' || typeof electricityEmissions === 'number'
+                ? Number(totalEmissions.toFixed(6))
+                : undefined;
+          } else if (
+            next.processingActivity === 'Electronics (laptops, TVs, phones)' ||
+            next.processingActivity === 'Electric machinery/equipment' ||
+            next.processingActivity === 'Batteries' ||
+            next.processingActivity === 'Water-using devices' ||
+            next.processingActivity === 'Electric vehicles (cars, 2-wheelers, buses)' ||
+            next.processingActivity === 'Home appliances (ACs, fridges, fans, microwaves)'
+          ) {
+            // --- Electricity emissions for electronics categories (Scope 2 style) ---
+            let electricityEmissions: number | undefined;
+            if (next.electricityTotalKwh) {
+              const gridFactor = getGridFactor(next.electricityGridCountry);
+              const gridPart = next.electricityGridPct && gridFactor ? (next.electricityGridPct / 100) * next.electricityTotalKwh * gridFactor : 0;
+              const renewablePart = 0; // Renewable is always 0
+              let otherPart = 0;
+              if (next.electricityOtherPct && next.electricityOtherPct > 0 && (next.electricityOtherSources || []).length > 0) {
+                const sumOtherEmissions = (next.electricityOtherSources || []).reduce((sum, s) => sum + (s.emissions || 0), 0);
+                otherPart = (next.electricityOtherPct / 100) * next.electricityTotalKwh * sumOtherEmissions;
+              }
+              electricityEmissions = gridPart + renewablePart + otherPart;
+            }
+            emissions = electricityEmissions !== undefined ? Number(electricityEmissions.toFixed(6)) : undefined;
+          } else if (next.processingActivity === 'Refrigerants sold') {
+            // --- Refrigerant emissions (Scope 1 style) ---
+            if (next.refrigerantType) {
+              const factor = REFRIGERANT_FACTORS[next.refrigerantType];
+              next.refrigerantFactor = typeof factor === 'number' ? factor : undefined;
+            } else {
+              next.refrigerantFactor = undefined;
+            }
+            if (typeof next.quantity === 'number' && typeof next.refrigerantFactor === 'number') {
+              emissions = Number((next.quantity * next.refrigerantFactor).toFixed(6));
+            } else {
+              emissions = undefined;
+            }
+          } else if (next.processingActivity === 'Cooling products (AC, refrigeration)') {
+            // --- Cooling products: Scope 2 electricity emissions ---
+            let electricityEmissions: number | undefined;
+            if (next.electricityTotalKwh) {
+              const gridFactor = getGridFactor(next.electricityGridCountry);
+              const gridPart = next.electricityGridPct && gridFactor ? (next.electricityGridPct / 100) * next.electricityTotalKwh * gridFactor : 0;
+              const renewablePart = 0; // Renewable is always 0
+              let otherPart = 0;
+              if (next.electricityOtherPct && next.electricityOtherPct > 0 && (next.electricityOtherSources || []).length > 0) {
+                const sumOtherEmissions = (next.electricityOtherSources || []).reduce((sum, s) => sum + (s.emissions || 0), 0);
+                otherPart = (next.electricityOtherPct / 100) * next.electricityTotalKwh * sumOtherEmissions;
+              }
+              electricityEmissions = gridPart + renewablePart + otherPart;
+            }
+
+            // --- Cooling products: Scope 1 refrigerant emissions ---
+            let refrigerantEmissions: number | undefined;
+            if (next.refrigerantType) {
+              const factor = REFRIGERANT_FACTORS[next.refrigerantType];
+              next.refrigerantFactor = typeof factor === 'number' ? factor : undefined;
+            } else {
+              next.refrigerantFactor = undefined;
+            }
+            if (typeof next.coolingRefrigerantQuantity === 'number' && typeof next.refrigerantFactor === 'number') {
+              refrigerantEmissions = Number((next.coolingRefrigerantQuantity * next.refrigerantFactor).toFixed(6));
+            } else {
+              refrigerantEmissions = undefined;
+            }
+
+            // Total emissions = electricity + refrigerant (whichever are present)
+            const totalEmissions =
+              (typeof electricityEmissions === 'number' ? electricityEmissions : 0) +
+              (typeof refrigerantEmissions === 'number' ? refrigerantEmissions : 0);
+
+            emissions =
+              typeof electricityEmissions === 'number' || typeof refrigerantEmissions === 'number'
+                ? Number(totalEmissions.toFixed(6))
+                : undefined;
+          } else if (next.processingActivity === 'Gas-fired industrial machinery sold') {
+            // --- Fuel emissions (Scope 1 style) ---
+            if (next.gasMachineryFuelType && next.gasMachineryFuel && next.gasMachineryUnit) {
+              const factor = FACTORS[next.gasMachineryFuelType]?.[next.gasMachineryFuel]?.[next.gasMachineryUnit];
+              next.gasMachineryFactor = typeof factor === 'number' ? factor : undefined;
+            } else {
+              next.gasMachineryFactor = undefined;
+            }
+            if (typeof next.gasMachineryQuantity === 'number' && typeof next.gasMachineryFactor === 'number') {
+              emissions = Number((next.gasMachineryQuantity * next.gasMachineryFactor).toFixed(6));
+            } else {
+              emissions = undefined;
+            }
+          }
+
+          next.emissions = emissions !== undefined ? Number(emissions.toFixed(6)) : undefined;
+          
+          return next;
+        }));
+      };
+
+      // Update other source row for hybrid electricity
+      const updateHybridOtherSourceRow = (rowId: string, sourceId: string, patch: {
+        type?: FuelType;
+        fuel?: string;
+        unit?: string;
+        quantity?: number;
+        factor?: number;
+        emissions?: number;
+      }) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          const otherSources = (r.hybridOtherSources || []).map(s => {
+            if (s.id !== sourceId) return s;
+            const next = { ...s, ...patch };
+            if (next.type && next.fuel && next.unit) {
+              const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+              next.factor = typeof factor === 'number' ? factor : undefined;
+            }
+            if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
+              next.emissions = Number((next.quantity * next.factor).toFixed(6));
+            }
+            return next;
+          });
+          const updated = { ...r, hybridOtherSources: otherSources };
+          // Recalculate electricity emissions
+          if (updated.hybridTotalKwh) {
+            const gridFactor = getGridFactor(updated.hybridGridCountry);
+            const gridPart = updated.hybridGridPct && gridFactor ? (updated.hybridGridPct / 100) * updated.hybridTotalKwh * gridFactor : 0;
+            const renewablePart = 0;
+            const otherEmissions = otherSources.reduce((sum, s) => sum + (s.emissions || 0), 0);
+            const otherPart =
+              updated.hybridOtherPct && updated.hybridOtherPct > 0
+                ? (updated.hybridOtherPct / 100) * updated.hybridTotalKwh * (otherEmissions / (updated.hybridTotalKwh || 1))
+                : 0;
+            const electricityEmissions = gridPart + renewablePart + otherPart;
+            const fuelEmissions =
+              typeof updated.hybridFuelQuantity === 'number' && typeof updated.hybridFuelFactor === 'number'
+                ? updated.hybridFuelQuantity * updated.hybridFuelFactor
+                : 0;
+            updated.emissions = Number((fuelEmissions + electricityEmissions).toFixed(6));
+          }
+          return updated;
+        }));
+      };
+
+      // Add other source row for hybrid
+      const addHybridOtherSourceRow = (rowId: string) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          return {
+            ...r,
+            hybridOtherSources: [...(r.hybridOtherSources || []), {
+              id: `other-${Date.now()}-${Math.random()}`,
+            }]
+          };
+        }));
+      };
+
+      // Remove other source row for hybrid
+      const removeHybridOtherSourceRow = (rowId: string, sourceId: string) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          return {
+            ...r,
+            hybridOtherSources: (r.hybridOtherSources || []).filter(s => s.id !== sourceId)
+          };
+        }));
+      };
+
+      // Update other source row for electricity (electronics categories)
+      const updateElectricityOtherSourceRow = (rowId: string, sourceId: string, patch: {
+        type?: FuelType;
+        fuel?: string;
+        unit?: string;
+        quantity?: number;
+        factor?: number;
+        emissions?: number;
+      }) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          const otherSources = (r.electricityOtherSources || []).map(s => {
+            if (s.id !== sourceId) return s;
+            const next = { ...s, ...patch };
+            if (next.type && next.fuel && next.unit) {
+              const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+              next.factor = typeof factor === 'number' ? factor : undefined;
+            }
+            if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
+              next.emissions = Number((next.quantity * next.factor).toFixed(6));
+            }
+            return next;
+          });
+          const updated = { ...r, electricityOtherSources: otherSources };
+          // Recalculate electricity emissions
+          if (updated.electricityTotalKwh) {
+            const gridFactor = getGridFactor(updated.electricityGridCountry);
+            const gridPart = updated.electricityGridPct && gridFactor ? (updated.electricityGridPct / 100) * updated.electricityTotalKwh * gridFactor : 0;
+            const renewablePart = 0;
+            let otherPart = 0;
+            if (updated.electricityOtherPct && updated.electricityOtherPct > 0 && otherSources.length > 0) {
+              const sumOtherEmissions = otherSources.reduce((sum, s) => sum + (s.emissions || 0), 0);
+              otherPart = (updated.electricityOtherPct / 100) * updated.electricityTotalKwh * sumOtherEmissions;
+            }
+            const electricityEmissions = gridPart + renewablePart + otherPart;
+            
+            // For Cooling products, also add refrigerant emissions
+            if (updated.processingActivity === 'Cooling products (AC, refrigeration)') {
+              let refrigerantEmissions = 0;
+              if (typeof updated.coolingRefrigerantQuantity === 'number' && typeof updated.refrigerantFactor === 'number') {
+                refrigerantEmissions = updated.coolingRefrigerantQuantity * updated.refrigerantFactor;
+              }
+              updated.emissions = Number((electricityEmissions + refrigerantEmissions).toFixed(6));
+            } else {
+              updated.emissions = Number(electricityEmissions.toFixed(6));
+            }
+          }
+          return updated;
+        }));
+      };
+
+      // Add other source row for electricity
+      const addElectricityOtherSourceRow = (rowId: string) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          return {
+            ...r,
+            electricityOtherSources: [...(r.electricityOtherSources || []), {
+              id: `other-${Date.now()}-${Math.random()}`,
+            }]
+          };
+        }));
+      };
+
+      // Remove other source row for electricity
+      const removeElectricityOtherSourceRow = (rowId: string, sourceId: string) => {
+        setUseRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          return {
+            ...r,
+            electricityOtherSources: (r.electricityOtherSources || []).filter(s => s.id !== sourceId)
+          };
+        }));
+      };
+
       const totalEmissions = useRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
       
     return (
@@ -2619,17 +3833,74 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                 className="p-6 rounded-lg bg-gray-50 border border-gray-200 hover:border-teal-300 transition-all duration-200 animate-in fade-in-0 slide-in-from-bottom-4"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
+                <div className="mb-4">
                     <Label className="flex items-center gap-1 mb-2">
                       Processing Activity <FieldTooltip content="Select the processing activity type" />
                     </Label>
                     <Select 
                       value={row.processingActivity} 
                       onValueChange={(value) => {
-                        setUseRows(prev => prev.map(r => 
-                          r.id === row.id ? { ...r, processingActivity: value } : r
-                        ));
+                        const isInternalCombustion = value === 'Internal combustion engine vehicles (cars, trucks, bikes)';
+                        const isSoldFuels = value === 'Sold fuels (LPG, petrol, diesel)';
+                        const isBoilers = value === 'Boilers, stoves, heaters (gas-based)';
+                        const isCombustionCategory = isInternalCombustion || isSoldFuels || isBoilers;
+                        const isHybrid = value === 'Hybrid vehicles';
+                        const isElectronicsCategory = 
+                          value === 'Electronics (laptops, TVs, phones)' ||
+                          value === 'Electric machinery/equipment' ||
+                          value === 'Batteries' ||
+                          value === 'Water-using devices' ||
+                          value === 'Electric vehicles (cars, 2-wheelers, buses)' ||
+                          value === 'Home appliances (ACs, fridges, fans, microwaves)';
+                        const isRefrigerant = value === 'Refrigerants sold';
+                        const isCoolingProducts = value === 'Cooling products (AC, refrigeration)';
+                        const isGasMachinery = value === 'Gas-fired industrial machinery sold';
+                        updateUseRow(row.id, {
+                          processingActivity: value,
+                          // Clear combustion fields if not combustion categories
+                          combustionType: isCombustionCategory ? row.combustionType : undefined,
+                          stationaryMainFuelType: isCombustionCategory ? row.stationaryMainFuelType : undefined,
+                          stationarySubFuelType: isCombustionCategory ? row.stationarySubFuelType : undefined,
+                          stationaryCo2Factor: isCombustionCategory ? row.stationaryCo2Factor : undefined,
+                          stationaryUnit: isCombustionCategory ? row.stationaryUnit : undefined,
+                          stationaryQuantity: undefined,
+                          mobileFuelType: isCombustionCategory ? row.mobileFuelType : undefined,
+                          mobileKgCo2PerUnit: isCombustionCategory ? row.mobileKgCo2PerUnit : undefined,
+                          mobileUnit: isCombustionCategory ? row.mobileUnit : undefined,
+                          mobileQuantity: undefined,
+                          // Clear hybrid fields if not Hybrid vehicles
+                          hybridFuelType: isHybrid ? row.hybridFuelType : undefined,
+                          hybridFuel: isHybrid ? row.hybridFuel : undefined,
+                          hybridFuelUnit: isHybrid ? row.hybridFuelUnit : undefined,
+                          hybridFuelQuantity: undefined,
+                          hybridFuelFactor: undefined,
+                          hybridFuelEmissions: undefined,
+                          hybridTotalKwh: isHybrid ? row.hybridTotalKwh : undefined,
+                          hybridGridPct: isHybrid ? row.hybridGridPct : undefined,
+                          hybridRenewablePct: isHybrid ? row.hybridRenewablePct : undefined,
+                          hybridOtherPct: isHybrid ? row.hybridOtherPct : undefined,
+                          hybridGridCountry: isHybrid ? row.hybridGridCountry : undefined,
+                          hybridOtherSources: isHybrid ? row.hybridOtherSources : undefined,
+                          // Clear electricity fields if not electronics categories or cooling products
+                          electricityTotalKwh: (isElectronicsCategory || isCoolingProducts) ? row.electricityTotalKwh : undefined,
+                          electricityGridPct: (isElectronicsCategory || isCoolingProducts) ? row.electricityGridPct : undefined,
+                          electricityRenewablePct: (isElectronicsCategory || isCoolingProducts) ? row.electricityRenewablePct : undefined,
+                          electricityOtherPct: (isElectronicsCategory || isCoolingProducts) ? row.electricityOtherPct : undefined,
+                          electricityGridCountry: (isElectronicsCategory || isCoolingProducts) ? row.electricityGridCountry : undefined,
+                          electricityOtherSources: (isElectronicsCategory || isCoolingProducts) ? row.electricityOtherSources : undefined,
+                          // Clear refrigerant fields if not Refrigerants sold or Cooling products
+                          refrigerantType: (isRefrigerant || isCoolingProducts) ? row.refrigerantType : undefined,
+                          refrigerantFactor: (isRefrigerant || isCoolingProducts) ? row.refrigerantFactor : undefined,
+                          coolingRefrigerantQuantity: isCoolingProducts ? row.coolingRefrigerantQuantity : undefined,
+                          // Clear fuel fields if not Gas-fired industrial machinery sold
+                          gasMachineryFuelType: isGasMachinery ? row.gasMachineryFuelType : undefined,
+                          gasMachineryFuel: isGasMachinery ? row.gasMachineryFuel : undefined,
+                          gasMachineryUnit: isGasMachinery ? row.gasMachineryUnit : undefined,
+                          gasMachineryQuantity: undefined,
+                          gasMachineryFactor: undefined,
+                          quantity: undefined,
+                          emissions: undefined,
+                        });
                       }}
                     >
                       <SelectTrigger>
@@ -2645,50 +3916,1775 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                         <SelectItem value="Electronics (laptops, TVs, phones)">Electronics (laptops, TVs, phones)</SelectItem>
                         <SelectItem value="Electric machinery/equipment">Electric machinery/equipment</SelectItem>
                         <SelectItem value="Gas-fired industrial machinery sold">Gas-fired industrial machinery sold</SelectItem>
-                        <SelectItem value="Sold fuels (LPG, petrol, diesel)">Sold fuels (LPG, petrol, diesel)</SelectItem>
-                        <SelectItem value="Sold chemicals that emit during use">Sold chemicals that emit during use</SelectItem>
-                        <SelectItem value="Refrigerants sold">Refrigerants sold</SelectItem>
+                      <SelectItem value="Sold fuels (LPG, petrol, diesel)">Sold fuels (LPG, petrol, diesel)</SelectItem>
+                      <SelectItem value="Refrigerants sold">Refrigerants sold</SelectItem>
                         <SelectItem value="Batteries">Batteries</SelectItem>
                         <SelectItem value="Water-using devices">Water-using devices</SelectItem>
                       </SelectContent>
                     </Select>
           </div>
+
+                {/* Combustion Sections for Internal combustion engine vehicles */}
+                {row.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' && (
+                  <div className="space-y-4 mb-4">
+                    {/* Stationary Combustion Fields */}
+                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200 mb-4">
+                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {stationaryCombustionData.length} rows | 
+                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
                     <Label className="flex items-center gap-1 mb-2">
-                      Quantity <FieldTooltip content="Amount or quantity of product" />
+                              Main Fuel Type <FieldTooltip content="Select main fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationaryMainFuelType || ''} 
+                              onValueChange={(value) => {
+                                updateUseRow(row.id, { 
+                                  stationaryMainFuelType: value,
+                                  stationarySubFuelType: undefined,
+                                  stationaryCo2Factor: undefined,
+                                  stationaryUnit: undefined,
+                                  stationaryQuantity: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select main fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).map(mainType => (
+                                    <SelectItem key={mainType} value={mainType}>{mainType}</SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Sub Fuel Type <FieldTooltip content="Select sub fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationarySubFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = stationaryCombustionData.find(
+                                  d => d['Main Fuel Type'] === row.stationaryMainFuelType && d['Sub Fuel Type'] === value
+                                );
+                                console.log('Selected sub fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  stationarySubFuelType: value,
+                                  stationaryCo2Factor: selected?.['CO2 Factor'],
+                                  stationaryUnit: selected?.['Units'],
+                                  stationaryQuantity: undefined,
+                                });
+                              }}
+                              disabled={!row.stationaryMainFuelType}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select sub fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData
+                                  .filter(d => d['Main Fuel Type'] === row.stationaryMainFuelType)
+                                  .map(d => {
+                                    const subType = d['Sub Fuel Type'];
+                                    return (
+                                      <SelectItem key={subType} value={subType}>
+                                        {subType}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.stationaryUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
                     </Label>
                     <Input
                       type="number"
                       step="any"
                       min="0"
                       placeholder="Enter quantity"
-                      value={row.quantity ?? ''}
+                              value={row.stationaryQuantity ?? ''}
                       onChange={(e) => {
                         const value = e.target.value === '' ? undefined : Number(e.target.value);
-                        setUseRows(prev => prev.map(r => 
-                          r.id === row.id ? { ...r, quantity: value } : r
-                        ));
+                                updateUseRow(row.id, { stationaryQuantity: value });
                       }}
+                              disabled={!row.stationarySubFuelType}
+                    />
+          </div>
+                        </div>
+                        {row.stationaryCo2Factor !== undefined && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            CO2 Factor: <span className="font-semibold">{row.stationaryCo2Factor.toFixed(6)}</span>
+                          </div>
+                        )}
+                        {row.stationaryQuantity !== undefined && row.stationaryCo2Factor !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Stationary Emissions: <span className="font-semibold">{(row.stationaryQuantity * row.stationaryCo2Factor).toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                </div>
+
+                    {/* Mobile Combustion Fields */}
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {mobileCombustionData.length} rows | 
+                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Fuel Type <FieldTooltip content="Select fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.mobileFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = mobileCombustionData.find(d => d['FuelType'] === value);
+                                console.log('Selected fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  mobileFuelType: value,
+                                  mobileKgCo2PerUnit: selected?.['kg CO2 per unit'],
+                                  mobileUnit: selected?.['Unit'],
+                                  mobileQuantity: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mobileCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  (() => {
+                                    const fuelTypes = mobileCombustionData.map(d => d['FuelType']).filter(Boolean);
+                                    console.log('Fuel Types for dropdown:', fuelTypes);
+                                    if (fuelTypes.length === 0) {
+                                      return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
+                                    }
+                                    return fuelTypes.map(fuelType => (
+                                      <SelectItem key={fuelType} value={fuelType}>
+                                        {fuelType}
+                                      </SelectItem>
+                                    ));
+                                  })()
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              kg CO2 per Unit <FieldTooltip content="CO2 emission factor" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileKgCo2PerUnit !== undefined ? row.mobileKgCo2PerUnit.toFixed(6) : ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.mobileQuantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateUseRow(row.id, { mobileQuantity: value });
+                              }}
+                              disabled={!row.mobileFuelType}
+                            />
+                          </div>
+                        </div>
+                        {row.mobileQuantity !== undefined && row.mobileKgCo2PerUnit !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Mobile Emissions: <span className="font-semibold">{(row.mobileQuantity * row.mobileKgCo2PerUnit).toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    
+                    {/* Total Emissions Display */}
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-300">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Total Emissions: <span className="text-teal-600">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Combustion Type Selection for Sold fuels (LPG, petrol, diesel) */}
+                {row.processingActivity === 'Sold fuels (LPG, petrol, diesel)' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Combustion Type</h4>
+                    <div className="mb-4">
+                      <Label className="flex items-center gap-1 mb-2">
+                        Select Combustion Type <FieldTooltip content="Choose between Stationary or Mobile Combustion" />
+                      </Label>
+                      <Select 
+                        value={row.combustionType || ''} 
+                        onValueChange={(value) => {
+                          updateUseRow(row.id, { 
+                            combustionType: value as 'stationary' | 'mobile',
+                            // Clear all combustion-related fields
+                            stationaryMainFuelType: undefined,
+                            stationarySubFuelType: undefined,
+                            stationaryCo2Factor: undefined,
+                            stationaryUnit: undefined,
+                            mobileFuelType: undefined,
+                            mobileKgCo2PerUnit: undefined,
+                            mobileUnit: undefined,
+                            quantity: undefined,
+                            emissions: undefined,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select combustion type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="stationary">Stationary Combustion</SelectItem>
+                          <SelectItem value="mobile">Mobile Combustion</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Stationary Combustion Fields */}
+                    {row.combustionType === 'stationary' && (
+                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {stationaryCombustionData.length} rows | 
+                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Main Fuel Type <FieldTooltip content="Select main fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationaryMainFuelType || ''} 
+                              onValueChange={(value) => {
+                                updateUseRow(row.id, { 
+                                  stationaryMainFuelType: value,
+                                  stationarySubFuelType: undefined,
+                                  stationaryCo2Factor: undefined,
+                                  stationaryUnit: undefined,
+                                  stationaryQuantity: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select main fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).map(mainType => (
+                                    <SelectItem key={mainType} value={mainType}>{mainType}</SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Sub Fuel Type <FieldTooltip content="Select sub fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationarySubFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = stationaryCombustionData.find(
+                                  d => d['Main Fuel Type'] === row.stationaryMainFuelType && d['Sub Fuel Type'] === value
+                                );
+                                console.log('Selected sub fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  stationarySubFuelType: value,
+                                  stationaryCo2Factor: selected?.['CO2 Factor'],
+                                  stationaryUnit: selected?.['Units'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                              disabled={!row.stationaryMainFuelType}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select sub fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData
+                                  .filter(d => d['Main Fuel Type'] === row.stationaryMainFuelType)
+                                  .map(d => {
+                                    const subType = d['Sub Fuel Type'];
+                                    return (
+                                      <SelectItem key={subType} value={subType}>
+                                        {subType}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.stationaryUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateUseRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.stationarySubFuelType}
+                            />
+                          </div>
+                        </div>
+                        {row.stationaryCo2Factor !== undefined && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            CO2 Factor: <span className="font-semibold">{row.stationaryCo2Factor.toFixed(6)}</span>
+                          </div>
+                        )}
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mobile Combustion Fields */}
+                    {row.combustionType === 'mobile' && (
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {mobileCombustionData.length} rows | 
+                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Fuel Type <FieldTooltip content="Select fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.mobileFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = mobileCombustionData.find(d => d['FuelType'] === value);
+                                console.log('Selected fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  mobileFuelType: value,
+                                  mobileKgCo2PerUnit: selected?.['kg CO2 per unit'],
+                                  mobileUnit: selected?.['Unit'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mobileCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  (() => {
+                                    const fuelTypes = mobileCombustionData.map(d => d['FuelType']).filter(Boolean);
+                                    console.log('Fuel Types for dropdown:', fuelTypes);
+                                    if (fuelTypes.length === 0) {
+                                      return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
+                                    }
+                                    return fuelTypes.map(fuelType => (
+                                      <SelectItem key={fuelType} value={fuelType}>
+                                        {fuelType}
+                                      </SelectItem>
+                                    ));
+                                  })()
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              kg CO2 per Unit <FieldTooltip content="CO2 emission factor" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileKgCo2PerUnit !== undefined ? row.mobileKgCo2PerUnit.toFixed(6) : ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateUseRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.mobileFuelType}
                     />
           </div>
                 </div>
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-4">
+                {/* Combustion Type Selection for Boilers, stoves, heaters (gas-based) */}
+                {row.processingActivity === 'Boilers, stoves, heaters (gas-based)' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Combustion Type</h4>
+                    <div className="mb-4">
+                      <Label className="flex items-center gap-1 mb-2">
+                        Select Combustion Type <FieldTooltip content="Choose between Stationary or Mobile Combustion" />
+                      </Label>
+                      <Select 
+                        value={row.combustionType || ''} 
+                        onValueChange={(value) => {
+                          updateUseRow(row.id, { 
+                            combustionType: value as 'stationary' | 'mobile',
+                            // Clear all combustion-related fields
+                            stationaryMainFuelType: undefined,
+                            stationarySubFuelType: undefined,
+                            stationaryCo2Factor: undefined,
+                            stationaryUnit: undefined,
+                            mobileFuelType: undefined,
+                            mobileKgCo2PerUnit: undefined,
+                            mobileUnit: undefined,
+                            quantity: undefined,
+                            emissions: undefined,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select combustion type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="stationary">Stationary Combustion</SelectItem>
+                          <SelectItem value="mobile">Mobile Combustion</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Stationary Combustion Fields */}
+                    {row.combustionType === 'stationary' && (
+                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {stationaryCombustionData.length} rows | 
+                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Main Fuel Type <FieldTooltip content="Select main fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationaryMainFuelType || ''} 
+                              onValueChange={(value) => {
+                                updateUseRow(row.id, { 
+                                  stationaryMainFuelType: value,
+                                  stationarySubFuelType: undefined,
+                                  stationaryCo2Factor: undefined,
+                                  stationaryUnit: undefined,
+                                  stationaryQuantity: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select main fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).map(mainType => (
+                                    <SelectItem key={mainType} value={mainType}>{mainType}</SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Sub Fuel Type <FieldTooltip content="Select sub fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.stationarySubFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = stationaryCombustionData.find(
+                                  d => d['Main Fuel Type'] === row.stationaryMainFuelType && d['Sub Fuel Type'] === value
+                                );
+                                console.log('Selected sub fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  stationarySubFuelType: value,
+                                  stationaryCo2Factor: selected?.['CO2 Factor'],
+                                  stationaryUnit: selected?.['Units'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                              disabled={!row.stationaryMainFuelType}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select sub fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {stationaryCombustionData
+                                  .filter(d => d['Main Fuel Type'] === row.stationaryMainFuelType)
+                                  .map(d => {
+                                    const subType = d['Sub Fuel Type'];
+                                    return (
+                                      <SelectItem key={subType} value={subType}>
+                                        {subType}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.stationaryUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateUseRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.stationarySubFuelType}
+                            />
+                          </div>
+                        </div>
+                        {row.stationaryCo2Factor !== undefined && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            CO2 Factor: <span className="font-semibold">{row.stationaryCo2Factor.toFixed(6)}</span>
+                          </div>
+                        )}
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mobile Combustion Fields */}
+                    {row.combustionType === 'mobile' && (
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
+                            Data loaded: {mobileCombustionData.length} rows | 
+                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Fuel Type <FieldTooltip content="Select fuel type" />
+                            </Label>
+                            <Select 
+                              value={row.mobileFuelType || ''} 
+                              onValueChange={(value) => {
+                                const selected = mobileCombustionData.find(d => d['FuelType'] === value);
+                                console.log('Selected fuel type:', selected);
+                                updateUseRow(row.id, { 
+                                  mobileFuelType: value,
+                                  mobileKgCo2PerUnit: selected?.['kg CO2 per unit'],
+                                  mobileUnit: selected?.['Unit'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mobileCombustionData.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  (() => {
+                                    const fuelTypes = mobileCombustionData.map(d => d['FuelType']).filter(Boolean);
+                                    console.log('Fuel Types for dropdown:', fuelTypes);
+                                    if (fuelTypes.length === 0) {
+                                      return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
+                                    }
+                                    return fuelTypes.map(fuelType => (
+                                      <SelectItem key={fuelType} value={fuelType}>
+                                        {fuelType}
+                                      </SelectItem>
+                                    ));
+                                  })()
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Unit <FieldTooltip content="Unit of measurement" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileUnit || ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              kg CO2 per Unit <FieldTooltip content="CO2 emission factor" />
+                            </Label>
+                            <Input
+                              type="text"
+                              value={row.mobileKgCo2PerUnit !== undefined ? row.mobileKgCo2PerUnit.toFixed(6) : ''}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Quantity <FieldTooltip content="Enter quantity" />
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Enter quantity"
+                              value={row.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateUseRow(row.id, { quantity: value });
+                              }}
+                              disabled={!row.mobileFuelType}
+                    />
+          </div>
+                </div>
+                        {row.emissions !== undefined && (
+                          <div className="mt-2 text-sm text-gray-700 font-medium">
+                            Emissions: <span className="font-semibold">{row.emissions.toFixed(6)} kg CO2e</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Hybrid Vehicles - Scope 1 Fuel and Scope 2 Electricity */}
+                {row.processingActivity === 'Hybrid vehicles' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Hybrid Vehicle Fuel & Energy Details</h4>
+                    
+                    {/* Scope 1 Style Fuel Selection */}
+                    <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200 mb-4">
+                      <h5 className="text-sm font-semibold text-purple-900 mb-3">Fuel</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Type <FieldTooltip content="Select fuel type group" />
+                          </Label>
+                          <Select 
+                            value={row.hybridFuelType || ''} 
+                            onValueChange={(value) => {
+                              updateUseRow(row.id, { 
+                                hybridFuelType: value as FuelType,
+                                hybridFuel: undefined,
+                                hybridFuelUnit: undefined,
+                                hybridFuelFactor: undefined,
+                                hybridFuelEmissions: undefined,
+                                hybridFuelQuantity: undefined,
+                                emissions: undefined,
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.keys(FACTORS).map(t => (
+                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Fuel <FieldTooltip content="Select fuel" />
+                          </Label>
+                          <Select 
+                            value={row.hybridFuel || ''} 
+                            onValueChange={(value) => {
+                              updateUseRow(row.id, { 
+                                hybridFuel: value,
+                                hybridFuelUnit: undefined,
+                                hybridFuelFactor: undefined,
+                                hybridFuelEmissions: undefined,
+                                hybridFuelQuantity: undefined,
+                                emissions: undefined,
+                              });
+                            }}
+                            disabled={!row.hybridFuelType}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select fuel" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {row.hybridFuelType && Object.keys(FACTORS[row.hybridFuelType] || {}).map(f => (
+                                <SelectItem key={f} value={f}>{f}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Unit <FieldTooltip content="Select unit" />
+                          </Label>
+                          <Select 
+                            value={row.hybridFuelUnit || ''} 
+                            onValueChange={(value) => {
+                              updateUseRow(row.id, { hybridFuelUnit: value });
+                            }}
+                            disabled={!row.hybridFuelType || !row.hybridFuel}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {row.hybridFuelType && row.hybridFuel && Object.keys(FACTORS[row.hybridFuelType]?.[row.hybridFuel] || {}).map(u => (
+                                <SelectItem key={u} value={u}>{u}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Quantity <FieldTooltip content="Enter quantity" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            placeholder="Enter quantity"
+                            value={row.hybridFuelQuantity ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { hybridFuelQuantity: value });
+                            }}
+                            disabled={!row.hybridFuelType || !row.hybridFuel || !row.hybridFuelUnit}
+                          />
+                        </div>
+                      </div>
+                      {row.hybridFuelFactor !== undefined && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          Emission Factor: <span className="font-semibold">{row.hybridFuelFactor.toFixed(6)}</span>
+                        </div>
+                      )}
+                      {row.hybridFuelEmissions !== undefined && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          Fuel Emissions: <span className="font-semibold">{row.hybridFuelEmissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Scope 2 Style Electricity Selection */}
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h5 className="text-sm font-semibold text-blue-900 mb-3">Electricity</h5>
+                      
+                      {/* Main electricity inputs */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-1">
+                          <Label className="flex items-center gap-1 mb-2">
+                            Total electricity consumption (kWh) <FieldTooltip content="Total electricity consumption" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="999999999999.999999"
+                            placeholder="e.g., 120000"
+                            value={row.hybridTotalKwh ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { hybridTotalKwh: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Grid Energy (%) <FieldTooltip content="Percentage from grid" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 60"
+                            value={row.hybridGridPct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { hybridGridPct: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Renewable Energy (%) <FieldTooltip content="Percentage from renewable sources" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 30"
+                            value={row.hybridRenewablePct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { hybridRenewablePct: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Other sources (%) <FieldTooltip content="Percentage from other sources" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 10"
+                            value={row.hybridOtherPct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { hybridOtherPct: value });
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Grid sources section */}
+                      {row.hybridGridPct && row.hybridGridPct > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Electricity provider country <FieldTooltip content="Select country for grid factor" />
+                            </Label>
+                            <Select 
+                              value={row.hybridGridCountry || ''} 
+                              onValueChange={(v) => updateUseRow(row.id, { hybridGridCountry: v as 'UAE' | 'Pakistan' })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select country" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="UAE">UAE</SelectItem>
+                                <SelectItem value="Pakistan">Pakistan</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Other sources section */}
+                      {row.hybridOtherPct && row.hybridOtherPct > 0 && (
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold">Other Energy Sources</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addHybridOtherSourceRow(row.id)}
+                              className="text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Source
+                            </Button>
+                          </div>
+                          {(row.hybridOtherSources || []).map((source) => (
+                            <div key={source.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-white rounded border">
+                              <Select
+                                value={source.type || ''}
+                                onValueChange={(v) => updateHybridOtherSourceRow(row.id, source.id, { type: v as FuelType, fuel: undefined, unit: undefined, factor: undefined, emissions: undefined })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.keys(FACTORS).map(t => (
+                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={source.fuel || ''}
+                                onValueChange={(v) => updateHybridOtherSourceRow(row.id, source.id, { fuel: v, unit: undefined, factor: undefined, emissions: undefined })}
+                                disabled={!source.type}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Fuel" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {source.type && Object.keys(FACTORS[source.type] || {}).map(f => (
+                                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={source.unit || ''}
+                                onValueChange={(v) => updateHybridOtherSourceRow(row.id, source.id, { unit: v })}
+                                disabled={!source.type || !source.fuel}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {source.type && source.fuel && Object.keys(FACTORS[source.type]?.[source.fuel] || {}).map(u => (
+                                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                step="any"
+                                min="0"
+                                placeholder="Quantity"
+                                value={source.quantity ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                  updateHybridOtherSourceRow(row.id, source.id, { quantity: value });
+                                }}
+                                disabled={!source.type || !source.fuel || !source.unit}
+                              />
+                              <div className="flex items-center gap-2">
+                                {source.emissions !== undefined && (
+                                  <span className="text-xs text-gray-600 flex-1">
+                                    {source.emissions.toFixed(2)} kg CO2e
+                                  </span>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeHybridOtherSourceRow(row.id, source.id)}
+                                  className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="text-sm text-gray-700 font-medium">
+                          Total Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                        {row.hybridFuelEmissions !== undefined && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            (Fuel: {row.hybridFuelEmissions.toFixed(6)} kg CO2e)
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Electricity Section for Electronics, Electric machinery, Batteries, Water-using devices, Electric vehicles, Home appliances */}
+                {(row.processingActivity === 'Electronics (laptops, TVs, phones)' ||
+                  row.processingActivity === 'Electric machinery/equipment' ||
+                  row.processingActivity === 'Batteries' ||
+                  row.processingActivity === 'Water-using devices' ||
+                  row.processingActivity === 'Electric vehicles (cars, 2-wheelers, buses)' ||
+                  row.processingActivity === 'Home appliances (ACs, fridges, fans, microwaves)') && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Electricity Consumption</h4>
+                    
+                    {/* Main electricity inputs */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="md:col-span-1">
+                        <Label className="flex items-center gap-1 mb-2">
+                          Total electricity consumption (kWh) <FieldTooltip content="Total electricity consumption" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="999999999999.999999"
+                          placeholder="e.g., 120000"
+                          value={row.electricityTotalKwh ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { electricityTotalKwh: value });
+                          }}
+                        />
+                      </div>
                   <div>
                     <Label className="flex items-center gap-1 mb-2">
-                      Energy Consumption During Use <FieldTooltip content="Total lifetime energy consumed" />
+                          Grid Energy (%) <FieldTooltip content="Percentage from grid" />
                     </Label>
                     <Input
-                      placeholder="e.g., kWh/year"
-                      value={row.energyConsumption}
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="100"
+                          placeholder="e.g., 60"
+                          value={row.electricityGridPct ?? ''}
                       onChange={(e) => {
-                        setUseRows(prev => prev.map(r => 
-                          r.id === row.id ? { ...r, energyConsumption: e.target.value } : r
-                        ));
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { electricityGridPct: value });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Renewable Energy (%) <FieldTooltip content="Percentage from renewable sources" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="100"
+                          placeholder="e.g., 30"
+                          value={row.electricityRenewablePct ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { electricityRenewablePct: value });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Other sources (%) <FieldTooltip content="Percentage from other sources" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="100"
+                          placeholder="e.g., 10"
+                          value={row.electricityOtherPct ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { electricityOtherPct: value });
                       }}
                     />
         </div>
                 </div>
+
+                    {/* Grid sources section */}
+                    {row.electricityGridPct && row.electricityGridPct > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Electricity provider country <FieldTooltip content="Select country for grid factor" />
+                          </Label>
+                          <Select 
+                            value={row.electricityGridCountry || ''} 
+                            onValueChange={(v) => updateUseRow(row.id, { electricityGridCountry: v as 'UAE' | 'Pakistan' })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select country" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="UAE">UAE</SelectItem>
+                              <SelectItem value="Pakistan">Pakistan</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Grid emission factor <FieldTooltip content="Auto-calculated based on country" />
+                          </Label>
+                          <Input 
+                            value={getGridFactor(row.electricityGridCountry) ?? ''} 
+                            readOnly 
+                            placeholder="Auto" 
+                            className="bg-gray-100"
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Grid emissions <FieldTooltip content="Calculated grid emissions" />
+                          </Label>
+                          <Input
+                            readOnly
+                            value={row.electricityTotalKwh && row.electricityGridPct && getGridFactor(row.electricityGridCountry)
+                              ? ((row.electricityGridPct / 100) * row.electricityTotalKwh * getGridFactor(row.electricityGridCountry)!).toFixed(6)
+                              : ''}
+                            className="bg-gray-100"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Other sources section */}
+                    {row.electricityOtherPct && row.electricityOtherPct > 0 && (
+                      <div className="mt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold">Other Energy Sources</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addElectricityOtherSourceRow(row.id)}
+                            className="text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Add Source
+                          </Button>
+                        </div>
+                        {(row.electricityOtherSources || []).map((source) => (
+                          <div key={source.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-white rounded border">
+                            <Select
+                              value={source.type || ''}
+                              onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { type: v as FuelType, fuel: undefined, unit: undefined, factor: undefined, emissions: undefined })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.keys(FACTORS).map(t => (
+                                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={source.fuel || ''}
+                              onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { fuel: v, unit: undefined, factor: undefined, emissions: undefined })}
+                              disabled={!source.type}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Fuel" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {source.type && Object.keys(FACTORS[source.type] || {}).map(f => (
+                                  <SelectItem key={f} value={f}>{f}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={source.unit || ''}
+                              onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { unit: v })}
+                              disabled={!source.type || !source.fuel}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {source.type && source.fuel && Object.keys(FACTORS[source.type]?.[source.fuel] || {}).map(u => (
+                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Quantity"
+                              value={source.quantity ?? ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                updateElectricityOtherSourceRow(row.id, source.id, { quantity: value });
+                              }}
+                              disabled={!source.type || !source.fuel || !source.unit}
+                            />
+                            <div className="flex items-center gap-2">
+                              {source.emissions !== undefined && (
+                                <span className="text-xs text-gray-600 flex-1">
+                                  {source.emissions.toFixed(2)} kg CO2e
+                                </span>
+                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeElectricityOtherSourceRow(row.id, source.id)}
+                                className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="text-sm text-gray-700 font-medium">
+                          Total Electricity Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Refrigerant Section for Refrigerants sold */}
+                {row.processingActivity === 'Refrigerants sold' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Refrigerant Details</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Refrigerant Type <FieldTooltip content="Select the type of refrigerant" />
+                        </Label>
+                        <Select 
+                          value={row.refrigerantType || ''} 
+                          onValueChange={(v) => updateUseRow(row.id, { refrigerantType: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select refrigerant type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(REFRIGERANT_FACTORS).map(type => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Quantity (kg) <FieldTooltip content="Enter quantity in kilograms" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="999999999999.999999"
+                          placeholder="Enter quantity"
+                          value={row.quantity ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { quantity: value });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Emission Factor <FieldTooltip content="Auto-calculated based on refrigerant type" />
+                        </Label>
+                        <Input 
+                          value={row.refrigerantFactor !== undefined ? row.refrigerantFactor.toFixed(5) : ''} 
+                          readOnly 
+                          placeholder="Auto" 
+                          className="bg-gray-100"
+                        />
+                      </div>
+                    </div>
+
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="text-sm text-gray-700 font-medium">
+                          Total Refrigerant Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cooling Products Section - Electricity (Scope 2) and Refrigerant (Scope 1) */}
+                {row.processingActivity === 'Cooling products (AC, refrigeration)' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Cooling Products: Electricity & Refrigerant Details</h4>
+                    
+                    {/* Electricity Section (Scope 2 Style) */}
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+                      <h5 className="text-sm font-semibold text-blue-900 mb-3">Electricity Consumption</h5>
+                      
+                      {/* Main electricity inputs */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="md:col-span-1">
+                          <Label className="flex items-center gap-1 mb-2">
+                            Total electricity consumption (kWh) <FieldTooltip content="Total electricity consumption" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="999999999999.999999"
+                            placeholder="e.g., 120000"
+                            value={row.electricityTotalKwh ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { electricityTotalKwh: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Grid Energy (%) <FieldTooltip content="Percentage from grid" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 60"
+                            value={row.electricityGridPct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { electricityGridPct: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Renewable Energy (%) <FieldTooltip content="Percentage from renewable sources" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 30"
+                            value={row.electricityRenewablePct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { electricityRenewablePct: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Other sources (%) <FieldTooltip content="Percentage from other sources" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="100"
+                            placeholder="e.g., 10"
+                            value={row.electricityOtherPct ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { electricityOtherPct: value });
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Grid sources section */}
+                      {row.electricityGridPct && row.electricityGridPct > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Electricity provider country <FieldTooltip content="Select country for grid factor" />
+                            </Label>
+                            <Select 
+                              value={row.electricityGridCountry || ''} 
+                              onValueChange={(v) => updateUseRow(row.id, { electricityGridCountry: v as 'UAE' | 'Pakistan' })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select country" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="UAE">UAE</SelectItem>
+                                <SelectItem value="Pakistan">Pakistan</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Grid emission factor <FieldTooltip content="Auto-calculated based on country" />
+                            </Label>
+                            <Input 
+                              value={getGridFactor(row.electricityGridCountry) ?? ''} 
+                              readOnly 
+                              placeholder="Auto" 
+                              className="bg-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-1 mb-2">
+                              Grid emissions <FieldTooltip content="Calculated grid emissions" />
+                            </Label>
+                            <Input
+                              readOnly
+                              value={row.electricityTotalKwh && row.electricityGridPct && getGridFactor(row.electricityGridCountry)
+                                ? ((row.electricityGridPct / 100) * row.electricityTotalKwh * getGridFactor(row.electricityGridCountry)!).toFixed(6)
+                                : ''}
+                              className="bg-gray-100"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Other sources section */}
+                      {row.electricityOtherPct && row.electricityOtherPct > 0 && (
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold">Other Energy Sources</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addElectricityOtherSourceRow(row.id)}
+                              className="text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Source
+                            </Button>
+                          </div>
+                          {(row.electricityOtherSources || []).map((source) => (
+                            <div key={source.id} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 bg-white rounded border">
+                              <Select
+                                value={source.type || ''}
+                                onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { type: v as FuelType, fuel: undefined, unit: undefined, factor: undefined, emissions: undefined })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.keys(FACTORS).map(t => (
+                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={source.fuel || ''}
+                                onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { fuel: v, unit: undefined, factor: undefined, emissions: undefined })}
+                                disabled={!source.type}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Fuel" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {source.type && Object.keys(FACTORS[source.type] || {}).map(f => (
+                                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={source.unit || ''}
+                                onValueChange={(v) => updateElectricityOtherSourceRow(row.id, source.id, { unit: v })}
+                                disabled={!source.type || !source.fuel}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {source.type && source.fuel && Object.keys(FACTORS[source.type]?.[source.fuel] || {}).map(u => (
+                                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                step="any"
+                                min="0"
+                                placeholder="Quantity"
+                                value={source.quantity ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                  updateElectricityOtherSourceRow(row.id, source.id, { quantity: value });
+                                }}
+                                disabled={!source.type || !source.fuel || !source.unit}
+                              />
+                              <div className="flex items-center gap-2">
+                                {source.emissions !== undefined && (
+                                  <span className="text-xs text-gray-600 flex-1">
+                                    {source.emissions.toFixed(2)} kg CO2e
+                                  </span>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeElectricityOtherSourceRow(row.id, source.id)}
+                                  className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Refrigerant Section (Scope 1 Style) */}
+                    <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
+                      <h5 className="text-sm font-semibold text-teal-900 mb-3">Refrigerant Details</h5>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Refrigerant Type <FieldTooltip content="Select the type of refrigerant" />
+                          </Label>
+                          <Select 
+                            value={row.refrigerantType || ''} 
+                            onValueChange={(v) => updateUseRow(row.id, { refrigerantType: v })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select refrigerant type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.keys(REFRIGERANT_FACTORS).map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Quantity (kg) <FieldTooltip content="Enter quantity in kilograms" />
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            max="999999999999.999999"
+                            placeholder="Enter quantity"
+                            value={row.coolingRefrigerantQuantity ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                              updateUseRow(row.id, { coolingRefrigerantQuantity: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label className="flex items-center gap-1 mb-2">
+                            Emission Factor <FieldTooltip content="Auto-calculated based on refrigerant type" />
+                          </Label>
+                          <Input 
+                            value={row.refrigerantFactor !== undefined ? row.refrigerantFactor.toFixed(5) : ''} 
+                            readOnly 
+                            placeholder="Auto" 
+                            className="bg-gray-100"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="text-sm text-gray-700 font-medium">
+                          Total Emissions (Electricity + Refrigerant): <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Gas-fired Industrial Machinery Section - Fuel (Scope 1 Style) */}
+                {row.processingActivity === 'Gas-fired industrial machinery sold' && (
+                  <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Fuel Details</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Type <FieldTooltip content="Select fuel type group" />
+                        </Label>
+                        <Select 
+                          value={row.gasMachineryFuelType || ''} 
+                          onValueChange={(value) => {
+                            updateUseRow(row.id, { 
+                              gasMachineryFuelType: value as FuelType,
+                              gasMachineryFuel: undefined,
+                              gasMachineryUnit: undefined,
+                              gasMachineryFactor: undefined,
+                              gasMachineryQuantity: undefined,
+                              emissions: undefined,
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(FACTORS).map(t => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Fuel <FieldTooltip content="Select fuel" />
+                        </Label>
+                        <Select 
+                          value={row.gasMachineryFuel || ''} 
+                          onValueChange={(value) => {
+                            updateUseRow(row.id, { 
+                              gasMachineryFuel: value,
+                              gasMachineryUnit: undefined,
+                              gasMachineryFactor: undefined,
+                              gasMachineryQuantity: undefined,
+                              emissions: undefined,
+                            });
+                          }}
+                          disabled={!row.gasMachineryFuelType}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select fuel" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {row.gasMachineryFuelType && Object.keys(FACTORS[row.gasMachineryFuelType] || {}).map(f => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Unit <FieldTooltip content="Select unit" />
+                        </Label>
+                        <Select 
+                          value={row.gasMachineryUnit || ''} 
+                          onValueChange={(value) => {
+                            updateUseRow(row.id, { gasMachineryUnit: value });
+                          }}
+                          disabled={!row.gasMachineryFuelType || !row.gasMachineryFuel}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {row.gasMachineryFuelType && row.gasMachineryFuel && Object.keys(FACTORS[row.gasMachineryFuelType]?.[row.gasMachineryFuel] || {}).map(u => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-1 mb-2">
+                          Quantity <FieldTooltip content="Enter quantity" />
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="999999999999.999999"
+                          placeholder="Enter quantity"
+                          value={row.gasMachineryQuantity ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : Number(e.target.value);
+                            updateUseRow(row.id, { gasMachineryQuantity: value });
+                          }}
+                          disabled={!row.gasMachineryFuelType || !row.gasMachineryFuel || !row.gasMachineryUnit}
+                        />
+                      </div>
+                    </div>
+
+                    {row.gasMachineryFactor !== undefined && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        Emission Factor: <span className="font-semibold">{row.gasMachineryFactor.toFixed(6)}</span>
+                      </div>
+                    )}
+
+                    {row.emissions !== undefined && (
+                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                        <div className="text-sm text-gray-700 font-medium">
+                          Total Fuel Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex justify-end">
                   <Button

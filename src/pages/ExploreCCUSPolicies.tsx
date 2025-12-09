@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
 // Add a normalization function for country names
@@ -38,6 +39,10 @@ function normalizeCountryName(name: string) {
     "Australia": "Australia",
     // South Africa
     "South Africa": "South Africa",
+    // United States
+    "United States": "United States",
+    "USA": "United States",
+    "US": "United States",
   };
   return map[name.trim()] || name.trim();
 }
@@ -57,6 +62,9 @@ function getCountryCode(country: string) {
     "Netherlands": "NL",
     "Japan": "JP",
     "China": "CN",
+    "United States": "US",
+    "USA": "US",
+    "US": "US",
     "Canada": "CA",
     "Australia": "AU",
     "South Africa": "ZA",
@@ -222,6 +230,7 @@ const ExploreCCUSPolicies = () => {
   const [policies, setPolicies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [managementStrategies, setManagementStrategies] = useState<Database["public"]["Tables"]["ccus_management_strategies"]["Row"][]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -262,6 +271,12 @@ const ExploreCCUSPolicies = () => {
     return a.localeCompare(b); // alphabetical order for same type
   });
 
+  // Filter countries based on search query
+  const filteredCountries = sortedCountries.filter((country) => {
+    const displayCountry = normalizeCountryName(country);
+    return displayCountry.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 relative">
       {/* Animated Background */}
@@ -283,11 +298,32 @@ const ExploreCCUSPolicies = () => {
         
         <h1 className="text-3xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">Explore CCUS Policies in Different Regions</h1>
         <p className="text-gray-600 mb-6">Select a country to view detailed CCUS policies and regulatory landscapes</p>
+        
+        {/* Search Bar */}
+        <div className="mb-6 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search countries..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full border-teal-200 focus:border-teal-400 focus:ring-teal-400 rounded-lg"
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div>Loading...</div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {sortedCountries.map((country) => {
+          <>
+            {filteredCountries.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">No countries found matching "{searchQuery}"</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {filteredCountries.map((country) => {
               const displayCountry = normalizeCountryName(country);
               const countryCode = getCountryCode(displayCountry);
               const hasStrategy = !!getStrategyForCountry(country);
@@ -322,7 +358,9 @@ const ExploreCCUSPolicies = () => {
                 </Card>
               );
             })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -642,8 +642,8 @@ const ExploreCCUSProjects = () => {
               <CardTitle className="text-lg">Projects by Sector</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 35)}>
-                <ComposedChart
+              <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 40)}>
+                <BarChart
                   layout="vertical"
                   data={sectorData}
                   margin={{ top: 16, right: 32, left: 32, bottom: 16 }}
@@ -661,30 +661,24 @@ const ExploreCCUSProjects = () => {
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         return (
-                          <div className="bg-white p-3 rounded shadow text-sm">
-                            <div className="font-semibold mb-1">Sector: {label}</div>
-                            <div className="text-teal-600 font-medium">Count: {payload[0].value} projects</div>
+                          <div className="bg-white p-3 rounded shadow text-sm border border-gray-200">
+                            <div className="font-semibold mb-1 text-gray-900">Sector: {label}</div>
+                            <div className="text-teal-600 font-medium">Count: {payload[0].value} {payload[0].value === 1 ? 'project' : 'projects'}</div>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Line 
+                  <Bar 
                     dataKey="count" 
-                    stroke="#14b8a6" 
-                    strokeWidth={2}
-                    dot={false}
+                    fill="#14b8a6"
+                    radius={[0, 8, 8, 0]}
                     animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
                   />
-                  <Scatter 
-                    dataKey="count" 
-                    fill="#14b8a6" 
-                    r={8}
-                  />
-                </ComposedChart>
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>

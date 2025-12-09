@@ -446,8 +446,13 @@ const EmissionCalculator = () => {
         // Downstream emissions (9-15)
         { id: 'investments', title: 'Investments', icon: Building2, description: 'Financed emissions from investments', group: 'downstream' },
         { id: 'downstreamTransportation', title: 'Downstream Transportation', icon: Truck, description: 'Distribution of sold products', group: 'downstream' },
-        { id: 'processingSoldProducts', title: 'Processing of Sold Products', icon: Factory, description: 'Processing activities by third parties', group: 'downstream' },
-        { id: 'useOfSoldProducts', title: 'Use of Sold Products', icon: Factory, description: 'Emissions from product use phase', group: 'downstream' },
+        {
+          id: 'processingUseOfSoldProducts',
+          title: 'Processing / Use of Sold Products',
+          icon: Factory,
+          description: 'Processing by third parties and use-phase emissions',
+          group: 'downstream',
+        },
         { id: 'endOfLifeTreatment', title: 'End-of-Life Treatment', icon: Factory, description: 'End-of-life processing and disposal', group: 'downstream' },
         { id: 'downstreamLeasedAssets', title: 'Downstream Leased Assets', icon: Building2, description: 'Leased assets downstream (tenants)', group: 'downstream' },
         { id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations', group: 'downstream' }
@@ -744,14 +749,14 @@ const EmissionCalculator = () => {
                         <button
                           key={category.id}
                           onClick={() => handleCategoryClick(scope.id, category.id)}
-                          className={`w-full flex items-center space-x-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                          className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                             activeScope === scope.id && activeCategory === category.id
                               ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
                               : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                           }`}
                         >
-                          <category.icon className={`h-4 w-4 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
-                          <span>{category.title}</span>
+                          <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                          <span className="text-left">{category.title}</span>
                         </button>
                       ))
                     ) : (
@@ -773,14 +778,14 @@ const EmissionCalculator = () => {
                                 <button
                                   key={category.id}
                                   onClick={() => handleCategoryClick(scope.id, category.id)}
-                                  className={`w-full flex items-center space-x-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                                  className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                     activeScope === scope.id && activeCategory === category.id
                                       ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
                                       : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                                   }`}
                                 >
-                                  <category.icon className={`h-4 w-4 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
-                                  <span>{category.title}</span>
+                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                                  <span className="text-left">{category.title}</span>
                                 </button>
                               ))}
                             </div>
@@ -803,14 +808,14 @@ const EmissionCalculator = () => {
                                 <button
                                   key={category.id}
                                   onClick={() => handleCategoryClick(scope.id, category.id)}
-                                  className={`w-full flex items-center space-x-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                                  className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                     activeScope === scope.id && activeCategory === category.id
                                       ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
                                       : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                                   }`}
                                 >
-                                  <category.icon className={`h-4 w-4 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
-                                  <span>{category.title}</span>
+                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                                  <span className="text-left">{category.title}</span>
                                 </button>
                               ))}
                             </div>
@@ -1097,18 +1102,7 @@ const EmissionCalculator = () => {
                         />
                       )}
 
-                      {activeCategory === 'processingSoldProducts' && (
-                        <Scope3Section 
-                          activeCategory={activeCategory} 
-                          emissionData={emissionData} 
-                          setEmissionData={setEmissionData} 
-                          onSaveAndNext={navigateToNextCategory}
-                          companyContext={!!companyContext}
-                          counterpartyId={companyContext?.counterpartyId}
-                        />
-                      )}
-
-                      {activeCategory === 'useOfSoldProducts' && (
+                      {activeCategory === 'processingUseOfSoldProducts' && (
                         <Scope3Section 
                           activeCategory={activeCategory} 
                           emissionData={emissionData} 

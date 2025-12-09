@@ -8,7 +8,22 @@ export interface ProcessingSoldProductsRow {
   id: string;
   processingActivity: string;
   factorType?: 'fuel' | 'electricity';
-  // Fuel-related fields (only when factorType is 'fuel')
+  // Combustion type for "Heating, melting, smelting" activity
+  combustionType?: 'stationary' | 'mobile';
+  // Stationary Combustion fields (when combustionType is 'stationary')
+  stationaryMainFuelType?: string;
+  stationarySubFuelType?: string;
+  stationaryCo2Factor?: number;
+  stationaryUnit?: string;
+  // Mobile Combustion fields (when combustionType is 'mobile')
+  mobileFuelType?: string;
+  mobileKgCo2PerUnit?: number;
+  mobileUnit?: string;
+  // Heat and Steam fields (for "Drying / Curing / Kilns" activity)
+  heatSteamType?: string; // 'Onsite heat and steam' | 'District heat and steam'
+  heatSteamKgCo2e?: number;
+  heatSteamUnit?: string;
+  // Fuel-related fields (only when factorType is 'fuel' and not using combustion tables)
   type?: FuelType;
   fuel?: string;
   unit?: string;
@@ -39,6 +54,65 @@ export interface UseOfSoldProductsRow {
   energyConsumption: string;
   quantity: number | undefined;
   emissions: number | undefined;
+  // Combustion type for "Internal combustion engine vehicles (cars, trucks, bikes)" activity
+  combustionType?: 'stationary' | 'mobile';
+  // Stationary Combustion fields (when combustionType is 'stationary')
+  stationaryMainFuelType?: string;
+  stationarySubFuelType?: string;
+  stationaryCo2Factor?: number;
+  stationaryUnit?: string;
+  // Mobile Combustion fields (when combustionType is 'mobile')
+  mobileFuelType?: string;
+  mobileKgCo2PerUnit?: number;
+  mobileUnit?: string;
+  // Fuel fields for "Hybrid vehicles" - Scope 1 style
+  hybridFuelType?: FuelType;
+  hybridFuel?: string;
+  hybridFuelUnit?: string;
+  hybridFuelQuantity?: number;
+  hybridFuelFactor?: number;
+  hybridFuelEmissions?: number;
+  // Electricity fields for "Hybrid vehicles" - Scope 2 style
+  hybridTotalKwh?: number;
+  hybridGridPct?: number;
+  hybridRenewablePct?: number;
+  hybridOtherPct?: number;
+  hybridGridCountry?: 'UAE' | 'Pakistan';
+  hybridOtherSources?: Array<{
+    id: string;
+    type?: FuelType;
+    fuel?: string;
+    unit?: string;
+    quantity?: number;
+    factor?: number;
+    emissions?: number;
+  }>;
+  // Electricity fields for "Electronics", "Electric machinery/equipment", "Batteries", "Water-using devices" - Scope 2 style
+  electricityTotalKwh?: number;
+  electricityGridPct?: number;
+  electricityRenewablePct?: number;
+  electricityOtherPct?: number;
+  electricityGridCountry?: 'UAE' | 'Pakistan';
+  electricityOtherSources?: Array<{
+    id: string;
+    type?: FuelType;
+    fuel?: string;
+    unit?: string;
+    quantity?: number;
+    factor?: number;
+    emissions?: number;
+  }>;
+  // Refrigerant fields for "Refrigerants sold" - Scope 1 style
+  refrigerantType?: string;
+  refrigerantFactor?: number;
+  // Refrigerant quantity for "Cooling products (AC, refrigeration)" - separate from electricity
+  coolingRefrigerantQuantity?: number;
+  // Fuel fields for "Gas-fired industrial machinery sold" - Scope 1 style
+  gasMachineryFuelType?: FuelType;
+  gasMachineryFuel?: string;
+  gasMachineryUnit?: string;
+  gasMachineryQuantity?: number;
+  gasMachineryFactor?: number;
 }
 
 export interface PurchasedGoodsRow {
