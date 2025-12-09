@@ -45,12 +45,16 @@ else:
 
 logger.info(f"CORS allowed origins: {allowed_origins}")
 
+# Add CORS middleware - MUST be added before routes
+# For Vercel serverless functions, explicit CORS configuration is critical
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Bank portfolio management removed - keeping simple individual company approach
