@@ -6,6 +6,23 @@ import os
 import traceback
 import json
 
+# CORS headers that should be on ALL responses
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "https://www.rethinkcarbon.io",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "3600",
+}
+
+def add_cors_headers(response):
+    """Add CORS headers to any response"""
+    if isinstance(response, dict):
+        if "headers" not in response:
+            response["headers"] = {}
+        response["headers"].update(CORS_HEADERS)
+    return response
+
 def get_handler():
     """Initialize and return the handler with detailed error reporting"""
     try:
@@ -38,10 +55,41 @@ def get_handler():
         print("✓ FastAPI app imported successfully")
         
         # Create ASGI handler for Vercel
-        handler = Mangum(app, lifespan="off", api_gateway_base_path="")
+        mangum_handler = Mangum(app, lifespan="off", api_gateway_base_path="")
         print("✓ Mangum handler created successfully")
         
-        return handler
+        # Wrap handler to ensure CORS headers are always added
+        def wrapped_handler(event, context):
+            try:
+                # Handle OPTIONS preflight requests directly
+                if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+                    return {
+                        "statusCode": 200,
+                        "headers": CORS_HEADERS,
+                        "body": ""
+                    }
+                
+                # Call the actual handler
+                response = mangum_handler(event, context)
+                
+                # Ensure CORS headers are added
+                return add_cors_headers(response)
+                
+            except Exception as e:
+                # Even on error, return CORS headers
+                error_response = {
+                    "statusCode": 500,
+                    "headers": CORS_HEADERS.copy(),
+                    "body": json.dumps({
+                        "error": "Internal server error",
+                        "message": str(e)
+                    })
+                }
+                error_response["headers"]["Content-Type"] = "application/json"
+                print(f"Error in handler: {e}\n{traceback.format_exc()}")
+                return error_response
+        
+        return wrapped_handler
         
     except Exception as e:
         error_msg = f"Failed to initialize FastAPI app: {str(e)}\n{traceback.format_exc()}"
@@ -50,14 +98,19 @@ def get_handler():
         print(error_msg)
         print("=" * 80)
         
-        # Return a handler that shows the error
+        # Return a handler that shows the error but still has CORS headers
         def error_handler(event, context):
+            # Handle OPTIONS preflight
+            if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+                return {
+                    "statusCode": 200,
+                    "headers": CORS_HEADERS,
+                    "body": ""
+                }
+            
             return {
                 "statusCode": 500,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
+                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
                 "body": json.dumps({
                     "error": "Server initialization failed",
                     "message": str(e),
