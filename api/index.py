@@ -62,7 +62,16 @@ def get_handler():
         def wrapped_handler(event, context):
             try:
                 # Handle OPTIONS preflight requests directly
-                if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+                # Check multiple possible event formats (Vercel uses different formats)
+                method = (
+                    event.get("requestContext", {}).get("http", {}).get("method") or
+                    event.get("httpMethod") or
+                    event.get("method") or
+                    ""
+                )
+                
+                if method.upper() == "OPTIONS":
+                    print("Handling OPTIONS preflight request")
                     return {
                         "statusCode": 200,
                         "headers": CORS_HEADERS,
@@ -72,21 +81,25 @@ def get_handler():
                 # Call the actual handler
                 response = mangum_handler(event, context)
                 
-                # Ensure CORS headers are added
-                return add_cors_headers(response)
+                # Ensure CORS headers are added to the response
+                if isinstance(response, dict):
+                    if "headers" not in response:
+                        response["headers"] = {}
+                    response["headers"].update(CORS_HEADERS)
+                
+                return response
                 
             except Exception as e:
                 # Even on error, return CORS headers
+                print(f"Error in wrapped handler: {e}\n{traceback.format_exc()}")
                 error_response = {
                     "statusCode": 500,
-                    "headers": CORS_HEADERS.copy(),
+                    "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
                     "body": json.dumps({
                         "error": "Internal server error",
                         "message": str(e)
                     })
                 }
-                error_response["headers"]["Content-Type"] = "application/json"
-                print(f"Error in handler: {e}\n{traceback.format_exc()}")
                 return error_response
         
         return wrapped_handler
@@ -100,8 +113,16 @@ def get_handler():
         
         # Return a handler that shows the error but still has CORS headers
         def error_handler(event, context):
-            # Handle OPTIONS preflight
-            if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+            # Handle OPTIONS preflight - check multiple event formats
+            method = (
+                event.get("requestContext", {}).get("http", {}).get("method") or
+                event.get("httpMethod") or
+                event.get("method") or
+                ""
+            )
+            
+            if method.upper() == "OPTIONS":
+                print("Handling OPTIONS preflight in error handler")
                 return {
                     "statusCode": 200,
                     "headers": CORS_HEADERS,
