@@ -11,5 +11,6 @@ sys.path.insert(0, backend_path)
 
 from fastapi_app.main import app
 
-# Create ASGI handler for Vercel
-handler = Mangum(app, lifespan="off")
+# Create ASGI handler for Vercel with CORS support
+# Mangum automatically handles CORS through FastAPI's middleware
+handler = Mangum(app, lifespan="off", api_gateway_base_path="")
