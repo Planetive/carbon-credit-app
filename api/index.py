@@ -7,13 +7,39 @@ import traceback
 import json
 
 # CORS headers that should be on ALL responses
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "https://www.rethinkcarbon.io",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-    "Access-Control-Allow-Headers": "*",
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Max-Age": "3600",
-}
+# Note: Access-Control-Allow-Origin should be set dynamically based on request origin
+# For now, we'll use a wildcard for development, but FastAPI middleware will handle it properly
+def get_cors_headers(origin=None):
+    """Get CORS headers, allowing specific origins"""
+    allowed_origins = [
+        "https://www.rethinkcarbon.io",
+        "https://rethinkcarbon.io",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
+    ]
+    
+    # If origin is provided and in allowed list, use it; otherwise use wildcard for localhost
+    if origin and origin in allowed_origins:
+        allow_origin = origin
+    elif origin and origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+        allow_origin = origin  # Allow any localhost origin for dev
+    else:
+        allow_origin = "https://www.rethinkcarbon.io"  # Default to production
+    
+    return {
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "3600",
+    }
+
+# Default CORS headers (will be overridden by get_cors_headers in handler)
+CORS_HEADERS = get_cors_headers()
 
 def add_cors_headers(response):
     """Add CORS headers to any response"""
@@ -61,6 +87,18 @@ def get_handler():
         # Wrap handler to ensure CORS headers are always added
         def wrapped_handler(event, context):
             try:
+                # Extract origin from request headers
+                headers = event.get("headers", {}) or {}
+                origin = (
+                    headers.get("origin") or
+                    headers.get("Origin") or
+                    headers.get("ORIGIN") or
+                    None
+                )
+                
+                # Get CORS headers based on origin
+                cors_headers = get_cors_headers(origin)
+                
                 # Handle OPTIONS preflight requests directly
                 # Check multiple possible event formats (Vercel uses different formats)
                 method = (
@@ -71,10 +109,10 @@ def get_handler():
                 )
                 
                 if method.upper() == "OPTIONS":
-                    print("Handling OPTIONS preflight request")
+                    print(f"Handling OPTIONS preflight request from origin: {origin}")
                     return {
                         "statusCode": 200,
-                        "headers": CORS_HEADERS,
+                        "headers": cors_headers,
                         "body": ""
                     }
                 
@@ -85,16 +123,20 @@ def get_handler():
                 if isinstance(response, dict):
                     if "headers" not in response:
                         response["headers"] = {}
-                    response["headers"].update(CORS_HEADERS)
+                    response["headers"].update(cors_headers)
                 
                 return response
                 
             except Exception as e:
                 # Even on error, return CORS headers
+                headers = event.get("headers", {}) or {}
+                origin = headers.get("origin") or headers.get("Origin") or headers.get("ORIGIN") or None
+                cors_headers = get_cors_headers(origin)
+                
                 print(f"Error in wrapped handler: {e}\n{traceback.format_exc()}")
                 error_response = {
                     "statusCode": 500,
-                    "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                    "headers": {**cors_headers, "Content-Type": "application/json"},
                     "body": json.dumps({
                         "error": "Internal server error",
                         "message": str(e)
@@ -113,6 +155,11 @@ def get_handler():
         
         # Return a handler that shows the error but still has CORS headers
         def error_handler(event, context):
+            # Extract origin from request headers
+            headers = event.get("headers", {}) or {}
+            origin = headers.get("origin") or headers.get("Origin") or headers.get("ORIGIN") or None
+            cors_headers = get_cors_headers(origin)
+            
             # Handle OPTIONS preflight - check multiple event formats
             method = (
                 event.get("requestContext", {}).get("http", {}).get("method") or
@@ -122,16 +169,16 @@ def get_handler():
             )
             
             if method.upper() == "OPTIONS":
-                print("Handling OPTIONS preflight in error handler")
+                print(f"Handling OPTIONS preflight in error handler from origin: {origin}")
                 return {
                     "statusCode": 200,
-                    "headers": CORS_HEADERS,
+                    "headers": cors_headers,
                     "body": ""
                 }
             
             return {
                 "statusCode": 500,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                "headers": {**cors_headers, "Content-Type": "application/json"},
                 "body": json.dumps({
                     "error": "Server initialization failed",
                     "message": str(e),
