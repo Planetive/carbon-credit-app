@@ -59,9 +59,23 @@ app.add_middleware(
 
 # Bank portfolio management removed - keeping simple individual company approach
 
-# Initialize the calculation engines
-calculation_engine = CalculationEngine()
-scenario_engine = ScenarioEngine()
+# Initialize the calculation engines lazily to avoid crashes during import
+calculation_engine = None
+scenario_engine = None
+
+def get_calculation_engine():
+    """Lazy initialization of calculation engine"""
+    global calculation_engine
+    if calculation_engine is None:
+        calculation_engine = CalculationEngine()
+    return calculation_engine
+
+def get_scenario_engine():
+    """Lazy initialization of scenario engine"""
+    global scenario_engine
+    if scenario_engine is None:
+        scenario_engine = ScenarioEngine()
+    return scenario_engine
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -118,7 +132,7 @@ def finance_emission(req: FinanceEmissionRequest) -> FinanceEmissionResponse:
         company_type = CompanyType.LISTED if req.company_type == "listed" else CompanyType.PRIVATE
         
         # Perform calculation
-        result = calculation_engine.calculate(
+        result = get_calculation_engine().calculate(
             formula_id=req.formula_id,
             inputs=req.inputs,
             company_type=company_type
@@ -154,7 +168,7 @@ def facilitated_emission(req: FacilitatedEmissionRequest) -> FacilitatedEmission
         company_type = CompanyType.LISTED if req.company_type == "listed" else CompanyType.PRIVATE
         
         # Perform calculation
-        result = calculation_engine.calculate(
+        result = get_calculation_engine().calculate(
             formula_id=req.formula_id,
             inputs=req.inputs,
             company_type=company_type
@@ -191,7 +205,7 @@ def calculate_scenario(req: ScenarioRequest) -> ScenarioResponse:
             raise ValueError("Portfolio entries cannot be empty")
         
         # Perform scenario calculation
-        result = scenario_engine.calculate_scenario(
+        result = get_scenario_engine().calculate_scenario(
             portfolio_entries=req.portfolio_entries,
             scenario_type=req.scenario_type
         )

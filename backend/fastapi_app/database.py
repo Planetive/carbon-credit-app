@@ -7,17 +7,16 @@ from supabase import create_client, Client
 from typing import Optional
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (only if it exists, for local dev)
+# In Vercel, environment variables are set directly, no .env file needed
+try:
+    load_dotenv()
+except:
+    pass  # .env file not required in production
 
 # Supabase configuration - using the same instance as frontend
 SUPABASE_URL = "https://yhticndmpvzczquivpfb.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-# Fallback to the same service role key from frontend (for development)
-# In production, this should be set via environment variables
-if not SUPABASE_SERVICE_ROLE_KEY:
-    SUPABASE_SERVICE_ROLE_KEY = "YOUR_SERVICE_ROLE_KEY_HERE"
 
 # Create Supabase client for backend operations
 # Using service role key to bypass RLS for backend operations
@@ -44,7 +43,7 @@ def get_supabase_client() -> Client:
 
 def test_connection() -> bool:
     """
-    Test database connection
+    Test database connection - returns False if connection fails, doesn't raise exception
     Returns True if connection is successful, False otherwise
     """
     try:
@@ -59,10 +58,5 @@ def test_connection() -> bool:
         print(f"Database connection test failed: {e}")
         return False
 
-# Initialize connection on module import
-try:
-    get_supabase_client()
-    print("Database connection initialized successfully")
-except Exception as e:
-    print(f"Database connection initialization failed: {e}")
-    print("   Make sure to set SUPABASE_SERVICE_ROLE_KEY environment variable")
+# Don't initialize connection on module import - let it be lazy
+# This prevents crashes if SUPABASE_SERVICE_ROLE_KEY is not set
