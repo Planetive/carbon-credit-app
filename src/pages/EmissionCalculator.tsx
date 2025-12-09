@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData, ScopeTotals } from "@/components/emissions/shared/types";
+import { supabase } from "@/integrations/supabase/client";
 import FuelEmissions from "@/components/emissions/scope1/FuelEmissions";
 import RefrigerantEmissions from "@/components/emissions/scope1/RefrigerantEmissions";
 import PassengerVehicleEmissions from "@/components/emissions/scope1/PassengerVehicleEmissions";
@@ -72,6 +73,7 @@ const EmissionCalculator = () => {
   const [initialQuestionnaireCompleted, setInitialQuestionnaireCompleted] = useState(false);
   const [calculationMode, setCalculationMode] = useState<'lca' | 'manual' | null>(null);
   const [showSwitchToLCADialog, setShowSwitchToLCADialog] = useState(false);
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [emissionData, setEmissionData] = useState<EmissionData>({
     scope1: {
       fuel: [],
@@ -236,6 +238,76 @@ const EmissionCalculator = () => {
         description: "Failed to save company emissions. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Load LCA preferences from database
+  useEffect(() => {
+    const loadLCAPreferences = async () => {
+      if (!user) {
+        setLoadingPreferences(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from("emission_calculator_preferences")
+          .select("has_lca_data, calculation_mode, initial_questionnaire_completed")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+          console.error('Error loading LCA preferences:', error);
+        } else if (data) {
+          // If user has completed the questionnaire, set the state
+          if (data.initial_questionnaire_completed) {
+            setInitialQuestionnaireCompleted(true);
+            // Set calculation mode from database
+            if (data.calculation_mode) {
+              setCalculationMode(data.calculation_mode as 'lca' | 'manual');
+            } else {
+              // Default based on has_lca_data if calculation_mode is not set
+              setCalculationMode(data.has_lca_data ? 'lca' : 'manual');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading LCA preferences:', error);
+      } finally {
+        setLoadingPreferences(false);
+      }
+    };
+
+    loadLCAPreferences();
+  }, [user]);
+
+  // Save LCA preferences to database
+  const saveLCAPreferences = async (hasLCA: boolean, mode: 'lca' | 'manual') => {
+    if (!user) return;
+
+    try {
+      // Use upsert to handle both insert and update
+      const { error } = await (supabase as any)
+        .from("emission_calculator_preferences")
+        .upsert({
+          user_id: user.id,
+          has_lca_data: hasLCA,
+          calculation_mode: mode,
+          initial_questionnaire_completed: true,
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.error('Error saving LCA preferences:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save preferences. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error saving LCA preferences:', error);
     }
   };
 
@@ -540,6 +612,18 @@ const EmissionCalculator = () => {
     );
   }
 
+  // Show loading state while preferences are being loaded
+  if (loadingPreferences) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show initial questionnaire if not completed
   if (!initialQuestionnaireCompleted) {
     return (
@@ -557,15 +641,20 @@ const EmissionCalculator = () => {
                   setCalculationMode('manual');
                   setActiveScope('scope1');
                   setActiveCategory('fuel');
+                  // Save preference to database
+                  saveLCAPreferences(false, 'manual');
                 }}
                 onInitialAnswer={(hasLCA) => {
                   setInitialQuestionnaireCompleted(true);
-                  setCalculationMode(hasLCA ? 'lca' : 'manual');
+                  const mode = hasLCA ? 'lca' : 'manual';
+                  setCalculationMode(mode);
                   if (!hasLCA) {
                     // Auto-select first category for manual mode
                     setActiveScope('scope1');
                     setActiveCategory('fuel');
                   }
+                  // Save preference to database
+                  saveLCAPreferences(hasLCA, mode);
                 }}
                 onComplete={() => {
                   // Questionnaire completed
@@ -583,6 +672,8 @@ const EmissionCalculator = () => {
     setCalculationMode('manual');
     setActiveScope('scope1');
     setActiveCategory('fuel');
+    // Save preference to database
+    saveLCAPreferences(false, 'manual');
   };
 
   const handleSwitchToLCA = () => {
@@ -599,6 +690,8 @@ const EmissionCalculator = () => {
     });
     setCalculationMode('lca');
     setShowSwitchToLCADialog(false);
+    // Save preference to database
+    saveLCAPreferences(true, 'lca');
   };
 
   return (
@@ -834,33 +927,49 @@ const EmissionCalculator = () => {
 
       {/* Main Content Area */}
       <div className={`flex-1 flex flex-col ${calculationMode === 'lca' ? '' : ''}`}>
-        {/* Top Header - Only show in manual mode */}
-        {calculationMode === 'manual' && (
+        {/* Top Header - Show in both manual and LCA modes */}
+        {(calculationMode === 'manual' || calculationMode === 'lca') && (
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-8 py-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
-                {(() => {
-                  const scope = sidebarItems.find(s => s.id === activeScope);
-                  const category = scope?.categories.find(c => c.id === activeCategory);
-                  return category ? `${scope?.title} - ${category.title}` : 'Select a Category';
-                })()}
-              </h2>
-              <p className="text-gray-600 text-base">
-                {(() => {
-                  const scope = sidebarItems.find(s => s.id === activeScope);
-                  const category = scope?.categories.find(c => c.id === activeCategory);
-                  return category?.description || 'Choose a category from the sidebar to start calculating emissions';
-                })()}
-              </p>
+              {calculationMode === 'manual' ? (
+                <>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
+                    {(() => {
+                      const scope = sidebarItems.find(s => s.id === activeScope);
+                      const category = scope?.categories.find(c => c.id === activeCategory);
+                      return category ? `${scope?.title} - ${category.title}` : 'Select a Category';
+                    })()}
+                  </h2>
+                  <p className="text-gray-600 text-base">
+                    {(() => {
+                      const scope = sidebarItems.find(s => s.id === activeScope);
+                      const category = scope?.categories.find(c => c.id === activeCategory);
+                      return category?.description || 'Choose a category from the sidebar to start calculating emissions';
+                    })()}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
+                    LCA Input Mode
+                  </h2>
+                  <p className="text-gray-600 text-base">
+                    Enter your emissions data directly from your lifecycle assessment studies
+                  </p>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 rounded-full border border-gray-200/50">
               <span className="text-sm font-semibold text-gray-700">Manual</span>
               <Switch
-                checked={false}
+                checked={calculationMode === 'lca'}
                 onCheckedChange={(checked) => {
                   if (checked) {
                     setShowSwitchToLCADialog(true);
+                  } else {
+                    // Switch to manual mode
+                    handleSwitchToManual();
                   }
                 }}
                 className="data-[state=checked]:bg-teal-600"

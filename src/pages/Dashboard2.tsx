@@ -33,10 +33,14 @@ const Dashboard2 = () => {
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [organizationName, setOrganizationName] = useState<string>("");
+  const [userType, setUserType] = useState<string>("financial_institution");
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
   const [hasAnyEmissions, setHasAnyEmissions] = useState<boolean>(false);
+  const [scope1Total, setScope1Total] = useState<number>(0);
+  const [scope2Total, setScope2Total] = useState<number>(0);
+  const [scope3Total, setScope3Total] = useState<number>(0);
   const [financeEmissionData, setFinanceEmissionData] = useState<any>(null);
   const [facilitatedEmissionData, setFacilitatedEmissionData] = useState<any>(null);
   const [riskAssessmentData, setRiskAssessmentData] = useState<any>(null);
@@ -50,7 +54,7 @@ const Dashboard2 = () => {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, organization_name")
+        .select("id, organization_name, user_type")
         .eq("user_id", user.id)
         .single();
       if (!data || error) {
@@ -62,6 +66,11 @@ const Dashboard2 = () => {
         setOrganizationName(data.organization_name);
       } else {
         setOrganizationName("");
+      }
+      if (data && data.user_type) {
+        setUserType(data.user_type);
+      } else {
+        setUserType("financial_institution"); // Default to financial_institution
       }
 
       // Onboarding completion check removed
@@ -156,18 +165,120 @@ const Dashboard2 = () => {
         setEmissionData(emissionData);
       }
 
-      // Determine if user has any scope 1 emission entries saved
+      // Load emission totals for Scope 1, 2, and 3
       try {
-        const [fuelCount, refCount, passCount, delCount] = await Promise.all([
-          (supabase as any).from('scope1_fuel_entries').select('id', { count: 'exact' }).eq('user_id', user.id),
-          (supabase as any).from('scope1_refrigerant_entries').select('id', { count: 'exact' }).eq('user_id', user.id),
-          (supabase as any).from('scope1_passenger_vehicle_entries').select('id', { count: 'exact' }).eq('user_id', user.id),
-          (supabase as any).from('scope1_delivery_vehicle_entries').select('id', { count: 'exact' }).eq('user_id', user.id),
+        // Scope 1 - Load all categories
+        const [fuelRes, refRes, passRes, delRes] = await Promise.all([
+          (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_passenger_vehicle_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_delivery_vehicle_entries').select('emissions').eq('user_id', user.id),
         ]);
-        const totalCount = (fuelCount.count || 0) + (refCount.count || 0) + (passCount.count || 0) + (delCount.count || 0);
-        setHasAnyEmissions(totalCount > 0);
-      } catch (_) {
+
+        const sum = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+        const scope1 = sum(fuelRes.data) + sum(refRes.data) + sum(passRes.data) + sum(delRes.data);
+        setScope1Total(scope1);
+
+        // Scope 2 - Electricity
+        const { data: mainRow } = await (supabase as any)
+          .from('scope2_electricity_main')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let elecTotal = 0;
+        if (mainRow) {
+          const totalKwh = Number(mainRow.total_kwh) || 0;
+          const gridPct = Number(mainRow.grid_pct) || 0;
+          const otherPct = Number(mainRow.other_pct) || 0;
+
+          const { data: subs } = await (supabase as any)
+            .from('scope2_electricity_subanswers')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('main_id', mainRow.id);
+
+          const gridRow = (subs || []).find((r: any) => r.type === 'grid');
+          const gridFactor = gridRow?.grid_emission_factor ? Number(gridRow.grid_emission_factor) : 0;
+          const gridPart = totalKwh > 0 && gridPct > 0 && gridFactor > 0 ? (gridPct / 100) * totalKwh * gridFactor : 0;
+
+          const otherRows = (subs || []).filter((r: any) => r.type === 'other');
+          const sumOtherEmissions = otherRows.reduce((s: number, r: any) => s + (Number(r.other_sources_emissions) || 0), 0);
+          const otherPart = totalKwh > 0 && otherPct > 0 ? (otherPct / 100) * totalKwh * sumOtherEmissions : 0;
+
+          elecTotal = Number((gridPart + otherPart).toFixed(6));
+        }
+
+        // Scope 2 - Heat & Steam
+        const { data: heatRows } = await (supabase as any)
+          .from('scope2_heatsteam_entries')
+          .select('emissions')
+          .eq('user_id', user.id);
+        const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
+        const scope2 = elecTotal + Number(heatTotal.toFixed(6));
+        setScope2Total(scope2);
+
+        // Scope 3 - Load all categories (excluding LCA)
+        const [
+          purchasedGoodsRes,
+          capitalGoodsRes,
+          fuelEnergyRes,
+          upstreamTransportRes,
+          wasteGeneratedRes,
+          businessTravelRes,
+          employeeCommutingRes,
+          investmentsRes,
+          downstreamTransportRes,
+          endOfLifeRes,
+          processingSoldRes,
+          useOfSoldRes,
+        ] = await Promise.all([
+          (supabase as any).from('scope3_purchased_goods_services').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_capital_goods').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_fuel_energy_activities').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_upstream_transportation').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_investments').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
+          (supabase as any).from('scope3_use_of_sold_products').select('row_data').eq('user_id', user.id),
+        ]);
+
+        const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+        const processingTotal = (processingSoldRes.data || []).reduce((s: number, r: any) => {
+          const rowData = r.row_data;
+          if (rowData && typeof rowData.emissions === 'number') {
+            return s + rowData.emissions;
+          }
+          return s;
+        }, 0);
+        const useTotal = (useOfSoldRes.data || []).reduce((s: number, r: any) => {
+          const rowData = r.row_data;
+          if (rowData && typeof rowData.emissions === 'number') {
+            return s + rowData.emissions;
+          }
+          return s;
+        }, 0);
+
+        const scope3 = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
+          sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
+          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumScope3(investmentsRes.data) + 
+          sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
+        setScope3Total(scope3);
+
+        // Set hasAnyEmissions based on whether any scope has data
+        setHasAnyEmissions(scope1 > 0 || scope2 > 0 || scope3 > 0);
+      } catch (error) {
+        console.error('Error loading emission totals:', error);
         setHasAnyEmissions(false);
+        setScope1Total(0);
+        setScope2Total(0);
+        setScope3Total(0);
       }
 
       // Fetch and aggregate all Finance Emission calculations across all portfolios
@@ -398,6 +509,7 @@ const Dashboard2 = () => {
 
   // Onboarding gate removed; continue to dashboard
 
+  // Conditionally set sidebar items based on user_type
   const sidebarItems = [
     {
       id: 'overview',
@@ -407,15 +519,15 @@ const Dashboard2 = () => {
     },
     {
       id: 'portfolio',
-      title: 'My Portfolio',
+      title: userType === 'corporate' ? 'My Projects' : 'My Portfolio',
       icon: FileText,
-      path: null
+      path: userType === 'corporate' ? '/project-wizard' : null
     },
     {
       id: 'start-project',
-      title: 'Start New Portfolio',
+      title: userType === 'corporate' ? 'Start New Projects' : 'Start New Portfolio',
       icon: Plus,
-      path: '/bank-portfolio'
+      path: userType === 'corporate' ? '/project-wizard' : '/bank-portfolio'
     },
     {
       id: 'reports',
@@ -629,8 +741,10 @@ const Dashboard2 = () => {
                           <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                           <span className="text-sm font-medium">Scope 1 Emissions</span>
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {hasAnyEmissions ? 'Data Available' : 'No Data'}
+                        <span className="text-sm font-semibold text-gray-800">
+                          {scope1Total > 0 
+                            ? `${scope1Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
+                            : 'Not Tracked'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -638,8 +752,10 @@ const Dashboard2 = () => {
                           <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                           <span className="text-sm font-medium">Scope 2 Emissions</span>
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {hasAnyEmissions ? 'Data Available' : 'No Data'}
+                        <span className="text-sm font-semibold text-gray-800">
+                          {scope2Total > 0 
+                            ? `${scope2Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
+                            : 'Not Tracked'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -647,7 +763,11 @@ const Dashboard2 = () => {
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                           <span className="text-sm font-medium">Scope 3 Emissions</span>
                         </div>
-                        <span className="text-sm text-gray-600">Not Tracked</span>
+                        <span className="text-sm font-semibold text-gray-800">
+                          {scope3Total > 0 
+                            ? `${scope3Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
+                            : 'Not Tracked'}
+                        </span>
                       </div>
                     </div>
                     <div className="mt-4">
@@ -751,21 +871,39 @@ const Dashboard2 = () => {
                   </Card>
                 </Link> */}
 
-                <Link to="/bank-portfolio">
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Plus className="h-6 w-6 text-green-600" />
+                {userType === 'corporate' ? (
+                  <Link to="/project-wizard">
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                      <CardContent className="p-6">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Plus className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">Start New Projects</h3>
+                            <p className="text-sm text-gray-600">Begin your project wizard</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">Start New Portfolio</h3>
-                          <p className="text-sm text-gray-600">Add companies and loan amounts</p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ) : (
+                  <Link to="/bank-portfolio">
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                      <CardContent className="p-6">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Plus className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">Start New Portfolio</h3>
+                            <p className="text-sm text-gray-600">Add companies and loan amounts</p>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                )}
 
               </div>
             </div>

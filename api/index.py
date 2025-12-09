@@ -22,18 +22,23 @@ def get_cors_headers(origin=None):
         "http://127.0.0.1:8080",
     ]
     
-    # If origin is provided and in allowed list, use it; otherwise use wildcard for localhost
+    # If origin is provided and in allowed list, use it
     if origin and origin in allowed_origins:
         allow_origin = origin
-    elif origin and origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+    # Allow any localhost or 127.0.0.1 origin for dev (fix: use proper condition)
+    elif origin and (origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")):
         allow_origin = origin  # Allow any localhost origin for dev
     else:
-        allow_origin = "https://www.rethinkcarbon.io"  # Default to production
+        # Default to production, but if origin is provided and not localhost, reject it
+        if origin and not (origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")):
+            allow_origin = "https://www.rethinkcarbon.io"  # Default to production
+        else:
+            allow_origin = origin if origin else "https://www.rethinkcarbon.io"
     
     return {
         "Access-Control-Allow-Origin": allow_origin,
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Max-Age": "3600",
     }
@@ -87,28 +92,64 @@ def get_handler():
         # Wrap handler to ensure CORS headers are always added
         def wrapped_handler(event, context):
             try:
-                # Extract origin from request headers
+                # Extract origin from request headers (Vercel uses lowercase keys)
                 headers = event.get("headers", {}) or {}
+                # Try multiple case variations
                 origin = (
                     headers.get("origin") or
                     headers.get("Origin") or
                     headers.get("ORIGIN") or
+                    headers.get("x-forwarded-host") or  # Vercel sometimes uses this
                     None
                 )
+                
+                # Also check if there's a referer header that might help
+                if not origin:
+                    referer = headers.get("referer") or headers.get("Referer") or headers.get("REFERER")
+                    if referer:
+                        # Extract origin from referer
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(referer)
+                            origin = f"{parsed.scheme}://{parsed.netloc}"
+                        except:
+                            pass
+                
+                print(f"Request origin: {origin}, headers keys: {list(headers.keys())}")
                 
                 # Get CORS headers based on origin
                 cors_headers = get_cors_headers(origin)
                 
                 # Handle OPTIONS preflight requests directly
-                # Check multiple possible event formats (Vercel uses different formats)
-                method = (
-                    event.get("requestContext", {}).get("http", {}).get("method") or
-                    event.get("httpMethod") or
-                    event.get("method") or
-                    ""
-                )
+                # Vercel Python runtime event format - check multiple possible locations
+                method = None
                 
-                if method.upper() == "OPTIONS":
+                # Try Vercel's event format first (requestContext.http.method)
+                if "requestContext" in event:
+                    http_info = event.get("requestContext", {}).get("http", {})
+                    if http_info:
+                        method = http_info.get("method")
+                
+                # Fallback to other possible formats
+                if not method:
+                    method = event.get("httpMethod") or event.get("method") or event.get("requestMethod")
+                
+                # Check if it's an OPTIONS request by examining the request
+                # Sometimes the method might be in a different format
+                is_options = False
+                if method:
+                    is_options = method.upper() == "OPTIONS"
+                else:
+                    # If we can't find method, check if there's an access-control-request-method header
+                    # which indicates a preflight request
+                    acrm = headers.get("access-control-request-method") or headers.get("Access-Control-Request-Method")
+                    if acrm:
+                        is_options = True
+                        method = "OPTIONS"
+                
+                print(f"Request method: {method}, is_options: {is_options}, origin: {origin}")
+                
+                if is_options:
                     print(f"Handling OPTIONS preflight request from origin: {origin}")
                     return {
                         "statusCode": 200,
@@ -123,6 +164,7 @@ def get_handler():
                 if isinstance(response, dict):
                     if "headers" not in response:
                         response["headers"] = {}
+                    # Merge CORS headers, ensuring they're not overwritten
                     response["headers"].update(cors_headers)
                 
                 return response

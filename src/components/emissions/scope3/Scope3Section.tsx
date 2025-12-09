@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Save, Trash2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
@@ -67,9 +68,15 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   // Row-based state for Processing of Sold Products
   const [processingRows, setProcessingRows] = useState<ProcessingSoldProductsRow[]>([]);
+  const [existingProcessingRows, setExistingProcessingRows] = useState<Array<ProcessingSoldProductsRow & { dbId?: string }>>([]);
+  const [savingProcessing, setSavingProcessing] = useState(false);
+  const [isInitialLoadProcessing, setIsInitialLoadProcessing] = useState(true);
 
   // Row-based state for Use of Sold Products
   const [useRows, setUseRows] = useState<UseOfSoldProductsRow[]>([]);
+  const [existingUseRows, setExistingUseRows] = useState<Array<UseOfSoldProductsRow & { dbId?: string }>>([]);
+  const [savingUse, setSavingUse] = useState(false);
+  const [isInitialLoadUse, setIsInitialLoadUse] = useState(true);
 
   const newProcessingRow = (): ProcessingSoldProductsRow => ({
     id: `psp-${Date.now()}-${Math.random()}`,
@@ -2105,6 +2112,165 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
   };
 
+  // Load Processing of Sold Products
+  useEffect(() => {
+    const loadProcessing = async () => {
+      if (activeCategory !== 'processingUseOfSoldProducts' || productType !== 'intermediate' || !user) {
+        setIsInitialLoadProcessing(false);
+        return;
+      }
+
+      setIsInitialLoadProcessing(true);
+      try {
+        let query = supabase
+          .from('scope3_processing_sold_products' as any)
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (companyContext && counterpartyId) {
+          query = query.eq('counterparty_id', counterpartyId);
+        } else {
+          query = query.is('counterparty_id', null);
+        }
+
+        const { data, error } = await (query as any).order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const loadedRows = (data || []).map((entry: any) => {
+          // Reconstruct row from database entry, using row_data if available
+          const rowData = entry.row_data || {};
+          return {
+            id: crypto.randomUUID(),
+            dbId: entry.id,
+            processingActivity: entry.processing_activity || rowData.processingActivity || '',
+            factorType: entry.factor_type || rowData.factorType,
+            combustionType: entry.combustion_type || rowData.combustionType,
+            stationaryMainFuelType: entry.stationary_main_fuel_type || rowData.stationaryMainFuelType,
+            stationarySubFuelType: entry.stationary_sub_fuel_type || rowData.stationarySubFuelType,
+            stationaryCo2Factor: entry.stationary_co2_factor || rowData.stationaryCo2Factor,
+            stationaryUnit: entry.stationary_unit || rowData.stationaryUnit,
+            mobileFuelType: entry.mobile_fuel_type || rowData.mobileFuelType,
+            mobileKgCo2PerUnit: entry.mobile_kg_co2_per_unit || rowData.mobileKgCo2PerUnit,
+            mobileUnit: entry.mobile_unit || rowData.mobileUnit,
+            heatSteamType: entry.heat_steam_type || rowData.heatSteamType,
+            heatSteamKgCo2e: entry.heat_steam_kg_co2e || rowData.heatSteamKgCo2e,
+            heatSteamUnit: entry.heat_steam_unit || rowData.heatSteamUnit,
+            type: entry.fuel_type || rowData.type,
+            fuel: entry.fuel || rowData.fuel,
+            unit: entry.fuel_unit || rowData.unit,
+            quantity: entry.fuel_quantity || entry.quantity || rowData.quantity,
+            factor: entry.fuel_factor || rowData.factor,
+            emissions: entry.emissions || rowData.emissions,
+            totalKwh: entry.total_kwh || rowData.totalKwh,
+            gridPct: entry.grid_pct || rowData.gridPct,
+            renewablePct: entry.renewable_pct || rowData.renewablePct,
+            otherPct: entry.other_pct || rowData.otherPct,
+            gridCountry: entry.grid_country || rowData.gridCountry,
+            otherSources: entry.other_sources || rowData.otherSources || [],
+          } as ProcessingSoldProductsRow & { dbId: string };
+        });
+
+        setExistingProcessingRows(loadedRows);
+        setProcessingRows(loadedRows.length > 0 ? loadedRows : []);
+      } catch (error: any) {
+        console.error('Error loading processing of sold products:', error);
+        toast({ title: "Error", description: "Failed to load processing entries", variant: "destructive" });
+      } finally {
+        setIsInitialLoadProcessing(false);
+      }
+    };
+
+    loadProcessing();
+  }, [user, activeCategory, productType, companyContext, counterpartyId, toast]);
+
+  // Load Use of Sold Products
+  useEffect(() => {
+    const loadUse = async () => {
+      if (activeCategory !== 'processingUseOfSoldProducts' || productType !== 'final' || !user) {
+        setIsInitialLoadUse(false);
+        return;
+      }
+
+      setIsInitialLoadUse(true);
+      try {
+        let query = supabase
+          .from('scope3_use_of_sold_products' as any)
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (companyContext && counterpartyId) {
+          query = query.eq('counterparty_id', counterpartyId);
+        } else {
+          query = query.is('counterparty_id', null);
+        }
+
+        const { data, error } = await (query as any).order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const loadedRows = (data || []).map((entry: any) => {
+          // Reconstruct row from database entry, using row_data if available
+          const rowData = entry.row_data || {};
+          return {
+            id: crypto.randomUUID(),
+            dbId: entry.id,
+            processingActivity: entry.processing_activity || rowData.processingActivity || '',
+            energyConsumption: entry.energy_consumption || rowData.energyConsumption || '',
+            quantity: entry.quantity || rowData.quantity,
+            emissions: entry.emissions || rowData.emissions,
+            combustionType: entry.combustion_type || rowData.combustionType,
+            stationaryMainFuelType: entry.stationary_main_fuel_type || rowData.stationaryMainFuelType,
+            stationarySubFuelType: entry.stationary_sub_fuel_type || rowData.stationarySubFuelType,
+            stationaryCo2Factor: entry.stationary_co2_factor || rowData.stationaryCo2Factor,
+            stationaryUnit: entry.stationary_unit || rowData.stationaryUnit,
+            stationaryQuantity: entry.stationary_quantity || rowData.stationaryQuantity,
+            mobileFuelType: entry.mobile_fuel_type || rowData.mobileFuelType,
+            mobileKgCo2PerUnit: entry.mobile_kg_co2_per_unit || rowData.mobileKgCo2PerUnit,
+            mobileUnit: entry.mobile_unit || rowData.mobileUnit,
+            mobileQuantity: entry.mobile_quantity || rowData.mobileQuantity,
+            hybridFuelType: entry.hybrid_fuel_type || rowData.hybridFuelType,
+            hybridFuel: entry.hybrid_fuel || rowData.hybridFuel,
+            hybridFuelUnit: entry.hybrid_fuel_unit || rowData.hybridFuelUnit,
+            hybridFuelQuantity: entry.hybrid_fuel_quantity || rowData.hybridFuelQuantity,
+            hybridFuelFactor: entry.hybrid_fuel_factor || rowData.hybridFuelFactor,
+            hybridFuelEmissions: entry.hybrid_fuel_emissions || rowData.hybridFuelEmissions,
+            hybridTotalKwh: entry.hybrid_total_kwh || rowData.hybridTotalKwh,
+            hybridGridPct: entry.hybrid_grid_pct || rowData.hybridGridPct,
+            hybridRenewablePct: entry.hybrid_renewable_pct || rowData.hybridRenewablePct,
+            hybridOtherPct: entry.hybrid_other_pct || rowData.hybridOtherPct,
+            hybridGridCountry: entry.hybrid_grid_country || rowData.hybridGridCountry,
+            hybridOtherSources: entry.hybrid_other_sources || rowData.hybridOtherSources || [],
+            electricityTotalKwh: entry.electricity_total_kwh || rowData.electricityTotalKwh,
+            electricityGridPct: entry.electricity_grid_pct || rowData.electricityGridPct,
+            electricityRenewablePct: entry.electricity_renewable_pct || rowData.electricityRenewablePct,
+            electricityOtherPct: entry.electricity_other_pct || rowData.electricityOtherPct,
+            electricityGridCountry: entry.electricity_grid_country || rowData.electricityGridCountry,
+            electricityOtherSources: entry.electricity_other_sources || rowData.electricityOtherSources || [],
+            refrigerantType: entry.refrigerant_type || rowData.refrigerantType,
+            refrigerantFactor: entry.refrigerant_factor || rowData.refrigerantFactor,
+            coolingRefrigerantQuantity: entry.cooling_refrigerant_quantity || rowData.coolingRefrigerantQuantity,
+            gasMachineryFuelType: entry.gas_machinery_fuel_type || rowData.gasMachineryFuelType,
+            gasMachineryFuel: entry.gas_machinery_fuel || rowData.gasMachineryFuel,
+            gasMachineryUnit: entry.gas_machinery_unit || rowData.gasMachineryUnit,
+            gasMachineryQuantity: entry.gas_machinery_quantity || rowData.gasMachineryQuantity,
+            gasMachineryFactor: entry.gas_machinery_factor || rowData.gasMachineryFactor,
+          } as UseOfSoldProductsRow & { dbId: string };
+        });
+
+        setExistingUseRows(loadedRows);
+        setUseRows(loadedRows.length > 0 ? loadedRows : []);
+      } catch (error: any) {
+        console.error('Error loading use of sold products:', error);
+        toast({ title: "Error", description: "Failed to load use entries", variant: "destructive" });
+      } finally {
+        setIsInitialLoadUse(false);
+      }
+    };
+
+    loadUse();
+  }, [user, activeCategory, productType, companyContext, counterpartyId, toast]);
+
   // Purchased Goods & Services
   if (activeCategory === 'purchasedGoods') {
     return (
@@ -2567,7 +2733,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
               <button
                 onClick={() => handleProductTypeSelect('intermediate')}
-                className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-teal-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
               >
                 <div className="text-center">
                   <div className="text-4xl mb-4">🏭</div>
@@ -2579,7 +2745,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
               <button
                 onClick={() => handleProductTypeSelect('final')}
-                className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-teal-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
               >
                 <div className="text-center">
                   <div className="text-4xl mb-4">📦</div>
@@ -2596,41 +2762,171 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     // Processing of Sold Products Form (Intermediate)
     if (productType === 'intermediate') {
+      // Save Processing function (local to this block)
+      const saveProcessingLocal = async () => {
+        if (!user) {
+          toast({ title: "Sign in required", description: "Please sign in to save entries", variant: "destructive" });
+          return;
+        }
+
+        setSavingProcessing(true);
+        try {
+          // Identify new and changed entries
+          const newEntries = processingRows.filter(r => !existingProcessingRows.find(e => e.id === r.id));
+          const changedExisting = processingRows.filter(r => {
+            const existing = existingProcessingRows.find(e => e.id === r.id);
+            return existing && existing.dbId && JSON.stringify(existing) !== JSON.stringify(r);
+          });
+          const deletedIds = existingProcessingRows
+            .filter(e => !processingRows.find(r => r.id === e.id))
+            .map(e => e.dbId)
+            .filter((id): id is string => !!id);
+
+          // Delete removed entries
+          if (deletedIds.length > 0) {
+            const { error } = await supabase
+              .from('scope3_processing_sold_products' as any)
+              .delete()
+              .in('id', deletedIds);
+            if (error) throw error;
+          }
+
+          // Insert new entries
+          if (newEntries.length > 0) {
+            const payload = newEntries.map(r => ({
+              user_id: user.id,
+              counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
+              processing_activity: r.processingActivity,
+              factor_type: r.factorType,
+              combustion_type: r.combustionType,
+              stationary_main_fuel_type: r.stationaryMainFuelType,
+              stationary_sub_fuel_type: r.stationarySubFuelType,
+              stationary_co2_factor: r.stationaryCo2Factor,
+              stationary_unit: r.stationaryUnit,
+              mobile_fuel_type: r.mobileFuelType,
+              mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
+              mobile_unit: r.mobileUnit,
+              heat_steam_type: r.heatSteamType,
+              heat_steam_kg_co2e: r.heatSteamKgCo2e,
+              heat_steam_unit: r.heatSteamUnit,
+              fuel_type: r.type,
+              fuel: r.fuel,
+              fuel_unit: r.unit,
+              fuel_quantity: r.quantity,
+              fuel_factor: r.factor,
+              total_kwh: r.totalKwh,
+              grid_pct: r.gridPct,
+              renewable_pct: r.renewablePct,
+              other_pct: r.otherPct,
+              grid_country: r.gridCountry,
+              other_sources: r.otherSources || [],
+              quantity: r.quantity,
+              emissions: r.emissions || 0,
+              row_data: r, // Store full row data as JSONB
+            }));
+
+            const { data, error } = await supabase.from('scope3_processing_sold_products' as any).insert(payload).select('id');
+            if (error) throw error;
+
+            // Update existing rows with new dbIds
+            const updatedRows = processingRows.map(r => {
+              const newEntryIndex = newEntries.findIndex(ne => ne.id === r.id);
+              if (newEntryIndex >= 0 && data && data[newEntryIndex] && (data[newEntryIndex] as any).id) {
+                return { ...r, dbId: (data[newEntryIndex] as any).id };
+              }
+              return r;
+            });
+            setExistingProcessingRows(updatedRows as Array<ProcessingSoldProductsRow & { dbId?: string }>);
+          }
+
+          // Update changed entries
+          if (changedExisting.length > 0) {
+            const updates = changedExisting.map(r => {
+              const existing = existingProcessingRows.find(e => e.id === r.id);
+              return supabase
+                .from('scope3_processing_sold_products' as any)
+                .update({
+                  processing_activity: r.processingActivity,
+                  factor_type: r.factorType,
+                  combustion_type: r.combustionType,
+                  stationary_main_fuel_type: r.stationaryMainFuelType,
+                  stationary_sub_fuel_type: r.stationarySubFuelType,
+                  stationary_co2_factor: r.stationaryCo2Factor,
+                  stationary_unit: r.stationaryUnit,
+                  mobile_fuel_type: r.mobileFuelType,
+                  mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
+                  mobile_unit: r.mobileUnit,
+                  heat_steam_type: r.heatSteamType,
+                  heat_steam_kg_co2e: r.heatSteamKgCo2e,
+                  heat_steam_unit: r.heatSteamUnit,
+                  fuel_type: r.type,
+                  fuel: r.fuel,
+                  fuel_unit: r.unit,
+                  fuel_quantity: r.quantity,
+                  fuel_factor: r.factor,
+                  total_kwh: r.totalKwh,
+                  grid_pct: r.gridPct,
+                  renewable_pct: r.renewablePct,
+                  other_pct: r.otherPct,
+                  grid_country: r.gridCountry,
+                  other_sources: r.otherSources || [],
+                  quantity: r.quantity,
+                  emissions: r.emissions || 0,
+                  row_data: r, // Store full row data as JSONB
+                })
+                .eq('id', existing!.dbId!);
+            });
+            const results = await Promise.all(updates);
+            const updateError = results.find(r => (r as any).error)?.error;
+            if (updateError) throw updateError;
+          }
+
+          toast({ title: "Saved", description: "Processing of sold products saved successfully." });
+          onSaveAndNext?.();
+        } catch (e: any) {
+          toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+        } finally {
+          setSavingProcessing(false);
+        }
+      };
+
       const totalEmissions = processingRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
       
       return (
         <div className={`space-y-6 transition-all duration-300 ${isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-          <div className="flex items-center justify-between mb-4">
-          <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBackToSelection}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  ← Back
-                </Button>
+          {/* Header Section */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBackToSelection}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                ← Back
+              </Button>
+              <div>
                 <h3 className="text-xl font-semibold text-gray-900">Processing of Sold Products</h3>
-          </div>
-              <p className="text-sm text-gray-600 ml-12">Lifecycle data, transformations, and energy use</p>
+                <p className="text-sm text-gray-600 mt-1">Lifecycle data, transformations, and energy use</p>
+              </div>
             </div>
             <Button 
               variant="default" 
               className="bg-teal-600 hover:bg-teal-700 text-white" 
               onClick={() => setProcessingRows(prev => [...prev, newProcessingRow()])}
             >
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
-          </Button>
-        </div>
+              <Plus className="h-4 w-4 mr-2" /> Add New Entry
+            </Button>
+          </div>
 
+          {/* Entries Section */}
           <div className="space-y-4">
             {processingRows.map((row, index) => (
-              <div 
+              <Card 
                 key={row.id} 
-                className="p-6 rounded-lg bg-gray-50 border border-gray-200 hover:border-teal-300 transition-all duration-200 animate-in fade-in-0 slide-in-from-bottom-4"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="overflow-hidden border-gray-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow-md"
               >
+                <CardContent className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
                     <Label className="flex items-center gap-1 mb-2">
@@ -2749,8 +3045,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Stationary Combustion Fields */}
                     {row.combustionType === 'stationary' && (
-                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Stationary Combustion Details</h5>
                         {/* Debug info - remove in production */}
                         {process.env.NODE_ENV === 'development' && (
                           <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
@@ -2879,8 +3175,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Mobile Combustion Fields */}
                     {row.combustionType === 'mobile' && (
-                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Mobile Combustion Details</h5>
                         {/* Debug info - remove in production */}
                         {process.env.NODE_ENV === 'development' && (
                           <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
@@ -3416,48 +3712,55 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                   </div>
                 )}
 
-                <div className="flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => setProcessingRows(prev => prev.filter(r => r.id !== row.id))}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Remove
-                  </Button>
-                </div>
-              </div>
+                  <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setProcessingRows(prev => prev.filter(r => r.id !== row.id))}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Remove Entry
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
+
+            {processingRows.length === 0 && (
+              <Card>
+                <CardContent className="p-12">
+                  <div className="text-center text-gray-500">
+                    <p className="text-lg mb-2">No entries yet</p>
+                    <p className="text-sm">Click "Add New Entry" to get started.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {processingRows.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <p>No entries yet. Click "Add New Entry" to get started.</p>
-          </div>
-        )}
-
-        <div className="pt-4 border-t">
+          {/* Footer Section */}
+          <Card className="bg-gray-50">
+            <CardContent className="p-6">
               <div className="flex items-center justify-between">
-              <div className="text-gray-700 font-medium">
-                Total Processing Entries: <span className="font-semibold">{processingRows.length}</span>
-                {totalEmissions > 0 && (
-                  <span className="ml-4">
-                    Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
-                  </span>
-                )}
+                <div className="text-gray-700 font-medium">
+                  <span className="text-sm text-gray-600">Total Processing Entries:</span> <span className="font-semibold text-lg">{processingRows.length}</span>
+                  {totalEmissions > 0 && (
+                    <span className="ml-6">
+                      <span className="text-sm text-gray-600">Total Emissions:</span> <span className="font-semibold text-lg text-teal-700">{totalEmissions.toFixed(6)} kg CO2e</span>
+                    </span>
+                  )}
+                </div>
+                <Button 
+                  onClick={saveProcessingLocal}
+                  disabled={processingRows.length === 0 || savingProcessing} 
+                  className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {savingProcessing ? 'Saving...' : `Save and Next (${processingRows.length})`}
+                </Button>
               </div>
-              <Button 
-                onClick={() => {
-                  toast({ title: 'Saved', description: 'Processing of sold products saved.' });
-                  onSaveAndNext?.();
-                }} 
-                disabled={processingRows.length === 0} 
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                <Save className="h-4 w-4 mr-2" />{`Save and Next (${processingRows.length})`}
-              </Button>
-              </div>
-        </div>
+            </CardContent>
+          </Card>
       </div>
     );
   }
@@ -3798,41 +4101,199 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         }));
       };
 
+      // Save Use function (local to this block)
+      const saveUseLocal = async () => {
+        if (!user) {
+          toast({ title: "Sign in required", description: "Please sign in to save entries", variant: "destructive" });
+          return;
+        }
+
+        setSavingUse(true);
+        try {
+          // Identify new and changed entries
+          const newEntries = useRows.filter(r => !existingUseRows.find(e => e.id === r.id));
+          const changedExisting = useRows.filter(r => {
+            const existing = existingUseRows.find(e => e.id === r.id);
+            return existing && existing.dbId && JSON.stringify(existing) !== JSON.stringify(r);
+          });
+          const deletedIds = existingUseRows
+            .filter(e => !useRows.find(r => r.id === e.id))
+            .map(e => e.dbId)
+            .filter((id): id is string => !!id);
+
+          // Delete removed entries
+          if (deletedIds.length > 0) {
+            const { error } = await supabase
+              .from('scope3_use_of_sold_products' as any)
+              .delete()
+              .in('id', deletedIds);
+            if (error) throw error;
+          }
+
+          // Insert new entries
+          if (newEntries.length > 0) {
+            const payload = newEntries.map(r => ({
+              user_id: user.id,
+              counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
+              processing_activity: r.processingActivity,
+              energy_consumption: r.energyConsumption,
+              combustion_type: r.combustionType,
+              stationary_main_fuel_type: r.stationaryMainFuelType,
+              stationary_sub_fuel_type: r.stationarySubFuelType,
+              stationary_co2_factor: r.stationaryCo2Factor,
+              stationary_unit: r.stationaryUnit,
+              stationary_quantity: r.stationaryQuantity,
+              mobile_fuel_type: r.mobileFuelType,
+              mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
+              mobile_unit: r.mobileUnit,
+              mobile_quantity: r.mobileQuantity,
+              hybrid_fuel_type: r.hybridFuelType,
+              hybrid_fuel: r.hybridFuel,
+              hybrid_fuel_unit: r.hybridFuelUnit,
+              hybrid_fuel_quantity: r.hybridFuelQuantity,
+              hybrid_fuel_factor: r.hybridFuelFactor,
+              hybrid_fuel_emissions: r.hybridFuelEmissions,
+              hybrid_total_kwh: r.hybridTotalKwh,
+              hybrid_grid_pct: r.hybridGridPct,
+              hybrid_renewable_pct: r.hybridRenewablePct,
+              hybrid_other_pct: r.hybridOtherPct,
+              hybrid_grid_country: r.hybridGridCountry,
+              hybrid_other_sources: r.hybridOtherSources || [],
+              electricity_total_kwh: r.electricityTotalKwh,
+              electricity_grid_pct: r.electricityGridPct,
+              electricity_renewable_pct: r.electricityRenewablePct,
+              electricity_other_pct: r.electricityOtherPct,
+              electricity_grid_country: r.electricityGridCountry,
+              electricity_other_sources: r.electricityOtherSources || [],
+              refrigerant_type: r.refrigerantType,
+              refrigerant_factor: r.refrigerantFactor,
+              cooling_refrigerant_quantity: r.coolingRefrigerantQuantity,
+              gas_machinery_fuel_type: r.gasMachineryFuelType,
+              gas_machinery_fuel: r.gasMachineryFuel,
+              gas_machinery_unit: r.gasMachineryUnit,
+              gas_machinery_quantity: r.gasMachineryQuantity,
+              gas_machinery_factor: r.gasMachineryFactor,
+              quantity: r.quantity,
+              emissions: r.emissions || 0,
+              row_data: r, // Store full row data as JSONB
+            }));
+
+            const { data, error } = await supabase.from('scope3_use_of_sold_products' as any).insert(payload).select('id');
+            if (error) throw error;
+
+            // Update existing rows with new dbIds
+            const updatedRows = useRows.map(r => {
+              const newEntryIndex = newEntries.findIndex(ne => ne.id === r.id);
+              if (newEntryIndex >= 0 && data && data[newEntryIndex] && (data[newEntryIndex] as any).id) {
+                return { ...r, dbId: (data[newEntryIndex] as any).id };
+              }
+              return r;
+            });
+            setExistingUseRows(updatedRows as Array<UseOfSoldProductsRow & { dbId?: string }>);
+          }
+
+          // Update changed entries
+          if (changedExisting.length > 0) {
+            const updates = changedExisting.map(r => {
+              const existing = existingUseRows.find(e => e.id === r.id);
+              return supabase
+                .from('scope3_use_of_sold_products' as any)
+                .update({
+                  processing_activity: r.processingActivity,
+                  energy_consumption: r.energyConsumption,
+                  combustion_type: r.combustionType,
+                  stationary_main_fuel_type: r.stationaryMainFuelType,
+                  stationary_sub_fuel_type: r.stationarySubFuelType,
+                  stationary_co2_factor: r.stationaryCo2Factor,
+                  stationary_unit: r.stationaryUnit,
+                  stationary_quantity: r.stationaryQuantity,
+                  mobile_fuel_type: r.mobileFuelType,
+                  mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
+                  mobile_unit: r.mobileUnit,
+                  mobile_quantity: r.mobileQuantity,
+                  hybrid_fuel_type: r.hybridFuelType,
+                  hybrid_fuel: r.hybridFuel,
+                  hybrid_fuel_unit: r.hybridFuelUnit,
+                  hybrid_fuel_quantity: r.hybridFuelQuantity,
+                  hybrid_fuel_factor: r.hybridFuelFactor,
+                  hybrid_fuel_emissions: r.hybridFuelEmissions,
+                  hybrid_total_kwh: r.hybridTotalKwh,
+                  hybrid_grid_pct: r.hybridGridPct,
+                  hybrid_renewable_pct: r.hybridRenewablePct,
+                  hybrid_other_pct: r.hybridOtherPct,
+                  hybrid_grid_country: r.hybridGridCountry,
+                  hybrid_other_sources: r.hybridOtherSources || [],
+                  electricity_total_kwh: r.electricityTotalKwh,
+                  electricity_grid_pct: r.electricityGridPct,
+                  electricity_renewable_pct: r.electricityRenewablePct,
+                  electricity_other_pct: r.electricityOtherPct,
+                  electricity_grid_country: r.electricityGridCountry,
+                  electricity_other_sources: r.electricityOtherSources || [],
+                  refrigerant_type: r.refrigerantType,
+                  refrigerant_factor: r.refrigerantFactor,
+                  cooling_refrigerant_quantity: r.coolingRefrigerantQuantity,
+                  gas_machinery_fuel_type: r.gasMachineryFuelType,
+                  gas_machinery_fuel: r.gasMachineryFuel,
+                  gas_machinery_unit: r.gasMachineryUnit,
+                  gas_machinery_quantity: r.gasMachineryQuantity,
+                  gas_machinery_factor: r.gasMachineryFactor,
+                  quantity: r.quantity,
+                  emissions: r.emissions || 0,
+                  row_data: r, // Store full row data as JSONB
+                })
+                .eq('id', existing!.dbId!);
+            });
+            const results = await Promise.all(updates);
+            const updateError = results.find(r => (r as any).error)?.error;
+            if (updateError) throw updateError;
+          }
+
+          toast({ title: "Saved", description: "Use of sold products saved successfully." });
+          onSaveAndNext?.();
+        } catch (e: any) {
+          toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+        } finally {
+          setSavingUse(false);
+        }
+      };
+
       const totalEmissions = useRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
       
     return (
         <div className={`space-y-6 transition-all duration-300 ${isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-          <div className="flex items-center justify-between mb-4">
-          <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBackToSelection}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  ← Back
-                </Button>
+          {/* Header Section */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBackToSelection}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                ← Back
+              </Button>
+              <div>
                 <h3 className="text-xl font-semibold text-gray-900">Use of Sold Products</h3>
-          </div>
-              <p className="text-sm text-gray-600 ml-12">Usage specs and energy during use</p>
+                <p className="text-sm text-gray-600 mt-1">Usage specs and energy during use</p>
+              </div>
             </div>
             <Button 
               variant="default" 
               className="bg-teal-600 hover:bg-teal-700 text-white" 
               onClick={() => setUseRows(prev => [...prev, newUseRow()])}
             >
-            <Plus className="h-4 w-4 mr-2" /> Add New Entry
-          </Button>
-        </div>
+              <Plus className="h-4 w-4 mr-2" /> Add New Entry
+            </Button>
+          </div>
 
+          {/* Entries Section */}
           <div className="space-y-4">
             {useRows.map((row, index) => (
-              <div 
+              <Card 
                 key={row.id} 
-                className="p-6 rounded-lg bg-gray-50 border border-gray-200 hover:border-teal-300 transition-all duration-200 animate-in fade-in-0 slide-in-from-bottom-4"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="overflow-hidden border-gray-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow-md"
               >
+                <CardContent className="p-6">
                 <div className="mb-4">
                     <Label className="flex items-center gap-1 mb-2">
                       Processing Activity <FieldTooltip content="Select the processing activity type" />
@@ -3928,14 +4389,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                 {row.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' && (
                   <div className="space-y-4 mb-4">
                     {/* Stationary Combustion Fields */}
-                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200 mb-4">
-                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {stationaryCombustionData.length} rows | 
-                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 mb-4">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Stationary Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
                     <Label className="flex items-center gap-1 mb-2">
@@ -3977,7 +4432,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                                 const selected = stationaryCombustionData.find(
                                   d => d['Main Fuel Type'] === row.stationaryMainFuelType && d['Sub Fuel Type'] === value
                                 );
-                                console.log('Selected sub fuel type:', selected);
                                 updateUseRow(row.id, { 
                                   stationarySubFuelType: value,
                                   stationaryCo2Factor: selected?.['CO2 Factor'],
@@ -4046,14 +4500,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                 </div>
 
                     {/* Mobile Combustion Fields */}
-                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {mobileCombustionData.length} rows | 
-                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Mobile Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <Label className="flex items-center gap-1 mb-2">
@@ -4063,7 +4511,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                               value={row.mobileFuelType || ''} 
                               onValueChange={(value) => {
                                 const selected = mobileCombustionData.find(d => d['FuelType'] === value);
-                                console.log('Selected fuel type:', selected);
                                 updateUseRow(row.id, { 
                                   mobileFuelType: value,
                                   mobileKgCo2PerUnit: selected?.['kg CO2 per unit'],
@@ -4081,7 +4528,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                                 ) : (
                                   (() => {
                                     const fuelTypes = mobileCombustionData.map(d => d['FuelType']).filter(Boolean);
-                                    console.log('Fuel Types for dropdown:', fuelTypes);
                                     if (fuelTypes.length === 0) {
                                       return <SelectItem value="no-data" disabled>No fuel types found</SelectItem>;
                                     }
@@ -4191,14 +4637,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Stationary Combustion Fields */}
                     {row.combustionType === 'stationary' && (
-                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {stationaryCombustionData.length} rows | 
-                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Stationary Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <Label className="flex items-center gap-1 mb-2">
@@ -4312,14 +4752,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Mobile Combustion Fields */}
                     {row.combustionType === 'mobile' && (
-                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {mobileCombustionData.length} rows | 
-                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Mobile Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <Label className="flex items-center gap-1 mb-2">
@@ -4450,14 +4884,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Stationary Combustion Fields */}
                     {row.combustionType === 'stationary' && (
-                      <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                        <h5 className="text-sm font-semibold text-teal-900 mb-3">Stationary Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {stationaryCombustionData.length} rows | 
-                            Main Fuel Types: {Array.from(new Set(stationaryCombustionData.map(d => d['Main Fuel Type']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Stationary Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <Label className="flex items-center gap-1 mb-2">
@@ -4571,14 +4999,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
                     {/* Mobile Combustion Fields */}
                     {row.combustionType === 'mobile' && (
-                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h5 className="text-sm font-semibold text-blue-900 mb-3">Mobile Combustion Details</h5>
-                        {process.env.NODE_ENV === 'development' && (
-                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                            Data loaded: {mobileCombustionData.length} rows | 
-                            Fuel Types: {Array.from(new Set(mobileCombustionData.map(d => d['FuelType']).filter(Boolean))).length}
-                          </div>
-                        )}
+                      <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                        <h5 className="text-sm font-semibold text-gray-900 mb-3">Mobile Combustion Details</h5>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div>
                             <Label className="flex items-center gap-1 mb-2">
@@ -4788,8 +5210,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </div>
 
                     {/* Scope 2 Style Electricity Selection */}
-                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <h5 className="text-sm font-semibold text-blue-900 mb-3">Electricity</h5>
+                    <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3">Electricity</h5>
                       
                       {/* Main electricity inputs */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -4979,9 +5401,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </div>
 
                     {row.emissions !== undefined && (
-                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="text-sm text-gray-700 font-medium">
-                          Total Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Emissions: <span className="font-semibold text-gray-900">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                         {row.hybridFuelEmissions !== undefined && (
                           <div className="text-xs text-gray-600 mt-1">
@@ -5213,9 +5635,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     )}
 
                     {row.emissions !== undefined && (
-                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="text-sm text-gray-700 font-medium">
-                          Total Electricity Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Electricity Emissions: <span className="font-semibold text-gray-900">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                       </div>
                     )}
@@ -5277,9 +5699,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </div>
 
                     {row.emissions !== undefined && (
-                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="text-sm text-gray-700 font-medium">
-                          Total Refrigerant Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Refrigerant Emissions: <span className="font-semibold text-gray-900">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                       </div>
                     )}
@@ -5292,8 +5714,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     <h4 className="text-sm font-semibold text-gray-900 mb-3">Cooling Products: Electricity & Refrigerant Details</h4>
                     
                     {/* Electricity Section (Scope 2 Style) */}
-                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
-                      <h5 className="text-sm font-semibold text-blue-900 mb-3">Electricity Consumption</h5>
+                    <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200 mb-4">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3">Electricity Consumption</h5>
                       
                       {/* Main electricity inputs */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -5506,8 +5928,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </div>
 
                     {/* Refrigerant Section (Scope 1 Style) */}
-                    <div className="space-y-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
-                      <h5 className="text-sm font-semibold text-teal-900 mb-3">Refrigerant Details</h5>
+                    <div className="space-y-4 p-4 bg-white rounded-lg border border-gray-200">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3">Refrigerant Details</h5>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
@@ -5560,9 +5982,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </div>
 
                     {row.emissions !== undefined && (
-                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="text-sm text-gray-700 font-medium">
-                          Total Emissions (Electricity + Refrigerant): <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Emissions (Electricity + Refrigerant): <span className="font-semibold text-gray-900">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                       </div>
                     )}
@@ -5677,57 +6099,64 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     )}
 
                     {row.emissions !== undefined && (
-                      <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="text-sm text-gray-700 font-medium">
-                          Total Fuel Emissions: <span className="font-semibold text-teal-700">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Fuel Emissions: <span className="font-semibold text-gray-900">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                <div className="flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => setUseRows(prev => prev.filter(r => r.id !== row.id))}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Remove
-                  </Button>
-                </div>
-              </div>
+                  <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setUseRows(prev => prev.filter(r => r.id !== row.id))}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Remove Entry
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
+
+            {useRows.length === 0 && (
+              <Card>
+                <CardContent className="p-12">
+                  <div className="text-center text-gray-500">
+                    <p className="text-lg mb-2">No entries yet</p>
+                    <p className="text-sm">Click "Add New Entry" to get started.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {useRows.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <p>No entries yet. Click "Add New Entry" to get started.</p>
-          </div>
-        )}
-
-        <div className="pt-4 border-t">
+          {/* Footer Section */}
+          <Card className="bg-gray-50">
+            <CardContent className="p-6">
               <div className="flex items-center justify-between">
-              <div className="text-gray-700 font-medium">
-                Total Use Entries: <span className="font-semibold">{useRows.length}</span>
-                {totalEmissions > 0 && (
-                  <span className="ml-4">
-                    Total Emissions: <span className="font-semibold">{totalEmissions.toFixed(2)} kg CO2e</span>
-                  </span>
-                )}
+                <div className="text-gray-700 font-medium">
+                  <span className="text-sm text-gray-600">Total Use Entries:</span> <span className="font-semibold text-lg">{useRows.length}</span>
+                  {totalEmissions > 0 && (
+                    <span className="ml-6">
+                      <span className="text-sm text-gray-600">Total Emissions:</span> <span className="font-semibold text-lg text-teal-700">{totalEmissions.toFixed(6)} kg CO2e</span>
+                    </span>
+                  )}
+                </div>
+                <Button 
+                  onClick={saveUseLocal}
+                  disabled={useRows.length === 0 || savingUse} 
+                  className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {savingUse ? 'Saving...' : `Save and Next (${useRows.length})`}
+                </Button>
               </div>
-              <Button 
-                onClick={() => {
-                  toast({ title: 'Saved', description: 'Use of sold products saved.' });
-                  onSaveAndNext?.();
-                }} 
-                disabled={useRows.length === 0} 
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                <Save className="h-4 w-4 mr-2" />{`Save and Next (${useRows.length})`}
-              </Button>
-              </div>
-        </div>
+            </CardContent>
+          </Card>
       </div>
     );
   }

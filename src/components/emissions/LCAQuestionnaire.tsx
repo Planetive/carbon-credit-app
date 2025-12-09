@@ -168,6 +168,10 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
     setTimeout(() => {
       setIsAnimating(false);
       if (answer) {
+        // User said yes, call the callback to set LCA mode
+        if (onInitialAnswer) {
+          onInitialAnswer(true);
+        }
         setCurrentStep(0); // Move to first data entry step
       } else {
         // User said no, call the callback to switch to manual mode

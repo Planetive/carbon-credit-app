@@ -61,10 +61,12 @@ export interface UseOfSoldProductsRow {
   stationarySubFuelType?: string;
   stationaryCo2Factor?: number;
   stationaryUnit?: string;
+  stationaryQuantity?: number;
   // Mobile Combustion fields (when combustionType is 'mobile')
   mobileFuelType?: string;
   mobileKgCo2PerUnit?: number;
   mobileUnit?: string;
+  mobileQuantity?: number;
   // Fuel fields for "Hybrid vehicles" - Scope 1 style
   hybridFuelType?: FuelType;
   hybridFuel?: string;

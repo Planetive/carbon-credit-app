@@ -40,7 +40,7 @@ const MainHeader = () => {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
           ? "bg-white/95 backdrop-blur-md border-b border-gray-200"
-          : "bg-transparent"
+          : "bg-white/85 backdrop-blur-sm"
       }`}
     >
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -95,8 +95,8 @@ const MainHeader = () => {
             </button>
             {solutionsOpen && (
               <div className="absolute left-0 mt-3 w-80 rounded-xl bg-white/80 backdrop-blur-md shadow-xl py-2 z-50 overflow-hidden">
-                <Link to="/register" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for corporates</Link>
-                <Link to="/register" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for financial institutions</Link>
+                <Link to="/register?user_type=corporate" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for corporates</Link>
+                <Link to="/register?user_type=financial_institution" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for financial institutions</Link>
                 <Link to="/solutions/esg-financial-institutions" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">ESG for financial institutions</Link>
                 <Link to="/solutions/ccus" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">CCUS</Link>
                 <Link to="/solutions/decarbonization" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Decarbonization and energy transitions</Link>
@@ -205,8 +205,8 @@ const MainHeader = () => {
                 </button>
                 {mobileSolutionsOpen && (
                   <div className="px-2 pb-2">
-                    <Link to="/register" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>Carbon Intelligence for corporates</Link>
-                    <Link to="/register" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>Carbon Intelligence for financial institutions</Link>
+                    <Link to="/register?user_type=corporate" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>Carbon Intelligence for corporates</Link>
+                    <Link to="/register?user_type=financial_institution" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>Carbon Intelligence for financial institutions</Link>
                     <Link to="/solutions/esg-financial-institutions" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>ESG for financial institutions</Link>
                     <Link to="/solutions/cccus" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>CCCUS</Link>
                     <Link to="/solutions/decarbonization" className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100" onClick={() => setIsMobileMenuOpen(false)}>Decarbonization and energy transitions</Link>

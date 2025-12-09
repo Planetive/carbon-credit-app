@@ -36,6 +36,8 @@ default_origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8080",
+    "http://localhost:8000",  # Local backend (for testing)
+    "http://127.0.0.1:8000",  # Local backend (for testing)
 ]
 
 # Get allowed origins from environment variable or use defaults
@@ -49,12 +51,23 @@ logger.info(f"CORS allowed origins: {allowed_origins}")
 
 # Add CORS middleware - MUST be added before routes
 # For Vercel serverless functions, explicit CORS configuration is critical
+# Note: When allow_credentials=True, allow_headers must be explicit, not ["*"]
+# Using allow_origin_regex to allow any localhost port for local development
+# and specific production domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://(www\.)?rethinkcarbon\.io",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
     expose_headers=["*"],
     max_age=3600,
 )

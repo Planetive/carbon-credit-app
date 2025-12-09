@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Share2, BarChart3, TrendingDown, Factory, Leaf } from 'lucide-react';
+import { ArrowLeft, Download, Share2, BarChart3, TrendingDown, Factory, Leaf, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,6 +28,23 @@ const EmissionResults = () => {
   const [deliveryEmissions, setDeliveryEmissions] = useState<number>(0);
   const [electricityEmissions, setElectricityEmissions] = useState<number>(0);
   const [heatSteamEmissions, setHeatSteamEmissions] = useState<number>(0);
+  const [mounted, setMounted] = useState(false);
+  
+  // Scope 3 emissions by category
+  const [scope3PurchasedGoods, setScope3PurchasedGoods] = useState<number>(0);
+  const [scope3CapitalGoods, setScope3CapitalGoods] = useState<number>(0);
+  const [scope3FuelEnergy, setScope3FuelEnergy] = useState<number>(0);
+  const [scope3UpstreamTransport, setScope3UpstreamTransport] = useState<number>(0);
+  const [scope3WasteGenerated, setScope3WasteGenerated] = useState<number>(0);
+  const [scope3BusinessTravel, setScope3BusinessTravel] = useState<number>(0);
+  const [scope3EmployeeCommuting, setScope3EmployeeCommuting] = useState<number>(0);
+  const [scope3Investments, setScope3Investments] = useState<number>(0);
+  const [scope3DownstreamTransport, setScope3DownstreamTransport] = useState<number>(0);
+  const [scope3EndOfLife, setScope3EndOfLife] = useState<number>(0);
+  const [scope3ProcessingSold, setScope3ProcessingSold] = useState<number>(0);
+  const [scope3UseOfSold, setScope3UseOfSold] = useState<number>(0);
+  const [scope3LCAUpstream, setScope3LCAUpstream] = useState<number>(0);
+  const [scope3LCADownstream, setScope3LCADownstream] = useState<number>(0);
 
   const scope1Total = useMemo(() => {
     return fuelEmissions + refrigerantEmissions + passengerEmissions + deliveryEmissions;
@@ -60,9 +77,69 @@ const EmissionResults = () => {
   }, [electricityEmissions, heatSteamEmissions, scope2Total]);
   const topContributorS2 = useMemo(() => scope2Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [scope2Breakdown]);
 
+  // Scope 3 total and breakdown (excluding LCA entries as they are separate)
+  const scope3Total = useMemo(() => {
+    return scope3PurchasedGoods + scope3CapitalGoods + scope3FuelEnergy + 
+           scope3UpstreamTransport + scope3WasteGenerated + scope3BusinessTravel + 
+           scope3EmployeeCommuting + scope3Investments + scope3DownstreamTransport + 
+           scope3EndOfLife + scope3ProcessingSold + scope3UseOfSold;
+  }, [scope3PurchasedGoods, scope3CapitalGoods, scope3FuelEnergy, scope3UpstreamTransport, 
+      scope3WasteGenerated, scope3BusinessTravel, scope3EmployeeCommuting, scope3Investments, 
+      scope3DownstreamTransport, scope3EndOfLife, scope3ProcessingSold, scope3UseOfSold]);
+
+  // Scope 3 Upstream Emissions (Categories 1-8)
+  const scope3UpstreamTotal = useMemo(() => {
+    return scope3PurchasedGoods + scope3CapitalGoods + scope3FuelEnergy + 
+           scope3UpstreamTransport + scope3WasteGenerated + scope3BusinessTravel + 
+           scope3EmployeeCommuting;
+  }, [scope3PurchasedGoods, scope3CapitalGoods, scope3FuelEnergy, scope3UpstreamTransport, 
+      scope3WasteGenerated, scope3BusinessTravel, scope3EmployeeCommuting]);
+
+  // Scope 3 Downstream Emissions (Categories 9-15)
+  const scope3DownstreamTotal = useMemo(() => {
+    return scope3DownstreamTransport + scope3ProcessingSold + scope3UseOfSold + 
+           scope3EndOfLife + scope3Investments;
+  }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
+      scope3EndOfLife, scope3Investments]);
+
+  const scope3UpstreamBreakdown = useMemo(() => {
+    const data = [
+      { label: 'Purchased Goods & Services', value: scope3PurchasedGoods, color: 'bg-purple-500', category: 'upstream' },
+      { label: 'Capital Goods', value: scope3CapitalGoods, color: 'bg-indigo-500', category: 'upstream' },
+      { label: 'Fuel & Energy Activities', value: scope3FuelEnergy, color: 'bg-violet-500', category: 'upstream' },
+      { label: 'Upstream Transportation', value: scope3UpstreamTransport, color: 'bg-blue-500', category: 'upstream' },
+      { label: 'Waste Generated', value: scope3WasteGenerated, color: 'bg-cyan-500', category: 'upstream' },
+      { label: 'Business Travel', value: scope3BusinessTravel, color: 'bg-teal-500', category: 'upstream' },
+      { label: 'Employee Commuting', value: scope3EmployeeCommuting, color: 'bg-green-500', category: 'upstream' },
+    ];
+    return data.map(d => ({ ...d, pct: scope3UpstreamTotal > 0 ? (d.value / scope3UpstreamTotal) * 100 : 0 }));
+  }, [scope3PurchasedGoods, scope3CapitalGoods, scope3FuelEnergy, scope3UpstreamTransport, 
+      scope3WasteGenerated, scope3BusinessTravel, scope3EmployeeCommuting, scope3UpstreamTotal]);
+
+  const scope3DownstreamBreakdown = useMemo(() => {
+    const data = [
+      { label: 'Downstream Transportation', value: scope3DownstreamTransport, color: 'bg-lime-500', category: 'downstream' },
+      { label: 'Processing of Sold Products', value: scope3ProcessingSold, color: 'bg-orange-500', category: 'downstream' },
+      { label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
+      { label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
+      { label: 'Investments', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
+    ];
+    return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
+  }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
+      scope3EndOfLife, scope3Investments, scope3DownstreamTotal]);
+
+  // Combined breakdown for CSV export
+  const scope3Breakdown = useMemo(() => {
+    return [...scope3UpstreamBreakdown, ...scope3DownstreamBreakdown];
+  }, [scope3UpstreamBreakdown, scope3DownstreamBreakdown]);
+
+  const topContributorS3 = useMemo(() => 
+    scope3Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), 
+    [scope3Breakdown]
+  );
+
   const exportCsv = () => {
     const scope2Total = electricityEmissions + heatSteamEmissions;
-    const scope3Total = 0;
     const grandTotal = scope1Total + scope2Total + scope3Total;
 
     // Build a comprehensive CSV across all scopes
@@ -87,9 +164,26 @@ const EmissionResults = () => {
     rows.push(['Scope 2', 'Total', scope2Total.toFixed(6)]);
     rows.push([]);
 
-    // Scope 3 placeholder
-    rows.push(['Scope', 'Category', 'Emissions (kg CO2e)']);
-    rows.push(['Scope 3', 'Total', scope3Total.toFixed(6)]);
+    // Scope 3 breakdown - Upstream
+    rows.push(['Scope 3', 'Upstream Emissions', '', '']);
+    rows.push(['Scope', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
+    scope3UpstreamBreakdown.forEach(b => {
+      rows.push(['Scope 3', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
+    });
+    rows.push(['Scope 3', 'Upstream Total', scope3UpstreamTotal.toFixed(6), scope3Total > 0 ? ((scope3UpstreamTotal / scope3Total) * 100).toFixed(2) : '0.00']);
+    rows.push([]);
+    
+    // Scope 3 breakdown - Downstream
+    rows.push(['Scope 3', 'Downstream Emissions', '', '']);
+    rows.push(['Scope', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
+    scope3DownstreamBreakdown.forEach(b => {
+      rows.push(['Scope 3', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
+    });
+    rows.push(['Scope 3', 'Downstream Total', scope3DownstreamTotal.toFixed(6), scope3Total > 0 ? ((scope3DownstreamTotal / scope3Total) * 100).toFixed(2) : '0.00']);
+    rows.push([]);
+    
+    // Scope 3 Grand Total
+    rows.push(['Scope 3', 'Total', scope3Total.toFixed(6), '100.00']);
     rows.push([]);
 
     // Grand total
@@ -184,17 +278,93 @@ const EmissionResults = () => {
         const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
         setHeatSteamEmissions(Number(heatTotal.toFixed(6)));
 
-        // Keep minimal meta so existing UI sections render
+        // Scope 3 - Load all categories
+        const [
+          purchasedGoodsRes,
+          capitalGoodsRes,
+          fuelEnergyRes,
+          upstreamTransportRes,
+          wasteGeneratedRes,
+          businessTravelRes,
+          employeeCommutingRes,
+          investmentsRes,
+          downstreamTransportRes,
+          endOfLifeRes,
+          processingSoldRes,
+          useOfSoldRes,
+          lcaRes,
+        ] = await Promise.all([
+          (supabase as any).from('scope3_purchased_goods_services').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_capital_goods').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_fuel_energy_activities').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_upstream_transportation').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_investments').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
+          (supabase as any).from('scope3_use_of_sold_products').select('row_data').eq('user_id', user.id),
+          (supabase as any).from('scope3_lca_entries').select('emissions').eq('user_id', user.id).in('scope_type', ['scope3_upstream', 'scope3_downstream']),
+        ]);
+
+        const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+
+        setScope3PurchasedGoods(sumScope3(purchasedGoodsRes.data));
+        setScope3CapitalGoods(sumScope3(capitalGoodsRes.data));
+        setScope3FuelEnergy(sumScope3(fuelEnergyRes.data));
+        setScope3UpstreamTransport(sumScope3(upstreamTransportRes.data));
+        setScope3WasteGenerated(sumScope3(wasteGeneratedRes.data));
+        setScope3BusinessTravel(sumScope3(businessTravelRes.data));
+        setScope3EmployeeCommuting(sumScope3(employeeCommutingRes.data));
+        setScope3Investments(sumScope3(investmentsRes.data));
+        setScope3DownstreamTransport(sumScope3(downstreamTransportRes.data));
+        setScope3EndOfLife(sumScope3(endOfLifeRes.data));
+
+        // Processing and Use of Sold Products - extract emissions from JSONB
+        const processingTotal = (processingSoldRes.data || []).reduce((s: number, r: any) => {
+          const rowData = r.row_data;
+          if (rowData && typeof rowData.emissions === 'number') {
+            return s + rowData.emissions;
+          }
+          return s;
+        }, 0);
+        setScope3ProcessingSold(processingTotal);
+
+        const useTotal = (useOfSoldRes.data || []).reduce((s: number, r: any) => {
+          const rowData = r.row_data;
+          if (rowData && typeof rowData.emissions === 'number') {
+            return s + rowData.emissions;
+          }
+          return s;
+        }, 0);
+        setScope3UseOfSold(useTotal);
+
+        // LCA entries are loaded but not included in Scope 3 totals (they are separate)
+        const lcaUpstream = (lcaRes.data || []).filter((r: any) => r.scope_type === 'scope3_upstream');
+        const lcaDownstream = (lcaRes.data || []).filter((r: any) => r.scope_type === 'scope3_downstream');
+        setScope3LCAUpstream(sumScope3(lcaUpstream));
+        setScope3LCADownstream(sumScope3(lcaDownstream));
+
+        // Keep minimal meta so existing UI sections render (excluding LCA entries)
+        const scope3TotalCalc = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
+          sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
+          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumScope3(investmentsRes.data) + 
+          sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
+
         setResults({
           scope1_completion: 100,
           scope2_completion: 100,
-          scope3_completion: 0,
+          scope3_completion: scope3TotalCalc > 0 ? 100 : 0,
           total_completion: 100,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
         });
       } finally {
         setLoading(false);
+        // Trigger animation after data loads
+        setTimeout(() => setMounted(true), 100);
       }
     };
     loadScope1Totals();
@@ -202,10 +372,16 @@ const EmissionResults = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading emission results...</p>
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center relative overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
+        </div>
+        <div className="text-center relative z-10">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-200 border-t-teal-600 mx-auto mb-4"></div>
+          <p className="text-gray-700 font-medium text-lg">Loading emission results...</p>
         </div>
       </div>
     );
@@ -213,10 +389,15 @@ const EmissionResults = () => {
 
   if (!results) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">No emission results found</p>
-          <Button onClick={() => navigate('/emission-calculator')}>
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center relative overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+        </div>
+        <div className="text-center relative z-10">
+          <p className="text-gray-700 mb-4 text-lg">No emission results found</p>
+          <Button onClick={() => navigate('/emission-calculator')} className="bg-teal-600 hover:bg-teal-700">
             Go to Emission Calculator
           </Button>
         </div>
@@ -225,55 +406,153 @@ const EmissionResults = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50">
-      {/* Header - minimal */}
-      {/* <div className="">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center justify-between mt-5">
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/dashboard')}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </div>
-            <div className="flex-1 flex items-center justify-center gap-2">
-              <BarChart3 className="h-6 w-6 text-gray-800" />
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Emission Results</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white" size="sm" onClick={exportCsv}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            </div>
-          </div>
+    <>
+      {/* Global Styles for Animations */}
+      <style>{`
+        @keyframes blob {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            background-position: -1000px 0;
+          }
+          100% {
+            background-position: 1000px 0;
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.6s ease-out forwards;
+        }
+        .animate-slide-in-right {
+          animation: slideInRight 0.6s ease-out forwards;
+        }
+        .animate-shimmer {
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+          background-size: 1000px 100%;
+          animation: shimmer 2s infinite;
+        }
+        .glass-effect {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .card-hover {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .progress-bar-animate {
+          transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+      `}</style>
+
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50">
+        {/* Animated Background with Blobs */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+          
+          {/* Floating particles */}
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full bg-teal-300/20 animate-float"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                width: `${Math.random() * 10 + 5}px`,
+                height: `${Math.random() * 10 + 5}px`,
+                animationDelay: `${Math.random() * 6}s`,
+                animationDuration: `${Math.random() * 4 + 4}s`,
+              }}
+            />
+          ))}
         </div>
-      </div> */}
-{/* Page Hero - Emission Results */}
-<div className="relative bg-gradient-to-r from-teal-50 via-white to-teal-50 rounded-2xl shadow-sm border border-teal-100">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-center">
-    
+
+        {/* Main Content */}
+        <div className="relative z-10">
+          {/* Hero Section */}
+          <div 
+            className={`relative glass-effect rounded-3xl shadow-2xl mx-4 sm:mx-6 lg:mx-auto mt-6 sm:mt-8 max-w-7xl overflow-hidden ${
+              mounted ? 'animate-fade-in-up' : 'opacity-0'
+            }`}
+            style={{ animationDelay: '0.1s' }}
+          >
+            {/* Shimmer effect overlay */}
+            <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
+            
+            <div className="relative px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
     {/* Icon + Title */}
-    <div className="flex flex-col items-center">
-      <div className="flex items-center justify-center gap-3 mb-2">
-        <BarChart3 className="h-8 w-8 sm:h-10 sm:w-10 text-teal-600" />
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900">
+              <div className="flex flex-col items-center mb-6">
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="relative">
+                    <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-teal-600 relative z-10" />
+                    <Sparkles className="h-6 w-6 text-teal-400 absolute -top-1 -right-1 animate-pulse" />
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">
           Emission Results
         </h1>
       </div>
-      <p className="text-gray-600 text-sm md:text-lg">
+                <p className="text-gray-600 text-base md:text-xl mb-2">
         Your sustainability insights at a glance
       </p>
 
       {/* Submission Date */}
-      <p className="mt-3 text-sm text-gray-500">
+                <p className="text-sm text-gray-500">
         Submitted on{" "}
-        <span className="font-medium text-gray-800">
+                  <span className="font-semibold text-gray-800">
           {new Date(results.submitted_at).toLocaleDateString("en-US", {
             year: "numeric",
             month: "long",
@@ -286,19 +565,19 @@ const EmissionResults = () => {
     </div>
 
     {/* Action Buttons */}
-    <div className="mt-4 sm:mt-6 flex items-center justify-center gap-3 sm:gap-4 flex-col sm:flex-row">
+              <div className="flex items-center justify-center gap-4 flex-wrap">
       <Button
         variant="outline"
-        size="sm"
+                  size="lg"
         onClick={() => navigate('/emission-calculator')}
-        className="text-gray-600 hover:text-teal-700 hover:border-teal-300 transition-colors w-full sm:w-auto"
+                  className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 transition-all duration-300 hover:scale-105"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Change your emissions
       </Button>
       <Button
-        className="bg-teal-600 hover:bg-teal-700 text-white shadow-md px-5 py-2 rounded-xl transition-transform hover:scale-105 w-full sm:w-auto"
-        size="sm"
+                  className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  size="lg"
         onClick={exportCsv}
       >
         <Download className="h-4 w-4 mr-2" />
@@ -308,120 +587,154 @@ const EmissionResults = () => {
   </div>
 </div>
 
-
-
-
-      {/* Main Content */}
+          {/* Main Content Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        
-        {/* KPI Summary */}
+            {/* KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
-          {/* Scope 1 - Primary Stat */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-gray-100 h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-red-100 to-rose-50 flex items-center justify-center">
-                    <Factory className="h-5 w-5 text-red-600" />
+              {/* Scope 1 */}
+              <Card 
+                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
+                  mounted ? 'animate-fade-in-up' : 'opacity-0'
+                }`}
+                style={{ animationDelay: '0.2s' }}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
+                      <Factory className="h-6 w-6 text-white" />
+                    </div>
+                    <CardTitle className="text-base font-semibold text-gray-800">Scope 1 Emissions</CardTitle>
                   </div>
-                  <CardTitle className="text-base font-medium text-gray-700 truncate">Scope 1 Emissions</CardTitle>
-                </div></div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight break-words">{formatKg(scope1Total)}</div>
-              <div className="text-xs sm:text-sm text-gray-500">kg CO2e</div>
+                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent tracking-tight">
+                    {formatKg(scope1Total)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
             </CardContent>
           </Card>
 
           {/* Scope 2 */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-gray-100 h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5 text-orange-600" />
+              <Card 
+                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
+                  mounted ? 'animate-fade-in-up' : 'opacity-0'
+                }`}
+                style={{ animationDelay: '0.3s' }}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
+                      <BarChart3 className="h-6 w-6 text-white" />
                 </div>
-                <CardTitle className="text-base font-medium text-gray-700 truncate">Scope 2 Emissions</CardTitle>
+                    <CardTitle className="text-base font-semibold text-gray-800">Scope 2 Emissions</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight break-words">{formatKg(electricityEmissions + heatSteamEmissions)}</div>
-              <div className="text-xs sm:text-sm text-gray-500">kg CO2e</div>
+                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent tracking-tight">
+                    {formatKg(electricityEmissions + heatSteamEmissions)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
             </CardContent>
           </Card>
 
-          {/* Scope 3 - Placeholder */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-gray-100 h-full">
-            <CardHeader className="pb-2">
+              {/* Scope 3 */}
+              <Card 
+                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
+                  mounted ? 'animate-fade-in-up' : 'opacity-0'
+                }`}
+                style={{ animationDelay: '0.4s' }}
+              >
+                <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-50 flex items-center justify-center">
-                  <TrendingDown className="h-5 w-5 text-blue-600" />
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
+                      <TrendingDown className="h-6 w-6 text-white" />
                 </div>
-                <CardTitle className="text-base font-medium text-gray-700">Scope 3</CardTitle>
+                    <CardTitle className="text-base font-semibold text-gray-800">Scope 3</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">{results.scope3_completion}%</div>
-              <div className="text-xs sm:text-sm text-gray-500">Coming soon</div>
+                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
+                    {formatKg(scope3Total)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
             </CardContent>
           </Card>
 
-          {/* Total - Placeholder */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow rounded-2xl border border-gray-100 h-full">
-            <CardHeader className="pb-2">
+              {/* Total */}
+              <Card 
+                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
+                  mounted ? 'animate-fade-in-up' : 'opacity-0'
+                }`}
+                style={{ animationDelay: '0.5s' }}
+              >
+                <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-100 to-emerald-50 flex items-center justify-center">
-                  <Leaf className="h-5 w-5 text-green-600" />
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
+                      <Leaf className="h-6 w-6 text-white" />
                 </div>
-                <CardTitle className="text-base font-medium text-gray-700">Total</CardTitle>
+                    <CardTitle className="text-base font-semibold text-gray-800">Total</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight break-words">{formatKg(scope1Total + electricityEmissions + heatSteamEmissions)}</div>
-              <div className="text-xs sm:text-sm text-gray-500">kg CO2e (Scopes 1 + 2)</div>
+                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent tracking-tight">
+                    {formatKg(scope1Total + electricityEmissions + heatSteamEmissions + scope3Total)}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">kg CO2e (All Scopes)</div>
             </CardContent>
           </Card>
         </div>
 
-        
-
         {/* Scope 1 Breakdown + Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 rounded-2xl border border-gray-100 shadow-sm">
+            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 ${
+              mounted ? 'animate-fade-in-up' : 'opacity-0'
+            }`}
+            style={{ animationDelay: '0.6s' }}
+            >
+              <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-800">Scope 1 Breakdown</CardTitle>
+                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
+                    Scope 1 Breakdown
+                  </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="text-left text-gray-600 text-sm bg-gray-50/70">
-                      <th className="py-2 pr-4">Category</th>
-                      <th className="py-2 pr-4">Emissions (kg CO2e)</th>
-                      <th className="py-2">Share</th>
+                        <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                          <th className="py-3 px-4 font-semibold">Category</th>
+                          <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
+                          <th className="py-3 px-4 font-semibold">Share</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {breakdown.map(b => (
-                      <tr key={b.label} className="border-t border-gray-100 hover:bg-gray-50/50">
-                        <td className="py-3 pr-4 font-medium text-gray-900">{b.label}</td>
-                        <td className="py-3 pr-4">{formatKg(b.value)}</td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-full h-2 bg-gray-100 rounded">
-                              <div className={`${b.color} h-2 rounded`} style={{ width: `${b.pct}%` }}></div>
+                        {breakdown.map((b, idx) => (
+                          <tr 
+                            key={b.label} 
+                            className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
+                            style={{ animationDelay: `${0.7 + idx * 0.1}s` }}
+                          >
+                            <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
+                            <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
+                                    style={{ width: `${b.pct}%` }}
+                                  ></div>
                             </div>
-                            <span className="text-sm text-gray-600 w-14 text-right">{b.pct.toFixed(1)}%</span>
+                                <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-gray-200 bg-gray-50/70">
-                      <td className="py-3 pr-4 font-semibold text-gray-900">Total</td>
-                      <td className="py-3 pr-4 font-semibold text-gray-900">{formatKg(scope1Total)}</td>
-                      <td className="py-3 text-sm text-gray-600">100%</td>
+                        <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                          <td className="py-4 px-4 font-bold text-gray-900">Total</td>
+                          <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope1Total)}</td>
+                          <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -429,29 +742,37 @@ const EmissionResults = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-gray-100 shadow-sm">
+              <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-800">Insights</CardTitle>
+                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-teal-600" />
+                    Insights
+                  </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-3 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>
-                    Largest contributor: <span className="font-medium text-gray-900">{topContributor.label}</span> ({(topContributor.pct || 0).toFixed(1)}%)
+                  <ul className="space-y-4 text-sm">
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">
+                        Largest contributor: <span className="font-bold text-gray-900">{topContributor.label}</span> ({(topContributor.pct || 0).toFixed(1)}%)
                   </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>Total Scope 1: <span className="font-medium text-gray-900">{formatKg(scope1Total)} kg CO2e</span></span>
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">
+                        Total Scope 1: <span className="font-bold text-gray-900">{formatKg(scope1Total)} kg CO2e</span>
+                      </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>Export breakdown via CSV for reporting or audits.</span>
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
                 </li>
               </ul>
-              <div className="mt-4">
-                <Button className="bg-teal-600 hover:bg-teal-700 w-full" onClick={exportCsv}>
+                  <div className="mt-6">
+                    <Button 
+                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                      onClick={exportCsv}
+                    >
                   <Download className="h-4 w-4 mr-2" /> Download CSV
                 </Button>
               </div>
@@ -460,42 +781,200 @@ const EmissionResults = () => {
         </div>
 
         {/* Scope 2 Breakdown + Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-          <Card className="lg:col-span-2 rounded-2xl border border-gray-100 shadow-sm">
+            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 ${
+              mounted ? 'animate-fade-in-up' : 'opacity-0'
+            }`}
+            style={{ animationDelay: '0.8s' }}
+            >
+              <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-800">Scope 2 Breakdown</CardTitle>
+                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
+                    Scope 2 Breakdown
+                  </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="text-left text-gray-600 text-sm bg-gray-50/70">
-                      <th className="py-2 pr-4">Category</th>
-                      <th className="py-2 pr-4">Emissions (kg CO2e)</th>
-                      <th className="py-2">Share</th>
+                        <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                          <th className="py-3 px-4 font-semibold">Category</th>
+                          <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
+                          <th className="py-3 px-4 font-semibold">Share</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {scope2Breakdown.map(b => (
-                      <tr key={b.label} className="border-t border-gray-100 hover:bg-gray-50/50">
-                        <td className="py-3 pr-4 font-medium text-gray-900">{b.label}</td>
-                        <td className="py-3 pr-4">{formatKg(b.value)}</td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-full h-2 bg-gray-100 rounded">
-                              <div className={`${b.color} h-2 rounded`} style={{ width: `${b.pct}%` }}></div>
+                        {scope2Breakdown.map((b, idx) => (
+                          <tr 
+                            key={b.label} 
+                            className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
+                            style={{ animationDelay: `${0.9 + idx * 0.1}s` }}
+                          >
+                            <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
+                            <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
+                                    style={{ width: `${b.pct}%` }}
+                                  ></div>
                             </div>
-                            <span className="text-sm text-gray-600 w-14 text-right">{b.pct.toFixed(1)}%</span>
+                                <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-gray-200 bg-gray-50/70">
-                      <td className="py-3 pr-4 font-semibold text-gray-900">Total</td>
-                      <td className="py-3 pr-4 font-semibold text-gray-900">{formatKg(scope2Total)}</td>
-                      <td className="py-3 text-sm text-gray-600">100%</td>
+                        <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                          <td className="py-4 px-4 font-bold text-gray-900">Total</td>
+                          <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope2Total)}</td>
+                          <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-teal-600" />
+                    Insights
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-4 text-sm">
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">
+                        Largest contributor: <span className="font-bold text-gray-900">{topContributorS2.label}</span> ({(topContributorS2.pct || 0).toFixed(1)}%)
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">
+                        Total Scope 2: <span className="font-bold text-gray-900">{formatKg(scope2Total)} kg CO2e</span>
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
+                    </li>
+                  </ul>
+                  <div className="mt-6">
+                    <Button 
+                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                      onClick={exportCsvScope2}
+                    >
+                      <Download className="h-4 w-4 mr-2" /> Download CSV
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Scope 3 Breakdown + Insights */}
+            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start ${
+              mounted ? 'animate-fade-in-up' : 'opacity-0'
+            }`}
+            style={{ animationDelay: '1s' }}
+            >
+                <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
+                      Scope 3 Breakdown
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                            <th className="py-3 px-4 font-semibold">Category</th>
+                            <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
+                            <th className="py-3 px-4 font-semibold">Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Upstream Emissions Section */}
+                          <tr>
+                            <td colSpan={3} className="py-3 px-4 bg-blue-50/50 border-t-2 border-blue-200">
+                              <div className="font-bold text-blue-700 text-sm uppercase tracking-wide">Upstream Emissions</div>
+                            </td>
+                          </tr>
+                          {scope3UpstreamBreakdown.map((b, idx) => (
+                            <tr 
+                              key={b.label} 
+                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
+                              style={{ animationDelay: `${1.1 + idx * 0.05}s` }}
+                            >
+                              <td className="py-4 px-4 font-medium text-gray-900 pl-8">{b.label}</td>
+                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
+                                      style={{ width: `${b.pct}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-blue-50/30">
+                            <td className="py-3 px-4 font-semibold text-blue-800 pl-8">Upstream Total</td>
+                            <td className="py-3 px-4 font-semibold text-blue-800">{formatKg(scope3UpstreamTotal)}</td>
+                            <td className="py-3 px-4 text-sm font-semibold text-blue-700">
+                              {scope3Total > 0 ? ((scope3UpstreamTotal / scope3Total) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                          
+                          {/* Downstream Emissions Section */}
+                          <tr>
+                            <td colSpan={3} className="py-3 px-4 bg-green-50/50 border-t-2 border-green-200">
+                              <div className="font-bold text-green-700 text-sm uppercase tracking-wide">Downstream Emissions</div>
+                            </td>
+                          </tr>
+                          {scope3DownstreamBreakdown.map((b, idx) => (
+                            <tr 
+                              key={b.label} 
+                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
+                              style={{ animationDelay: `${1.1 + (scope3UpstreamBreakdown.length + idx) * 0.05}s` }}
+                            >
+                              <td className="py-4 px-4 font-medium text-gray-900 pl-8">{b.label}</td>
+                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
+                                      style={{ width: `${b.pct}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-green-50/30">
+                            <td className="py-3 px-4 font-semibold text-green-800 pl-8">Downstream Total</td>
+                            <td className="py-3 px-4 font-semibold text-green-800">{formatKg(scope3DownstreamTotal)}</td>
+                            <td className="py-3 px-4 text-sm font-semibold text-green-700">
+                              {scope3Total > 0 ? ((scope3DownstreamTotal / scope3Total) * 100).toFixed(1) : '0.0'}%
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
+                            <td className="py-4 px-4 font-bold text-gray-900">Scope 3 Total</td>
+                            <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope3Total)}</td>
+                            <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -503,29 +982,51 @@ const EmissionResults = () => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-gray-100 shadow-sm">
+                <Card className="glass-effect shadow-xl rounded-2xl border border-white/50 self-start">
             <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-800">Insights</CardTitle>
+                    <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-teal-600" />
+                      Insights
+                    </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-3 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>
-                    Largest contributor: <span className="font-medium text-gray-900">{topContributorS2.label}</span> ({(topContributorS2.pct || 0).toFixed(1)}%)
+                    <ul className="space-y-4 text-sm">
+                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                        <span className="h-2 w-2 rounded-full bg-blue-500 mt-2 animate-pulse"></span>
+                        <span className="text-gray-700">
+                          Upstream Total: <span className="font-bold text-gray-900">{formatKg(scope3UpstreamTotal)} kg CO2e</span>
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                        <span className="h-2 w-2 rounded-full bg-green-500 mt-2 animate-pulse"></span>
+                        <span className="text-gray-700">
+                          Downstream Total: <span className="font-bold text-gray-900">{formatKg(scope3DownstreamTotal)} kg CO2e</span>
+                        </span>
+                      </li>
+                      {topContributorS3.label && (
+                        <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                          <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                          <span className="text-gray-700">
+                            Largest contributor: <span className="font-bold text-gray-900">{topContributorS3.label}</span> ({(topContributorS3.pct || 0).toFixed(1)}%)
                   </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>Total Scope 2: <span className="font-medium text-gray-900">{formatKg(scope2Total)} kg CO2e</span></span>
+                      )}
+                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                        <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                        <span className="text-gray-700">
+                          Total Scope 3: <span className="font-bold text-gray-900">{formatKg(scope3Total)} kg CO2e</span>
+                        </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="h-2 w-2 rounded-full bg-teal-600 mt-1.5"></span>
-                  <span>Export breakdown via CSV for reporting or audits.</span>
+                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
+                        <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                        <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
                 </li>
               </ul>
-              <div className="mt-4">
-                <Button className="bg-teal-600 hover:bg-teal-700 w-full" onClick={exportCsvScope2}>
+                    <div className="mt-6">
+                      <Button 
+                        className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                        onClick={exportCsv}
+                      >
                   <Download className="h-4 w-4 mr-2" /> Download CSV
                 </Button>
               </div>
@@ -534,22 +1035,32 @@ const EmissionResults = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4 mt-8">
+            <div 
+              className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 ${
+                mounted ? 'animate-fade-in-up' : 'opacity-0'
+              }`}
+              style={{ animationDelay: '1.2s' }}
+            >
           <Button 
             onClick={() => navigate('/emission-calculator')}
-            className="bg-teal-600 hover:bg-teal-700"
+                className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                size="lg"
           >
             Edit Assessment
           </Button>
           <Button 
             variant="outline"
             onClick={() => navigate('/dashboard')}
+                className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
+                size="lg"
           >
             Back to Dashboard
           </Button>
         </div>
       </div>
     </div>
+      </div>
+    </>
   );
 };
 
