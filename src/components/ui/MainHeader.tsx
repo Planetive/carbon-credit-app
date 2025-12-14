@@ -95,12 +95,8 @@ const MainHeader = () => {
             </button>
             {solutionsOpen && (
               <div className="absolute left-0 mt-3 w-80 rounded-xl bg-white/80 backdrop-blur-md shadow-xl py-2 z-50 overflow-hidden">
-                <Link to="/register?user_type=corporate" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for corporates</Link>
-                <Link to="/register?user_type=financial_institution" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for financial institutions</Link>
-                <Link to="/solutions/esg-financial-institutions" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">ESG for financial institutions</Link>
-                <Link to="/solutions/ccus" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">CCUS</Link>
-                <Link to="/solutions/decarbonization" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Decarbonization and energy transitions</Link>
-                <Link to="/solutions/esg-risk-assessment" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">ESG Risk Assessment</Link>
+                <Link to="/register?user_type=corporate" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for Corporates</Link>
+                <Link to="/register?user_type=financial_institution" className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors">Carbon Intelligence for Financial Institutions</Link>
               </div>
             )}
           </div>

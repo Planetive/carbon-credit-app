@@ -300,25 +300,67 @@ const SimpleScenarioBuilding: React.FC = () => {
 
       // Call backend API with timeout
       const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '/api' : 'http://127.0.0.1:8000');
+      const requestUrl = `${backendUrl}/scenario/calculate`;
+      const requestBody = {
+        scenario_type: backendScenarioType,
+        portfolio_entries: backendPortfolioEntries
+      };
+      
+      console.log('='.repeat(80));
+      console.log('DEBUG: Frontend - Preparing scenario calculation request');
+      console.log('DEBUG: Request URL:', requestUrl);
+      console.log('DEBUG: Request method: POST');
+      console.log('DEBUG: Request origin:', window.location.origin);
+      console.log('DEBUG: Request body size:', JSON.stringify(requestBody).length, 'bytes');
+      console.log('DEBUG: Portfolio entries count:', backendPortfolioEntries.length);
+      console.log('='.repeat(80));
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       let response;
       try {
-        response = await fetch(`${backendUrl}/scenario/calculate`, {
+        console.log('DEBUG: Frontend - Sending fetch request...');
+        response = await fetch(requestUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scenario_type: backendScenarioType,
-            portfolio_entries: backendPortfolioEntries
-          }),
-          signal: controller.signal
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+          credentials: 'include' // Include credentials for CORS
+        });
+        
+        console.log('DEBUG: Frontend - Fetch completed');
+        console.log('DEBUG: Response status:', response.status, response.statusText);
+        console.log('DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
+        console.log('DEBUG: Response OK:', response.ok);
+        console.log('DEBUG: CORS headers present:', {
+          'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+          'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+          'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials'),
         });
       } catch (error: any) {
         clearTimeout(timeoutId);
+        console.error('DEBUG: Frontend - Fetch error caught:', error);
+        console.error('DEBUG: Error name:', error.name);
+        console.error('DEBUG: Error message:', error.message);
+        console.error('DEBUG: Error stack:', error.stack);
+        
         if (error.name === 'AbortError') {
           throw new Error('Request timed out. The backend may be slow or unresponsive. Please check if the backend server is running.');
         }
+        
+        // Enhanced error message for CORS errors
+        if (error.message && error.message.includes('CORS')) {
+          console.error('DEBUG: CORS error detected!');
+          console.error('DEBUG: This usually means:');
+          console.error('  1. Backend is not returning proper CORS headers');
+          console.error('  2. Backend OPTIONS preflight is failing');
+          console.error('  3. Origin is not in allowed list');
+          throw new Error(`CORS Error: ${error.message}. Check backend logs for CORS header details.`);
+        }
+        
         throw error;
       }
       clearTimeout(timeoutId);

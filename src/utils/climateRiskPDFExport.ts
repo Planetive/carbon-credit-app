@@ -148,20 +148,25 @@ const addTable = (
 ): number => {
   const rowHeight = 10;
   const headerHeight = 12;
+  const cellPadding = 3;
+  const startX = 15;
   
   // Table header
   pdf.setFillColor(BRAND_COLORS.primaryDark);
   pdf.setDrawColor(BRAND_COLORS.primaryDark);
   pdf.setLineWidth(0.3);
-  pdf.rect(15, yPos, 180, headerHeight, 'FD');
+  pdf.rect(startX, yPos, 180, headerHeight, 'FD');
   
   pdf.setFontSize(9);
   pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   
-  let xPos = 18;
+  let xPos = startX + cellPadding;
   headers.forEach((header, index) => {
-    pdf.text(header, xPos, yPos + 7);
+    // Wrap text if needed
+    const maxWidth = columnWidths[index] - (cellPadding * 2);
+    const lines = pdf.splitTextToSize(header, maxWidth);
+    pdf.text(lines[0], xPos, yPos + 7);
     xPos += columnWidths[index];
   });
   
@@ -172,44 +177,85 @@ const addTable = (
   
   let currentY = yPos + headerHeight;
   rows.forEach((row, rowIndex) => {
-    if (currentY + rowHeight > 280) {
+    // Check if we need a new page
+    const rowNeedsMultipleLines = row.some((cell, idx) => {
+      const maxWidth = columnWidths[idx] - (cellPadding * 2);
+      const lines = pdf.splitTextToSize(cell, maxWidth);
+      return lines.length > 1;
+    });
+    const estimatedRowHeight = rowNeedsMultipleLines ? rowHeight * 1.5 : rowHeight;
+    
+    if (currentY + estimatedRowHeight > 280) {
       // New page
       pdf.addPage();
       currentY = 20;
       
       // Redraw header
       pdf.setFillColor(BRAND_COLORS.primaryDark);
-      pdf.rect(15, currentY, 180, headerHeight, 'FD');
+      pdf.rect(startX, currentY, 180, headerHeight, 'FD');
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
-      xPos = 18;
+      pdf.setFontSize(9);
+      xPos = startX + cellPadding;
       headers.forEach((header, index) => {
-        pdf.text(header, xPos, currentY + 7);
+        const maxWidth = columnWidths[index] - (cellPadding * 2);
+        const lines = pdf.splitTextToSize(header, maxWidth);
+        pdf.text(lines[0], xPos, currentY + 7);
         xPos += columnWidths[index];
       });
       pdf.setTextColor(BRAND_COLORS.text);
       pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
       currentY += headerHeight;
     }
     
     // Alternate row colors
     if (rowIndex % 2 === 0) {
       pdf.setFillColor(250, 250, 250);
-      pdf.rect(15, currentY, 180, rowHeight, 'FD');
+      pdf.rect(startX, currentY, 180, rowHeight, 'FD');
     }
     
-    xPos = 18;
+    // Draw cell borders
+    pdf.setDrawColor(BRAND_COLORS.border);
+    pdf.setLineWidth(0.1);
+    xPos = startX;
+    headers.forEach((_, index) => {
+      if (index > 0) {
+        pdf.line(xPos, currentY, xPos, currentY + rowHeight);
+      }
+      xPos += columnWidths[index];
+    });
+    
+    // Add cell content
+    xPos = startX + cellPadding;
+    let maxLinesInRow = 1;
     row.forEach((cell, cellIndex) => {
-      pdf.text(cell, xPos, currentY + 6);
+      const maxWidth = columnWidths[cellIndex] - (cellPadding * 2);
+      const lines = pdf.splitTextToSize(cell, maxWidth);
+      maxLinesInRow = Math.max(maxLinesInRow, lines.length);
+      
+      // Draw text (first line only for now, or adjust row height)
+      pdf.text(lines[0], xPos, currentY + 6);
+      
+      // If text wraps, draw additional lines
+      if (lines.length > 1) {
+        lines.slice(1).forEach((line, lineIndex) => {
+          pdf.text(line, xPos, currentY + 6 + (lineIndex + 1) * 4);
+        });
+      }
+      
       xPos += columnWidths[cellIndex];
     });
+    
+    // Adjust row height if text wrapped
+    const actualRowHeight = maxLinesInRow > 1 ? rowHeight + (maxLinesInRow - 1) * 4 : rowHeight;
     
     // Row border
     pdf.setDrawColor(BRAND_COLORS.border);
     pdf.setLineWidth(0.1);
-    pdf.line(15, currentY + rowHeight, 195, currentY + rowHeight);
+    pdf.line(startX, currentY + actualRowHeight, startX + 180, currentY + actualRowHeight);
     
-    currentY += rowHeight;
+    currentY += actualRowHeight;
   });
   
   return currentY + 10;
@@ -330,7 +376,7 @@ export const exportClimateRiskReport = async (
     `${(sector.percentage || 0).toFixed(1)}%`,
     formatCurrency(sector.estimatedLoss || 0)
   ]);
-  const sectorWidths = [70, 40, 30, 40];
+  const sectorWidths = [85, 35, 25, 35];
   
   yPos = addTable(pdf, sectorHeaders, sectorRows, yPos, sectorWidths);
   
@@ -591,7 +637,7 @@ export const exportTCFDReport = async (
     `${(sector.percentage || 0).toFixed(1)}%`,
     formatCurrency(sector.estimatedLoss || 0)
   ]);
-  const sectorWidths = [70, 40, 30, 40];
+  const sectorWidths = [85, 35, 25, 35];
   
   yPos = addTable(pdf, sectorHeaders, sectorRows, yPos, sectorWidths);
   

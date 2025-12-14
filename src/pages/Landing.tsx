@@ -30,13 +30,14 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Landing = () => {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [logoAnimation, setLogoAnimation] = useState(false);
+  const [showGetStarted, setShowGetStarted] = useState(false);
   
   // Features images array using direct URLs
   const featureImages = [
@@ -48,25 +49,24 @@ const Landing = () => {
     "Features/20.png"
   ];
 
-  // Handle scroll to change header background
+  // Handle scroll to change header background and show/hide Get Started button
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
+      const triggerPoint = window.innerHeight * 0.5; // 50vh (50% of viewport height)
+      
       setIsScrolled(scrollTop > 50);
+      // Show Get Started button only when scrolled past 50vh
+      setShowGetStarted(scrollTop > triggerPoint);
     };
 
     window.addEventListener("scroll", handleScroll);
+    // Check initial scroll position
+    handleScroll();
+    
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Trigger logo animation on page load
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLogoAnimation(true);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   const testimonials = [
     {
@@ -194,20 +194,6 @@ const Landing = () => {
         <div className="container mx-auto px-4 sm:px-6 relative z-10 h-full flex items-center justify-center">
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6">
-              <div 
-                className={`h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 relative mb-4 sm:mb-0 sm:mr-4 transition-all ease-in-out ${
-                  logoAnimation 
-                    ? 'opacity-100 scale-100 transform translate-x-0 translate-y-0' 
-                    : 'opacity-0 scale-50 transform -translate-x-64 -translate-y-32'
-                }`}
-                style={{ transitionDuration: '2000ms' }}
-              >
-                <img
-                  src="/logo3.png"
-                  alt="ReThink Carbon Logo"
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
-              </div>
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '0.02em' }}>
                   ReThink Carbon
               </h1>
@@ -474,16 +460,26 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Fixed Bottom Right Button */}
-      <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50">
-        <Button
-          size="lg"
-          className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
-          asChild
-        >
-          <Link to="/login">Get Started</Link>
-        </Button>
-      </div>
+      {/* Fixed Bottom Right Button - Only shows after scrolling past hero */}
+      <AnimatePresence>
+        {showGetStarted && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50"
+          >
+            <Button
+              size="lg"
+              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
+              asChild
+            >
+              <Link to="/login">Get Started</Link>
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

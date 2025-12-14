@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,10 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormattedNumberInput } from './finance_facilitated/components/FormattedNumberInput';
-import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, TrendingUp, Upload, Download, FileSpreadsheet, Edit, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, TrendingUp, Upload, Download, FileSpreadsheet, Edit, Trash2, X, Grid3X3, FileText, BarChart3, Factory, Sparkles, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PortfolioClient, Counterparty, Exposure } from '@/integrations/supabase/portfolioClient';
 import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import DashboardSidebar from '@/components/DashboardSidebar';
 
 const currencyFormat = (value: number) =>
   (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -30,11 +33,14 @@ interface PortfolioEntry {
 
 const BankPortfolio: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [entries, setEntries] = useState<PortfolioEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [userType, setUserType] = useState<string>("financial_institution");
 
   const zeroPadId = (num: number, width = 4) => num.toString().padStart(width, '0');
   const getNextId = (): string => {
@@ -62,6 +68,22 @@ const BankPortfolio: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<PortfolioEntry | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Load user type
+  useEffect(() => {
+    const fetchUserType = async () => {
+      if (!user) return;
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("user_type")
+        .eq("user_id", user.id)
+        .single();
+      if (data?.user_type) {
+        setUserType(data.user_type);
+      }
+    };
+    fetchUserType();
+  }, [user]);
 
   // Load data from database on component mount
   useEffect(() => {
@@ -409,166 +431,77 @@ const BankPortfolio: React.FC = () => {
     setEditingEntry(null);
   };
 
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-teal-50/30">
-      <div className="max-w-9xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
-            {/* Main list */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Bank Portfolio
-              </CardTitle>
-              <CardDescription>
-                List of companies and their loan amounts (PKR)
-              </CardDescription>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 mt-3">
-                <p className="text-xs text-gray-600">
-                  <strong>Note:</strong> Loan amounts are now automatically retrieved from your Finance Emission calculations. 
-                  Please ensure you have completed the Finance Emission form for each company to see their loan amounts.
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Toolbar */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-4">
-                <div className="relative w-full sm:w-80">
-                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search company"
-                    className="pl-9"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Grid of entries */}
-              {loading ? (
-                <div className="text-center text-muted-foreground py-12">Loading portfolio data...</div>
-              ) : filtered.length === 0 ? (
-                <div className="text-center text-muted-foreground py-12">No companies found.</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {filtered.map((e) => (
-                    <Card key={e.id} className="border-primary/10 hover:shadow transition-shadow">
-                      <CardContent className="p-6">
-                        <button
-                          onClick={() => navigate(`/bank-portfolio/${e.id}`, { state: e })}
-                          className="w-full text-left"
-                        >
-                          <div className="space-y-4">
-                          <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="text-base font-semibold text-teal-700 hover:underline mb-2">
-                                {e.company}
-                                </div>
-                                <div className="text-xs text-muted-foreground mb-3">
-                                  Type: {e.counterpartyType}
-                                </div>
-                                
-                                {/* Left side details - Geography and Tenor */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">Geography:</span>
-                                    <span className="text-xs font-medium">{e.geography}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">Tenor:</span>
-                                    <span className="text-xs font-medium">{e.tenor} months</span>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                            <div className="text-right">
-                                <div className="text-sm text-muted-foreground flex items-center justify-end gap-1 mb-2">
-                                <Wallet className="h-4 w-4" /> Loan Amount (PKR)
-                                </div>
-                                <div className="text-xl font-bold text-primary mb-3">{currencyFormat(e.amount)}</div>
-                                
-                                {/* Right side details - Sector and PD */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="text-xs text-muted-foreground">Sector:</span>
-                                    <span className="text-xs font-medium">{e.sector}</span>
-                                    <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                                  </div>
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="text-xs text-muted-foreground">PD:</span>
-                                    <span className="text-xs font-medium">{e.probabilityOfDefault}%</span>
-                                    <Shield className="h-3 w-3 text-muted-foreground" />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-
-                        {/* Action icons */}
-                        <div className="flex gap-2 mt-3 justify-end">
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              editEntry(e);
-                            }}
-                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit company"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setShowDeleteConfirm(e.id);
-                            }}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete company"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Right side add panel (separate from main card) */}
-          <div>
-            <Card className="border-teal-200/60 sticky top-6">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Plus className="h-4 w-4" /> Add Company Loan
+    <div className="max-w-4xl mx-auto">
+      {/* Main Add Company Form */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <Card className="bg-white border border-gray-200/80 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-teal-500/10 border-b border-gray-200/80">
+            <div className="flex items-center gap-3">
+              <motion.div
+                whileHover={{ rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 0.5 }}
+                className="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/30"
+              >
+                <Building2 className="h-6 w-6 text-white" />
+              </motion.div>
+              <div>
+                <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  Add Company to Portfolio
                 </CardTitle>
-                <CardDescription>Add a company with complete loan details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
+                <CardDescription className="text-gray-600 mt-1">
+                  Add a company with complete loan details to your portfolio
+                </CardDescription>
+              </div>
+            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4 flex items-start gap-2"
+            >
+              <Sparkles className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-blue-800">
+                <strong className="font-semibold">Note:</strong> Loan amounts are automatically retrieved from your Finance Emission calculations. 
+                Once added, you can view and manage all companies in the "My Portfolio" section.
+              </p>
+            </motion.div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            {/* Company Information Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                <Building2 className="h-5 w-5 text-teal-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Company Information</h3>
+              </div>
+              
+              <div>
+                <Label htmlFor="company" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-gray-500" />
+                  Company Name *
+                </Label>
+                <Input
+                  id="company"
+                  placeholder="e.g., Sunrise Textiles Ltd."
+                  value={newCompany}
+                  onChange={(e) => setNewCompany(e.target.value)}
+                  className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="company">Company Name *</Label>
-                  <Input
-                    id="company"
-                    placeholder="e.g., Sunrise Textiles Ltd."
-                    value={newCompany}
-                    onChange={(e) => setNewCompany(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="counterparty-type">Counterparty Type *</Label>
+                  <Label htmlFor="counterparty-type" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-gray-500" />
+                    Counterparty Type *
+                  </Label>
                   <Select value={newCounterpartyType} onValueChange={setNewCounterpartyType}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
                       <SelectValue placeholder="Select counterparty type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -585,9 +518,12 @@ const BankPortfolio: React.FC = () => {
                 </div>
                 
                 <div>
-                  <Label htmlFor="sector">Sector *</Label>
+                  <Label htmlFor="sector" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Factory className="h-4 w-4 text-gray-500" />
+                    Sector *
+                  </Label>
                   <Select value={newSector} onValueChange={setNewSector}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
@@ -632,12 +568,17 @@ const BankPortfolio: React.FC = () => {
                   </Select>
                 </div>
                 
-                <div>
-                  <Label htmlFor="geography">Geography *</Label>
-                  <Select value={newGeography} onValueChange={setNewGeography}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select Pakistan or district" />
-                    </SelectTrigger>
+              </div>
+              
+              <div>
+                <Label htmlFor="geography" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  Geography *
+                </Label>
+                <Select value={newGeography} onValueChange={setNewGeography}>
+                  <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
+                    <SelectValue placeholder="Select Pakistan or district" />
+                  </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Pakistan">Pakistan</SelectItem>
                       <SelectItem value="__heading_azad_kashmir" disabled>Azad Kashmir</SelectItem>
@@ -823,39 +764,55 @@ const BankPortfolio: React.FC = () => {
                   </Select>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="pd">Probability of Default (%) *</Label>
-                    <Input
-                      id="pd"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      placeholder="2.5"
-                      value={newPD || ''}
-                      onChange={(e) => setNewPD(Number(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lgd">Loss Given Default (%) *</Label>
-                    <Input
-                      id="lgd"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      placeholder="45"
-                      value={newLGD || ''}
-                      onChange={(e) => setNewLGD(Number(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                
+            </div>
+
+            {/* Risk Parameters Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                <Shield className="h-5 w-5 text-orange-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Risk Parameters</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="tenor">Tenor/Maturity (months) *</Label>
+                  <Label htmlFor="pd" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-gray-500" />
+                    Probability of Default (%) *
+                  </Label>
+                  <Input
+                    id="pd"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    placeholder="2.5"
+                    value={newPD || ''}
+                    onChange={(e) => setNewPD(Number(e.target.value))}
+                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lgd" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-gray-500" />
+                    Loss Given Default (%) *
+                  </Label>
+                  <Input
+                    id="lgd"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    placeholder="45"
+                    value={newLGD || ''}
+                    onChange={(e) => setNewLGD(Number(e.target.value))}
+                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tenor" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    Tenor/Maturity (months) *
+                  </Label>
                   <Input
                     id="tenor"
                     type="number"
@@ -863,73 +820,178 @@ const BankPortfolio: React.FC = () => {
                     placeholder="36"
                     value={newTenor || ''}
                     onChange={(e) => setNewTenor(Number(e.target.value))}
-                    className="mt-1"
+                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+              <Button 
+                onClick={addEntry} 
+                className="w-full h-12 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30 font-semibold text-base" 
+                disabled={saving}
+              >
+                {saving ? (
+                  <span className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                    />
+                    Adding Company...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    Add Company to Portfolio
+                  </span>
+                )}
+              </Button>
+            </motion.div>
                 
-                <Button onClick={addEntry} className="w-full" disabled={saving}>
-                  {saving ? 'Adding...' : 'Add Company'}
-                </Button>
-                
-                <Separator />
-                
-                {/* Bulk Upload Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Bulk Upload</span>
+            <Separator className="my-6" />
+            
+            {/* Bulk Upload Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
+                <motion.div
+                  whileHover={{ rotate: [0, -5, 5, 0] }}
+                  transition={{ duration: 0.5 }}
+                  className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-md shadow-teal-500/30"
+                >
+                  <FileSpreadsheet className="h-5 w-5 text-white" />
+                </motion.div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Bulk Upload</h3>
+                  <p className="text-xs text-gray-500">Add multiple companies at once</p>
+                </div>
+              </div>
+              
+              <Card className="bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 border-2 border-teal-200/60 shadow-md overflow-hidden">
+                <CardContent className="p-6 space-y-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-white/80 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Sparkles className="h-4 w-4 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 mb-1">
+                        Upload multiple companies efficiently
+                      </p>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        Use our template to format your data correctly. Supports CSV, XLS, and XLSX files with all required company information.
+                      </p>
+                    </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      onClick={downloadTemplate}
-                      className="w-full"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <motion.div 
+                      whileHover={{ scale: 1.02, y: -2 }} 
+                      whileTap={{ scale: 0.98 }}
+                      className="relative"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Template
-                    </Button>
+                      <Button
+                        onClick={downloadTemplate}
+                        className="w-full h-14 bg-white border-2 border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400 hover:shadow-lg transition-all duration-200 font-medium"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                            <Download className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-sm font-semibold">Download Template</div>
+                            <div className="text-xs text-teal-600 font-normal">Get the CSV format</div>
+                          </div>
+                        </div>
+                      </Button>
+                    </motion.div>
                     
                     <div className="relative">
                       <input
                         type="file"
                         accept=".csv,.xlsx,.xls"
                         onChange={handleFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         disabled={isUploading}
                       />
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={isUploading}
+                      <motion.div 
+                        whileHover={{ scale: 1.02, y: -2 }} 
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {isUploading ? 'Uploading...' : 'Upload CSV/Excel'}
-                      </Button>
+                        <Button
+                          className="w-full h-14 bg-white border-2 border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400 hover:shadow-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isUploading}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isUploading ? (
+                              <>
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full"
+                                />
+                                <div className="text-left">
+                                  <div className="text-sm font-semibold">Uploading...</div>
+                                  <div className="text-xs text-teal-600 font-normal">Processing your file</div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg flex items-center justify-center">
+                                  <Upload className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-sm font-semibold">Upload CSV/Excel</div>
+                                  <div className="text-xs text-teal-600 font-normal">Select your file</div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </Button>
+                      </motion.div>
                     </div>
                   </div>
                   
                   {uploadError && (
-                    <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                      {uploadError}
-                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-red-50 border-2 border-red-200 rounded-lg p-4 flex items-start gap-3"
+                    >
+                      <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <X className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-800 mb-1">Upload Error</p>
+                        <p className="text-sm text-red-700">{uploadError}</p>
+                      </div>
+                    </motion.div>
                   )}
                   
-                  <div className="text-xs text-muted-foreground">
-                    Upload a CSV or Excel file with the template format. All required fields must be included.
+                  <div className="pt-3 border-t border-teal-200/60">
+                    <div className="flex items-start gap-2 text-xs text-gray-600">
+                      <div className="w-1 h-1 bg-teal-400 rounded-full mt-1.5 flex-shrink-0" />
+                      <p>
+                        <strong className="font-semibold text-gray-700">Tip:</strong> Ensure your file includes all required fields: Company Name, Counterparty Type, Sector, Geography, PD, LGD, and Tenor.
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                <Separator />
-                <div className="text-xs text-muted-foreground">
-                  * Required fields. All fields must be completed to add a company.
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <span className="text-red-500">*</span>
+                Required fields. All fields must be completed to add a company.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-        {/* Edit Modal */}
+      {/* Edit Modal */}
         {editingEntry && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1303,7 +1365,6 @@ const BankPortfolio: React.FC = () => {
             </Card>
           </div>
         )}
-      </div>
     </div>
   );
 };

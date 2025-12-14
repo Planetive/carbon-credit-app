@@ -557,12 +557,14 @@ export const ESGWizard: React.FC = () => {
       }
 
       // Also clean up emission_calculations table
+      // IMPORTANT: Don't delete the 'aggregate' record - it's the main record used by dashboard for both finance and facilitated
       const { error: emissionError } = await supabase
         .from('emission_calculations')
         .delete()
         .eq('user_id', user.id)
         .eq('counterparty_id', counterpartyId)
         .eq('calculation_type', mode)
+        .neq('formula_id', 'aggregate') // Never delete the aggregate record (works for both finance and facilitated)
         .not('formula_id', 'in', `(${currentFormulaIds.map(id => `'${id}'`).join(',')})`);
 
       if (emissionError) {

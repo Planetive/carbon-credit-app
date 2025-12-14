@@ -82,18 +82,46 @@ const Register = () => {
       });
       return;
     }
-    // Insert into profiles table
+    // Insert into profiles table and create organization
     const user = data?.user;
     if (user) {
+      // Create organization first (using organization name from form, or email domain as fallback)
+      const orgName = formData.organizationName || formData.email.split('@')[1]?.split('.')[0] || 'My Organization';
+      const { data: orgData, error: orgError } = await supabase
+        .from("organizations")
+        .insert([
+          {
+            name: orgName,
+            description: null,
+            parent_organization_id: null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (orgError) {
+        console.error('Error creating organization:', orgError);
+        toast({
+          title: "Organization error",
+          description: orgError.message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // The trigger will automatically add user as admin and set current_organization_id
+      // But we still need to create the profile
       const { error: profileError } = await (supabase as any)
         .from("profiles")
         .insert([
           {
             user_id: user.id,
-            organization_name: formData.organizationName,
-            display_name: formData.displayName,
-            phone: formData.phone,
+            organization_name: orgName, // Keep for backward compatibility
+            display_name: formData.displayName || formData.email.split('@')[0],
+            phone: formData.phone || null,
             user_type: userType, // Save user_type from query params
+            current_organization_id: orgData.id, // Set the current organization
           },
         ]);
       if (profileError) {

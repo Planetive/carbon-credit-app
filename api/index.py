@@ -11,6 +11,8 @@ import json
 # For now, we'll use a wildcard for development, but FastAPI middleware will handle it properly
 def get_cors_headers(origin=None):
     """Get CORS headers, allowing specific origins"""
+    print(f"DEBUG get_cors_headers: origin={origin}")
+    
     allowed_origins = [
         "https://www.rethinkcarbon.io",
         "https://rethinkcarbon.io",
@@ -25,23 +27,40 @@ def get_cors_headers(origin=None):
     # If origin is provided and in allowed list, use it
     if origin and origin in allowed_origins:
         allow_origin = origin
-    # Allow any localhost or 127.0.0.1 origin for dev (fix: use proper condition)
+        print(f"DEBUG: Origin {origin} is in allowed list")
+    # Allow any localhost or 127.0.0.1 origin for dev (MOST IMPORTANT FOR LOCAL DEV)
     elif origin and (origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")):
         allow_origin = origin  # Allow any localhost origin for dev
+        print(f"DEBUG: Origin {origin} is localhost/127.0.0.1, allowing")
+    # Allow production origins
+    elif origin and (origin.startswith("https://") and ("rethinkcarbon.io" in origin or "rethinkcarbon" in origin)):
+        allow_origin = origin
+        print(f"DEBUG: Origin {origin} is production domain, allowing")
     else:
-        # Default to production, but if origin is provided and not localhost, reject it
-        if origin and not (origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")):
-            allow_origin = "https://www.rethinkcarbon.io"  # Default to production
+        # Default behavior: if origin provided but not recognized, still allow it for localhost
+        if origin and (origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:")):
+            allow_origin = origin
+            print(f"DEBUG: Origin {origin} is localhost variant, allowing")
+        elif origin:
+            # Unknown origin - be permissive for now but log it
+            allow_origin = origin
+            print(f"DEBUG: WARNING - Unknown origin {origin}, allowing anyway (should be restricted in production)")
         else:
-            allow_origin = origin if origin else "https://www.rethinkcarbon.io"
+            # No origin - default to allowing localhost for dev, production for prod
+            # Can't use wildcard with credentials, so default to a safe option
+            allow_origin = "http://localhost:8080"  # Default to common dev port
+            print(f"DEBUG: No origin provided, defaulting to {allow_origin} (should not happen in production)")
     
-    return {
+    cors_headers = {
         "Access-Control-Allow-Origin": allow_origin,
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Max-Age": "3600",
     }
+    
+    print(f"DEBUG: Returning CORS headers with origin: {allow_origin}")
+    return cors_headers
 
 # Default CORS headers (will be overridden by get_cors_headers in handler)
 CORS_HEADERS = get_cors_headers()
@@ -92,8 +111,24 @@ def get_handler():
         # Wrap handler to ensure CORS headers are always added
         def wrapped_handler(event, context):
             try:
+                # DEBUG: Log entire event structure
+                print("=" * 80)
+                print("DEBUG: Incoming request event structure:")
+                print(f"Event keys: {list(event.keys())}")
+                print(f"Event type: {type(event)}")
+                print(f"Full event (first 2000 chars): {str(event)[:2000]}")
+                if "requestContext" in event:
+                    print(f"requestContext: {event.get('requestContext')}")
+                if "path" in event:
+                    print(f"Path: {event.get('path')}")
+                if "rawPath" in event:
+                    print(f"Raw path: {event.get('rawPath')}")
+                print("=" * 80)
+                
                 # Extract origin from request headers (Vercel uses lowercase keys)
                 headers = event.get("headers", {}) or {}
+                print(f"DEBUG: All headers: {headers}")
+                
                 # Try multiple case variations
                 origin = (
                     headers.get("origin") or
@@ -112,13 +147,26 @@ def get_handler():
                             from urllib.parse import urlparse
                             parsed = urlparse(referer)
                             origin = f"{parsed.scheme}://{parsed.netloc}"
-                        except:
-                            pass
+                            print(f"DEBUG: Extracted origin from referer: {origin}")
+                        except Exception as e:
+                            print(f"DEBUG: Failed to extract origin from referer: {e}")
                 
-                print(f"Request origin: {origin}, headers keys: {list(headers.keys())}")
+                print(f"DEBUG: Final origin: {origin}, headers keys: {list(headers.keys())}")
                 
-                # Get CORS headers based on origin
+                # Get CORS headers based on origin - ALWAYS generate them first
                 cors_headers = get_cors_headers(origin)
+                print(f"DEBUG: Generated CORS headers: {cors_headers}")
+                
+                # CRITICAL: Check for OPTIONS preflight requests FIRST, before method detection
+                # This is the most reliable way to detect preflight requests
+                has_cors_preflight_headers = (
+                    headers.get("access-control-request-method") or 
+                    headers.get("Access-Control-Request-Method") or 
+                    headers.get("ACCESS-CONTROL-REQUEST-METHOD") or
+                    headers.get("access-control-request-headers") or
+                    headers.get("Access-Control-Request-Headers") or
+                    headers.get("ACCESS-CONTROL-REQUEST-HEADERS")
+                )
                 
                 # Handle OPTIONS preflight requests directly
                 # Vercel Python runtime event format - check multiple possible locations
@@ -129,61 +177,121 @@ def get_handler():
                     http_info = event.get("requestContext", {}).get("http", {})
                     if http_info:
                         method = http_info.get("method")
+                        print(f"DEBUG: Found method in requestContext.http.method: {method}")
                 
                 # Fallback to other possible formats
                 if not method:
                     method = event.get("httpMethod") or event.get("method") or event.get("requestMethod")
+                    if method:
+                        print(f"DEBUG: Found method in event: {method}")
                 
-                # Check if it's an OPTIONS request by examining the request
-                # Sometimes the method might be in a different format
+                # Check if it's an OPTIONS request - be VERY aggressive
                 is_options = False
+                
+                # Method-based detection
                 if method:
                     is_options = method.upper() == "OPTIONS"
-                else:
-                    # If we can't find method, check if there's an access-control-request-method header
-                    # which indicates a preflight request
-                    acrm = headers.get("access-control-request-method") or headers.get("Access-Control-Request-Method")
-                    if acrm:
-                        is_options = True
-                        method = "OPTIONS"
+                    print(f"DEBUG: Method-based OPTIONS detection: {is_options}")
                 
-                print(f"Request method: {method}, is_options: {is_options}, origin: {origin}")
+                # Preflight header detection (MOST RELIABLE)
+                if has_cors_preflight_headers:
+                    is_options = True
+                    method = "OPTIONS"
+                    print(f"DEBUG: Detected OPTIONS from CORS preflight headers")
                 
-                if is_options:
-                    print(f"Handling OPTIONS preflight request from origin: {origin}")
-                    return {
+                # Path-based detection as last resort
+                if not is_options:
+                    path = event.get("path") or event.get("rawPath") or event.get("rawUrl", "") or ""
+                    # If we have a path and it's a known endpoint, and we have origin but no method
+                    # it might be a preflight
+                    if path and ("/scenario/calculate" in path or "/finance-emission" in path or "/facilitated-emission" in path):
+                        if origin and not method:
+                            is_options = True
+                            method = "OPTIONS"
+                            print(f"DEBUG: Detected OPTIONS from path pattern: {path}")
+                
+                print(f"DEBUG: Request method: {method}, is_options: {is_options}, origin: {origin}")
+                print(f"DEBUG: Has CORS preflight headers: {has_cors_preflight_headers}")
+                
+                # ALWAYS handle OPTIONS requests immediately with CORS headers
+                if is_options or has_cors_preflight_headers:
+                    print(f"DEBUG: Handling OPTIONS preflight request from origin: {origin}")
+                    print(f"DEBUG: Returning OPTIONS response with headers: {cors_headers}")
+                    
+                    # Ensure all required CORS headers are present
+                    final_cors_headers = cors_headers.copy()
+                    # Make sure we have all required headers
+                    if "Access-Control-Allow-Origin" not in final_cors_headers:
+                        final_cors_headers["Access-Control-Allow-Origin"] = origin if origin else "http://localhost:8080"
+                    
+                    response = {
                         "statusCode": 200,
-                        "headers": cors_headers,
+                        "headers": final_cors_headers,
                         "body": ""
                     }
+                    print(f"DEBUG: OPTIONS response status: {response['statusCode']}")
+                    print(f"DEBUG: OPTIONS response headers: {response['headers']}")
+                    print(f"DEBUG: OPTIONS Access-Control-Allow-Origin: {response['headers'].get('Access-Control-Allow-Origin')}")
+                    return response
                 
                 # Call the actual handler
+                print(f"DEBUG: Calling mangum handler for {method} request")
                 response = mangum_handler(event, context)
+                print(f"DEBUG: Mangum handler returned: {type(response)}, keys: {list(response.keys()) if isinstance(response, dict) else 'N/A'}")
                 
-                # Ensure CORS headers are added to the response
+                # CRITICAL: Ensure CORS headers are ALWAYS added to the response
+                # This is essential for all requests, not just OPTIONS
                 if isinstance(response, dict):
                     if "headers" not in response:
                         response["headers"] = {}
                     # Merge CORS headers, ensuring they're not overwritten
-                    response["headers"].update(cors_headers)
+                    # Use update() to preserve existing headers but add CORS
+                    for key, value in cors_headers.items():
+                        if key not in response["headers"]:
+                            response["headers"][key] = value
+                    print(f"DEBUG: Final response headers: {response.get('headers')}")
+                    print(f"DEBUG: CORS headers in response: Access-Control-Allow-Origin = {response.get('headers', {}).get('Access-Control-Allow-Origin')}")
+                else:
+                    print(f"DEBUG: WARNING - Response is not a dict: {type(response)}")
+                    # Convert to dict if possible, or create error response with CORS
+                    if hasattr(response, '__dict__'):
+                        response = response.__dict__
+                        response["headers"] = cors_headers
+                    else:
+                        # Last resort: create a proper response dict
+                        response = {
+                            "statusCode": 500,
+                            "headers": cors_headers,
+                            "body": json.dumps({"error": "Invalid response format"})
+                        }
                 
                 return response
                 
             except Exception as e:
                 # Even on error, return CORS headers
+                print("=" * 80)
+                print("DEBUG: Exception caught in wrapped_handler")
+                print(f"DEBUG: Error type: {type(e).__name__}")
+                print(f"DEBUG: Error message: {str(e)}")
+                print(f"DEBUG: Traceback:\n{traceback.format_exc()}")
+                print("=" * 80)
+                
                 headers = event.get("headers", {}) or {}
                 origin = headers.get("origin") or headers.get("Origin") or headers.get("ORIGIN") or None
+                print(f"DEBUG: Error handler - origin: {origin}")
                 cors_headers = get_cors_headers(origin)
+                print(f"DEBUG: Error handler - CORS headers: {cors_headers}")
                 
-                print(f"Error in wrapped handler: {e}\n{traceback.format_exc()}")
                 error_response = {
                     "statusCode": 500,
                     "headers": {**cors_headers, "Content-Type": "application/json"},
                     "body": json.dumps({
                         "error": "Internal server error",
-                        "message": str(e)
+                        "message": str(e),
+                        "traceback": traceback.format_exc() if os.getenv("DEBUG", "false").lower() == "true" else None
                     })
                 }
+                print(f"DEBUG: Error response: {error_response}")
                 return error_response
         
         return wrapped_handler

@@ -207,6 +207,13 @@ def facilitated_emission(req: FacilitatedEmissionRequest) -> FacilitatedEmission
         raise HTTPException(status_code=500, detail="Internal calculation error")
 
 
+@app.options("/scenario/calculate")
+def options_scenario():
+    """Handle OPTIONS preflight requests for scenario endpoint"""
+    logger.info("OPTIONS preflight request received for /scenario/calculate")
+    return {"message": "OK"}
+
+
 @app.post("/scenario/calculate", response_model=ScenarioResponse)
 def calculate_scenario(req: ScenarioRequest) -> ScenarioResponse:
     """

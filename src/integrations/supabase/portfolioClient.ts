@@ -739,6 +739,13 @@ export class PortfolioClient {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    console.log('💾 PortfolioClient - saveFinanceEmissionCalculation called:', {
+      user_id: user.id,
+      counterparty_id: data.counterparty_id,
+      calculation_type: data.calculation_type,
+      financed_emissions: data.financed_emissions
+    });
+
     // First, try to find existing calculation with same counterparty_id, calculation_type, and formula_id
     const { data: existing, error: findError } = await supabase
       .from('finance_emission_calculations')
@@ -750,10 +757,12 @@ export class PortfolioClient {
       .single();
 
     if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('❌ PortfolioClient - Error finding existing record:', findError);
       throw findError;
     }
 
     if (existing) {
+      console.log('📝 PortfolioClient - Updating existing record:', existing.id);
       // Update existing record
       const { data: updated, error: updateError } = await supabase
         .from('finance_emission_calculations')
@@ -766,8 +775,13 @@ export class PortfolioClient {
         .select()
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ PortfolioClient - Error updating record:', updateError);
+        throw updateError;
+      }
+      console.log('✅ PortfolioClient - Record updated successfully:', updated);
     } else {
+      console.log('➕ PortfolioClient - Creating new record');
       // Create new record
       const { data: created, error: createError } = await supabase
         .from('finance_emission_calculations')
@@ -778,7 +792,12 @@ export class PortfolioClient {
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error('❌ PortfolioClient - Error creating record:', createError);
+        console.error('   Data being inserted:', { ...data, user_id: user.id });
+        throw createError;
+      }
+      console.log('✅ PortfolioClient - Record created successfully:', created);
     }
   }
 }

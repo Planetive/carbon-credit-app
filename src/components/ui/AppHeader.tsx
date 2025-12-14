@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Plus, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useEffect, useState } from "react";
 import { isCompanyUser, isRestrictedRoute } from "@/utils/roleUtils";
 import {
@@ -17,8 +18,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const navLinks = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -32,7 +49,12 @@ const AppHeader = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { currentOrganization, organizations, switchOrganization, createOrganization } = useOrganization();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCreateOrgDialogOpen, setIsCreateOrgDialogOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgDescription, setNewOrgDescription] = useState("");
+  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
 
     const handleLogout = async () => {
     try {
@@ -90,6 +112,43 @@ const AppHeader = () => {
 
   // Determine logo link destination based on user role
   const logoLink = isCompanyUser(user) ? "/dashboard" : "/explore";
+
+  const handleCreateOrganization = async () => {
+    if (!newOrgName.trim()) {
+      toast({
+        title: "Organization name required",
+        description: "Please enter an organization name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingOrg(true);
+    try {
+      const { data, error } = await createOrganization(newOrgName, newOrgDescription || undefined);
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Organization created",
+        description: `${newOrgName} has been created successfully.`,
+      });
+
+      setNewOrgName("");
+      setNewOrgDescription("");
+      setIsCreateOrgDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error creating organization",
+        description: error.message || "Failed to create organization. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingOrg(false);
+    }
+  };
 
   return (
     <header className="w-full bg-white shadow-sm py-4 px-4 md:px-8 flex items-center justify-between z-50 relative">
@@ -166,7 +225,7 @@ const AppHeader = () => {
               <ChevronDown className="h-4 w-4 text-gray-600" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
@@ -177,6 +236,101 @@ const AppHeader = () => {
                 </p>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            {/* Organization Switcher */}
+            {organizations.length > 0 && (
+              <>
+                <DropdownMenuLabel className="text-xs text-muted-foreground px-2 py-1.5">
+                  Organization
+                </DropdownMenuLabel>
+                {organizations.map((org) => (
+                  <DropdownMenuItem
+                    key={org.id}
+                    onClick={() => switchOrganization(org.id)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Building2 className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{org.name}</p>
+                          {org.parent_organization_id && (
+                            <p className="text-xs text-muted-foreground truncate">Subsidiary</p>
+                          )}
+                        </div>
+                      </div>
+                      {currentOrganization?.id === org.id && (
+                        <Check className="h-4 w-4 text-teal-600 flex-shrink-0 ml-2" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </>
+            )}
+
+            {/* Create Organization */}
+            <Dialog open={isCreateOrgDialogOpen} onOpenChange={setIsCreateOrgDialogOpen}>
+              <DialogTrigger asChild>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setIsCreateOrgDialogOpen(true);
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  <span>Create Organization</span>
+                </DropdownMenuItem>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Organization</DialogTitle>
+                  <DialogDescription>
+                    Create a new organization or subsidiary. You'll be set as the administrator.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="org-name">Organization Name *</Label>
+                    <Input
+                      id="org-name"
+                      placeholder="Enter organization name"
+                      value={newOrgName}
+                      onChange={(e) => setNewOrgName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="org-description">Description (Optional)</Label>
+                    <Textarea
+                      id="org-description"
+                      placeholder="Enter organization description"
+                      value={newOrgDescription}
+                      onChange={(e) => setNewOrgDescription(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCreateOrgDialogOpen(false)}
+                    disabled={isCreatingOrg}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateOrganization}
+                    disabled={isCreatingOrg || !newOrgName.trim()}
+                    className="bg-teal-600 hover:bg-teal-700"
+                  >
+                    {isCreatingOrg ? "Creating..." : "Create"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/dashboard" className="cursor-pointer">
@@ -306,6 +460,55 @@ const AppHeader = () => {
                 </p>
               </div>
             </div>
+
+            {/* Mobile Organization Switcher */}
+            {organizations.length > 0 && (
+              <>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">Organization</p>
+                {organizations.map((org) => (
+                  <button
+                    key={org.id}
+                    onClick={() => {
+                      switchOrganization(org.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-between w-full p-3 rounded-lg transition-colors mb-2 ${
+                      currentOrganization?.id === org.id
+                        ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <Building2 className="h-5 w-5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-sm font-medium truncate">{org.name}</p>
+                        {org.parent_organization_id && (
+                          <p className="text-xs text-gray-500 truncate">Subsidiary</p>
+                        )}
+                      </div>
+                    </div>
+                    {currentOrganization?.id === org.id && (
+                      <Check className="h-5 w-5 text-teal-600 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+                <div className="mb-3" />
+              </>
+            )}
+
+            {/* Create Organization - Mobile */}
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsCreateOrgDialogOpen(true);
+              }}
+              className="flex items-center gap-3 w-full p-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors mb-2"
+            >
+              <Plus className="h-5 w-5" />
+              Create Organization
+            </button>
+
+            <div className="mb-2 border-t border-gray-200 pt-2" />
             <Link
               to="/dashboard"
               onClick={() => setIsMobileMenuOpen(false)}
