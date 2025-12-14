@@ -39,7 +39,7 @@ const MainLayout = () => {
       <>
         <AppHeader />
         <main className="flex-1">
-          <Outlet />
+          <Outlet context={{ activeSection, setActiveSection }} />
         </main>
       </>
     );

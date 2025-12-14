@@ -1,0 +1,17 @@
+{
+  "include": [
+    "api",
+    "backend"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*"
+  ],
+  "extraPaths": [
+    "backend"
+  ],
+  "reportMissingImports": "warning",
+  "typeCheckingMode": "basic"
+}
+
