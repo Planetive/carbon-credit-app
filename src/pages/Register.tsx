@@ -21,7 +21,6 @@ const Register = () => {
     password: "",
     confirmPassword: "",
     displayName: "",
-    organizationName: "",
     phone: "",
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -62,6 +61,9 @@ const Register = () => {
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
       });
       
       if (error) {
@@ -85,47 +87,15 @@ const Register = () => {
         return;
       }
 
-      // Use RPC function to create organization and profile
-      // This bypasses RLS issues during signup when session might not be fully established
-      const orgName = formData.organizationName || formData.email.split('@')[1]?.split('.')[0] || 'My Organization';
-      const displayName = formData.displayName || formData.email.split('@')[0];
+      // Profile will be created automatically by database trigger or user can complete it in dashboard
+      // No need to create it here - avoids timing issues with auth.users commitment
       
-      const { data: rpcData, error: rpcError } = await (supabase as any).rpc('create_organization_for_user', {
-        p_user_id: user.id,
-        p_organization_name: orgName,
-        p_display_name: displayName,
-        p_phone: formData.phone || null,
-        p_user_type: userType,
-      });
-
-      if (rpcError) {
-        console.error('Error creating organization via RPC:', rpcError);
-        toast({
-          title: "Organization error",
-          description: rpcError.message || "Failed to create organization. Please contact support.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (!rpcData || (rpcData as any).success !== true) {
-        console.error('RPC function returned error:', rpcData);
-        toast({
-          title: "Organization error",
-          description: (rpcData as any)?.error || "Failed to create organization. Please contact support.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
       setLoading(false);
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",
       });
-      navigate("/confirm-email");
+      navigate(`/confirm-email?email=${encodeURIComponent(formData.email)}`);
     } catch (error: any) {
       console.error('Unexpected error during registration:', error);
       setLoading(false);
@@ -161,6 +131,7 @@ const Register = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleRegister} className="space-y-4">
+              {/* Organization field removed */}
               {/* <Label>Organization Name</Label>
               <Input
                 name="organizationName"

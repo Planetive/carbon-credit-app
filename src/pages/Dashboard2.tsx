@@ -23,10 +23,11 @@ import {
   Building2,
   Edit,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  Calendar,
+  Leaf
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,15 +38,14 @@ import DashboardSidebar from "@/components/DashboardSidebar";
 
 const Dashboard2 = () => {
   const { signOut, user } = useAuth();
-  const { currentOrganization } = useOrganization();
   const { toast } = useToast();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
-  const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
+  const [profileForm, setProfileForm] = useState({ displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
-  const [organizationName, setOrganizationName] = useState<string>("");
+  const [displayName, setDisplayName] = useState<string>("");
   const [userType, setUserType] = useState<string>("financial_institution");
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
@@ -82,19 +82,31 @@ const Dashboard2 = () => {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, user_type")
+        .select("id, user_type, display_name, phone")
         .eq("user_id", user.id)
         .single();
       if (!data || error) {
         setProfileMissing(true);
+        setDisplayName("");
       } else {
-        setProfileMissing(false);
-      }
-      // Use current organization name from context instead of old organization_name field
-      if (currentOrganization) {
-        setOrganizationName(currentOrganization.name);
-      } else {
-        setOrganizationName("");
+        // Check if display_name and phone are missing or just default values
+        // If display_name is just the email prefix (from default) or phone is null, show the form
+        const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
+        const phoneIsMissing = !data.phone || data.phone.trim() === '';
+        
+        // Show questionnaire if display name or phone is missing
+        setProfileMissing(displayNameIsDefault || phoneIsMissing);
+        
+        // Pre-fill the form with existing data if available
+        if (data.display_name && !displayNameIsDefault) {
+          setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
+          setDisplayName(data.display_name);
+        } else {
+          setDisplayName("");
+        }
+        if (data.phone && !phoneIsMissing) {
+          setProfileForm(prev => ({ ...prev, phone: data.phone }));
+        }
       }
       if (data && data.user_type) {
         setUserType(data.user_type);
@@ -105,52 +117,49 @@ const Dashboard2 = () => {
       // Onboarding completion check removed
     };
     checkProfile();
-  }, [user, currentOrganization]);
+  }, [user]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileForm.organizationName || !profileForm.displayName) {
-      toast({ title: "Missing fields", description: "Organization name and display name are required.", variant: "destructive" });
+    if (!profileForm.displayName || !profileForm.phone) {
+      toast({ title: "Missing fields", description: "Name and phone number are required.", variant: "destructive" });
       return;
     }
     setProfileSubmitting(true);
+    
+    // Use upsert to handle both insert and update
     const { error } = await (supabase as any)
       .from("profiles")
-      .insert([
-        {
-          user_id: user.id,
-          organization_name: profileForm.organizationName,
-          display_name: profileForm.displayName,
-          phone: profileForm.phone || null,
-        },
-      ]);
+      .upsert({
+        user_id: user.id,
+        display_name: profileForm.displayName,
+        phone: profileForm.phone || null,
+        user_type: userType, // Preserve user type
+      }, {
+        onConflict: 'user_id'
+      });
+    
     setProfileSubmitting(false);
     if (error) {
       toast({ title: "Profile error", description: error.message, variant: "destructive" });
     } else {
       setProfileMissing(false);
-      toast({ title: "Profile created!", description: "Your profile has been saved." });
+      setDisplayName(profileForm.displayName);
+      toast({ title: "Profile saved!", description: "Your profile has been saved." });
     }
   };
 
   useEffect(() => {
-    if (!user || profileMissing || !currentOrganization) return;
+    if (!user || profileMissing) return;
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       
-      // Fetch projects - filter by organization_id if available
-      let projectsQuery = (supabase as any)
+      // Fetch projects
+      const { data: projectsData, error: projectsError } = await (supabase as any)
         .from("project_inputs")
         .select("*")
-        .eq("user_id", user.id);
-      
-      // Filter by organization_id, or include NULL values for backward compatibility
-      if (currentOrganization) {
-        projectsQuery = projectsQuery.or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`);
-      }
-      
-      const { data: projectsData, error: projectsError } = await projectsQuery
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       
       if (projectsError) {
@@ -160,18 +169,12 @@ const Dashboard2 = () => {
         setProjects(projectsData || []);
       }
 
-      // Fetch ESG assessment - filter by organization_id if available
-      let esgQuery = (supabase as any)
+      // Fetch ESG assessment
+      const { data: esgData, error: esgError } = await (supabase as any)
         .from("esg_assessments")
         .select("*")
-        .eq("user_id", user.id);
-      
-      // Filter by organization_id, or include NULL values for backward compatibility
-      if (currentOrganization) {
-        esgQuery = esgQuery.or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`);
-      }
-      
-      const { data: esgData, error: esgError } = await esgQuery.single();
+        .eq("user_id", user.id)
+        .single();
 
       if (!esgError && esgData) {
         setEsgAssessment(esgData);
@@ -196,18 +199,12 @@ const Dashboard2 = () => {
         }
       }
 
-      // Fetch emission calculator data - filter by organization_id if available
-      let emissionQuery = (supabase as any)
+      // Fetch emission calculator data
+      const { data: emissionData, error: emissionError } = await (supabase as any)
         .from("emission_calculator")
         .select("*")
-        .eq("user_id", user.id);
-      
-      // Filter by organization_id, or include NULL values for backward compatibility
-      if (currentOrganization) {
-        emissionQuery = emissionQuery.or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`);
-      }
-      
-      const { data: emissionData, error: emissionError } = await emissionQuery.single();
+        .eq("user_id", user.id)
+        .single();
 
       if (!emissionError && emissionData) {
         setEmissionData(emissionData);
@@ -443,9 +440,9 @@ const Dashboard2 = () => {
       setLoading(false);
     };
     fetchData();
-    }, [user, profileMissing, currentOrganization]);
+    }, [user, profileMissing]);
 
-  // Fetch portfolio companies when portfolio section is active
+  // Fetch portfolio companies when portfolio section is active (financial institution)
   useEffect(() => {
     if (activeSection === 'portfolio' && userType === 'financial_institution' && user && !profileMissing) {
       const loadPortfolioCompanies = async () => {
@@ -478,6 +475,36 @@ const Dashboard2 = () => {
       };
       
       loadPortfolioCompanies();
+    }
+  }, [activeSection, userType, user, profileMissing]);
+
+  // Fetch projects when portfolio section is active (corporate users)
+  useEffect(() => {
+    if (activeSection === 'portfolio' && userType === 'corporate' && user && !profileMissing) {
+      const loadProjects = async () => {
+        try {
+          setLoading(true);
+          const { data: projectsData, error: projectsError } = await (supabase as any)
+            .from("project_inputs")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+          
+          if (projectsError) {
+            console.error('Error loading projects:', projectsError);
+            setProjects([]);
+          } else {
+            setProjects(projectsData || []);
+          }
+        } catch (error) {
+          console.error('Error loading projects:', error);
+          setProjects([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadProjects();
     }
   }, [activeSection, userType, user, profileMissing]);
 
@@ -601,7 +628,7 @@ const Dashboard2 = () => {
                 Complete Your Profile
               </CardTitle>
               <CardDescription className="text-base text-gray-600">
-                To continue, please provide your organization and display name.
+                To continue, please provide your name and phone number.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -611,23 +638,7 @@ const Dashboard2 = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Organization Name</label>
-                  <input
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
-                    name="organizationName"
-                    type="text"
-                    value={profileForm.organizationName}
-                    onChange={e => setProfileForm(f => ({ ...f, organizationName: e.target.value }))}
-                    required
-                    placeholder="Enter your organization name"
-                  />
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Designation</label>
+                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Your Name <span className="text-red-500">*</span></label>
                   <input
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
                     name="displayName"
@@ -635,21 +646,22 @@ const Dashboard2 = () => {
                     value={profileForm.displayName}
                     onChange={e => setProfileForm(f => ({ ...f, displayName: e.target.value }))}
                     required
-                    placeholder="Enter your display name"
+                    placeholder="Enter your full name"
                   />
                 </motion.div>
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 }}
+                  transition={{ delay: 0.4 }}
                 >
-                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Phone Number</label>
+                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Phone Number <span className="text-red-500">*</span></label>
                   <input
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
                     name="phone"
                     type="tel"
                     value={profileForm.phone}
                     onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                    required
                     placeholder="03XX-XXXXXXX"
                   />
                 </motion.div>
@@ -682,7 +694,7 @@ const Dashboard2 = () => {
   const sectionTitles: Record<string, string> = {
     'overview': 'Company Overview',
     'portfolio': userType === 'corporate' ? 'My Projects' : 'My Portfolio',
-    'start-project': userType === 'corporate' ? 'Start New Projects' : 'Start New Portfolio',
+    'start-project': userType === 'corporate' ? 'Start New Project' : 'Start New Portfolio',
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
     'emissions': 'Emission Calculator',
@@ -728,7 +740,7 @@ const Dashboard2 = () => {
                         </div>
                         <div>
                           <h2 className="text-3xl md:text-4xl font-bold mb-1">
-                            {organizationName ? `Welcome back, ${organizationName}! 👋` : "Welcome to your Dashboard!"}
+                            {displayName ? `Welcome back, ${displayName}! 👋` : "Welcome to your Dashboard! 👋"}
                           </h2>
                           <p className="text-teal-100 text-lg">
                             Track your organization's sustainability progress and carbon footprint
@@ -1256,7 +1268,7 @@ const Dashboard2 = () => {
                               <Plus className="h-7 w-7 text-white" />
                             </motion.div>
                             <div className="flex-1">
-                              <h3 className="font-bold text-gray-900 text-lg mb-1">Start New Projects</h3>
+                              <h3 className="font-bold text-gray-900 text-lg mb-1">Start New Project</h3>
                               <p className="text-sm text-gray-600">Begin your project wizard</p>
                             </div>
                             <motion.div
@@ -1455,6 +1467,165 @@ const Dashboard2 = () => {
                     </Card>
                   </motion.div>
                 </motion.div>
+              )}
+            </motion.div>
+          ) : activeSection === 'portfolio' && userType === 'corporate' ? (
+            <motion.div
+              key="projects"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="max-w-7xl mx-auto"
+            >
+              {/* Projects Header */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-8"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Projects</h2>
+                    <p className="text-gray-600">View and manage all your carbon credit projects</p>
+                  </div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      onClick={() => navigate('/project-wizard')}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Start New Project
+                    </Button>
+                  </motion.div>
+                </div>
+              </motion.div>
+
+              {/* Projects Grid */}
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  <p className="mt-4 text-gray-600">Loading projects...</p>
+                </div>
+              ) : projects.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-16"
+                >
+                  <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <FileText className="h-10 w-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No projects yet</h3>
+                  <p className="text-gray-600 mb-6">Start building your carbon credit portfolio by creating your first project</p>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      onClick={() => navigate('/project-wizard')}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Start Your First Project
+                    </Button>
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {projects.map((project, index) => (
+                    <motion.div
+                      key={project.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ y: -5, scale: 1.02 }}
+                    >
+                      <Card 
+                        className="bg-white border border-gray-200/80 shadow-md hover:border-green-300/60 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 hover:opacity-100 transition-opacity" />
+                        <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
+                          <div 
+                            className="flex-1 cursor-pointer"
+                            onClick={() => navigate(`/project/${project.id}`)}
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <h3 className="text-lg font-bold text-gray-900 mb-1">{project.project_name || 'Untitled Project'}</h3>
+                                {project.type && (
+                                  <Badge className="mt-1 bg-green-100 text-green-800">
+                                    {project.type}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                                <Leaf className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {project.country && (
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-500">Country</span>
+                                  <span className="font-semibold text-gray-900">{project.country}</span>
+                                </div>
+                              )}
+                              {project.area_of_interest && (
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-500">Area of Interest</span>
+                                  <span className="font-semibold text-gray-900 truncate ml-2">{project.area_of_interest}</span>
+                                </div>
+                              )}
+                              {project.goal && (
+                                <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
+                                  <span className="text-gray-500">Goal</span>
+                                  <span className="font-semibold text-green-600 truncate ml-2">{project.goal}</span>
+                                </div>
+                              )}
+                              {project.created_at && (
+                                <div className="flex items-center text-xs text-gray-400 pt-2 border-t border-gray-100">
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  Created {new Date(project.created_at).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => {
+                                const typeToPass = project.subcategory?.trim() || project.type?.trim();
+                                navigate('/filtered-projects-landing', {
+                                  state: {
+                                    country: project.country,
+                                    areaOfInterest: project.area_of_interest,
+                                    type: typeToPass,
+                                    subcategory: project.subcategory,
+                                    goal: project.goal,
+                                  }
+                                });
+                              }}
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Continue
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => navigate(`/project/${project.id}`)}
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              <FileText className="h-4 w-4" />
+                              View
+                            </motion.button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
               )}
             </motion.div>
           ) : (

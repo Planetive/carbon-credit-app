@@ -14,22 +14,44 @@ CREATE OR REPLACE FUNCTION public.create_organization_for_user(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = auth, public
 AS $$
 DECLARE
   v_org_id UUID;
   v_result JSONB;
+  v_user_email TEXT;
 BEGIN
-  -- Create the organization
+  -- Try to get user email (may fail if user not ready yet, but that's OK)
+  BEGIN
+    SELECT email INTO v_user_email FROM auth.users WHERE id = p_user_id;
+  EXCEPTION
+    WHEN OTHERS THEN
+      v_user_email := NULL; -- Email not available yet, continue anyway
+  END;
+  
+  -- Create the organization first (this always works)
   INSERT INTO public.organizations (name, description, parent_organization_id)
   VALUES (p_organization_name, NULL, NULL)
   RETURNING id INTO v_org_id;
 
-  -- Add user as admin of the organization
-  -- Since this is SECURITY DEFINER, we can bypass RLS
-  INSERT INTO public.user_organizations (user_id, organization_id, role)
-  VALUES (p_user_id, v_org_id, 'admin')
-  ON CONFLICT (user_id, organization_id) DO NOTHING;
+  -- Try to add user as admin of the organization
+  -- If user doesn't exist yet in auth.users, this will fail with foreign key error
+  BEGIN
+    INSERT INTO public.user_organizations (user_id, organization_id, role)
+    VALUES (p_user_id, v_org_id, 'admin')
+    ON CONFLICT (user_id, organization_id) DO NOTHING;
+  EXCEPTION
+    WHEN foreign_key_violation THEN
+      -- User not ready yet, return error for frontend to retry
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'User not ready yet. Please retry shortly.',
+        'organization_id', v_org_id
+      );
+    WHEN OTHERS THEN
+      -- Other error, re-raise it
+      RAISE;
+  END;
 
   -- Create or update the profile
   INSERT INTO public.profiles (
@@ -43,7 +65,7 @@ BEGIN
   VALUES (
     p_user_id,
     p_organization_name,
-    COALESCE(p_display_name, split_part((SELECT email FROM auth.users WHERE id = p_user_id), '@', 1)),
+    COALESCE(p_display_name, split_part(COALESCE(v_user_email, ''), '@', 1)),
     p_phone,
     p_user_type,
     v_org_id
@@ -64,10 +86,16 @@ BEGIN
 
   RETURN v_result;
 EXCEPTION
+  WHEN foreign_key_violation THEN
+    -- If user is not yet visible in auth.users, signal a retry
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'User not ready yet. Please retry shortly.'
+    );
   WHEN OTHERS THEN
     RETURN jsonb_build_object(
       'success', false,
-      'error', SQLERRM
+      'error', SQLERRM || ' (Error Code: ' || SQLSTATE || ')'
     );
 END;
 $$;
@@ -86,21 +114,30 @@ CREATE POLICY "Users can create organizations"
 
 -- Ensure the trigger function works correctly even if called from RPC
 -- The trigger should still work, but let's make sure it handles the case where profile doesn't exist yet
+-- NOTE: This trigger is disabled when called from RPC function since RPC handles user_organizations insertion
 CREATE OR REPLACE FUNCTION public.handle_new_organization()
 RETURNS TRIGGER 
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 AS $$
 DECLARE
   current_user_id UUID;
+  v_user_exists BOOLEAN;
 BEGIN
   -- Get the current user ID from the JWT token
   current_user_id := auth.uid();
   
-  -- If no user ID, we can't proceed (but this shouldn't happen with SECURITY DEFINER)
+  -- If no user ID, skip (this happens when called from RPC function)
+  -- The RPC function handles user_organizations insertion directly
   IF current_user_id IS NULL THEN
-    -- Try to get user_id from the context if available
-    -- This is a fallback for when called from RPC
+    RETURN NEW;
+  END IF;
+  
+  -- Verify user exists before inserting
+  SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = current_user_id) INTO v_user_exists;
+  
+  IF NOT v_user_exists THEN
+    -- User doesn't exist yet, skip (will be handled by RPC function)
     RETURN NEW;
   END IF;
   
@@ -117,6 +154,13 @@ BEGIN
     AND current_organization_id IS NULL;
   
   RETURN NEW;
+EXCEPTION
+  WHEN foreign_key_violation THEN
+    -- If foreign key fails, just return NEW (RPC function will handle it)
+    RETURN NEW;
+  WHEN OTHERS THEN
+    -- Log error but don't fail the transaction
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 

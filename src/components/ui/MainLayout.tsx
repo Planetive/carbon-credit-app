@@ -53,8 +53,8 @@ const MainLayout = () => {
           activeSection={activeSection}
           onSectionChange={setActiveSection}
         />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 lg:p-10">
+        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+          <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 lg:p-10 bg-slate-50">
             <Outlet context={{ activeSection, setActiveSection }} />
           </main>
         </div>

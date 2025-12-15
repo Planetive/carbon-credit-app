@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles } from 'lucide-react';
 import { PortfolioClient, EmissionCalculation } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
+import { motion } from 'framer-motion';
 
 const currencyFormat = (value: number) => (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -35,7 +37,7 @@ const CompanyDetail: React.FC = () => {
     location?.state || {
       company: 'Company',
       amount: 0,
-      counterparty: 'N/A',
+      counterpartyType: 'N/A',
       sector: 'N/A',
       geography: 'N/A',
       probabilityOfDefault: 0,
@@ -135,7 +137,7 @@ const CompanyDetail: React.FC = () => {
   const {
     company,
     amount,
-    counterparty,
+    counterpartyType,
     counterpartyId,
     sector,
     geography,
@@ -326,254 +328,442 @@ const CompanyDetail: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-teal-50/30">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" onClick={() => navigate('/bank-portfolio')}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Portfolio
-          </Button>
-        </div>
-
-        {/* Hero Banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 text-white mb-8">
-          <div className="absolute inset-0 bg-gradient-to-r from-teal-600/90 to-cyan-600/90"></div>
-          <div className="relative p-8 md:p-12">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-16 w-16 bg-white/20 rounded-2xl flex items-center justify-center">
-                    <Building2 className="h-8 w-8" />
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/20 to-cyan-50/30 relative overflow-hidden">
+        {/* Subtle Background Pattern */}
+        <div className="absolute inset-0 opacity-[0.02]" style={{
+          backgroundImage: `
+            linear-gradient(to right, rgb(20, 184, 166) 1px, transparent 1px),
+            linear-gradient(to bottom, rgb(20, 184, 166) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }}></div>
+        
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 relative z-10">
+        {/* Summary Card - Key Metrics Overview */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-6"
+        >
+          <Card className="border border-teal-100/50 shadow-xl bg-gradient-to-r from-teal-50/50 via-cyan-50/30 to-teal-50/50 backdrop-blur-sm rounded-3xl">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-5 flex-1">
+                  <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-xl">
+                    <Building2 className="h-10 w-10 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl md:text-4xl font-bold mb-2">{company}</h1>
-                    <p className="text-teal-100 text-lg">Loan Portfolio Management</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Wallet className="h-5 w-5" />
-                      <span className="text-sm font-medium">Loan Amount</span>
-                    </div>
-                    <div className="text-xl md:text-2xl font-bold">{currencyFormat(amount)} PKR</div>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Hash className="h-5 w-5" />
-                      <span className="text-sm font-medium">Counterparty Type</span>
-                    </div>
-                    <div className="text-xl md:text-2xl font-bold">{portfolioData.counterpartyType || 'SME'}</div>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-5 w-5" />
-                      <span className="text-sm font-medium">Sector</span>
-                    </div>
-                    <div className="text-xl md:text-2xl font-bold">{sector}</div>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-5 w-5" />
-                      <span className="text-sm font-medium">Geography</span>
-                    </div>
-                    <div className="text-xl md:text-2xl font-bold">{geography}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Credit Risk Information */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Credit Risk & Loan Details
-            </CardTitle>
-            <CardDescription>Key risk metrics and loan terms for this counterparty</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Shield className="h-5 w-5 text-red-600" />
-                  <span className="text-sm font-medium text-red-700">Probability of Default</span>
-                </div>
-                <div className="text-3xl font-bold text-red-600">{probabilityOfDefault}%</div>
-                <div className="text-xs text-red-500 mt-1">Baseline PD</div>
-              </div>
-              
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Shield className="h-5 w-5 text-orange-600" />
-                  <span className="text-sm font-medium text-orange-700">Loss Given Default</span>
-                </div>
-                <div className="text-3xl font-bold text-orange-600">{lossGivenDefault}%</div>
-                <div className="text-xs text-orange-500 mt-1">Baseline LGD</div>
-              </div>
-              
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-700">Tenor/Maturity</span>
-                </div>
-                <div className="text-3xl font-bold text-blue-600">{tenor}</div>
-                <div className="text-xs text-blue-500 mt-1">months</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          <Card className="hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center shadow-sm">
-                  <Calculator className="h-6 w-6 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-xl text-green-800">Finance Emission</CardTitle>
-                  <CardDescription className="text-green-600">
-                    {getFinanceEmissionResult() ? 
-                      `Last updated: ${new Date(getFinanceEmissionResult()?.updated_at || '').toLocaleDateString()}` : 
-                      'Calculate financed emissions for this loan'
-                    }
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <div className="text-sm text-muted-foreground">Loading emission data...</div>
-                </div>
-              ) : getFinanceEmissionResult() ? (
-                <div className="space-y-4">
-                  {/* Main Emission Value Card */}
-                  <div className="bg-white rounded-xl p-5 border shadow-sm">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-green-600 mb-2">
-                        {formatEmissionValue(getFinanceEmissionResult()?.financed_emissions)} tCO₂e
-                      </div>
+                  <div className="flex-1">
+                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent mb-2">
+                      {company}
+                    </h1>
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-teal-100 text-teal-700 border-teal-300 rounded-full px-3 py-1">
+                        {portfolioData.counterpartyType || 'SME'}
+                      </Badge>
+                      <span className="text-sm text-gray-600">Portfolio Company</span>
                     </div>
                   </div>
-                  
-                  {/* Enhanced Action Button */}
-                  <Button
-                    onClick={() => navigate('/finance-emission', { 
-                      state: { 
-                        mode: 'finance', 
-                        startFresh: true, 
-                        returnUrl: currentPath,
-                        ...portfolioData 
-                      } 
-                    })}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/dashboard', { state: { activeSection: 'portfolio' } })}
+                    className="border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300 rounded-xl transition-all duration-200"
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Calculation
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Portfolio
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Assess the carbon footprint associated with this specific loan using PCAF methodology.
-                  </p>
-                  <Button
-                    onClick={() => navigate('/finance-emission', { state: { mode: 'finance', ...portfolioData } })}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
-                  >
-                    Open Finance Emission Calculator
-                  </Button>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
+        </motion.div>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-sm">
+        {/* Hero Stats - Wrapped in Card for Consistency */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="mb-6"
+        >
+          <Card className="border border-gray-200/60 shadow-lg bg-white/90 backdrop-blur-sm rounded-2xl">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center shadow-sm">
-                  <BarChart3 className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-xl text-blue-800">Facilitated Emission</CardTitle>
-                  <CardDescription className="text-blue-600">
-                    {getFacilitatedEmissionResult() ? 
-                      `Last updated: ${new Date(getFacilitatedEmissionResult()?.updated_at || '').toLocaleDateString()}` : 
-                      'Calculate facilitated emissions for this loan'
-                    }
-                  </CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-xl font-semibold text-gray-800">Company Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <div className="text-sm text-muted-foreground">Loading emission data...</div>
-                </div>
-              ) : getFacilitatedEmissionResult() ? (
-                <div className="space-y-4">
-                  {/* Main Emission Value Card */}
-                  <div className="bg-white rounded-xl p-5 border shadow-sm">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-600 mb-2">
-                        {formatEmissionValue(getFacilitatedEmissionResult()?.financed_emissions)} tCO₂e
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  whileHover={{ scale: 1.02, y: -3 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 to-cyan-50 p-5 border-2 border-teal-100/80 shadow-md hover:shadow-xl hover:border-teal-300 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-teal-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-12 w-12 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md">
+                        <Wallet className="h-6 w-6 text-white" />
                       </div>
+                      <span className="text-sm font-semibold text-teal-700">Loan Amount</span>
                     </div>
+                    <motion.div 
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                      className="text-3xl font-bold text-teal-600 mb-2"
+                    >
+                      {currencyFormat(amount)}
+                    </motion.div>
+                    <div className="text-xs text-teal-500 font-medium">PKR</div>
                   </div>
-                  
-                  {/* Enhanced Action Button */}
-                  <Button
-                    onClick={() => navigate('/finance-emission', { 
-                      state: { 
-                        mode: 'facilitated', 
-                        startFresh: true, 
-                        returnUrl: currentPath,
-                        ...portfolioData 
-                      } 
-                    })}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Calculation
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Evaluate the environmental impact of facilitating this loan using advanced metrics.
-                  </p>
-                  <Button
-                    onClick={() => navigate('/finance-emission', { state: { mode: 'facilitated', ...portfolioData } })}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
-                  >
-                    Open Facilitated Emission Calculator
-                  </Button>
-                </div>
-              )}
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                  whileHover={{ scale: 1.02, y: -3 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-50 to-blue-50 p-5 border-2 border-cyan-100/80 shadow-md hover:shadow-xl hover:border-cyan-300 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-12 w-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-md">
+                        <TrendingUp className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-cyan-700">Sector</span>
+                    </div>
+                    <div className="text-2xl font-bold text-cyan-600 mb-2 truncate">{sector}</div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 }}
+                  whileHover={{ scale: 1.02, y: -3 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-5 border-2 border-emerald-100/80 shadow-md hover:shadow-xl hover:border-emerald-300 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-12 w-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                        <MapPin className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-emerald-700">Geography</span>
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-600 mb-2 truncate">{geography}</div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ scale: 1.02, y: -3 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-5 border-2 border-blue-100/80 shadow-md hover:shadow-xl hover:border-blue-300 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-blue-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                        <Calendar className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-blue-700">Tenor</span>
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{tenor}</div>
+                    <div className="text-xs text-blue-500 font-medium">months</div>
+                  </div>
+                </motion.div>
+              </div>
             </CardContent>
           </Card>
+        </motion.div>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-purple-50 to-violet-50">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <Layers className="h-6 w-6 text-purple-600" />
+        {/* Enhanced Credit Risk Information */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+        >
+          <Card className="mb-6 border border-gray-200/60 shadow-xl bg-white/90 backdrop-blur-sm rounded-2xl">
+            <CardHeader className="pb-5">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Shield className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">Scenario Building & Risk Analysis</CardTitle>
-                  <CardDescription>Build scenarios and assess climate risks</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-gray-800">Credit Risk & Loan Details</CardTitle>
+                  <CardDescription className="text-base text-gray-600">Key risk metrics and loan terms for this counterparty</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create and evaluate various scenarios including stress testing, climate scenarios, and market conditions. 
-                Includes comprehensive risk analysis with credit risk, climate risk, and portfolio impact assessment.
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* PD Card */}
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-50 to-orange-50 p-6 border-2 border-red-100/80 shadow-lg hover:shadow-xl hover:border-red-200 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-red-200/20 rounded-full -mr-20 -mt-20"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-14 w-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-md">
+                        <AlertCircle className="h-7 w-7 text-white" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold text-red-700">Probability of Default</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-red-500 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>The likelihood that a borrower will default on their loan obligations within a given time period.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <div className="text-5xl font-bold text-red-600 mb-3">{probabilityOfDefault}%</div>
+                    <div className="text-xs text-red-500 mt-3 font-medium">Baseline PD</div>
+                  </div>
+                </motion.div>
+                
+                {/* LGD Card */}
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 p-6 border-2 border-orange-100/80 shadow-lg hover:shadow-xl hover:border-orange-200 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-14 w-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-md">
+                        <Target className="h-7 w-7 text-white" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold text-orange-700">Loss Given Default</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-orange-500 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>The percentage of exposure that would be lost if a default occurs, accounting for recovery value.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <div className="text-5xl font-bold text-orange-600 mb-3">{lossGivenDefault}%</div>
+                    <div className="text-xs text-orange-500 mt-3 font-medium">Baseline LGD</div>
+                  </div>
+                </motion.div>
+                
+                {/* Tenor Card */}
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-6 border-2 border-blue-100/80 shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+                >
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+                  <div className="relative">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+                        <Calendar className="h-7 w-7 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-blue-700">Tenor/Maturity</span>
+                    </div>
+                    <div className="text-5xl font-bold text-blue-600 mb-3">{tenor}</div>
+                    <div className="text-xs text-blue-500 mt-3 font-medium">months</div>
+                  </div>
+                </motion.div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Emission Cards - Matching Credit Risk Style */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+          {/* Finance Emission Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            whileHover={{ scale: 1.02, y: -5 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-6 border-2 border-green-100/80 shadow-lg hover:shadow-xl hover:border-green-200 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/20 rounded-full -mr-20 -mt-20"></div>
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Calculator className="h-7 w-7 text-white" />
+                </div>
+                <span className="text-sm font-semibold text-green-700">Finance Emission</span>
+              </div>
+              
+              {loading ? (
+                <div className="text-center py-6">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500 border-t-transparent mx-auto mb-3"></div>
+                  <p className="text-xs text-green-500 font-medium">Loading...</p>
+                </div>
+              ) : getFinanceEmissionResult() ? (
+                <>
+                  <motion.div 
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    className="text-5xl font-bold text-green-600 mb-3"
+                  >
+                    {formatEmissionValue(getFinanceEmissionResult()?.financed_emissions)}
+                  </motion.div>
+                  <div className="flex items-center gap-1 mb-5">
+                    <span className="text-xs text-green-500 font-medium">tCO₂e</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-green-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl font-bold text-green-300 mb-3">—</div>
+                  <div className="text-xs text-green-500 mt-2 mb-4 font-medium">Not calculated</div>
+                  <div className="bg-green-50 rounded-xl p-4 mb-5 border-2 border-green-100">
+                    <p className="text-xs text-green-700 leading-relaxed">
+                      Calculate financed emissions using PCAF methodology to assess the carbon footprint of this loan.
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              <Button
+                onClick={() => navigate('/finance-emission', { 
+                  state: getFinanceEmissionResult() ? {
+                    mode: 'finance', 
+                    startFresh: true, 
+                    returnUrl: currentPath,
+                    ...portfolioData 
+                  } : { mode: 'finance', ...portfolioData }
+                })}
+                className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                size="default"
+              >
+                {getFinanceEmissionResult() ? (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Update Calculation
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Calculate Emissions
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Facilitated Emission Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            whileHover={{ scale: 1.02, y: -5 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-6 border-2 border-blue-100/80 shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <BarChart3 className="h-7 w-7 text-white" />
+                </div>
+                <span className="text-sm font-semibold text-blue-700">Facilitated Emission</span>
+              </div>
+              
+              {loading ? (
+                <div className="text-center py-6">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
+                  <p className="text-xs text-blue-500 font-medium">Loading...</p>
+                </div>
+              ) : getFacilitatedEmissionResult() ? (
+                <>
+                  <motion.div 
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    className="text-5xl font-bold text-blue-600 mb-3"
+                  >
+                    {formatEmissionValue(getFacilitatedEmissionResult()?.financed_emissions)}
+                  </motion.div>
+                  <div className="flex items-center gap-1 mb-5">
+                    <span className="text-xs text-blue-500 font-medium">tCO₂e</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-blue-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl font-bold text-blue-300 mb-3">—</div>
+                  <div className="text-xs text-blue-500 mt-2 mb-4 font-medium">Not calculated</div>
+                </>
+              )}
+              
+              <Button
+                onClick={() => navigate('/finance-emission', { 
+                  state: getFacilitatedEmissionResult() ? {
+                    mode: 'facilitated', 
+                    startFresh: true, 
+                    returnUrl: currentPath,
+                    ...portfolioData 
+                  } : { mode: 'facilitated', ...portfolioData }
+                })}
+                className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                size="default"
+              >
+                {getFacilitatedEmissionResult() ? (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Update Calculation
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Calculate Emissions
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Scenario Building Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+            whileHover={{ scale: 1.02, y: -5 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 p-6 border-2 border-purple-100/80 shadow-lg hover:shadow-xl hover:border-purple-200 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 rounded-full -mr-20 -mt-20"></div>
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Layers className="h-7 w-7 text-white" />
+                </div>
+                <span className="text-sm font-semibold text-purple-700">Risk Analysis</span>
+              </div>
+              
+              <div className="mb-5">
+                <p className="text-sm text-purple-600 leading-relaxed">
+                  Build scenarios and assess climate risks with comprehensive analysis tools
+                </p>
+              </div>
+              
               <Button
                 onClick={() => navigate('/scenario-building', { 
                   state: {
@@ -581,15 +771,18 @@ const CompanyDetail: React.FC = () => {
                     referrer: currentPath 
                   }
                 })}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                size="default"
               >
-                Open Scenario Builder & Risk Analysis
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Open Scenario Builder
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
+        </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 

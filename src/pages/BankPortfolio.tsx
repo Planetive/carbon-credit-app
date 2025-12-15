@@ -80,10 +80,15 @@ const BankPortfolio: React.FC = () => {
         .single();
       if (data?.user_type) {
         setUserType(data.user_type);
+        // Redirect corporate users to project wizard
+        if (data.user_type === 'corporate') {
+          navigate('/project-wizard');
+          return;
+        }
       }
     };
     fetchUserType();
-  }, [user]);
+  }, [user, navigate]);
 
   // Load data from database on component mount
   useEffect(() => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -369,6 +370,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const [multiResults, setMultiResults] = useState<Array<{ type: string; label: string; attributionFactor: number; financeEmission: number; denominatorLabel: string; denominatorValue: number }>>([]);
   const [selectedFormula, setSelectedFormula] = useState<string>('');
   const [companyType, setCompanyType] = useState<'listed' | 'private'>('listed');
+  const [isCalculating, setIsCalculating] = useState(false);
   // Remove local tab state - use prop from parent instead
   
   // Use props from ESGWizard questionnaire
@@ -1214,7 +1216,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       }
     }
 
-    try {
+    setIsCalculating(true);
+    
+    // Use setTimeout to allow UI to update before heavy calculation
+    setTimeout(() => {
+      try {
       // Single-loan detailed calculation (kept for current view and validations)
       // Calculate total property value for mortgages and commercial real estate
       const totalPropertyValueAtOrigination = loanType === 'mortgage'
@@ -1603,18 +1609,21 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         }
       }
     
-    toast({
-        title: "PCAF Calculation Complete",
-        description: `Finance emission calculated using ${pcafResult.methodology}`,
-      variant: "default"
-    });
-    } catch (error) {
-      toast({
-        title: "Calculation Error",
-        description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive"
-      });
-    }
+        toast({
+          title: "PCAF Calculation Complete",
+          description: `Finance emission calculated using ${pcafResult.methodology}`,
+          variant: "default"
+        });
+      } catch (error) {
+        toast({
+          title: "Calculation Error",
+          description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive"
+        });
+      } finally {
+        setIsCalculating(false);
+      }
+    }, 100);
   };
 
   const getCurrentFormula = () => {
@@ -1766,67 +1775,50 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Show content based on active tab */}
       {activeTab === 'finance' && (
         <>
-          {/* Current loan type heading */}
-          {loanType && (
-            <div className="pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {(typeLabels[loanType] || loanType)} Form
-              </h3>
+          {/* Loan Type Navigation - Clean Header */}
+          {expandedLoanTypes.length > 1 && (
+            <div className="space-y-6 pb-6 border-b border-gray-200">
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {(typeLabels[expandedLoanTypes[currentLoanIndex]?.type] || expandedLoanTypes[currentLoanIndex]?.type)}
+                </h3>
+                <p className="text-base text-gray-600">
+                  Loan {currentLoanIndex + 1} of {expandedLoanTypes.length}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentLoanIndex === 0}
+                  onClick={() => setCurrentLoanIndex(i => Math.max(0, i - 1))}
+                  className="h-10 px-6"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  disabled={currentLoanIndex >= expandedLoanTypes.length - 1}
+                  onClick={() => setCurrentLoanIndex(i => Math.min(expandedLoanTypes.length - 1, i + 1))}
+                  className="h-10 px-6"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
-          {/* Removed top pill navigation for cleaner UI */}
-          {/* Selected Loan Types Display */}
-          {expandedLoanTypes.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Selected Loan Types
-                </CardTitle>
-                <CardDescription>
-                  You are calculating emissions for the following loan types:
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {expandedLoanTypes.map((inst, index) => (
-                    <Badge key={inst.key || index} variant="secondary" className="px-3 py-1">
-                      {(typeLabels[inst.type] || inst.type)} #{inst.instance}
-                    </Badge>
-                  ))}
-                </div>
-                {expandedLoanTypes.length > 1 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Use Previous/Next to switch between loan instances.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          {/* Navigation buttons between loan forms (bottom only) */}
-          {expandedLoanTypes.length > 1 && (
-            <div className="flex justify-between items-center pt-4">
-              <Button
-                variant="outline"
-                disabled={currentLoanIndex === 0}
-                onClick={() => setCurrentLoanIndex(i => Math.max(0, i - 1))}
-              >
-                Previous Loan
-              </Button>
-              <div className="text-sm text-gray-600">
-                {currentLoanIndex + 1} of {expandedLoanTypes.length}
-              </div>
-              <Button
-                variant="default"
-                disabled={currentLoanIndex >= expandedLoanTypes.length - 1}
-                onClick={() => setCurrentLoanIndex(i => Math.min(expandedLoanTypes.length - 1, i + 1))}
-              >
-                Next Loan
-              </Button>
+          
+          {/* Single Loan Type Header */}
+          {expandedLoanTypes.length === 1 && loanType && (
+            <div className="text-center space-y-2 pb-6">
+              <h3 className="text-2xl font-bold text-gray-900">
+                {(typeLabels[loanType] || loanType)}
+              </h3>
             </div>
           )}
         </>
@@ -1897,191 +1889,260 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           onUpdateOutstandingLoan={(value) => updateFormData('outstandingLoan', value)}
         />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Financial Information & EVIC Calculation</CardTitle>
-            <CardDescription>
-              Enter the core financial data and {corporateStructure === 'listed' ? 'EVIC calculation details' : 'debt and equity information'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Basic Financial Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="outstanding-loan">Outstanding Loan Amount (PKR)</Label>
+        <div className="max-w-4xl mx-auto space-y-10">
+          {/* Financial Information Header - Centered */}
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-bold text-gray-900">
+              Financial Information
+            </h3>
+            <p className="text-base text-gray-600">
+              {corporateStructure === 'listed' ? 'Enter financial data for EVIC calculation' : 'Enter debt and equity information'}
+            </p>
+          </div>
+
+          {/* Outstanding Loan - Centered Card */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-md space-y-3">
+              <div className="text-center space-y-2">
+                <Label htmlFor="outstanding-loan" className="text-base font-semibold text-gray-900 block">
+                  Outstanding Loan Amount
+                </Label>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-sm text-gray-500">(PKR)</span>
                   <FieldTooltip content="How much money is currently owed on the loan or investment" />
                 </div>
-                <FormattedNumberInput
-                  id="outstanding-loan"
-                  placeholder="0"
-                  value={formData.outstandingLoan || 0}
-                  onChange={(value) => updateFormData('outstandingLoan', value)}
-                  className="mt-1"
-                />
-                {loanType !== 'project-finance' &&
-                  corporateStructure === 'unlisted' && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Calculated as Total Debt + Total Equity
-                    </p>
-                  )}
               </div>
+              <FormattedNumberInput
+                id="outstanding-loan"
+                placeholder="Enter amount"
+                value={formData.outstandingLoan || 0}
+                onChange={(value) => updateFormData('outstandingLoan', value)}
+                className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+              />
+              {loanType !== 'project-finance' &&
+                corporateStructure === 'unlisted' && (
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Calculated as Total Debt + Total Equity
+                  </p>
+                )}
             </div>
-
-          <Separator />
+          </div>
 
           {/* EVIC Calculation Section - Only show for Corporate Bonds and Business Loans */}
           {loanType === 'corporate-bond' || loanType === 'business-loan' ? (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">
-                {corporateStructure === 'listed' ? 'EVIC Calculation (Enterprise Value Including Cash)' : 'Total Equity + Debt Calculation'}
-              </h3>
+            <div className="space-y-8 pt-8 border-t-2 border-gray-200">
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {corporateStructure === 'listed' ? 'EVIC Calculation' : 'Total Equity + Debt Calculation'}
+                </h3>
+                <p className="text-base text-gray-600">
+                  {corporateStructure === 'listed' ? 'Enterprise Value Including Cash' : 'Total company equity and debt'}
+                </p>
+              </div>
             {corporateStructure === 'listed' ? (
               // Show full EVIC form only for first loan or single loan
               propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="share-price">Share Price (PKR)</Label>
-                      <FieldTooltip content="Current price of one company share" />
+                <div className="max-w-5xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="share-price" className="text-sm font-semibold text-gray-900 block">
+                          Share Price
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs text-gray-500">(PKR)</span>
+                          <FieldTooltip content="Current price of one company share" />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="share-price"
+                        placeholder="Enter value"
+                        value={formData.sharePrice || 0}
+                        onChange={(value) => updateFormData('sharePrice', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
                     </div>
-                    <FormattedNumberInput
-                      id="share-price"
-                      placeholder="0"
-                      value={formData.sharePrice || 0}
-                      onChange={(value) => updateFormData('sharePrice', value)}
-                      className="mt-1"
-                    />
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="outstanding-shares" className="text-sm font-semibold text-gray-900 block">
+                          Outstanding Shares
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <FieldTooltip content="Total number of company shares available" />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="outstanding-shares"
+                        placeholder="Enter value"
+                        value={formData.outstandingShares || 0}
+                        onChange={(value) => updateFormData('outstandingShares', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="total-debt" className="text-sm font-semibold text-gray-900 block">
+                          Total Debt
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs text-gray-500">(PKR)</span>
+                          <FieldTooltip content="Total amount of money the company owes" />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="total-debt"
+                        placeholder="Enter value"
+                        value={formData.totalDebt || 0}
+                        onChange={(value) => updateFormData('totalDebt', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="minority-interest" className="text-sm font-semibold text-gray-900 block">
+                          Minority Interest
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="minority-interest"
+                        placeholder="Enter value"
+                        value={formData.minorityInterest || 0}
+                        onChange={(value) => updateFormData('minorityInterest', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="preferred-stock" className="text-sm font-semibold text-gray-900 block">
+                          Preferred Stock
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="preferred-stock"
+                        placeholder="Enter value"
+                        value={formData.preferredStock || 0}
+                        onChange={(value) => updateFormData('preferredStock', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="outstanding-shares">Outstanding Shares</Label>
-                      <FieldTooltip content="Total number of company shares available" />
-                    </div>
-                    <FormattedNumberInput
-                      id="outstanding-shares"
-                      placeholder="0"
-                      value={formData.outstandingShares || 0}
-                      onChange={(value) => updateFormData('outstandingShares', value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="total-debt">Total Debt (PKR)</Label>
-                      <FieldTooltip content="Total amount of money the company owes" />
-                    </div>
-                    <FormattedNumberInput
-                      id="total-debt"
-                      placeholder="0"
-                      value={formData.totalDebt || 0}
-                      onChange={(value) => updateFormData('totalDebt', value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="minority-interest">Minority Interest</Label>
-                      <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                    </div>
-                    <FormattedNumberInput
-                      id="minority-interest"
-                      placeholder="0"
-                      value={formData.minorityInterest || 0}
-                      onChange={(value) => updateFormData('minorityInterest', value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="preferred-stock">Preferred Stock</Label>
-                      <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                    </div>
-                    <FormattedNumberInput
-                      id="preferred-stock"
-                      placeholder="0"
-                      value={formData.preferredStock || 0}
-                      onChange={(value) => updateFormData('preferredStock', value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="p-4 bg-primary/5 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">Calculated EVIC</div>
-                    <div className="text-xl font-bold text-primary">
-                      {((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()} PKR
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
+                  {/* Calculated EVIC - Centered Display */}
+                  <div className="mt-10 flex justify-center">
+                    <div className="w-full max-w-md p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-300 shadow-lg">
+                      <div className="text-center space-y-3">
+                        <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Calculated EVIC</div>
+                        <div className="text-3xl font-bold text-gray-900">
+                          {((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
+                        </div>
+                        <div className="text-base font-medium text-gray-600">PKR</div>
+                        <div className="text-xs text-gray-500 pt-2 border-t border-gray-300">
+                          (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               ) : (
                 // Show read-only EVIC display for subsequent loans
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Shared EVIC (from first loan)</div>
-                  <div className="text-xl font-bold text-primary">
-                    {((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()} PKR
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-2 text-amber-600">
-                    ⚠️ EVIC values are shared across all loans and can only be edited in the first loan form
+                <div className="flex justify-center">
+                  <div className="w-full max-w-md p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 shadow-lg">
+                    <div className="text-center space-y-3">
+                      <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Shared EVIC (from first loan)</div>
+                      <div className="text-3xl font-bold text-blue-900">
+                        {((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
+                      </div>
+                      <div className="text-base font-medium text-blue-700">PKR</div>
+                      <div className="text-xs text-blue-600 pt-2 border-t border-blue-200">
+                        (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
+                      </div>
+                      <div className="text-xs text-amber-700 mt-3 pt-3 border-t border-amber-200 bg-amber-50 rounded-lg p-2">
+                        ⚠️ EVIC values are shared across all loans and can only be edited in the first loan form
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
             ) : (
               // Show full form only for first loan or single loan
               propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="total-equity">Total Equity (PKR)</Label>
-                      <FieldTooltip content="Total value of company ownership (shares, retained earnings, etc.)" />
+                <div className="max-w-3xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="total-equity" className="text-sm font-semibold text-gray-900 block">
+                          Total Equity
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs text-gray-500">(PKR)</span>
+                          <FieldTooltip content="Total value of company ownership (shares, retained earnings, etc.)" />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="total-equity"
+                        placeholder="Enter value"
+                        value={formData.totalEquity || 0}
+                        onChange={(value) => updateFormData('totalEquity', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
                     </div>
-                    <FormattedNumberInput
-                      id="total-equity"
-                      placeholder="0"
-                      value={formData.totalEquity || 0}
-                      onChange={(value) => updateFormData('totalEquity', value)}
-                      className="mt-1"
-                    />
+                    <div className="space-y-3">
+                      <div className="text-center space-y-1">
+                        <Label htmlFor="total-debt-unlisted" className="text-sm font-semibold text-gray-900 block">
+                          Total Debt
+                        </Label>
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs text-gray-500">(PKR)</span>
+                          <FieldTooltip content="Total amount of money the company owes" />
+                        </div>
+                      </div>
+                      <FormattedNumberInput
+                        id="total-debt-unlisted"
+                        placeholder="Enter value"
+                        value={formData.totalDebt || 0}
+                        onChange={(value) => updateFormData('totalDebt', value)}
+                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="total-debt-unlisted">Total Debt (PKR)</Label>
-                      <FieldTooltip content="Total amount of money the company owes" />
-                    </div>
-                    <FormattedNumberInput
-                      id="total-debt-unlisted"
-                      placeholder="0"
-                      value={formData.totalDebt || 0}
-                      onChange={(value) => updateFormData('totalDebt', value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="p-4 bg-primary/5 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">Total Equity + Debt</div>
-                    <div className="text-xl font-bold text-primary">
-                      {((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()} PKR
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Total Equity + Total Debt
+                  {/* Calculated Total - Centered Display */}
+                  <div className="mt-10 flex justify-center">
+                    <div className="w-full max-w-md p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-300 shadow-lg">
+                      <div className="text-center space-y-3">
+                        <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Total Equity + Debt</div>
+                        <div className="text-3xl font-bold text-gray-900">
+                          {((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
+                        </div>
+                        <div className="text-base font-medium text-gray-600">PKR</div>
+                        <div className="text-xs text-gray-500 pt-2 border-t border-gray-300">
+                          Total Equity + Total Debt
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               ) : (
                 // Show read-only display for subsequent loans
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Shared Total Equity + Debt (from first loan)</div>
-                  <div className="text-xl font-bold text-primary">
-                    {((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()} PKR
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Total Equity + Total Debt
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-2 text-amber-600">
-                    ⚠️ Equity and Debt values are shared across all loans and can only be edited in the first loan form
+                <div className="flex justify-center">
+                  <div className="w-full max-w-md p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 shadow-lg">
+                    <div className="text-center space-y-3">
+                      <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Shared Total Equity + Debt (from first loan)</div>
+                      <div className="text-3xl font-bold text-blue-900">
+                        {((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
+                      </div>
+                      <div className="text-base font-medium text-blue-700">PKR</div>
+                      <div className="text-xs text-blue-600 pt-2 border-t border-blue-200">
+                        Total Equity + Total Debt
+                      </div>
+                      <div className="text-xs text-amber-700 mt-3 pt-3 border-t border-amber-200 bg-amber-50 rounded-lg p-2">
+                        ⚠️ Equity and Debt values are shared across all loans and can only be edited in the first loan form
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
@@ -2132,84 +2193,43 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               </div>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
       )}
 
-      {/* Auto-Selected Formula Display */}
-      {selectedFormula && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
-              Selected PCAF Formula
-            </CardTitle>
-            <CardDescription>
-              Formula automatically selected based on your questionnaire answers
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge className={getDataQualityColor(getCurrentFormula()?.dataQualityScore || 0)}>
-                  Score {getCurrentFormula()?.dataQualityScore}
-                </Badge>
-                <span className="text-sm font-medium text-primary">
-                  {getCurrentFormula()?.name}
-                </span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {getCurrentFormula()?.description}
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">
-                <strong>Based on:</strong> {hasEmissions === 'yes' ? 'Has emissions' : 'No emissions'} 
-                {verificationStatus && ` • ${verificationStatus === 'verified' ? 'Verified' : 'Unverified'}`}
-                {corporateStructure && ` • ${corporateStructure === 'listed' ? 'Listed Company' : 'Unlisted Company'}`}
-                {loanType && ` • ${loanType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
-              </div>
-              
-              {/* Display the actual formula that will be used */}
-              {getCurrentFormula()?.metadata?.formula && (
-                <div className="mt-3 p-3 bg-muted/50 border border-muted rounded-md">
-                  <div className="text-xs font-medium text-muted-foreground mb-1">Formula that will be used:</div>
-                  <div className="text-sm font-mono text-foreground bg-background p-2 rounded border">
-                    {getCurrentFormula()?.metadata?.formula}
-                  </div>
-                </div>
-              )}
-              {getCurrentFormula()?.notes && (
-                <div className="mt-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-1">Notes:</div>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    {getCurrentFormula()?.notes.map((note, index) => (
-                      <li key={index} className="flex items-start gap-1">
-                        <span className="text-primary">•</span>
-                        <span>{note}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Auto-Selected Formula Display - Hidden from UI, logged to console */}
+      {selectedFormula && (() => {
+        const currentFormula = getCurrentFormula();
+        console.log('🔍 Selected PCAF Formula:', {
+          name: currentFormula?.name,
+          description: currentFormula?.description,
+          dataQualityScore: currentFormula?.dataQualityScore,
+          formula: currentFormula?.metadata?.formula,
+          notes: currentFormula?.notes,
+          basedOn: {
+            hasEmissions: hasEmissions === 'yes' ? 'Has emissions' : 'No emissions',
+            verificationStatus: verificationStatus === 'verified' ? 'Verified' : 'Unverified',
+            corporateStructure: corporateStructure === 'listed' ? 'Listed Company' : 'Unlisted Company',
+            loanType: loanType ? loanType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null
+          }
+        });
+        return null;
+      })()}
 
       {/* Dynamic Form Fields */}
       {(() => {
         const dynamicInputs = renderDynamicInputs();
         return selectedFormula && dynamicInputs && dynamicInputs.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Required Data</CardTitle>
-              <CardDescription>
-                Enter the additional data required for {getCurrentFormula()?.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="max-w-4xl mx-auto space-y-8 pt-8 border-t-2 border-gray-200">
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-bold text-gray-900">Additional Required Data</h3>
+              <p className="text-base text-gray-600">
+                Enter the additional data required for the calculation
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {dynamicInputs}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })()}
 
@@ -2239,11 +2259,20 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             <>
               <Button
                 onClick={calculateFinanceEmission}
-                disabled={isDisabled}
-                className="px-8 py-3"
+                disabled={isDisabled || isCalculating}
+                className="px-8 py-3 h-12 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Calculator className="h-5 w-5 mr-2" />
-                Calculate Finance Emission
+                {isCalculating ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-5 w-5 mr-2" />
+                    Calculate Finance Emission
+                  </>
+                )}
               </Button>
               {expandedLoanTypes.length > 1 && !validation.isValid && (
                 <div className="mt-2 text-center">
@@ -2258,35 +2287,55 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       </div>
 
       {/* Results */}
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Calculation Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="text-sm font-medium text-muted-foreground">Attribution Factor</div>
-                <div className="text-2xl font-bold text-primary">{result.attributionFactor.toFixed(6)}</div>
-              </div>
-              <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="text-sm font-medium text-muted-foreground">Finance Emission</div>
-                <div className="text-2xl font-bold text-primary">{result.financeEmission.toFixed(2)} tCO2e</div>
-              </div>
-              <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="text-sm font-medium text-muted-foreground">
-                  {loanType === 'mortgage' ? 'Attribution Factor Denominator' : 
-                   loanType === 'sovereign-debt' ? 'PP-Adjusted GDP' :
-                   loanType === 'motor-vehicle-loan' ? 'Total Value at Origination' :
-                   loanType === 'commercial-real-estate' ? 'Property Value at Origination' :
-                   corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'}
+      {result && activeTab === 'finance' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Card className="border-teal-200 shadow-xl bg-gradient-to-br from-teal-50/30 to-white">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-primary">{result.evic.toLocaleString()} PKR</div>
+                Calculation Results
+              </CardTitle>
+              <CardDescription className="text-base">
+                Your finance emission calculation is complete
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="text-sm font-semibold text-blue-700 mb-2">Attribution Factor</div>
+                    <div className="text-3xl font-bold text-blue-900">{result.attributionFactor.toFixed(6)}</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="text-sm font-semibold text-green-700 mb-2">Finance Emission</div>
+                    <div className="text-3xl font-bold text-green-900">
+                      {result.financeEmission.toFixed(2)} <span className="text-lg text-green-700">tCO₂e</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              </div>
+              <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                <CardContent className="p-6">
+                  <div className="text-sm font-semibold text-purple-700 mb-2">
+                    {loanType === 'mortgage' ? 'Total Property Value at Origination' : 
+                     loanType === 'sovereign-debt' ? 'PP-Adjusted GDP' :
+                     loanType === 'motor-vehicle-loan' ? 'Total Value at Origination' :
+                     loanType === 'commercial-real-estate' ? 'Property Value at Origination' :
+                     corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'}
+                  </div>
+                  <div className="text-3xl font-bold text-purple-900">
+                    {result.evic.toLocaleString()} <span className="text-lg text-purple-700">PKR</span>
+                  </div>
+                </CardContent>
+              </Card>
 
             {multiResults.length > 0 && (
               <div className="space-y-3">
@@ -2336,6 +2385,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             )}
           </CardContent>
         </Card>
+        </motion.div>
       )}
         </>
       )}

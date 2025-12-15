@@ -61,9 +61,9 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     },
     {
       id: 'start-project',
-      title: userType === 'corporate' ? 'Start New Projects' : 'Start New Portfolio',
+      title: userType === 'corporate' ? 'Start New Project' : 'Start New Portfolio',
       icon: Plus,
-      path: '/bank-portfolio'
+      path: userType === 'corporate' ? '/project-wizard' : '/bank-portfolio'
     },
     {
       id: 'reports',
@@ -100,7 +100,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   };
 
   const isActive = (item: SidebarItem) => {
-    if (item.id === 'start-project' && location.pathname === '/bank-portfolio') {
+    if (item.id === 'start-project' && (location.pathname === '/bank-portfolio' || location.pathname === '/project-wizard')) {
       return true;
     }
     if (item.id === 'overview' && location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview')) {
@@ -116,7 +116,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   };
 
   return (
-    <div className="w-72 bg-white border-r border-gray-200/80 shadow-lg flex flex-col">
+    <div className="w-72 bg-white border-r border-gray-200/60 shadow-xl flex flex-col">
       {/* Sidebar Navigation */}
       <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
         <nav className="space-y-2">
