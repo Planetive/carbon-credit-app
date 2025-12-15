@@ -13,21 +13,14 @@ import {
 import {
   Users,
   Target,
-  Award,
   Globe,
-  TrendingUp,
-  Shield,
-  Lightbulb,
-  Heart,
   ArrowRight,
   CheckCircle,
-  Star,
-  Zap,
-  BarChart3,
   Clock,
   Brain,
   Calculator,
   Database,
+  BarChart3,
   FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -57,18 +50,17 @@ const AboutUs = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Auto-rotate carousel with uniform 4-second cycle
+  // Auto-rotate carousel with uniform cycle
   useEffect(() => {
     if (!api) return;
 
     let interval: NodeJS.Timeout;
 
     const startRotation = () => {
-      // Calculate interval based on number of items and desired cycle time
       const totalItems = values.length;
-      const cycleTime = 15000; // 12 seconds for complete cycle
-      const intervalTime = cycleTime / totalItems; // Time per slide
-      
+      const cycleTime = 15000;
+      const intervalTime = cycleTime / totalItems;
+
       interval = setInterval(() => {
         api.scrollNext();
       }, intervalTime);
@@ -80,14 +72,14 @@ const AboutUs = () => {
       }
     };
 
-    // Start rotation initially
     startRotation();
 
-    // Add hover event listeners to carousel container
-    const carouselContainer = document.querySelector('[data-carousel-container]');
+    const carouselContainer = document.querySelector(
+      "[data-carousel-container]"
+    );
     if (carouselContainer) {
-      carouselContainer.addEventListener('mouseenter', stopRotation);
-      carouselContainer.addEventListener('mouseleave', startRotation);
+      carouselContainer.addEventListener("mouseenter", stopRotation);
+      carouselContainer.addEventListener("mouseleave", startRotation);
     }
 
     return () => {
@@ -95,8 +87,8 @@ const AboutUs = () => {
         clearInterval(interval);
       }
       if (carouselContainer) {
-        carouselContainer.removeEventListener('mouseenter', stopRotation);
-        carouselContainer.removeEventListener('mouseleave', startRotation);
+        carouselContainer.removeEventListener("mouseenter", stopRotation);
+        carouselContainer.removeEventListener("mouseleave", startRotation);
       }
     };
   }, [api]);
@@ -143,25 +135,19 @@ const AboutUs = () => {
       year: "2023",
       title: "Idea Conceived",
       description:
-        "The vision for ReThink Carbon was born from recognizing the urgent need for accessible carbon management solutions. Our founders identified the gap between complex carbon markets and businesses seeking sustainable solutions.",
+        "ReThink Carbon was created to close the gap between complex carbon markets and businesses that want simple, practical climate solutions.",
     },
     {
       year: "2024",
       title: "Platform Development",
       description:
-        "Intensive development phase where we built our comprehensive carbon management platform. Integrated AI-driven insights, real-time tracking, and user-friendly interfaces to democratize carbon markets.",
-    },
-    {
-      year: "2024",
-      title: "Global Usage",
-      description:
-        "Successfully launched and expanded our platform to serve clients across 50+ countries. Established partnerships with leading sustainability organizations and carbon project developers worldwide.",
+        "We built our AI-powered carbon management platform with real-time tracking and intuitive tools for organizations of all sizes.",
     },
     {
       year: "2025",
       title: "MVP Ready to Serve",
       description:
-        "Our Minimum Viable Product is fully operational and ready to serve businesses of all sizes. We've refined our platform based on user feedback and are positioned to scale rapidly.",
+        "Our MVP is live, serving early customers and continuously improving based on real-world feedback and results.",
     },
   ];
 
@@ -173,7 +159,7 @@ const AboutUs = () => {
       image: "/team/ayla.webp",
     },
     {
-      name: "Zainab Ahmed", 
+      name: "Zainab Ahmed",
       role: "Product Owner",
       bio: "A Product & Finance professional with experience in data analytics and climate innovation. Zainab’s work spans research, product development, market analysis, and data-driven decision support, particularly within climate-tech and development-focused projects. She brings hands-on experience in building MVPs and conducting in-depth analysis across emerging climate technologies, policy environments, and decarbonization pathways.",
       image: "/team/zainab.png",
@@ -190,19 +176,6 @@ const AboutUs = () => {
       bio: "Finance graduate with seven years of extensive experience in banking, audit, and accounts. Expert in financial analysis, planning, and strategic recommendations. Skilled in managing comprehensive audits, optimizing financial operations, and ensuring regulatory compliance. Known for analytical prowess and attention to detail.",
       image: "/team/umair.webp",
     },
-    
-    // {
-    //   name: "Rida",
-    //   role: "Team Member",
-    //   bio: "Dedicated team member contributing to our mission of transforming carbon markets through innovation and sustainable solutions.",
-    //   image: "/team/rida.webp",
-    // },
-    // {
-    //   name: "Sufia",
-    //   role: "Team Member",
-    //   bio: "Passionate team member working towards creating a sustainable future through effective carbon management solutions.",
-    //   image: "/team/sufia.webp",
-    // },
   ];
 
   return (
@@ -297,7 +270,9 @@ const AboutUs = () => {
             <div className="relative">
               <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 sm:p-8 text-white">
                 <Target className="h-10 w-10 sm:h-12 sm:w-12 mb-3 sm:mb-4" />
-                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Our Vision</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
+                  Our Vision
+                </h3>
                 <p className="text-base sm:text-lg leading-relaxed">
                   To create a world where every organization can easily measure,
                   manage, and monetize their carbon footprint, driving
@@ -312,17 +287,18 @@ const AboutUs = () => {
       {/* Global Presence */}
       <section className="py-8 sm:py-10 md:py-12 bg-gray-50">
         <div className="container mx-auto px-4 sm:px-8 md:px-16">
-            
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 items-center">            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 items-center">
             <div>
-            <Badge className="mb-3 sm:mb-4 bg-teal-100 text-teal-800">Features</Badge>
+              <Badge className="mb-3 sm:mb-4 bg-teal-100 text-teal-800">
+                Features
+              </Badge>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
-              Our Global Reach
+                Our Global Reach
               </h2>
               <p className="text-base sm:text-lg text-gray-600 mb-4 sm:mb-6 leading-relaxed">
                 With strategic offices in the United Arab Emirates and Pakistan,
                 ReThink Carbon has established a strong global presence to serve
-                our diverse client base. 
+                our diverse client base.
               </p>
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-start gap-3">
@@ -364,26 +340,37 @@ const AboutUs = () => {
 
             <div className="relative flex justify-center items-center">
               <div className="bg-white rounded-3xl p-2 sm:p-3 md:p-4 shadow-2xl transform hover:scale-105 transition-transform duration-300 w-full max-w-xs sm:max-w-sm md:max-w-md">
-                <div className="overflow-hidden rounded-2xl" style={{ 
-                  height: window.innerWidth > 1000 ? '300px' : '200px', 
-                  minHeight: '180px' 
-                }}>
+                <div
+                  className="overflow-hidden rounded-2xl"
+                  style={{
+                    height: window.innerWidth > 1000 ? "300px" : "200px",
+                    minHeight: "180px",
+                  }}
+                >
                   <img
                     src="/global_presence.jpg"
                     alt="Global Presence Map showing Planetive offices in UAE and Pakistan"
                     className="w-full h-full object-cover object-top"
                     onError={(e) => {
-                      console.log('Image failed to load:', e);
+                      console.log("Image failed to load:", e);
                       e.currentTarget.style.display = "none";
-                      e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                      e.currentTarget.nextElementSibling?.classList.remove(
+                        "hidden"
+                      );
                     }}
                   />
                 </div>
-                <div className="hidden bg-gradient-to-br from-teal-100 to-cyan-100 rounded-2xl p-4 sm:p-6 md:p-8 text-center" style={{ minHeight: '180px', maxHeight: '300px' }}>
+                <div
+                  className="hidden bg-gradient-to-br from-teal-100 to-cyan-100 rounded-2xl p-4 sm:p-6 md:p-8 text-center"
+                  style={{ minHeight: "180px", maxHeight: "300px" }}
+                >
                   <Globe className="h-8 w-8 sm:h-12 sm:w-12 md:h-16 md:w-16 text-teal-600 mx-auto mb-2 sm:mb-3 md:mb-4" />
-                  <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-2">Global Presence</h3>
+                  <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-2">
+                    Global Presence
+                  </h3>
                   <p className="text-xs sm:text-sm md:text-base text-gray-600">
-                    Strategic offices in UAE and Pakistan serving clients across 50+ countries worldwide.
+                    Strategic offices in UAE and Pakistan serving clients across
+                    50+ countries worldwide.
                   </p>
                 </div>
               </div>
@@ -396,7 +383,9 @@ const AboutUs = () => {
       <section className="py-8 sm:py-10 md:py-12 bg-white">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 sm:mb-16">
-            <Badge className="mb-4 bg-teal-100 text-teal-800 border-teal-200">Features</Badge>
+            <Badge className="mb-4 bg-teal-100 text-teal-800 border-teal-200">
+              Features
+            </Badge>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
               How does ReThink Carbon work?
             </h2>
@@ -405,32 +394,39 @@ const AboutUs = () => {
               to client relationships.
             </p>
           </div>
-          
+
           <div className="relative" data-carousel-container>
             <Carousel
               opts={{
                 align: "start",
                 loop: true,
-                duration: 2500, // Faster transition to match calculated interval
+                duration: 2500,
                 skipSnaps: false,
-                dragFree: true, // Allows free dragging for smoother movement
-                containScroll: false, // Allows continuous scrolling
+                dragFree: true,
+                containScroll: false,
               }}
               setApi={setApi}
               className="w-full"
             >
               <CarouselContent className="-ml-2">
                 {values.map((value, index) => (
-                  <CarouselItem key={index} className="pl-2 basis-full md:basis-1/2 lg:basis-1/3">
+                  <CarouselItem
+                    key={index}
+                    className="pl-2 basis-full md:basis-1/2 lg:basis-1/3"
+                  >
                     <Card className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105 h-full">
                       <CardHeader className="pb-4">
                         <div className="mx-auto mb-4 w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors">
                           <value.icon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                         </div>
-                        <CardTitle className="text-lg sm:text-xl text-white font-semibold">{value.title}</CardTitle>
+                        <CardTitle className="text-lg sm:text-xl text-white font-semibold">
+                          {value.title}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-white/90 leading-relaxed text-sm sm:text-base">{value.description}</p>
+                        <p className="text-white/90 leading-relaxed text-sm sm:text-base">
+                          {value.description}
+                        </p>
                       </CardContent>
                     </Card>
                   </CarouselItem>
@@ -458,7 +454,7 @@ const AboutUs = () => {
               our growth.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
             {milestones.map((milestone, index) => (
               <Card
                 key={index}
@@ -468,10 +464,14 @@ const AboutUs = () => {
                   <div className="text-2xl sm:text-3xl font-bold text-teal-600 mb-2">
                     {milestone.year}
                   </div>
-                  <CardTitle className="text-base sm:text-lg">{milestone.title}</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">
+                    {milestone.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm sm:text-base text-gray-600">{milestone.description}</p>
+                  <p className="text-sm sm:text-base text-gray-600">
+                    {milestone.description}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -492,7 +492,7 @@ const AboutUs = () => {
               climate science, technology, and business.
             </p>
           </div>
-          
+
           <div className="space-y-8 sm:space-y-12">
             {/* Ayla - Featured at top */}
             <div className="flex justify-center">
@@ -505,15 +505,21 @@ const AboutUs = () => {
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
-                        e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                        e.currentTarget.nextElementSibling?.classList.remove(
+                          "hidden"
+                        );
                       }}
                     />
                     <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
                       <Users className="h-12 w-12 text-white" />
                     </div>
                   </div>
-                  <CardTitle className="text-xl sm:text-2xl text-white">{team[0].name}</CardTitle>
-                  <p className="text-white/90 font-semibold text-sm sm:text-base">{team[0].role}</p>
+                  <CardTitle className="text-xl sm:text-2xl text-white">
+                    {team[0].name}
+                  </CardTitle>
+                  <p className="text-white/90 font-semibold text-sm sm:text-base">
+                    {team[0].role}
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="text-white/90 text-sm">
@@ -550,15 +556,21 @@ const AboutUs = () => {
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
-                          e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                          e.currentTarget.nextElementSibling?.classList.remove(
+                            "hidden"
+                          );
                         }}
                       />
                       <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
                         <Users className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
                       </div>
                     </div>
-                    <CardTitle className="text-lg sm:text-xl text-white">{member.name}</CardTitle>
-                    <p className="text-white/90 font-semibold text-sm sm:text-base">{member.role}</p>
+                    <CardTitle className="text-lg sm:text-xl text-white">
+                      {member.name}
+                    </CardTitle>
+                    <p className="text-white/90 font-semibold text-sm sm:text-base">
+                      {member.role}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <div className="text-white/90 text-sm">
@@ -622,3 +634,4 @@ const AboutUs = () => {
 };
 
 export default AboutUs;
+

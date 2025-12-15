@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Leaf, Mail, Phone, MapPin, Github, Twitter, Linkedin } from 'lucide-react';
+import { Leaf, Mail, Phone, MapPin, Twitter, Linkedin } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -27,8 +27,11 @@ const Footer = () => {
               Discover, create, and manage sustainable initiatives worldwide.
             </p>
             <div className="flex space-x-4">
-            <a href="#" className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors">
-                <Github className="h-5 w-5 text-gray-900" />
+              <a
+                href="mailto:info@rethinkcarbon.com"
+                className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors"
+              >
+                <Mail className="h-5 w-5 text-gray-900" />
               </a>
               <a href="#" className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors">
                 <Twitter className="h-5 w-5 text-gray-900" />
