@@ -33,6 +33,8 @@ export const ESGWizard: React.FC = () => {
   const counterpartyId: string | undefined = (location.state as any)?.counterpartyId || (location.state as any)?.counterparty || (location.state as any)?.id || new URLSearchParams(window.location.search).get('counterpartyId') || undefined;
   const startFresh: boolean = (location.state as any)?.startFresh === true;
   const returnUrl: string | undefined = (location.state as any)?.returnUrl;
+  const originalState = (location.state || {}) as any;
+  const hasPortfolioState = !!(originalState?.company || originalState?.counterpartyId || originalState?.id);
   
   // Debug logging to see what we're receiving
   useEffect(() => {
@@ -1373,16 +1375,16 @@ export const ESGWizard: React.FC = () => {
                     onValueChange={(value) => updateFormData('verificationStatus', value)}
                     className="space-y-3"
                   >
-                    <div className="flex items-center space-x-3 py-3">
+                    <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
                       <RadioGroupItem value="verified" id="verified" />
-                      <Label htmlFor="verified" className="text-sm font-medium text-gray-900 cursor-pointer flex-1">
-                        Verified
+                      <Label htmlFor="verified" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
+                        Yes
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-3 py-3">
+                    <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
                       <RadioGroupItem value="unverified" id="unverified" />
-                      <Label htmlFor="unverified" className="text-sm font-medium text-gray-900 cursor-pointer flex-1">
-                        Unverified
+                      <Label htmlFor="unverified" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
+                        No
                       </Label>
                     </div>
                   </RadioGroup>
@@ -1722,12 +1724,50 @@ export const ESGWizard: React.FC = () => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Recalculate
                   </Button>
-                  <Button 
-                    onClick={() => navigate(returnUrl || '/dashboard', { state: { activeSection: 'portfolio' } })}
-                    className="w-full sm:w-auto min-w-[200px] h-11 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                  {mode === 'finance' ? (
+                    <Button 
+                      onClick={() => navigate('/finance-emission', { 
+                        state: { 
+                          ...originalState,
+                          mode: 'facilitated',
+                          startFresh: true,
+                          returnUrl
+                        } 
+                      })}
+                      className="w-full sm:w-auto min-w-[220px] h-11 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Next: Facilitated Emission
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => {
+                        const target = returnUrl || '/dashboard';
+                        if (hasPortfolioState && returnUrl) {
+                          navigate(target, { state: originalState });
+                        } else {
+                          navigate(target);
+                        }
+                      }}
+                      className="w-full sm:w-auto min-w-[200px] h-11 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Complete & Return
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const target = returnUrl || '/dashboard';
+                      if (hasPortfolioState && returnUrl) {
+                        navigate(target, { state: originalState });
+                      } else {
+                        navigate(target);
+                      }
+                    }}
+                    className="w-full sm:w-auto min-w-[140px] h-11 text-base font-semibold border-gray-300 text-gray-800 hover:bg-gray-50"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Complete & Return to Portfolio
+                    Return
                   </Button>
                 </motion.div>
               </>
@@ -1899,7 +1939,7 @@ export const ESGWizard: React.FC = () => {
             </AnimatePresence>
             
             {/* Navigation - only show for non-results steps */}
-            {steps[currentStep].id !== 'results' && (
+            {steps[currentStep] && steps[currentStep].id !== 'results' && (
               <>
                 <Separator className="my-6" />
                 <div className="flex flex-col gap-4">
@@ -1942,20 +1982,31 @@ export const ESGWizard: React.FC = () => {
                       )}
                     </div>
                     
-                    {currentStep < steps.length - 1 ? (
-                      <Button 
-                        onClick={handleNext} 
-                        disabled={!canProceed() || Object.keys(validationErrors).length > 0}
-                        className="w-full sm:w-auto sm:min-w-[120px] h-11"
-                      >
-                        Next
-                        <ChevronRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    ) : (
-                      <Button variant="default" onClick={handleNext} className="w-full sm:w-auto sm:min-w-[180px] h-11">
-                        Complete Assessment
-                      </Button>
-                    )}
+                    {(() => {
+                      const isEmissionStep = steps[currentStep].id === 'emission-calculation';
+                      if (currentStep >= steps.length - 1) {
+                        return (
+                          <Button variant="default" onClick={handleNext} className="w-full sm:w-auto sm:min-w-[180px] h-11">
+                            Complete Assessment
+                          </Button>
+                        );
+                      }
+                      
+                      if (isEmissionStep) {
+                        return null; // Hide Next on emission calculation step to avoid double CTA with calculate button
+                      }
+                      
+                      return (
+                        <Button 
+                          onClick={handleNext} 
+                          disabled={!canProceed() || Object.keys(validationErrors).length > 0}
+                          className="w-full sm:w-auto sm:min-w-[120px] h-11"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      );
+                    })()}
                   </div>
                 </div>
               </>

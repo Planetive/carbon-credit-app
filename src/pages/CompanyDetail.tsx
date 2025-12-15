@@ -48,6 +48,9 @@ const CompanyDetail: React.FC = () => {
 
   // Load all portfolio entries for scenario building
   const [allPortfolioEntries, setAllPortfolioEntries] = useState<PortfolioEntry[]>([]);
+
+  // Ensure we don't accidentally reuse wizard-specific fields like `mode`/`returnUrl`
+  const { mode: _ignoredMode, returnUrl: _ignoredReturnUrl, ...cleanPortfolioData } = (portfolioData as any) || {};
   
   // Load company data from database if location.state is missing (e.g., when navigating back)
   useEffect(() => {
@@ -638,14 +641,17 @@ const CompanyDetail: React.FC = () => {
               )}
               
               <Button
-                onClick={() => navigate('/finance-emission', { 
-                  state: getFinanceEmissionResult() ? {
-                    mode: 'finance', 
-                    startFresh: true, 
-                    returnUrl: currentPath,
-                    ...portfolioData 
-                  } : { mode: 'finance', ...portfolioData }
-                })}
+              onClick={() => navigate('/finance-emission', { 
+                state: getFinanceEmissionResult() ? {
+                  ...cleanPortfolioData,
+                  mode: 'finance', 
+                  startFresh: true, 
+                  returnUrl: currentPath
+                } : { 
+                  ...cleanPortfolioData,
+                  mode: 'finance' 
+                }
+              })}
                 className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
@@ -715,14 +721,17 @@ const CompanyDetail: React.FC = () => {
               )}
               
               <Button
-                onClick={() => navigate('/finance-emission', { 
-                  state: getFacilitatedEmissionResult() ? {
-                    mode: 'facilitated', 
-                    startFresh: true, 
-                    returnUrl: currentPath,
-                    ...portfolioData 
-                  } : { mode: 'facilitated', ...portfolioData }
-                })}
+              onClick={() => navigate('/finance-emission', { 
+                state: getFacilitatedEmissionResult() ? {
+                  ...cleanPortfolioData,
+                  mode: 'facilitated', 
+                  startFresh: true, 
+                  returnUrl: currentPath
+                } : { 
+                  ...cleanPortfolioData,
+                  mode: 'facilitated' 
+                }
+              })}
                 className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >

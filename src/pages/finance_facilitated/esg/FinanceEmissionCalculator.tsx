@@ -380,6 +380,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const currentLoan = expandedLoanTypes.length > 0 ? expandedLoanTypes[currentLoanIndex] : undefined;
   const loanType = currentLoan?.type || '';
   const loanInstanceKey = currentLoan?.key || '';
+  const currentLoanLabel = currentLoan ? (typeLabels[loanType] || loanType) : '—';
   // Resolve counterpartyId from prop first, then URL/state
   const resolvedCounterpartyId = (() => {
     if (propCounterpartyId) return propCounterpartyId;
@@ -772,19 +773,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       
       return next;
     });
-  };
-
-  // Edit Company Emissions - Navigate to emission calculator with company context
-  const editCompanyEmissions = (counterpartyId: string) => {
-    // Store company context in session storage
-    sessionStorage.setItem('companyEmissionsContext', JSON.stringify({
-      counterpartyId,
-      returnUrl: window.location.pathname,
-      timestamp: Date.now()
-    }));
-    
-    // Navigate to emission calculator
-    window.location.href = '/emission-calculator';
   };
 
   // Sync shared data from any loan that has EVIC data when switching between loans
@@ -1768,21 +1756,15 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   };
 
 
-  console.log('🔍 FinanceEmissionCalculator - Rendering decision:', {
-    activeTab,
-    willRenderFinance: activeTab === 'finance',
-    willRenderFacilitated: activeTab === 'facilitated'
-  });
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-6xl mx-auto">
       {/* Show content based on active tab */}
       {activeTab === 'finance' && (
         <>
           {/* Loan Type Navigation - Clean Header */}
           {expandedLoanTypes.length > 1 && (
-            <div className="space-y-6 pb-6 border-b border-gray-200">
-              <div className="text-center space-y-2">
+            <div className="space-y-4 pb-6 border-b border-gray-200">
+              <div className="space-y-1">
                 <h3 className="text-2xl font-bold text-gray-900">
                   {(typeLabels[expandedLoanTypes[currentLoanIndex]?.type] || expandedLoanTypes[currentLoanIndex]?.type)}
                 </h3>
@@ -1790,7 +1772,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                   Loan {currentLoanIndex + 1} of {expandedLoanTypes.length}
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1815,12 +1797,13 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           
           {/* Single Loan Type Header */}
           {expandedLoanTypes.length === 1 && loanType && (
-            <div className="text-center space-y-2 pb-6">
+            <div className="space-y-2 pb-6">
               <h3 className="text-2xl font-bold text-gray-900">
                 {(typeLabels[loanType] || loanType)}
               </h3>
             </div>
           )}
+
         </>
       )}
 
@@ -1889,39 +1872,37 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           onUpdateOutstandingLoan={(value) => updateFormData('outstandingLoan', value)}
         />
       ) : (
-        <div className="max-w-4xl mx-auto space-y-10">
-          {/* Financial Information Header - Centered */}
-          <div className="text-center space-y-2">
-            <h3 className="text-2xl font-bold text-gray-900">
+        <div className="space-y-8">
+          {/* Financial Information Header */}
+          <div className="space-y-1">
+            <h3 className="text-xl font-semibold text-gray-900">
               Financial Information
             </h3>
-            <p className="text-base text-gray-600">
-              {corporateStructure === 'listed' ? 'Enter financial data for EVIC calculation' : 'Enter debt and equity information'}
+            <p className="text-sm text-muted-foreground">
+              {corporateStructure === 'listed' ? 'Provide the inputs for EVIC' : 'Provide the debt and equity values'}
             </p>
           </div>
 
-          {/* Outstanding Loan - Centered Card */}
-          <div className="flex justify-center">
-            <div className="w-full max-w-md space-y-3">
-              <div className="text-center space-y-2">
-                <Label htmlFor="outstanding-loan" className="text-base font-semibold text-gray-900 block">
+          {/* Outstanding Loan */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="outstanding-loan" className="text-sm font-medium text-gray-900">
                   Outstanding Loan Amount
                 </Label>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-sm text-gray-500">(PKR)</span>
-                  <FieldTooltip content="How much money is currently owed on the loan or investment" />
-                </div>
+                <span className="text-xs text-muted-foreground">(PKR)</span>
+                <FieldTooltip content="How much money is currently owed on the loan or investment" />
               </div>
               <FormattedNumberInput
                 id="outstanding-loan"
                 placeholder="Enter amount"
                 value={formData.outstandingLoan || 0}
                 onChange={(value) => updateFormData('outstandingLoan', value)}
-                className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
               />
               {loanType !== 'project-finance' &&
                 corporateStructure === 'unlisted' && (
-                  <p className="text-xs text-gray-500 text-center mt-2">
+                  <p className="text-xs text-muted-foreground">
                     Calculated as Total Debt + Total Equity
                   </p>
                 )}
@@ -1930,220 +1911,181 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
           {/* EVIC Calculation Section - Only show for Corporate Bonds and Business Loans */}
           {loanType === 'corporate-bond' || loanType === 'business-loan' ? (
-            <div className="space-y-8 pt-8 border-t-2 border-gray-200">
-              <div className="text-center space-y-2">
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {corporateStructure === 'listed' ? 'EVIC Calculation' : 'Total Equity + Debt Calculation'}
+            <div className="space-y-6 pt-2 border-t border-gray-200">
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {corporateStructure === 'listed' ? 'EVIC inputs' : 'Total Equity + Debt inputs'}
                 </h3>
-                <p className="text-base text-gray-600">
-                  {corporateStructure === 'listed' ? 'Enterprise Value Including Cash' : 'Total company equity and debt'}
+                <p className="text-sm text-muted-foreground">
+                  {corporateStructure === 'listed' ? 'Enterprise Value Including Cash' : 'Sum of company equity and debt'}
                 </p>
               </div>
             {corporateStructure === 'listed' ? (
               // Show full EVIC form only for first loan or single loan
               propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="max-w-5xl mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="share-price" className="text-sm font-semibold text-gray-900 block">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="share-price" className="text-sm font-medium text-gray-900">
                           Share Price
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-gray-500">(PKR)</span>
-                          <FieldTooltip content="Current price of one company share" />
-                        </div>
+                        <span className="text-xs text-muted-foreground">(PKR)</span>
+                        <FieldTooltip content="Current price of one company share" />
                       </div>
                       <FormattedNumberInput
                         id="share-price"
                         placeholder="Enter value"
                         value={formData.sharePrice || 0}
                         onChange={(value) => updateFormData('sharePrice', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="outstanding-shares" className="text-sm font-semibold text-gray-900 block">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="outstanding-shares" className="text-sm font-medium text-gray-900">
                           Outstanding Shares
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <FieldTooltip content="Total number of company shares available" />
-                        </div>
+                        <FieldTooltip content="Total number of company shares available" />
                       </div>
                       <FormattedNumberInput
                         id="outstanding-shares"
                         placeholder="Enter value"
                         value={formData.outstandingShares || 0}
                         onChange={(value) => updateFormData('outstandingShares', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="total-debt" className="text-sm font-semibold text-gray-900 block">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="total-debt" className="text-sm font-medium text-gray-900">
                           Total Debt
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-gray-500">(PKR)</span>
-                          <FieldTooltip content="Total amount of money the company owes" />
-                        </div>
+                        <span className="text-xs text-muted-foreground">(PKR)</span>
+                        <FieldTooltip content="Total amount of money the company owes" />
                       </div>
                       <FormattedNumberInput
                         id="total-debt"
                         placeholder="Enter value"
                         value={formData.totalDebt || 0}
                         onChange={(value) => updateFormData('totalDebt', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="minority-interest" className="text-sm font-semibold text-gray-900 block">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="minority-interest" className="text-sm font-medium text-gray-900">
                           Minority Interest
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                        </div>
+                        <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
                       </div>
                       <FormattedNumberInput
                         id="minority-interest"
                         placeholder="Enter value"
                         value={formData.minorityInterest || 0}
                         onChange={(value) => updateFormData('minorityInterest', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="preferred-stock" className="text-sm font-semibold text-gray-900 block">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="preferred-stock" className="text-sm font-medium text-gray-900">
                           Preferred Stock
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                        </div>
+                        <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
                       </div>
                       <FormattedNumberInput
                         id="preferred-stock"
                         placeholder="Enter value"
                         value={formData.preferredStock || 0}
                         onChange={(value) => updateFormData('preferredStock', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
                   </div>
-                  {/* Calculated EVIC - Centered Display */}
-                  <div className="mt-10 flex justify-center">
-                    <div className="w-full max-w-md p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-300 shadow-lg">
-                      <div className="text-center space-y-3">
-                        <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Calculated EVIC</div>
-                        <div className="text-3xl font-bold text-gray-900">
-                          {((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
-                        </div>
-                        <div className="text-base font-medium text-gray-600">PKR</div>
-                        <div className="text-xs text-gray-500 pt-2 border-t border-gray-300">
-                          (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculated EVIC</div>
+                      <div className="text-2xl font-semibold text-gray-900 mt-1">
+                        {((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
                 // Show read-only EVIC display for subsequent loans
-                <div className="flex justify-center">
-                  <div className="w-full max-w-md p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 shadow-lg">
-                    <div className="text-center space-y-3">
-                      <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Shared EVIC (from first loan)</div>
-                      <div className="text-3xl font-bold text-blue-900">
-                        {((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
-                      </div>
-                      <div className="text-base font-medium text-blue-700">PKR</div>
-                      <div className="text-xs text-blue-600 pt-2 border-t border-blue-200">
-                        (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
-                      </div>
-                      <div className="text-xs text-amber-700 mt-3 pt-3 border-t border-amber-200 bg-amber-50 rounded-lg p-2">
-                        ⚠️ EVIC values are shared across all loans and can only be edited in the first loan form
-                      </div>
-                    </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Shared EVIC (from first loan)</div>
+                  <div className="text-xl font-semibold text-blue-900 mt-1">
+                    {((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
                   </div>
+                  <p className="text-xs text-blue-700 mt-1">
+                    (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
+                  </p>
+                  <p className="text-xs text-amber-700 mt-2">
+                    EVIC values are shared across all loans and can only be edited in the first loan form.
+                  </p>
                 </div>
               )
             ) : (
               // Show full form only for first loan or single loan
               propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="max-w-3xl mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="total-equity" className="text-sm font-semibold text-gray-900 block">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="total-equity" className="text-sm font-medium text-gray-900">
                           Total Equity
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-gray-500">(PKR)</span>
-                          <FieldTooltip content="Total value of company ownership (shares, retained earnings, etc.)" />
-                        </div>
+                        <span className="text-xs text-muted-foreground">(PKR)</span>
+                        <FieldTooltip content="Total value of company ownership (shares, retained earnings, etc.)" />
                       </div>
                       <FormattedNumberInput
                         id="total-equity"
                         placeholder="Enter value"
                         value={formData.totalEquity || 0}
                         onChange={(value) => updateFormData('totalEquity', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <div className="text-center space-y-1">
-                        <Label htmlFor="total-debt-unlisted" className="text-sm font-semibold text-gray-900 block">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="total-debt-unlisted" className="text-sm font-medium text-gray-900">
                           Total Debt
                         </Label>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-gray-500">(PKR)</span>
-                          <FieldTooltip content="Total amount of money the company owes" />
-                        </div>
+                        <span className="text-xs text-muted-foreground">(PKR)</span>
+                        <FieldTooltip content="Total amount of money the company owes" />
                       </div>
                       <FormattedNumberInput
                         id="total-debt-unlisted"
                         placeholder="Enter value"
                         value={formData.totalDebt || 0}
                         onChange={(value) => updateFormData('totalDebt', value)}
-                        className="h-14 text-lg text-center border-2 border-gray-300 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 rounded-xl"
+                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
                       />
                     </div>
                   </div>
-                  {/* Calculated Total - Centered Display */}
-                  <div className="mt-10 flex justify-center">
-                    <div className="w-full max-w-md p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-300 shadow-lg">
-                      <div className="text-center space-y-3">
-                        <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Total Equity + Debt</div>
-                        <div className="text-3xl font-bold text-gray-900">
-                          {((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
-                        </div>
-                        <div className="text-base font-medium text-gray-600">PKR</div>
-                        <div className="text-xs text-gray-500 pt-2 border-t border-gray-300">
-                          Total Equity + Total Debt
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Equity + Debt</div>
+                      <div className="text-2xl font-semibold text-gray-900 mt-1">
+                        {((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">Total Equity + Total Debt</p>
                     </div>
                   </div>
                 </div>
               ) : (
                 // Show read-only display for subsequent loans
-                <div className="flex justify-center">
-                  <div className="w-full max-w-md p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border-2 border-blue-200 shadow-lg">
-                    <div className="text-center space-y-3">
-                      <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Shared Total Equity + Debt (from first loan)</div>
-                      <div className="text-3xl font-bold text-blue-900">
-                        {((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
-                      </div>
-                      <div className="text-base font-medium text-blue-700">PKR</div>
-                      <div className="text-xs text-blue-600 pt-2 border-t border-blue-200">
-                        Total Equity + Total Debt
-                      </div>
-                      <div className="text-xs text-amber-700 mt-3 pt-3 border-t border-amber-200 bg-amber-50 rounded-lg p-2">
-                        ⚠️ Equity and Debt values are shared across all loans and can only be edited in the first loan form
-                      </div>
-                    </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Shared Total Equity + Debt (from first loan)</div>
+                  <div className="text-xl font-semibold text-blue-900 mt-1">
+                    {((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
                   </div>
+                  <p className="text-xs text-blue-700 mt-1">Total Equity + Total Debt</p>
+                  <p className="text-xs text-amber-700 mt-2">
+                    Equity and Debt values are shared across all loans and can only be edited in the first loan form.
+                  </p>
                 </div>
               )
             )}
@@ -2219,14 +2161,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       {(() => {
         const dynamicInputs = renderDynamicInputs();
         return selectedFormula && dynamicInputs && dynamicInputs.length > 0 && (
-          <div className="max-w-4xl mx-auto space-y-8 pt-8 border-t-2 border-gray-200">
-            <div className="text-center space-y-2">
-              <h3 className="text-2xl font-bold text-gray-900">Additional Required Data</h3>
-              <p className="text-base text-gray-600">
+          <div className="space-y-6 pt-8 border-t border-gray-200">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold text-gray-900">Additional Required Data</h3>
+              <p className="text-sm text-muted-foreground">
                 Enter the additional data required for the calculation
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {dynamicInputs}
             </div>
           </div>
@@ -2235,20 +2177,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
 
 
-
-      {/* Edit Company Emissions Button */}
-      {resolvedCounterpartyId && (
-        <div className="flex justify-center mb-4">
-          <Button
-            variant="outline"
-            onClick={() => editCompanyEmissions(resolvedCounterpartyId)}
-            className="px-6 py-2"
-          >
-            <Building2 className="h-4 w-4 mr-2" />
-            Edit Company Emissions
-          </Button>
-        </div>
-      )}
 
       {/* Calculate Button */}
       <div className="flex flex-col items-center">
