@@ -461,7 +461,10 @@ const Dashboard2 = () => {
               geography: counterparty.geography || 'N/A',
               counterpartyType: counterparty.counterparty_type || 'SME',
               amount: exposure?.amount_pkr || 0,
-              exposureId: exposure?.exposure_id || null
+              exposureId: exposure?.exposure_id || null,
+              probabilityOfDefault: exposure?.probability_of_default ?? 0,
+              lossGivenDefault: exposure?.loss_given_default ?? 0,
+              tenor: exposure?.tenor_months ?? 0
             };
           });
           
@@ -1306,15 +1309,46 @@ const Dashboard2 = () => {
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">My Portfolio</h2>
                     <p className="text-gray-600">View and manage all your portfolio companies</p>
                   </div>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      onClick={() => navigate('/bank-portfolio')}
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Company
-                    </Button>
-                  </motion.div>
+                  <div className="flex items-center gap-3">
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        onClick={() =>
+                          navigate('/scenario-building', {
+                            state: {
+                              bankPortfolioData: portfolioCompanies
+                                .filter((company) => Number(company.amount) > 0)
+                                .map((company) => ({
+                                  id: company.exposureId || company.id,
+                                  company: company.name,
+                                  amount: company.amount,
+                                  counterpartyType: company.counterpartyType,
+                                  counterpartyId: company.id,
+                                  sector: company.sector,
+                                  geography: company.geography,
+                                  probabilityOfDefault: company.probabilityOfDefault ?? 0,
+                                  lossGivenDefault: company.lossGivenDefault ?? 0,
+                                  tenor: company.tenor ?? 0,
+                                })),
+                              referrer: '/dashboard',
+                            },
+                          })
+                        }
+                        className="bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-md"
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Risk Analysis
+                      </Button>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        onClick={() => navigate('/bank-portfolio')}
+                        className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Company
+                      </Button>
+                    </motion.div>
+                  </div>
                 </div>
               </motion.div>
 

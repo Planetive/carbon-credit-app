@@ -595,7 +595,7 @@ const CompanyDetail: React.FC = () => {
         </motion.div>
 
         {/* Emission Cards - Matching Credit Risk Style */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
           {/* Finance Emission Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -752,45 +752,6 @@ const CompanyDetail: React.FC = () => {
                     Calculate Emissions
                   </>
                 )}
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* Scenario Building Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-            whileHover={{ scale: 1.02, y: -5 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 p-6 border-2 border-purple-100/80 shadow-lg hover:shadow-xl hover:border-purple-200 transition-all duration-300"
-          >
-            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 rounded-full -mr-20 -mt-20"></div>
-            <div className="relative">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-md">
-                  <Layers className="h-7 w-7 text-white" />
-                </div>
-                <span className="text-sm font-semibold text-purple-700">Risk Analysis</span>
-              </div>
-              
-              <div className="mb-5">
-                <p className="text-sm text-purple-600 leading-relaxed">
-                  Build scenarios and assess climate risks with comprehensive analysis tools
-                </p>
-              </div>
-              
-              <Button
-                onClick={() => navigate('/scenario-building', { 
-                  state: {
-                    bankPortfolioData: allPortfolioEntries,
-                    referrer: currentPath 
-                  }
-                })}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
-                size="default"
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Open Scenario Builder
               </Button>
             </div>
           </motion.div>

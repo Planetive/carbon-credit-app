@@ -56,7 +56,7 @@ const SimpleScenarioBuilding: React.FC = () => {
   } : undefined;
   
   // Get referrer/source page to navigate back to
-  const referrer = navState?.referrer || '/bank-portfolio';
+  const referrer = navState?.referrer || '/dashboard';
 
   useEffect(() => {
     console.log('SimpleScenarioBuilding - Received data:', { bankPortfolioData, resultsPageData });
@@ -79,9 +79,24 @@ const SimpleScenarioBuilding: React.FC = () => {
       
       console.log('SimpleScenarioBuilding - Portfolio array:', portfolioArray);
       console.log('SimpleScenarioBuilding - Total portfolio entries:', portfolioArray.length);
+
+      // Only include entries with a positive loan amount (finance/facilitated emissions done)
+      const filteredPortfolio = portfolioArray.filter((entry: any) => Number(entry.amount) > 0);
+      console.log('SimpleScenarioBuilding - Filtered portfolio entries with amount > 0:', filteredPortfolio.length);
+
+      if (filteredPortfolio.length === 0) {
+        toast({
+          title: "No Eligible Companies",
+          description: "Only companies with finance or facilitated emissions (loan amounts) can be used for risk analysis.",
+          variant: "default"
+        });
+        setPortfolioEntries([]);
+        setLoading(false);
+        return;
+      }
       
-      // Convert BankPortfolio data to Scenario Building format (including entries with 0 amount)
-      convertPortfolioToScenario(portfolioArray).then(convertedPortfolio => {
+      // Convert BankPortfolio data to Scenario Building format
+      convertPortfolioToScenario(filteredPortfolio as any).then(convertedPortfolio => {
         console.log('SimpleScenarioBuilding - Converted portfolio:', convertedPortfolio);
         setPortfolioEntries(convertedPortfolio);
         setLoading(false); // Turn off loading after conversion completes
@@ -159,8 +174,10 @@ const SimpleScenarioBuilding: React.FC = () => {
           
           // Get outstanding amount from exposures table
           const outstandingAmount = outstandingAmounts.get(counterparty.id) || exposure.amount_pkr || 0;
+
+          // Only include entries with a positive loan amount
+          if (!outstandingAmount || outstandingAmount <= 0) return null;
           
-          // Include all entries, even with zero amount (indicates finance emission not calculated)
           return {
             id: exposure.exposure_id,
             company: counterparty.name,
@@ -634,9 +651,6 @@ const SimpleScenarioBuilding: React.FC = () => {
                   <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                     Climate Risk Analysis
                   </h1>
-                  <p className="text-xl text-gray-600 mt-2">
-                    Advanced TCFD-compliant climate stress testing
-                  </p>
                 </div>
               </div>
             </div>
@@ -670,7 +684,12 @@ const SimpleScenarioBuilding: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-emerald-600 mb-1">Portfolio Value</p>
                     <p className="text-3xl font-bold text-emerald-900">
-                      {formatCurrency(portfolioEntries.reduce((sum, entry) => sum + entry.amount, 0))}
+                      {formatCurrency(
+                        portfolioEntries.reduce((sum, entry) => {
+                          const amount = Number((entry as any)?.amount ?? 0);
+                          return sum + (isNaN(amount) ? 0 : amount);
+                        }, 0)
+                      )}
                     </p>
                   </div>
                   <div className="p-3 bg-emerald-500 rounded-xl">
@@ -751,7 +770,7 @@ const SimpleScenarioBuilding: React.FC = () => {
             <div className="flex items-center justify-between space-x-6">
               <Button
                 variant="outline"
-                onClick={() => navigate(referrer)}
+                onClick={() => navigate('/dashboard', { state: { activeSection: 'portfolio' } })}
                 className="flex items-center space-x-3 px-6 py-3 bg-white/80 backdrop-blur-sm border-gray-200 hover:bg-white hover:border-gray-300 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <ArrowLeft className="h-5 w-5" />
