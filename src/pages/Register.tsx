@@ -55,89 +55,86 @@ const Register = () => {
       });
       return;
     }
-    // if (
-    //   !formData.organizationName ||
-    //   !formData.displayName ||
-    //   !formData.phone
-    // ) {
-    //   toast({
-    //     title: "Missing fields",
-    //     description:
-    //       "Organization name, display name, and phone number are required.",
-    //     variant: "destructive",
-    //   });
-    //   return;
-    // }
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    });
-    if (error) {
-      setLoading(false);
-      toast({
-        title: "Error creating account",
-        description: error.message,
-        variant: "destructive",
+    
+    try {
+      // Step 1: Sign up the user
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
       });
-      return;
-    }
-    // Insert into profiles table and create organization
-    const user = data?.user;
-    if (user) {
-      // Create organization first (using organization name from form, or email domain as fallback)
-      const orgName = formData.organizationName || formData.email.split('@')[1]?.split('.')[0] || 'My Organization';
-      const { data: orgData, error: orgError } = await supabase
-        .from("organizations")
-        .insert([
-          {
-            name: orgName,
-            description: null,
-            parent_organization_id: null,
-          },
-        ])
-        .select()
-        .single();
+      
+      if (error) {
+        setLoading(false);
+        toast({
+          title: "Error creating account",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
 
-      if (orgError) {
-        console.error('Error creating organization:', orgError);
+      const user = data?.user;
+      if (!user) {
+        setLoading(false);
+        toast({
+          title: "Error",
+          description: "User account was not created. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Use RPC function to create organization and profile
+      // This bypasses RLS issues during signup when session might not be fully established
+      const orgName = formData.organizationName || formData.email.split('@')[1]?.split('.')[0] || 'My Organization';
+      const displayName = formData.displayName || formData.email.split('@')[0];
+      
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc('create_organization_for_user', {
+        p_user_id: user.id,
+        p_organization_name: orgName,
+        p_display_name: displayName,
+        p_phone: formData.phone || null,
+        p_user_type: userType,
+      });
+
+      if (rpcError) {
+        console.error('Error creating organization via RPC:', rpcError);
         toast({
           title: "Organization error",
-          description: orgError.message,
+          description: rpcError.message || "Failed to create organization. Please contact support.",
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      // The trigger will automatically add user as admin and set current_organization_id
-      // But we still need to create the profile
-      const { error: profileError } = await (supabase as any)
-        .from("profiles")
-        .insert([
-          {
-            user_id: user.id,
-            organization_name: orgName, // Keep for backward compatibility
-            display_name: formData.displayName || formData.email.split('@')[0],
-            phone: formData.phone || null,
-            user_type: userType, // Save user_type from query params
-            current_organization_id: orgData.id, // Set the current organization
-          },
-        ]);
-      if (profileError) {
+      if (!rpcData || (rpcData as any).success !== true) {
+        console.error('RPC function returned error:', rpcData);
         toast({
-          title: "Profile error",
-          description: profileError.message,
+          title: "Organization error",
+          description: (rpcData as any)?.error || "Failed to create organization. Please contact support.",
           variant: "destructive",
         });
+        setLoading(false);
+        return;
       }
+
+      setLoading(false);
+      toast({
+        title: "Account created!",
+        description: "Please check your email to verify your account.",
+      });
+      navigate("/confirm-email");
+    } catch (error: any) {
+      console.error('Unexpected error during registration:', error);
+      setLoading(false);
+      toast({
+        title: "Error",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
     }
-    setLoading(false);
-    toast({
-      title: "Account created!",
-      description: "Please check your email to verify your account.",
-    });
-    navigate("/confirm-email");
   };
 
   return (
