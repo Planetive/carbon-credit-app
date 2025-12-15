@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .models import (
     HealthResponse,
@@ -40,6 +40,9 @@ default_origins = [
     "http://127.0.0.1:8000",  # Local backend (for testing)
 ]
 
+# Add Vercel preview URLs pattern support via regex (handled separately)
+# Vercel preview URLs look like: https://project-name-xyz123.vercel.app
+
 # Get allowed origins from environment variable or use defaults
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 if allowed_origins_env:
@@ -52,11 +55,13 @@ logger.info(f"CORS allowed origins: {allowed_origins}")
 # Add CORS middleware - MUST be added before routes
 # For Vercel serverless functions, explicit CORS configuration is critical
 # Note: When allow_credentials=True, allow_headers must be explicit, not ["*"]
-# Using allow_origin_regex to allow any localhost port for local development
-# and specific production domains
+# Using both allow_origins (explicit list) and allow_origin_regex (for localhost and Vercel preview URLs)
+# This ensures production domains work while allowing any localhost port for development
+# and Vercel preview deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://(www\.)?rethinkcarbon\.io",
+    allow_origins=allowed_origins,  # Explicit list of allowed origins
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.vercel\.app",  # Allow localhost and Vercel preview URLs
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -214,16 +219,29 @@ def options_scenario():
     return {"message": "OK"}
 
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests for debugging CORS and request flow"""
+    origin = request.headers.get("origin", "No origin header")
+    logger.info(f"Request: {request.method} {request.url.path} - Origin: {origin}")
+    response = await call_next(request)
+    # Log CORS headers in response
+    cors_origin = response.headers.get("access-control-allow-origin", "Not set")
+    logger.info(f"Response: {request.method} {request.url.path} - Status: {response.status_code} - CORS Origin: {cors_origin}")
+    return response
+
+
 @app.post("/scenario/calculate", response_model=ScenarioResponse)
 def calculate_scenario(req: ScenarioRequest) -> ScenarioResponse:
     """
     Calculate climate stress testing scenarios using sector-specific multipliers
     """
     try:
-        logger.info(f"Calculating {req.scenario_type} scenario for {len(req.portfolio_entries)} portfolio entries")
+        logger.info(f"POST /scenario/calculate - Calculating {req.scenario_type} scenario for {len(req.portfolio_entries)} portfolio entries")
         
         # Validate portfolio entries
         if not req.portfolio_entries:
+            logger.warning("POST /scenario/calculate - Empty portfolio entries received")
             raise ValueError("Portfolio entries cannot be empty")
         
         # Perform scenario calculation
@@ -233,16 +251,17 @@ def calculate_scenario(req: ScenarioRequest) -> ScenarioResponse:
         )
         
         if not result.success:
+            logger.error(f"POST /scenario/calculate - Scenario calculation failed: {result.error}")
             raise ValueError(result.error or "Scenario calculation failed")
         
-        logger.info(f"Scenario calculation completed successfully. Total loss increase: {result.total_loss_increase_percentage:.2f}%")
+        logger.info(f"POST /scenario/calculate - Success! Total loss increase: {result.total_loss_increase_percentage:.2f}%")
         return result
         
     except ValueError as e:
-        logger.error(f"Validation error in scenario calculation: {str(e)}")
+        logger.error(f"POST /scenario/calculate - Validation error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Internal error in scenario calculation: {str(e)}")
+        logger.error(f"POST /scenario/calculate - Internal error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal scenario calculation error")
 
 

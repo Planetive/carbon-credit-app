@@ -308,6 +308,8 @@ const SimpleScenarioBuilding: React.FC = () => {
       
       console.log('='.repeat(80));
       console.log('DEBUG: Frontend - Preparing scenario calculation request');
+      console.log('DEBUG: VITE_BACKEND_URL env var:', import.meta.env.VITE_BACKEND_URL);
+      console.log('DEBUG: Backend URL resolved to:', backendUrl);
       console.log('DEBUG: Request URL:', requestUrl);
       console.log('DEBUG: Request method: POST');
       console.log('DEBUG: Request origin:', window.location.origin);
@@ -346,9 +348,29 @@ const SimpleScenarioBuilding: React.FC = () => {
         console.error('DEBUG: Error name:', error.name);
         console.error('DEBUG: Error message:', error.message);
         console.error('DEBUG: Error stack:', error.stack);
+        console.error('DEBUG: Attempted URL:', requestUrl);
+        console.error('DEBUG: Backend URL from env:', backendUrl);
         
         if (error.name === 'AbortError') {
           throw new Error('Request timed out. The backend may be slow or unresponsive. Please check if the backend server is running.');
+        }
+        
+        // Enhanced error message for connection refused errors
+        if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('NetworkError'))) {
+          console.error('DEBUG: Connection refused error detected!');
+          console.error('DEBUG: This usually means:');
+          console.error('  1. Backend server is not running');
+          console.error('  2. Backend is running on a different port');
+          console.error('  3. Firewall is blocking the connection');
+          console.error('  4. Frontend needs to be restarted to pick up VITE_BACKEND_URL');
+          throw new Error(
+            `Cannot connect to backend server at ${backendUrl}.\n\n` +
+            `Please ensure:\n` +
+            `1. Backend server is running (check terminal where you started it)\n` +
+            `2. Backend is accessible at ${backendUrl}\n` +
+            `3. If you changed .env file, restart the frontend dev server\n` +
+            `4. Try accessing ${backendUrl}/health in your browser to verify backend is running`
+          );
         }
         
         // Enhanced error message for CORS errors

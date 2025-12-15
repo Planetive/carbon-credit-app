@@ -87,8 +87,22 @@ const Register = () => {
         return;
       }
 
-      // Profile will be created automatically by database trigger or user can complete it in dashboard
-      // No need to create it here - avoids timing issues with auth.users commitment
+      // Create profile with the correct user_type from query params
+      // Use a small delay to ensure user is committed to auth.users
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { error: profileError } = await (supabase.rpc as any)('create_profile_for_user', {
+        p_user_id: user.id,
+        p_display_name: formData.displayName || formData.email.split('@')[0],
+        p_phone: formData.phone || null,
+        p_user_type: userType // Use the user_type from query params
+      });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        // Don't fail the registration if profile creation fails - user can complete it later
+        // But log it for debugging
+      }
       
       setLoading(false);
       toast({
