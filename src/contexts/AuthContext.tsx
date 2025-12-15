@@ -67,11 +67,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+
+    if (error) {
+      return { error };
+    }
+
+    // Enforce email confirmation before allowing login
+    const user = data?.user;
+    if (user && !user.email_confirmed_at) {
+      // Immediately sign out unconfirmed users to clear any session
+      await supabase.auth.signOut();
+      return {
+        error: {
+          message: 'Please confirm your email address before signing in. Check your inbox for the verification link.',
+        } as any,
+      };
+    }
+
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string) => {

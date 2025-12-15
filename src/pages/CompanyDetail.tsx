@@ -351,21 +351,32 @@ const CompanyDetail: React.FC = () => {
           className="mb-6"
         >
           <Card className="border border-teal-100/50 shadow-xl bg-gradient-to-r from-teal-50/50 via-cyan-50/30 to-teal-50/50 backdrop-blur-sm rounded-3xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-5 flex-1">
+            <CardContent className="px-6 py-8">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-5 flex-1">
                   <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-xl">
                     <Building2 className="h-10 w-10 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent mb-2">
+                    <h1 className="text-3xl md:text-4xl lg:text-4xl leading-normal font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent -mt-1">
                       {company}
                     </h1>
-                    <div className="flex items-center gap-3">
-                      <Badge className="bg-teal-100 text-teal-700 border-teal-300 rounded-full px-3 py-1">
+                    <div className="flex items-center gap-3 mt-3">
+                      <Badge className="bg-teal-100 text-teal-700 border-teal-300 rounded-full px-3 py-1 text-xs">
                         {portfolioData.counterpartyType || 'SME'}
                       </Badge>
-                      <span className="text-sm text-gray-600">Portfolio Company</span>
+                      {sector && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200 rounded-full px-3 py-1 text-xs cursor-default max-w-xs truncate">
+                              {sector}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Sector</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -632,11 +643,6 @@ const CompanyDetail: React.FC = () => {
                 <>
                   <div className="text-5xl font-bold text-green-300 mb-3">—</div>
                   <div className="text-xs text-green-500 mt-2 mb-4 font-medium">Not calculated</div>
-                  <div className="bg-green-50 rounded-xl p-4 mb-5 border-2 border-green-100">
-                    <p className="text-xs text-green-700 leading-relaxed">
-                      Calculate financed emissions using PCAF methodology to assess the carbon footprint of this loan.
-                    </p>
-                  </div>
                 </>
               )}
               

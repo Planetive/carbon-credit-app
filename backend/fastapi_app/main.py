@@ -2,17 +2,19 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .models import (
     HealthResponse,
-    FinanceEmissionRequest,
-    FinanceEmissionResponse,
-    FacilitatedEmissionRequest,
-    FacilitatedEmissionResponse,
     ScenarioRequest,
     ScenarioResponse,
 )
 from .calculation_engine import CalculationEngine
 from .scenario_engine import ScenarioEngine
 from .database import test_connection, get_supabase_client
-from .finance_models import CompanyType
+from .finance_models import (
+    CompanyType,
+    FinanceEmissionRequest,
+    FinanceEmissionResponse,
+    FacilitatedEmissionRequest,
+    FacilitatedEmissionResponse,
+)
 import logging
 import os
 
@@ -148,21 +150,18 @@ def finance_emission(req: FinanceEmissionRequest) -> FinanceEmissionResponse:
     try:
         logger.info(f"Calculating finance emission for formula: {req.formula_id}")
         
-        # Convert company_type string to enum
-        company_type = CompanyType.LISTED if req.company_type == "listed" else CompanyType.PRIVATE
-        
-        # Perform calculation
+        # Perform calculation using migrated engine (matches frontend CalculationEngine)
         result = get_calculation_engine().calculate(
             formula_id=req.formula_id,
             inputs=req.inputs,
-            company_type=company_type
+            company_type=req.company_type,
         )
         
-        # Convert result to response format
+        # Wrap in response model (shape mirrors frontend CalculationResult)
         response = FinanceEmissionResponse(
             success=True,
             result=result,
-            calculation_id=None  # TODO: Save to database and return ID
+            calculation_id=None,  # TODO: Save to database and return ID
         )
         
         logger.info(f"Finance emission calculation completed successfully")
@@ -184,21 +183,18 @@ def facilitated_emission(req: FacilitatedEmissionRequest) -> FacilitatedEmission
     try:
         logger.info(f"Calculating facilitated emission for formula: {req.formula_id}")
         
-        # Convert company_type string to enum
-        company_type = CompanyType.LISTED if req.company_type == "listed" else CompanyType.PRIVATE
-        
-        # Perform calculation
+        # Perform calculation using migrated engine (matches frontend CalculationEngine)
         result = get_calculation_engine().calculate(
             formula_id=req.formula_id,
             inputs=req.inputs,
-            company_type=company_type
+            company_type=req.company_type,
         )
         
-        # Convert result to response format
+        # Wrap in response model (shape mirrors frontend CalculationResult)
         response = FacilitatedEmissionResponse(
             success=True,
             result=result,
-            calculation_id=None  # TODO: Save to database and return ID
+            calculation_id=None,  # TODO: Save to database and return ID
         )
         
         logger.info(f"Facilitated emission calculation completed successfully")

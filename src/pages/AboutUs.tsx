@@ -175,7 +175,7 @@ const AboutUs = () => {
     {
       name: "Zainab Ahmed", 
       role: "Product Owner",
-      bio: "Business Finance student with strong foundation in financial analysis, data analytics, and economic strategy. Passionate about sustainable finance and business strategies. Experienced in research and development, data analytics, financial analysis, strategy building, and technical proposal writing.",
+      bio: "A Product & Finance professional with experience in data analytics and climate innovation. Zainab’s work spans research, product development, market analysis, and data-driven decision support, particularly within climate-tech and development-focused projects. She brings hands-on experience in building MVPs and conducting in-depth analysis across emerging climate technologies, policy environments, and decarbonization pathways.",
       image: "/team/zainab.png",
     },
     {

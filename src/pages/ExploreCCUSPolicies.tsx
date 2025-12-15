@@ -251,8 +251,16 @@ const ExploreCCUSPolicies = () => {
     fetchData();
   }, []);
 
-  // Get unique countries
-  const countries = Array.from(new Set(policies.map((p: any) => p["Country"]).filter(Boolean)));
+  // Get unique countries from BOTH policies and management strategies
+  // so that countries with only management strategies (and no base policies)
+  // still show up as cards in the Explore view.
+  const policyCountries = policies
+    .map((p: any) => p["Country"])
+    .filter(Boolean);
+  const strategyCountries = managementStrategies
+    .map((s: any) => s.country)
+    .filter(Boolean);
+  const countries = Array.from(new Set([...policyCountries, ...strategyCountries]));
 
   // Helper to get Regulatory Landscapes for a country
   const getStrategyForCountry = (country: string) => {
