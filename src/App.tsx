@@ -59,6 +59,8 @@ import ESGRiskAssessment from "./pages/solutions/esg-risk-assessment.tsx";
 import Dashboard2 from "./pages/Dashboard2";
 // Removed ESGWizard import - now handled through IntegratedFinanceEmission
 import IntegratedFinanceEmission from "./pages/IntegratedFinanceEmission";
+import LoginChoice from "./pages/LoginChoice";
+import RegisterChoice from "./pages/RegisterChoice";
 
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
@@ -68,6 +70,8 @@ const AppRoutes = () => {
     <div className="min-h-screen flex flex-col">
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/login-choice" element={<LoginChoice />} />
+        <Route path="/register-choice" element={<RegisterChoice />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/about" element={<AboutUs />} />

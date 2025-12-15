@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 const MainHeader = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [mobileSolutionsOpen, setMobileSolutionsOpen] = useState(false);
   const [solutionsOpenedByClick, setSolutionsOpenedByClick] = useState(false);
   const solutionsRef = useRef<HTMLDivElement | null>(null);
   const hoverCloseTimer = useRef<number | null>(null);
+  const location = useLocation();
+  const isHome = location.pathname === "/";
 
   // Close Solutions dropdown on outside click when opened by click
   useEffect(() => {
@@ -26,22 +27,17 @@ const MainHeader = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [solutionsOpen]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
+  // Home: glass-rounded pill; other pages: standard white header
+  const headerClass = isHome
+    ? "mx-3 my-2 rounded-[32px] bg-white/14 backdrop-blur-2xl border border-white/40 shadow-[0_18px_68px_-34px_rgba(0,0,0,0.55)]"
+    : "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm";
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const navLinkClass = "transition-colors duration-300 text-gray-700 hover:text-teal-600";
+  const buttonTextClass = "text-gray-900";
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? "bg-white/95 backdrop-blur-md border-b border-gray-200"
-          : "bg-white/85 backdrop-blur-sm"
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerClass}`}
     >
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         {/* Logo */}
@@ -59,7 +55,7 @@ const MainHeader = () => {
         <div className="hidden md:flex space-x-6">
           <a
             href="/"
-            className={`transition-colors duration-300 text-gray-600 hover:text-teal-600`}
+            className={navLinkClass}
           >
             Home
           </a>
@@ -86,7 +82,7 @@ const MainHeader = () => {
                 setSolutionsOpen(v => !v);
                 setSolutionsOpenedByClick(v => !v ? true : false);
               }}
-              className={`transition-colors duration-300 text-gray-600 hover:text-teal-600 flex items-center gap-1`}
+              className={`${navLinkClass} flex items-center gap-1`}
             >
               Solutions
               <svg className={`h-4 w-4 transition-transform ${solutionsOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -103,21 +99,21 @@ const MainHeader = () => {
 
           <Link
             to="/about"
-            className={`transition-colors duration-300 text-gray-600 hover:text-teal-600`}
+            className={navLinkClass}
           >
             About
           </Link>
           
           <Link
             to="/pricing"
-            className={`transition-colors duration-300 text-gray-600 hover:text-teal-600`}
+            className={navLinkClass}
           >
             Pricing
           </Link>
           
           <Link
             to="/contact"
-            className={`transition-colors duration-300 text-gray-600 hover:text-teal-600`}
+            className={navLinkClass}
           >
             Contact
           </Link>
@@ -125,14 +121,14 @@ const MainHeader = () => {
 
         {/* Desktop Auth Buttons */}
         <div className="hidden md:flex space-x-4">
-          <Button variant={isScrolled ? "ghost" : "ghost"} asChild>
-            <Link to="/login">Login</Link>
+          <Button variant="ghost" asChild>
+            <Link to="/login" className={buttonTextClass}>Login</Link>
           </Button>
           <Button
             className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
             asChild
           >
-            <Link to="/register">Sign Up</Link>
+            <Link to="/register-choice">Sign Up</Link>
           </Button>
         </div>
 
@@ -235,7 +231,7 @@ const MainHeader = () => {
               className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
               asChild
             >
-              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}>Sign Up</Link>
+              <Link to="/register-choice" onClick={() => setIsMobileMenuOpen(false)}>Sign Up</Link>
             </Button>
           </div>
         </div>
