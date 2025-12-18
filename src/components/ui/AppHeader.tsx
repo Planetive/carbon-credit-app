@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { isCompanyUser, isRestrictedRoute } from "@/utils/roleUtils";
 import {
   Tooltip,
@@ -36,6 +36,7 @@ const AppHeader = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
 
     const handleLogout = async () => {
     try {
@@ -158,9 +159,17 @@ const AppHeader = () => {
 
       {/* Desktop Profile Dropdown */}
       <div className="hidden md:flex items-center ml-6">
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => {
+          if (!open && profileButtonRef.current) {
+            // Blur the button when dropdown closes to remove focus ring
+            profileButtonRef.current.blur();
+          }
+        }}>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+            <button 
+              ref={profileButtonRef}
+              className="flex items-center gap-2 p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none"
+            >
               <Avatar className="h-9 w-9 border-2 border-teal-500">
                 <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || "User"} />
                 <AvatarFallback className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-semibold">
