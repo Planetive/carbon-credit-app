@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { calculateESGScore, type ESGAssessmentData } from "@/utils/esgScoringEngine";
 
 
 interface ESGData {
@@ -464,8 +465,8 @@ const ESGHealthCheck = () => {
     loadAssessment();
   }, [user, toast]);
 
-  const saveToDatabase = async (isDraft: boolean = true) => {
-    if (!user) return;
+  const saveToDatabase = async (isDraft: boolean = true): Promise<boolean> => {
+    if (!user) return false;
     
     setSaving(true);
     try {
@@ -571,32 +572,176 @@ const ESGHealthCheck = () => {
       };
 
       let result;
-      if (existingAssessment) {
+      let assessmentId: string | undefined;
+      
+      if (existingAssessment?.id) {
         // Update existing assessment
+        assessmentId = existingAssessment.id;
         result = await supabase
           .from('esg_assessments')
           .update(assessmentData)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('id', assessmentId)
+          .select()
+          .single();
       } else {
         // Insert new assessment
         result = await supabase
           .from('esg_assessments')
-          .insert([assessmentData]);
+          .insert([assessmentData])
+          .select()
+          .single();
+        assessmentId = result.data?.id;
       }
 
       if (result.error) {
+        console.error('Database error:', result.error);
         throw result.error;
       }
 
-      setExistingAssessment(result.data?.[0] || assessmentData);
+      if (!result.data) {
+        throw new Error('Failed to save assessment: No data returned');
+      }
+
+      // Get the saved assessment
+      const savedAssessment = result.data;
+      assessmentId = savedAssessment.id;
+      
+      setExistingAssessment(savedAssessment);
+      
+      console.log('Assessment saved successfully:', {
+        id: assessmentId,
+        status: savedAssessment.status,
+        isDraft
+      });
+      
+      // Automatically calculate and save ESG scores when submitting (not for drafts)
+      if (!isDraft && assessmentId) {
+        try {
+          // Convert esgData to the format expected by scoring engine
+          const assessmentDataForScoring: ESGAssessmentData = {
+            // Environmental
+            ghg_baseline: esgData.environmental.ghgBaseline,
+            ghg_emissions: esgData.environmental.ghgEmissions,
+            air_pollutants: esgData.environmental.airPollutants,
+            ghg_reduction_initiatives: esgData.environmental.ghgReductionInitiatives,
+            energy_visibility: esgData.environmental.energyVisibility,
+            total_energy_used: esgData.environmental.totalEnergyUsed,
+            energy_grid: esgData.environmental.energyGrid,
+            energy_renewable: esgData.environmental.energyRenewable,
+            energy_diesel: esgData.environmental.energyDiesel,
+            energy_gas: esgData.environmental.energyGas,
+            water_withdrawal: esgData.environmental.waterWithdrawal,
+            water_reclaimed: esgData.environmental.waterReclaimed,
+            waste_type: esgData.environmental.wasteType,
+            waste_quantity: esgData.environmental.wasteQuantity,
+            waste_treated: esgData.environmental.wasteTreated,
+            environmental_policy: esgData.environmental.environmentalPolicy,
+            waste_management_policy: esgData.environmental.wasteManagementPolicy,
+            energy_management_policy: esgData.environmental.energyManagementPolicy,
+            water_management_policy: esgData.environmental.waterManagementPolicy,
+            recycling_policy: esgData.environmental.recyclingPolicy,
+            board_climate_oversight: esgData.environmental.boardClimateOversight,
+            management_climate_oversight: esgData.environmental.managementClimateOversight,
+            sustainable_sourcing: esgData.environmental.sustainableSourcing,
+            // Social
+            median_male_compensation: esgData.social.medianMaleCompensation,
+            median_female_compensation: esgData.social.medianFemaleCompensation,
+            ceo_pay_ratio: esgData.social.ceoPayRatio,
+            ceo_pay_ratio_reporting: esgData.social.ceoPayRatioReporting,
+            full_time_turnover: esgData.social.fullTimeTurnover,
+            part_time_turnover: esgData.social.partTimeTurnover,
+            consultants_turnover: esgData.social.consultantsTurnover,
+            diversity_inclusion_policy: esgData.social.diversityInclusionPolicy,
+            total_headcount: esgData.social.totalHeadcount,
+            men_headcount: esgData.social.menHeadcount,
+            women_headcount: esgData.social.womenHeadcount,
+            men_entry_mid_level: esgData.social.menEntryMidLevel,
+            women_entry_mid_level: esgData.social.womenEntryMidLevel,
+            men_senior_executive: esgData.social.menSeniorExecutive,
+            women_senior_executive: esgData.social.womenSeniorExecutive,
+            differently_abled_workforce: esgData.social.differentlyAbledWorkforce,
+            temporary_workers: esgData.social.temporaryWorkers,
+            consultants: esgData.social.consultants,
+            anti_harassment_policy: esgData.social.antiHarassmentPolicy,
+            harassment_cases_reported: esgData.social.harassmentCasesReported,
+            harassment_cases_resolved: esgData.social.harassmentCasesResolved,
+            grievance_mechanism: esgData.social.grievanceMechanism,
+            grievance_cases_reported: esgData.social.grievanceCasesReported,
+            grievance_cases_resolved: esgData.social.grievanceCasesResolved,
+            health_safety_policy: esgData.social.healthSafetyPolicy,
+            hse_management_system: esgData.social.hseManagementSystem,
+            fatalities: esgData.social.fatalities,
+            ltis: esgData.social.ltis,
+            safety_accidents: esgData.social.safetyAccidents,
+            production_loss: esgData.social.productionLoss,
+            trir: esgData.social.trir,
+            child_forced_labor_policy: esgData.social.childForcedLaborPolicy,
+            human_rights_policy: esgData.social.humanRightsPolicy,
+            personnel_trained: esgData.social.personnelTrained,
+            women_promoted: esgData.social.womenPromoted,
+            men_promoted: esgData.social.menPromoted,
+            csr_percentage: esgData.social.csrPercentage,
+            responsible_marketing_policy: esgData.social.responsibleMarketingPolicy,
+            // Governance
+            total_board_members: esgData.governance.totalBoardMembers,
+            independent_board_members: esgData.governance.independentBoardMembers,
+            men_board_members: esgData.governance.menBoardMembers,
+            women_board_members: esgData.governance.womenBoardMembers,
+            board_governance_committees: esgData.governance.boardGovernanceCommittees,
+            men_committee_chairs: esgData.governance.menCommitteeChairs,
+            women_committee_chairs: esgData.governance.womenCommitteeChairs,
+            ceo_board_prohibition: esgData.governance.ceoBoardProhibition,
+            esg_certified_board_members: esgData.governance.esgCertifiedBoardMembers,
+            esg_incentivization: esgData.governance.esgIncentivization,
+            workers_union: esgData.governance.workersUnion,
+            supplier_code_of_conduct: esgData.governance.supplierCodeOfConduct,
+            supplier_compliance_percentage: esgData.governance.supplierCompliancePercentage,
+            un_sdgs_focus: esgData.governance.unSdgsFocus,
+            sustainability_report: esgData.governance.sustainabilityReport,
+            sustainability_reporting_framework: esgData.governance.sustainabilityReportingFramework,
+            sustainability_regulatory_filing: esgData.governance.sustainabilityRegulatoryFiling,
+            sustainability_third_party_assurance: esgData.governance.sustainabilityThirdPartyAssurance,
+            ethics_anti_corruption_policy: esgData.governance.ethicsAntiCorruptionPolicy,
+            policy_regular_review: esgData.governance.policyRegularReview,
+            data_privacy_policy: esgData.governance.dataPrivacyPolicy,
+          };
+          
+          // Calculate ESG scores automatically
+          const scoringResult = calculateESGScore(assessmentDataForScoring);
+          
+          // Save scores to esg_scores table
+          const scoreData = {
+            user_id: user.id,
+            assessment_id: assessmentId,
+            ...scoringResult,
+            scored_by: 'Automated System',
+            scored_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          const { error: scoreError } = await supabase
+            .from('esg_scores')
+            .upsert(scoreData, { onConflict: 'assessment_id' });
+          
+          if (scoreError) {
+            console.error('Error saving ESG scores:', scoreError);
+            // Don't throw - assessment is saved, scores can be recalculated
+          }
+        } catch (scoringError) {
+          console.error('Error calculating ESG scores:', scoringError);
+          // Don't throw - assessment is saved, scores can be recalculated
+        }
+      }
       
       toast({
         title: isDraft ? "Draft Saved" : "Assessment Submitted",
         description: isDraft 
           ? "Your draft has been saved successfully. You can continue editing later."
-          : "Your ESG assessment has been submitted successfully!",
+          : "Your ESG assessment has been submitted and scored automatically!",
       });
 
+      return true; // Success
 
     } catch (error) {
       console.error('Error saving assessment:', error);
@@ -605,6 +750,7 @@ const ESGHealthCheck = () => {
         description: "Failed to save your assessment. Please try again.",
         variant: "destructive"
       });
+      return false; // Failure
     } finally {
       setSaving(false);
     }
@@ -614,10 +760,13 @@ const ESGHealthCheck = () => {
     saveToDatabase(true);
   };
 
-  const handleSubmitFinal = () => {
-    saveToDatabase(false);
-    // Navigate to ESG results page after successful submission
-    setTimeout(() => navigate('/esg-results'));
+  const handleSubmitFinal = async () => {
+    const success = await saveToDatabase(false);
+    // Navigate to ESG results page only after successful submission
+    if (success) {
+      // Small delay to ensure database is updated
+      setTimeout(() => navigate('/esg-results'), 500);
+    }
   };
 
   const toggleSection = (sectionId: string) => {

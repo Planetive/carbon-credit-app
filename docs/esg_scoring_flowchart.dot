@@ -1,0 +1,395 @@
+digraph ESGScoringFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    
+    // Start
+    Start [label="User Submits\nESG Assessment", shape=ellipse, style=filled, fillcolor=lightblue];
+    
+    // Data Validation
+    ValidateData [label="Validate Assessment Data\nCheck all fields"];
+    
+    // Main Scoring Process
+    CalculateScores [label="Calculate ESG Scores\n(calculateESGScore)", shape=box, style=filled, fillcolor=lightyellow];
+    
+    // Environmental Scoring
+    EnvStart [label="ENVIRONMENTAL SCORING\n(30% weight)", shape=box, style=filled, fillcolor=lightgreen];
+    
+    E_Q1 [label="E-Q1: GHG Emissions\n(5%)\nHas baseline?\nHas reduction?\nHas emissions?", shape=diamond];
+    E_Q1_Score3 [label="Score: 3\nAll three present"];
+    E_Q1_Score2 [label="Score: 2\nBaseline + one other"];
+    E_Q1_Score1 [label="Score: 1\nOnly one present"];
+    E_Q1_Null [label="Score: null\nNo data"];
+    
+    E_Q2 [label="E-Q2: Energy Efficiency\n(4%)\nHas visibility?\nRenewable %?\nFossil %?", shape=diamond];
+    E_Q2_Score3 [label="Score: 3\nRenewable ≥50%\nFossil ≤20%"];
+    E_Q2_Score2 [label="Score: 2\nRenewable ≥25%\nFossil ≤40%"];
+    E_Q2_Score1 [label="Score: 1\nNo visibility"];
+    
+    E_Q3 [label="E-Q3: Water Management\n(4%)\nReclamation rate?", shape=diamond];
+    E_Q3_Score3 [label="Score: 3\n≥50%"];
+    E_Q3_Score2 [label="Score: 2\n≥25%"];
+    E_Q3_Score1 [label="Score: 1\n<25%"];
+    
+    E_Q4 [label="E-Q4: Waste Management\n(4%)\nTreatment %?", shape=diamond];
+    E_Q4_Score3 [label="Score: 3\n≥80%"];
+    E_Q4_Score2 [label="Score: 2\n≥50%"];
+    E_Q4_Score1 [label="Score: 1\n<50%"];
+    
+    E_Q5 [label="E-Q5: Environmental Policies\n(4%)\nPolicy count?", shape=diamond];
+    E_Q5_Score3 [label="Score: 3\n4+ policies"];
+    E_Q5_Score2 [label="Score: 2\n2-3 policies"];
+    E_Q5_Score1 [label="Score: 1\n0-1 policy"];
+    
+    E_Q6 [label="E-Q6: Climate Oversight\n(5%)\nBoard oversight?\nManagement oversight?", shape=diamond];
+    E_Q6_Score3 [label="Score: 3\nBoth present"];
+    E_Q6_Score2 [label="Score: 2\nOne present"];
+    E_Q6_Score1 [label="Score: 1\nNeither"];
+    
+    E_Q7 [label="E-Q7: Sustainable Sourcing\n(4%)\nHas policy?", shape=diamond];
+    E_Q7_Score3 [label="Score: 3\nYes"];
+    E_Q7_Score1 [label="Score: 1\nNo"];
+    
+    EnvCalc [label="Calculate Environmental Score\nΣ(score × weight) / (totalWeight × 3) × 100", shape=box, style=filled, fillcolor=lightgreen];
+    
+    // Social Scoring
+    SocStart [label="SOCIAL SCORING\n(35% weight)", shape=box, style=filled, fillcolor=lightblue];
+    
+    S_Q1 [label="S-Q1: Pay Equity\n(3%)\nFemale/Male ratio?", shape=diamond];
+    S_Q1_Score3 [label="Score: 3\n≥95%"];
+    S_Q1_Score2 [label="Score: 2\n≥85%"];
+    S_Q1_Score1 [label="Score: 1\n<85%"];
+    
+    S_Q2 [label="S-Q2: CEO Pay Ratio\n(3%)\nRatio value?\nReports?", shape=diamond];
+    S_Q2_Score3 [label="Score: 3\n≤20:1 + reports"];
+    S_Q2_Score2 [label="Score: 2\n≤50:1"];
+    S_Q2_Score1 [label="Score: 1\n>50:1"];
+    
+    S_Q3 [label="S-Q3: Turnover\n(3%)\nAverage turnover %?", shape=diamond];
+    S_Q3_Score3 [label="Score: 3\n≤10%"];
+    S_Q3_Score2 [label="Score: 2\n≤20%"];
+    S_Q3_Score1 [label="Score: 1\n>20%"];
+    
+    S_Q4 [label="S-Q4: Gender Diversity\n(3%)\nHas policy?\nSenior women %?\nOverall women %?", shape=diamond];
+    S_Q4_Score3 [label="Score: 3\nPolicy + ≥40% senior\nOR 40-60% overall"];
+    S_Q4_Score2 [label="Score: 2\nPolicy + ≥30% senior\nOR 30-70% overall"];
+    S_Q4_Score1 [label="Score: 1\nNo policy"];
+    
+    S_Q5 [label="S-Q5: Temporary Workers\n(3%)\nTemp worker %?", shape=diamond];
+    S_Q5_Score3 [label="Score: 3\n≤10%"];
+    S_Q5_Score2 [label="Score: 2\n≤25%"];
+    S_Q5_Score1 [label="Score: 1\n>25%"];
+    
+    S_Q6 [label="S-Q6: Harassment/Grievance\n(3%)\nHas policy?\nHas mechanism?\nResolution rate?", shape=diamond];
+    S_Q6_Score3 [label="Score: 3\nPolicy + mechanism\n+ ≥90% resolution"];
+    S_Q6_Score2 [label="Score: 2\nPolicy OR mechanism\n+ ≥70% resolution"];
+    S_Q6_Score1 [label="Score: 1\nNeither"];
+    
+    S_Q7 [label="S-Q7: Health & Safety\n(3%)\nHas policy?\nHas HSE?\nTRIR?\nFatalities?", shape=diamond];
+    S_Q7_Score3 [label="Score: 3\nPolicy + HSE\n+ TRIR ≤1.0\n+ No fatalities"];
+    S_Q7_Score2 [label="Score: 2\nPolicy\n+ TRIR ≤3.0"];
+    S_Q7_Score1 [label="Score: 1\nNo policy\nOR fatalities >0"];
+    
+    S_Q8 [label="S-Q8: Child/Forced Labor\n(3%)\nHas policy?", shape=diamond];
+    S_Q8_Score3 [label="Score: 3\nYes"];
+    S_Q8_Score1 [label="Score: 1\nNo"];
+    
+    S_Q9 [label="S-Q9: Human Rights\n(3%)\nHas policy?", shape=diamond];
+    S_Q9_Score3 [label="Score: 3\nYes"];
+    S_Q9_Score1 [label="Score: 1\nNo"];
+    
+    S_Q10 [label="S-Q10: Training/Succession\n(3%)\nPersonnel trained?\nWomen promoted %?", shape=diamond];
+    S_Q10_Score3 [label="Score: 3\nTrained + 40-60%\nwomen promoted"];
+    S_Q10_Score2 [label="Score: 2\nTrained + ≥30%\nwomen promoted"];
+    S_Q10_Score1 [label="Score: 1\nNo training"];
+    
+    S_Q11 [label="S-Q11: CSR\n(3%)\nCSR spending %?", shape=diamond];
+    S_Q11_Score3 [label="Score: 3\n≥2%"];
+    S_Q11_Score2 [label="Score: 2\n≥1%"];
+    S_Q11_Score1 [label="Score: 1\n<1%"];
+    
+    S_Q12 [label="S-Q12: Marketing\n(2%)\nHas policy?", shape=diamond];
+    S_Q12_Score3 [label="Score: 3\nYes"];
+    S_Q12_Score1 [label="Score: 1\nNo"];
+    
+    SocCalc [label="Calculate Social Score\nΣ(score × weight) / (totalWeight × 3) × 100", shape=box, style=filled, fillcolor=lightblue];
+    
+    // Governance Scoring
+    GovStart [label="GOVERNANCE SCORING\n(35% weight)", shape=box, style=filled, fillcolor=lavender];
+    
+    G_Q1 [label="G-Q1: Board Composition\n(5%)\nIndependence %?\nWomen %?\nESG certified?\nCEO prohibited?", shape=diamond];
+    G_Q1_Score3 [label="Score: 3\nIndependence ≥50%\nOR Women ≥30%\n+ bonuses"];
+    G_Q1_Score2 [label="Score: 2\nIndependence ≥30%\nOR Women ≥20%"];
+    G_Q1_Score1 [label="Score: 1\nBelow thresholds"];
+    
+    G_Q2 [label="G-Q2: ESG Incentivization\n(5%)\nExecutives incentivized?", shape=diamond];
+    G_Q2_Score3 [label="Score: 3\nYes"];
+    G_Q2_Score1 [label="Score: 1\nNo"];
+    
+    G_Q3 [label="G-Q3: Voice of Employees\n(5%)\nHas union?", shape=diamond];
+    G_Q3_Score3 [label="Score: 3\nYes"];
+    G_Q3_Score1 [label="Score: 1\nNo"];
+    
+    G_Q4 [label="G-Q4: Supplier Code\n(5%)\nHas code?\nCompliance %?", shape=diamond];
+    G_Q4_Score3 [label="Score: 3\nCode + ≥80%\ncompliance"];
+    G_Q4_Score2 [label="Score: 2\nCode + ≥50%\ncompliance"];
+    G_Q4_Score1 [label="Score: 1\nNo code\nOR <50%"];
+    
+    G_Q5 [label="G-Q5: Sustainability Disclosures\n(5%)\nDisclosure count?", shape=diamond];
+    G_Q5_Score3 [label="Score: 3\n4+ practices"];
+    G_Q5_Score2 [label="Score: 2\n2-3 practices"];
+    G_Q5_Score1 [label="Score: 1\n0-1 practice"];
+    
+    G_Q6 [label="G-Q6: Ethics/Anti-Corruption\n(5%)\nHas policy?\nRegular review?", shape=diamond];
+    G_Q6_Score3 [label="Score: 3\nPolicy + review"];
+    G_Q6_Score2 [label="Score: 2\nPolicy only"];
+    G_Q6_Score1 [label="Score: 1\nNo policy"];
+    
+    G_Q7 [label="G-Q7: Data Privacy\n(5%)\nHas policy?", shape=diamond];
+    G_Q7_Score3 [label="Score: 3\nYes"];
+    G_Q7_Score1 [label="Score: 1\nNo"];
+    
+    GovCalc [label="Calculate Governance Score\nΣ(score × weight) / (totalWeight × 3) × 100", shape=box, style=filled, fillcolor=lavender];
+    
+    // Final Calculations
+    OverallCalc [label="Calculate Overall Score\n(Env × 0.30) + (Soc × 0.35) + (Gov × 0.35)", shape=box, style=filled, fillcolor=orange];
+    
+    GenerateRecs [label="Generate Recommendations\nData-driven analysis\nStrengths & Improvements", shape=box, style=filled, fillcolor=yellow];
+    
+    SaveScores [label="Save to Database\nesg_scores table", shape=box, style=filled, fillcolor=lightcoral];
+    
+    DisplayResults [label="Display Results\nESG Results Page", shape=ellipse, style=filled, fillcolor=lightgreen];
+    
+    // Flow connections
+    Start -> ValidateData;
+    ValidateData -> CalculateScores;
+    
+    CalculateScores -> EnvStart;
+    CalculateScores -> SocStart;
+    CalculateScores -> GovStart;
+    
+    // Environmental flow
+    EnvStart -> E_Q1;
+    E_Q1 -> E_Q1_Score3 [label="All"];
+    E_Q1 -> E_Q1_Score2 [label="Partial"];
+    E_Q1 -> E_Q1_Score1 [label="One"];
+    E_Q1 -> E_Q1_Null [label="None"];
+    
+    E_Q1_Score3 -> E_Q2;
+    E_Q1_Score2 -> E_Q2;
+    E_Q1_Score1 -> E_Q2;
+    E_Q1_Null -> E_Q2;
+    
+    E_Q2 -> E_Q2_Score3 [label="≥50% ren\n≤20% fossil"];
+    E_Q2 -> E_Q2_Score2 [label="≥25% ren\n≤40% fossil"];
+    E_Q2 -> E_Q2_Score1 [label="No visibility"];
+    
+    E_Q2_Score3 -> E_Q3;
+    E_Q2_Score2 -> E_Q3;
+    E_Q2_Score1 -> E_Q3;
+    
+    E_Q3 -> E_Q3_Score3 [label="≥50%"];
+    E_Q3 -> E_Q3_Score2 [label="≥25%"];
+    E_Q3 -> E_Q3_Score1 [label="<25%"];
+    E_Q3 -> E_Q4 [label="null"];
+    
+    E_Q3_Score3 -> E_Q4;
+    E_Q3_Score2 -> E_Q4;
+    E_Q3_Score1 -> E_Q4;
+    
+    E_Q4 -> E_Q4_Score3 [label="≥80%"];
+    E_Q4 -> E_Q4_Score2 [label="≥50%"];
+    E_Q4 -> E_Q4_Score1 [label="<50%"];
+    E_Q4 -> E_Q5 [label="null"];
+    
+    E_Q4_Score3 -> E_Q5;
+    E_Q4_Score2 -> E_Q5;
+    E_Q4_Score1 -> E_Q5;
+    
+    E_Q5 -> E_Q5_Score3 [label="4+"];
+    E_Q5 -> E_Q5_Score2 [label="2-3"];
+    E_Q5 -> E_Q5_Score1 [label="0-1"];
+    
+    E_Q5_Score3 -> E_Q6;
+    E_Q5_Score2 -> E_Q6;
+    E_Q5_Score1 -> E_Q6;
+    
+    E_Q6 -> E_Q6_Score3 [label="Both"];
+    E_Q6 -> E_Q6_Score2 [label="One"];
+    E_Q6 -> E_Q6_Score1 [label="None"];
+    
+    E_Q6_Score3 -> E_Q7;
+    E_Q6_Score2 -> E_Q7;
+    E_Q6_Score1 -> E_Q7;
+    
+    E_Q7 -> E_Q7_Score3 [label="Yes"];
+    E_Q7 -> E_Q7_Score1 [label="No"];
+    E_Q7 -> EnvCalc [label="null"];
+    
+    E_Q7_Score3 -> EnvCalc;
+    E_Q7_Score1 -> EnvCalc;
+    
+    // Social flow
+    SocStart -> S_Q1;
+    S_Q1 -> S_Q1_Score3 [label="≥95%"];
+    S_Q1 -> S_Q1_Score2 [label="≥85%"];
+    S_Q1 -> S_Q1_Score1 [label="<85%"];
+    S_Q1 -> S_Q2 [label="null"];
+    
+    S_Q1_Score3 -> S_Q2;
+    S_Q1_Score2 -> S_Q2;
+    S_Q1_Score1 -> S_Q2;
+    
+    S_Q2 -> S_Q2_Score3 [label="≤20:1"];
+    S_Q2 -> S_Q2_Score2 [label="≤50:1"];
+    S_Q2 -> S_Q2_Score1 [label=">50:1"];
+    
+    S_Q2_Score3 -> S_Q3;
+    S_Q2_Score2 -> S_Q3;
+    S_Q2_Score1 -> S_Q3;
+    
+    S_Q3 -> S_Q3_Score3 [label="≤10%"];
+    S_Q3 -> S_Q3_Score2 [label="≤20%"];
+    S_Q3 -> S_Q3_Score1 [label=">20%"];
+    
+    S_Q3_Score3 -> S_Q4;
+    S_Q3_Score2 -> S_Q4;
+    S_Q3_Score1 -> S_Q4;
+    
+    S_Q4 -> S_Q4_Score3 [label="Policy+\n≥40%"];
+    S_Q4 -> S_Q4_Score2 [label="Policy+\n≥30%"];
+    S_Q4 -> S_Q4_Score1 [label="No policy"];
+    
+    S_Q4_Score3 -> S_Q5;
+    S_Q4_Score2 -> S_Q5;
+    S_Q4_Score1 -> S_Q5;
+    
+    S_Q5 -> S_Q5_Score3 [label="≤10%"];
+    S_Q5 -> S_Q5_Score2 [label="≤25%"];
+    S_Q5 -> S_Q5_Score1 [label=">25%"];
+    
+    S_Q5_Score3 -> S_Q6;
+    S_Q5_Score2 -> S_Q6;
+    S_Q5_Score1 -> S_Q6;
+    
+    S_Q6 -> S_Q6_Score3 [label="Both+\n≥90%"];
+    S_Q6 -> S_Q6_Score2 [label="One+\n≥70%"];
+    S_Q6 -> S_Q6_Score1 [label="Neither"];
+    
+    S_Q6_Score3 -> S_Q7;
+    S_Q6_Score2 -> S_Q7;
+    S_Q6_Score1 -> S_Q7;
+    
+    S_Q7 -> S_Q7_Score3 [label="Policy+HSE\nTRIR≤1.0"];
+    S_Q7 -> S_Q7_Score2 [label="Policy\nTRIR≤3.0"];
+    S_Q7 -> S_Q7_Score1 [label="No policy\nOR fatalities"];
+    
+    S_Q7_Score3 -> S_Q8;
+    S_Q7_Score2 -> S_Q8;
+    S_Q7_Score1 -> S_Q8;
+    
+    S_Q8 -> S_Q8_Score3 [label="Yes"];
+    S_Q8 -> S_Q8_Score1 [label="No"];
+    S_Q8 -> S_Q9 [label="null"];
+    
+    S_Q8_Score3 -> S_Q9;
+    S_Q8_Score1 -> S_Q9;
+    
+    S_Q9 -> S_Q9_Score3 [label="Yes"];
+    S_Q9 -> S_Q9_Score1 [label="No"];
+    S_Q9 -> S_Q10 [label="null"];
+    
+    S_Q9_Score3 -> S_Q10;
+    S_Q9_Score1 -> S_Q10;
+    
+    S_Q10 -> S_Q10_Score3 [label="Trained+\n40-60%"];
+    S_Q10 -> S_Q10_Score2 [label="Trained+\n≥30%"];
+    S_Q10 -> S_Q10_Score1 [label="No training"];
+    
+    S_Q10_Score3 -> S_Q11;
+    S_Q10_Score2 -> S_Q11;
+    S_Q10_Score1 -> S_Q11;
+    
+    S_Q11 -> S_Q11_Score3 [label="≥2%"];
+    S_Q11 -> S_Q11_Score2 [label="≥1%"];
+    S_Q11 -> S_Q11_Score1 [label="<1%"];
+    
+    S_Q11_Score3 -> S_Q12;
+    S_Q11_Score2 -> S_Q12;
+    S_Q11_Score1 -> S_Q12;
+    
+    S_Q12 -> S_Q12_Score3 [label="Yes"];
+    S_Q12 -> S_Q12_Score1 [label="No"];
+    S_Q12 -> SocCalc [label="null"];
+    
+    S_Q12_Score3 -> SocCalc;
+    S_Q12_Score1 -> SocCalc;
+    
+    // Governance flow
+    GovStart -> G_Q1;
+    G_Q1 -> G_Q1_Score3 [label="≥50% ind\nOR ≥30% women"];
+    G_Q1 -> G_Q1_Score2 [label="≥30% ind\nOR ≥20% women"];
+    G_Q1 -> G_Q1_Score1 [label="Below"];
+    
+    G_Q1_Score3 -> G_Q2;
+    G_Q1_Score2 -> G_Q2;
+    G_Q1_Score1 -> G_Q2;
+    
+    G_Q2 -> G_Q2_Score3 [label="Yes"];
+    G_Q2 -> G_Q2_Score1 [label="No"];
+    G_Q2 -> G_Q3 [label="null"];
+    
+    G_Q2_Score3 -> G_Q3;
+    G_Q2_Score1 -> G_Q3;
+    
+    G_Q3 -> G_Q3_Score3 [label="Yes"];
+    G_Q3 -> G_Q3_Score1 [label="No"];
+    G_Q3 -> G_Q4 [label="null"];
+    
+    G_Q3_Score3 -> G_Q4;
+    G_Q3_Score1 -> G_Q4;
+    
+    G_Q4 -> G_Q4_Score3 [label="Code+\n≥80%"];
+    G_Q4 -> G_Q4_Score2 [label="Code+\n≥50%"];
+    G_Q4 -> G_Q4_Score1 [label="No code\nOR <50%"];
+    
+    G_Q4_Score3 -> G_Q5;
+    G_Q4_Score2 -> G_Q5;
+    G_Q4_Score1 -> G_Q5;
+    
+    G_Q5 -> G_Q5_Score3 [label="4+"];
+    G_Q5 -> G_Q5_Score2 [label="2-3"];
+    G_Q5 -> G_Q5_Score1 [label="0-1"];
+    
+    G_Q5_Score3 -> G_Q6;
+    G_Q5_Score2 -> G_Q6;
+    G_Q5_Score1 -> G_Q6;
+    
+    G_Q6 -> G_Q6_Score3 [label="Policy+\nReview"];
+    G_Q6 -> G_Q6_Score2 [label="Policy"];
+    G_Q6 -> G_Q6_Score1 [label="No policy"];
+    
+    G_Q6_Score3 -> G_Q7;
+    G_Q6_Score2 -> G_Q7;
+    G_Q6_Score1 -> G_Q7;
+    
+    G_Q7 -> G_Q7_Score3 [label="Yes"];
+    G_Q7 -> G_Q7_Score1 [label="No"];
+    G_Q7 -> GovCalc [label="null"];
+    
+    G_Q7_Score3 -> GovCalc;
+    G_Q7_Score1 -> GovCalc;
+    
+    // Final flow
+    EnvCalc -> OverallCalc;
+    SocCalc -> OverallCalc;
+    GovCalc -> OverallCalc;
+    
+    OverallCalc -> GenerateRecs;
+    GenerateRecs -> SaveScores;
+    SaveScores -> DisplayResults;
+    
+    // Styling
+    {rank=same; EnvStart; SocStart; GovStart}
+    {rank=same; EnvCalc; SocCalc; GovCalc}
+}
+
