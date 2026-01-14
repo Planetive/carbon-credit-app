@@ -166,9 +166,9 @@ const AboutUs = () => {
     },
     {
       name: "Kamal Rahim",
-      role: "Head of Strategy & Growth",
+      role: " Co-Founder and Head of Strategy ",
       bio: "Accomplished business development professional with engineering background and over a decade in energy sector and industrial digitization. Successfully established 1320 MW power plant, bulk handling sea terminal, and implemented digital twin solutions. Expert in industrial SaaS development and mergers & acquisitions.",
-      image: "/team/kamal.webp",
+      image: "/team/Kamal PP.jpg",
     },
     {
       name: "Umair Hussian Farooqi",
@@ -553,7 +553,7 @@ const AboutUs = () => {
                       <img
                         src={member.image}
                         alt={member.name}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover ${member.name === "Kamal Rahim" ? "object-[center_60%]" : ""}`}
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                           e.currentTarget.nextElementSibling?.classList.remove(

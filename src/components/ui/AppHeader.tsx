@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useEffect, useState, useRef } from "react";
 import { isCompanyUser, isRestrictedRoute } from "@/utils/roleUtils";
 import {
@@ -35,7 +36,9 @@ const AppHeader = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const { currentOrganization, organizations, switchOrganization, loading: orgLoading, refreshOrganizations } = useOrganization();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
 
     const handleLogout = async () => {
@@ -94,6 +97,31 @@ const AppHeader = () => {
 
   // Determine logo link destination based on user role
   const logoLink = isCompanyUser(user) ? "/dashboard" : "/explore";
+
+  const handleSwitchOrganization = async (orgId: string) => {
+    if (orgId === currentOrganization?.id) return;
+    
+    setSwitchingOrg(orgId);
+    try {
+      await switchOrganization(orgId);
+      toast({
+        title: 'Organization switched',
+        description: 'You have switched to a different organization.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to switch organization. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSwitchingOrg(null);
+    }
+  };
+
+  const handleCreateOrganization = () => {
+    navigate('/settings');
+  };
 
 
   return (
@@ -179,8 +207,8 @@ const AppHeader = () => {
               <ChevronDown className="h-4 w-4 text-gray-600" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel className="font-normal">
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel className="font-normal px-3 py-2.5">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
                   {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User"}
@@ -191,6 +219,74 @@ const AppHeader = () => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            
+            {/* Organizations Section - Always Show */}
+            <div className="px-1">
+              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground px-2 py-2">
+                Organizations
+              </DropdownMenuLabel>
+              
+              {orgLoading ? (
+                <div className="px-2 py-2 text-xs text-muted-foreground">
+                  Loading organizations...
+                </div>
+              ) : organizations.length > 0 ? (
+                <div className="max-h-56 overflow-y-auto">
+                  {organizations.map((org) => {
+                    const isCurrent = org.id === currentOrganization?.id;
+                    const isSwitching = switchingOrg === org.id;
+                    
+                    return (
+                      <DropdownMenuItem
+                        key={org.id}
+                        onClick={() => {
+                          if (!isCurrent) {
+                            handleSwitchOrganization(org.id);
+                          }
+                        }}
+                        disabled={isCurrent || isSwitching}
+                        className={`mx-1 my-0.5 rounded-md ${
+                          isCurrent 
+                            ? 'bg-primary/10 text-primary font-medium cursor-default opacity-100' 
+                            : 'cursor-pointer hover:bg-accent'
+                        } ${isSwitching ? 'opacity-50 cursor-wait' : ''}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Building2 className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-primary' : ''}`} />
+                            <span className="truncate text-sm font-medium">{org.name}</span>
+                            {isCurrent && (
+                              <span className="text-xs text-primary/70 ml-1 font-normal">(Current)</span>
+                            )}
+                          </div>
+                          {isCurrent && (
+                            <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+                          )}
+                          {isSwitching && (
+                            <div className="h-4 w-4 flex-shrink-0 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                  No organizations yet
+                </div>
+              )}
+              
+              <DropdownMenuItem
+                onClick={handleCreateOrganization}
+                className="cursor-pointer mx-1 mt-1 text-primary hover:bg-primary/10 rounded-md"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="text-sm font-medium">Create Organization</span>
+              </DropdownMenuItem>
+            </div>
+            
+            <DropdownMenuSeparator />
+            
             <DropdownMenuItem asChild>
               <Link to="/dashboard" className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
@@ -206,10 +302,10 @@ const AppHeader = () => {
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onClick={handleLogout}
-              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 mx-1 my-0.5 rounded-md"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Logout</span>
+              <span className="text-sm">Logout</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -321,6 +417,80 @@ const AppHeader = () => {
             </div>
 
             <div className="mb-2 border-t border-gray-200 pt-2" />
+            
+            {/* Mobile Organizations Section */}
+            {!orgLoading && organizations.length > 0 && (
+              <>
+                <div className="mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 mb-2">
+                    Organizations
+                  </p>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {organizations.map((org) => {
+                      const isCurrent = org.id === currentOrganization?.id;
+                      const isSwitching = switchingOrg === org.id;
+                      
+                      return (
+                        <button
+                          key={org.id}
+                          onClick={() => {
+                            if (!isCurrent) {
+                              handleSwitchOrganization(org.id);
+                            }
+                            setIsMobileMenuOpen(false);
+                          }}
+                          disabled={isCurrent || isSwitching}
+                          className={`flex items-center justify-between w-full p-3 rounded-lg transition-colors mb-1 ${
+                            isCurrent
+                              ? 'bg-primary text-white'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <Building2 className="h-5 w-5 flex-shrink-0" />
+                            <span className="truncate">{org.name}</span>
+                          </div>
+                          {isCurrent && (
+                            <Check className="h-5 w-5 flex-shrink-0" />
+                          )}
+                          {isSwitching && (
+                            <div className="h-5 w-5 flex-shrink-0 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleCreateOrganization();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full p-3 text-primary hover:bg-primary/10 rounded-lg transition-colors mb-2"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Create Organization
+                  </button>
+                </div>
+                <div className="mb-2 border-t border-gray-200 pt-2" />
+              </>
+            )}
+            
+            {!orgLoading && organizations.length === 0 && (
+              <>
+                <button
+                  onClick={() => {
+                    navigate('/settings');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 w-full p-3 text-primary hover:bg-primary/10 rounded-lg transition-colors mb-2"
+                >
+                  <Plus className="h-5 w-5" />
+                  Create Organization
+                </button>
+                <div className="mb-2 border-t border-gray-200 pt-2" />
+              </>
+            )}
+            
             <Link
               to="/dashboard"
               onClick={() => setIsMobileMenuOpen(false)}
@@ -350,6 +520,7 @@ const AppHeader = () => {
           </div>
         </div>
       </div>
+      
     </header>
   );
 };

@@ -91,9 +91,11 @@ const Register = () => {
       // Use a small delay to ensure user is committed to auth.users
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      const displayName = formData.displayName || formData.email.split('@')[0];
+      
       const { error: profileError } = await (supabase.rpc as any)('create_profile_for_user', {
         p_user_id: user.id,
-        p_display_name: formData.displayName || formData.email.split('@')[0],
+        p_display_name: displayName,
         p_phone: formData.phone || null,
         p_user_type: userType // Use the user_type from query params
       });
@@ -102,6 +104,40 @@ const Register = () => {
         console.error('Error creating profile:', profileError);
         // Don't fail the registration if profile creation fails - user can complete it later
         // But log it for debugging
+      }
+
+      // Create the original organization with the user's display name
+      // Wait a bit more to ensure profile is created
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      try {
+        const { data: newOrg, error: orgError } = await (supabase as any)
+          .from('organizations')
+          .insert([
+            {
+              name: displayName,
+              description: null,
+              parent_organization_id: null,
+              is_original: true, // Mark as original
+            },
+          ])
+          .select()
+          .single();
+
+        if (orgError) {
+          console.error('Error creating organization:', orgError);
+          // Don't fail registration, but log the error
+        } else if (newOrg) {
+          // The trigger will automatically add the user as admin and set it as current
+          // But let's make sure it's set as current organization
+          await (supabase as any)
+            .from('profiles')
+            .update({ current_organization_id: newOrg.id })
+            .eq('user_id', user.id);
+        }
+      } catch (orgErr: any) {
+        console.error('Error creating organization during signup:', orgErr);
+        // Don't fail registration
       }
       
       setLoading(false);
@@ -145,31 +181,15 @@ const Register = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleRegister} className="space-y-4">
-              {/* Organization field removed */}
-              {/* <Label>Organization Name</Label>
-              <Input
-                name="organizationName"
-                type="text"
-                value={formData.organizationName}
-                onChange={handleInputChange}
-                required
-              />{" "}
               <Label>Display Name</Label>
               <Input
                 name="displayName"
                 type="text"
                 value={formData.displayName}
                 onChange={handleInputChange}
+                placeholder="Your name"
                 required
               />
-              <Label>Phone Number</Label>
-              <Input
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleInputChange}
-                required
-              /> */}
               <Label>Email</Label>
               <Input
                 name="email"
