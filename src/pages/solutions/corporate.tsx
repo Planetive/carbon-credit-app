@@ -150,30 +150,60 @@ const CorporateSolutions = () => {
         <MainHeader />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-white">
+      <motion.section 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative overflow-hidden bg-white"
+      >
         <div className="container mx-auto px-6 py-20 md:py-32">
           <div className="max-w-5xl mx-auto text-center">
             {/* Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="flex flex-wrap items-center justify-center gap-3 mb-12"
+            >
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded bg-gray-900 text-white text-sm font-medium">
                 <span>Carbon Intelligence for Corporates</span>
               </div>
-            </div>
+            </motion.div>
 
             {/* Main Heading */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 leading-tight mb-6 tracking-tight">
+            <motion.h1 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 leading-tight mb-6 tracking-tight"
+            >
               Your end-to-end decarbonisation partner
               <br />
-              <span className="text-teal-600 inline-block">
+              <motion.span 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.4 }}
+                className="text-teal-600 inline-block"
+              >
                 from measurement to action
-              </span>
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed">
+              </motion.span>
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.5 }}
+              className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed"
+            >
               Measure emissions, assess ESG performance, and build credible decarbonisation and energy transition roadmaps — powered by data, standards, and AI.
-            </p>
+            </motion.p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.6 }}
+              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
               <Link
                 to="/register?user_type=corporate"
                 className="group inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-base hover:bg-gray-800 transition-all duration-300 hover:scale-105 hover:shadow-xl"
@@ -188,10 +218,10 @@ const CorporateSolutions = () => {
                 Request demo
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Two-Column Section */}
       <section className="relative pt-16 md:pt-24 pb-12 overflow-hidden bg-white">
@@ -244,7 +274,7 @@ const CorporateSolutions = () => {
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 1.1 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
                 className="relative z-10 grid md:grid-cols-2 gap-8"
               >
                 <div>
@@ -312,7 +342,7 @@ const CorporateSolutions = () => {
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 1.2 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
                 className="relative z-10"
               >
                 <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
@@ -368,7 +398,7 @@ const CorporateSolutions = () => {
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 1.3 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
                 className="relative z-10"
               >
                 <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
@@ -427,7 +457,7 @@ const CorporateSolutions = () => {
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 1.4 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
                 className="relative z-10 grid md:grid-cols-2 gap-8"
               >
                 <div>

@@ -189,10 +189,10 @@ const ESGFinancialInstitutions = () => {
                 ].map((item, index) => (
                   <motion.div
                     key={item.title}
-                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 20, scale: 0.98 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
+                    transition={{ duration: 0.3, delay: 0, ease: "easeOut" }}
                     whileHover={{ 
                       scale: 1.05, 
                       y: -8,
@@ -254,9 +254,9 @@ const ESGFinancialInstitutions = () => {
                 whileHover={{ 
                   scale: 1.03, 
                   y: -8,
-                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)"
+                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                  transition: { duration: 0.15 }
                 }}
-                transition={{ duration: 0.15 }}
               >
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-600/0 via-cyan-500/0 to-teal-600/0 group-hover:from-teal-600/20 group-hover:via-cyan-500/20 group-hover:to-teal-600/20 transition-all duration-150 opacity-0 group-hover:opacity-100" />
                 
@@ -264,7 +264,7 @@ const ESGFinancialInstitutions = () => {
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 1.1 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
@@ -306,9 +306,9 @@ const ESGFinancialInstitutions = () => {
                 whileHover={{ 
                   scale: 1.03, 
                   y: -8,
-                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)"
+                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                  transition: { duration: 0.15 }
                 }}
-                transition={{ duration: 0.15 }}
               >
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-600/0 via-cyan-500/0 to-teal-600/0 group-hover:from-teal-600/20 group-hover:via-cyan-500/20 group-hover:to-teal-600/20 transition-all duration-150 opacity-0 group-hover:opacity-100" />
                 
@@ -316,7 +316,7 @@ const ESGFinancialInstitutions = () => {
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 1.2 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
@@ -358,9 +358,9 @@ const ESGFinancialInstitutions = () => {
                 whileHover={{ 
                   scale: 1.03, 
                   y: -8,
-                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)"
+                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                  transition: { duration: 0.15 }
                 }}
-                transition={{ duration: 0.15 }}
               >
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-600/0 via-cyan-500/0 to-teal-600/0 group-hover:from-teal-600/20 group-hover:via-cyan-500/20 group-hover:to-teal-600/20 transition-all duration-150 opacity-0 group-hover:opacity-100" />
                 
@@ -368,7 +368,7 @@ const ESGFinancialInstitutions = () => {
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 1.3 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
@@ -410,9 +410,9 @@ const ESGFinancialInstitutions = () => {
                 whileHover={{ 
                   scale: 1.02, 
                   y: -8,
-                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)"
+                  boxShadow: "0 25px 50px -12px rgba(15, 118, 110, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                  transition: { duration: 0.15 }
                 }}
-                transition={{ duration: 0.15 }}
               >
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-teal-600/0 via-cyan-500/0 to-teal-600/0 group-hover:from-teal-600/20 group-hover:via-cyan-500/20 group-hover:to-teal-600/20 transition-all duration-150 opacity-0 group-hover:opacity-100" />
                 
@@ -420,7 +420,7 @@ const ESGFinancialInstitutions = () => {
                   initial={{ opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 1.4 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
                   className="relative z-10 grid md:grid-cols-2 gap-8"
                 >
                   <div>
@@ -489,14 +489,15 @@ const ESGFinancialInstitutions = () => {
                     whileHover={{ 
                       scale: 1.05, 
                       y: -5,
-                      boxShadow: "0 10px 25px -5px rgba(20, 184, 166, 0.3)"
+                      boxShadow: "0 10px 25px -5px rgba(20, 184, 166, 0.3)",
+                      transition: { duration: 0.15, ease: "easeOut" }
                     }}
-                    className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm text-center hover:border-teal-300 transition-all duration-200 cursor-pointer group"
+                    className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm text-center hover:border-teal-300 cursor-pointer group"
                   >
                     <motion.div
                       whileHover={{ scale: 1.1, rotate: 5 }}
-                      transition={{ duration: 0.2 }}
-                      className="w-12 h-12 rounded-full bg-teal-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-teal-700 transition-colors"
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="w-12 h-12 rounded-full bg-teal-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-teal-700"
                     >
                       {item.step}
                     </motion.div>

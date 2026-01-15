@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CompanyProtectedRoute } from "@/components/CompanyProtectedRoute";
@@ -71,6 +71,7 @@ import Settings from "./pages/Settings";
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
   useScrollToTop();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -298,7 +299,7 @@ const AppRoutes = () => {
         
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Footer />
+      {!user && <Footer />}
     </div>
   );
 };
