@@ -185,7 +185,7 @@ const AboutUs = () => {
     {
       name: "Farhan Hassan Rizvi",
       role: "FinTech Engineer",
-      bio: "Farhan is a FinTech developer and full-stack engineer focused on building the core product experience for ReThink Carbon. He is a Bachelor’s student in Financial Technology at FAST University Islamabad, combining a deep interest in climate-tech, software engineering, and financial systems to make complex carbon and ESG web experiences feel simple and user-friendly.",
+      bio: "Farhan is a Climate Tech expert focused on building the core product experience. With a degree in Financial Technology and combining a deep interest in climate-tech, software engineering, and financial systems, he translates complex carbon and ESG data into simple and user-friendly experiences.",
       image: "/team/farhan (2).jpeg",
     },
     {

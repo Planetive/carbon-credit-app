@@ -90,6 +90,7 @@ function normalizeCountryName(name: string) {
 const ExploreProjects = () => {
   const navigate = useNavigate();
   const [navigating, setNavigating] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   // Filter state
   const [regions, setRegions] = useState<string[]>([]);
   const [voluntaryStatuses, setVoluntaryStatuses] = useState<string[]>([]);
@@ -178,7 +179,7 @@ const ExploreProjects = () => {
     let to = BATCH_SIZE - 1;
     let keepFetching = true;
     while (keepFetching) {
-      const { data, error } = await supabase.from("global_projects" as any).select(`"${column}"`).range(from, to);
+      const { data, error } = await supabase.from("global_projects_2025" as any).select(`"${column}"`).range(from, to);
       if (error) throw error;
       allRows = allRows.concat(data || []);
       if (!data || data.length < BATCH_SIZE) {
@@ -252,7 +253,7 @@ const ExploreProjects = () => {
 
     while (keepFetching) {
       // Only select columns needed for charts, stats, and map
-      let query: any = supabase.from("global_projects" as any)
+      let query: any = supabase.from("global_projects_2025" as any)
         .select('"Country", "Region", "Voluntary Status"', { count: 'exact' })
         .range(from, to);
       
@@ -318,7 +319,7 @@ const ExploreProjects = () => {
     let consecutiveEmptyBatches = 0;
 
     while (keepFetching) {
-      let query: any = supabase.from("global_projects" as any).select('*', { count: 'exact' }).range(from, to);
+      let query: any = supabase.from("global_projects_2025" as any).select('*', { count: 'exact' }).range(from, to);
       
       // Apply filters (indexes will make these fast)
       if (filters.regions && filters.regions.length > 0) query = query.in("Region", filters.regions);
@@ -1139,22 +1140,34 @@ const ExploreProjects = () => {
               size="lg"
               className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg px-8"
               onClick={async () => {
-                // Fetch full data when user clicks (only when needed)
-                const fullData = await fetchAllProjectsWithFilters({
-                  regions: selectedRegions,
-                  voluntaryStatuses: selectedVoluntaryStatuses,
-                  voluntaryRegistries: selectedVoluntaryRegistries,
-                  countries: selectedCountries,
-                  areasOfInterest: selectedAreasOfInterest,
-                });
-                navigate('/project-cards', { state: { projects: fullData } });
+                setLoadingDetails(true);
+                try {
+                  // Fetch full data when user clicks (only when needed)
+                  const fullData = await fetchAllProjectsWithFilters({
+                    regions: selectedRegions,
+                    voluntaryStatuses: selectedVoluntaryStatuses,
+                    voluntaryRegistries: selectedVoluntaryRegistries,
+                    countries: selectedCountries,
+                    areasOfInterest: selectedAreasOfInterest,
+                  });
+                  navigate('/project-cards', { state: { projects: fullData } });
+                } catch (error) {
+                  console.error('Error fetching project details:', error);
+                  setLoadingDetails(false);
+                }
               }}
-              disabled={loading || projects.length === 0}
+              disabled={loading || projects.length === 0 || loadingDetails}
             >
               <Eye className="h-5 w-5 mr-2" />
-              View Project Details
+              {loadingDetails ? 'Loading...' : 'View Project Details'}
             </Button>
           </div>
+          {loadingDetails && (
+            <LoadingScreen 
+              message="Loading Project Details" 
+              subMessage="Fetching comprehensive project information..." 
+            />
+          )}
           <style>{`
             @media (max-width: 600px) {
               .responsive-map-container {

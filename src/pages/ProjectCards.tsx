@@ -33,9 +33,27 @@ const ProjectCards = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {project["Project Description"] && (
+                    <div className="mb-3 text-sm text-gray-600 line-clamp-3">
+                      {project["Project Description"]}
+                    </div>
+                  )}
                   <div className="mb-2"><b>Area of Interest:</b> {project["Area of Interest"]}</div>
                   <div className="mb-2"><b>Methodology:</b> {project["Methodology"]}</div>
                   <div className="mb-2"><b>Total Credits Issued:</b> {project["Total Credits Issued"]}</div>
+                  {project["Project Website"] && (
+                    <div className="mb-2">
+                      <b>Project Website:</b>{" "}
+                      <a 
+                        href={project["Project Website"]} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Visit Website
+                      </a>
+                    </div>
+                  )}
                   {project["Sustainability Certifications"] && (
                     <div className="mb-2"><b>Sustainability Certifications:</b> {project["Sustainability Certifications"]}</div>
                   )}
