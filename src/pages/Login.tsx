@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Leaf, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -22,8 +22,11 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  
+  const redirectTo = searchParams.get('redirect');
 
   // Show loading while auth state is being determined
   if (authLoading) {
@@ -62,9 +65,14 @@ const Login = () => {
           title: "Welcome back!",
           description: "You've been signed in successfully.",
         });
+        // Redirect to specified path or based on user role
+        if (redirectTo) {
+          navigate(redirectTo);
+        } else {
         // Redirect based on user role - but we need to wait for user to be set
         // The auth state change will handle the redirect via Index page
         navigate("/");
+        }
       }
     } catch (error: any) {
       toast({

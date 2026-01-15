@@ -149,6 +149,12 @@ const AboutUs = () => {
       description:
         "Our MVP is live, serving early customers and continuously improving based on real-world feedback and results.",
     },
+    {
+      year: "2026",
+      title: "Scaling Beyond MVP",
+      description:
+        "Moving from MVP to full production, expanding features, and scaling our customer base as ReThink Carbon becomes a core part of how organizations manage carbon and ESG.",
+    },
   ];
 
   const team = [
@@ -166,15 +172,27 @@ const AboutUs = () => {
     },
     {
       name: "Kamal Rahim",
-      role: "Head of Strategy & Growth",
+      role: " Co-Founder and Head of Strategy ",
       bio: "Accomplished business development professional with engineering background and over a decade in energy sector and industrial digitization. Successfully established 1320 MW power plant, bulk handling sea terminal, and implemented digital twin solutions. Expert in industrial SaaS development and mergers & acquisitions.",
-      image: "/team/kamal.webp",
+      image: "/team/Kamal PP.jpg",
     },
     {
       name: "Umair Hussian Farooqi",
       role: "Manager of Finance and buisness analysis",
       bio: "Finance graduate with seven years of extensive experience in banking, audit, and accounts. Expert in financial analysis, planning, and strategic recommendations. Skilled in managing comprehensive audits, optimizing financial operations, and ensuring regulatory compliance. Known for analytical prowess and attention to detail.",
       image: "/team/umair.webp",
+    },
+    {
+      name: "Farhan Hassan Rizvi",
+      role: "FinTech Engineer",
+      bio: "Farhan is a FinTech developer and full-stack engineer focused on building the core product experience for ReThink Carbon. He is a Bachelor’s student in Financial Technology at FAST University Islamabad, combining a deep interest in climate-tech, software engineering, and financial systems to make complex carbon and ESG web experiences feel simple and user-friendly.",
+      image: "/team/farhan (2).jpeg",
+    },
+    {
+      name: "Rija Zahid",
+      role: "Business Analyst",
+      bio: "As a Business Analyst at ReThink Carbon, she supports strategic initiatives through data-driven insights and thoughtful analysis. With a background that blends analytical thinking and creative problem-solving, she works closely with teams to translate complex information into clear, actionable outcomes.",
+      image: "/team/Rija.jpeg",
     },
   ];
 
@@ -440,7 +458,7 @@ const AboutUs = () => {
       </section>
 
       {/* Milestones */}
-      <section className="py-8 sm:py-10 md:py-12 bg-gray-50">
+      <section className="py-8 sm:py-10 md:py-12 bg-gray-100">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 sm:mb-16">
             <Badge className="mb-4 bg-teal-100 text-teal-800">
@@ -454,7 +472,7 @@ const AboutUs = () => {
               our growth.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto">
             {milestones.map((milestone, index) => (
               <Card
                 key={index}
@@ -541,9 +559,9 @@ const AboutUs = () => {
               </Card>
             </div>
 
-            {/* Other team members in a row */}
+            {/* Other team members */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {team.slice(1).map((member, index) => (
+              {team.slice(1, 4).map((member, index) => (
                 <Card
                   key={index + 1}
                   className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105"
@@ -553,7 +571,71 @@ const AboutUs = () => {
                       <img
                         src={member.image}
                         alt={member.name}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover ${
+                          member.name === "Kamal Rahim"
+                            ? "object-[center_60%]"
+                            : member.name === "Farhan Hassan Rizvi"
+                            ? "object-[center_65%]"
+                            : ""
+                        }`}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextElementSibling?.classList.remove(
+                            "hidden"
+                          );
+                        }}
+                      />
+                      <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
+                        <Users className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                      </div>
+                    </div>
+                    <CardTitle className="text-lg sm:text-xl text-white">
+                      {member.name}
+                    </CardTitle>
+                    <p className="text-white/90 font-semibold text-sm sm:text-base">
+                      {member.role}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-white/90 text-sm">
+                      <p
+                        className={`${
+                          expandedBios[member.name] ? "" : "line-clamp-2"
+                        }`}
+                      >
+                        {member.bio}
+                      </p>
+                      <button
+                        onClick={() => toggleBio(member.name)}
+                        className="text-white hover:text-white/80 text-sm font-medium mt-2 transition-colors"
+                      >
+                        {expandedBios[member.name] ? "Read Less" : "Read More"}
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Last two members centered with same card width */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 justify-items-center">
+              {team.slice(4).map((member, index) => (
+                <Card
+                  key={`last-${index}`}
+                  className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105"
+                >
+                  <CardHeader>
+                    <div className="mx-auto mb-4 w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
+                      <img
+                        src={member.image}
+                        alt={member.name}
+                        className={`w-full h-full object-cover ${
+                          member.name === "Kamal Rahim"
+                            ? "object-[center_60%]"
+                            : member.name === "Farhan Hassan Rizvi"
+                            ? "object-[center_65%]"
+                            : ""
+                        }`}
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                           e.currentTarget.nextElementSibling?.classList.remove(

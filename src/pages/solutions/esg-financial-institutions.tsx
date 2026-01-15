@@ -30,30 +30,19 @@ const ESGFinancialInstitutions = () => {
               Build consistent, explainable ESG risk workflows
             </h1>
             <p className="mt-6 text-gray-600 text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed">
-              Decision-grade issuer scores, portfolio analytics, and reporting components, delivered via API, feeds, and web.
+              Comprehensive finance & facilitated emissions calculations, portfolio management, and ESG assessments—all in one web-based platform.
             </p>
 
             {/* Enhanced CTA */}
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link
-                to="/contact"
+                to="/register?user_type=financial_institution"
                 className="group px-8 py-4 rounded-2xl bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 transition-all duration-300 text-white font-bold text-lg shadow-2xl shadow-teal-200/50 hover:shadow-teal-300/50 transform hover:-translate-y-1"
               >
                 <span className="flex items-center gap-2">
-                  Request demo
+                  Sign up as Financial Institution
                   <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </span>
-              </Link>
-              <Link
-                to="/demo"
-                className="group px-8 py-4 rounded-2xl bg-white/90 backdrop-blur-sm hover:bg-white text-gray-700 font-bold text-lg transition-all duration-300 shadow-xl ring-1 ring-gray-200 hover:ring-teal-300 transform hover:-translate-y-1"
-              >
-                <span className="flex items-center gap-2">
-                  Get product brief
-                  <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </span>
               </Link>
@@ -62,10 +51,10 @@ const ESGFinancialInstitutions = () => {
             {/* Enhanced Stats container */}
             <div className="mt-16 bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl ring-1 ring-white/20 p-8 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto border border-white/20">
               {[
-                { k: "16k+", v: "companies", icon: "🏢" },
-                { k: "200+", v: "indicators", icon: "📊" },
-                { k: "5", v: "risk bands", icon: "🎯" },
-                { k: "API", v: "& feeds", icon: "🔌" },
+                { k: "100%", v: "web-based", icon: "🌐" },
+                { k: "Real-time", v: "calculations", icon: "⚡" },
+                { k: "Portfolio", v: "tracking", icon: "📊" },
+                { k: "ESG", v: "assessments", icon: "🌱" },
               ].map((b) => (
                 <div key={b.v} className="text-center group">
                   <div className="text-4xl mb-2 group-hover:scale-110 transition-transform duration-300">{b.icon}</div>
@@ -89,27 +78,27 @@ const ESGFinancialInstitutions = () => {
             Why institutions choose us
           </h2>
           <p className="text-gray-600 text-xl leading-relaxed max-w-3xl mx-auto">
-            Consistency, coverage, and clarity—so investment, risk, and reporting teams operate from a single source of truth.
+            A unified web platform for finance emissions, portfolio management, and ESG assessments—helping your team track and report on climate impact with confidence.
           </p>
         </div>
         <div className="mt-16 grid md:grid-cols-3 gap-8">
           {[
             {
-              t: "Issuer‑level scores",
-              d: "Absolute, comparable ESG risk with peer benchmarking and banding.",
-              icon: "📈",
+              t: "Finance & Facilitated Emissions",
+              d: "Calculate emissions from loans, investments, and financial activities using standardized methodologies.",
+              icon: "💰",
               color: "from-blue-500 to-cyan-500"
             },
             {
-              t: "Drill‑down insights",
-              d: "Material issues, governance factors, and controversy adjustments.",
-              icon: "🔍",
+              t: "Portfolio Management",
+              d: "Track counterparties, exposures, and climate risk across your entire portfolio in one place.",
+              icon: "📊",
               color: "from-emerald-500 to-teal-500"
             },
             {
-              t: "Delivery your way",
-              d: "Web access for analysts, APIs and feeds for automated reporting.",
-              icon: "🚀",
+              t: "ESG Assessments",
+              d: "Evaluate environmental, social, and governance factors with comprehensive assessment tools.",
+              icon: "🌱",
               color: "from-purple-500 to-pink-500"
             },
           ].map((card, index) => (
@@ -145,29 +134,29 @@ const ESGFinancialInstitutions = () => {
               Our Framework
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              A transparent risk framework
+              Complete climate finance toolkit
             </h2>
             <p className="text-gray-300 text-xl max-w-4xl mx-auto leading-relaxed">
-              Decompose risk into exposure, management, and the residual gap—so decisions are explainable and auditable.
+              From emissions calculations to portfolio tracking and ESG assessments—everything you need to manage climate risk and reporting.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: "Total & Manageable Exposure",
-                body: "Start with industry‑specific exposure to material issues. Separate what can be managed via programs and policies from what is structurally unmanageable.",
+                title: "Calculate Finance Emissions",
+                body: "Input your portfolio data and calculate finance & facilitated emissions using standardized methodologies aligned with GHG Protocol and PCAF guidelines.",
                 step: "01",
                 color: "from-blue-500/20 to-cyan-500/20"
               },
               {
-                title: "Managed Risk & Management Gap",
-                body: "Quantify the portion controlled by the company and highlight the residual management gap—adjusted with controversies to reflect real‑world performance.",
+                title: "Track Portfolio & Counterparties",
+                body: "Manage your portfolio entries, track exposures by sector and geography, and monitor counterparty-level climate data all in one dashboard.",
                 step: "02",
                 color: "from-emerald-500/20 to-teal-500/20"
               },
               {
-                title: "Unmanaged Risk (Final Score)",
-                body: "Aggregate residual risk to an absolute, comparable score that is easy to benchmark across peers, sectors, and portfolios.",
+                title: "Generate Reports & Insights",
+                body: "Export data, view analytics, and generate reports for internal use and regulatory compliance with clear, auditable calculations.",
                 step: "03",
                 color: "from-purple-500/20 to-pink-500/20"
               },
@@ -201,21 +190,21 @@ const ESGFinancialInstitutions = () => {
         <div className="grid md:grid-cols-3 gap-8">
           {[
             {
-              title: "Two‑dimensional materiality",
-              body: "Measure both exposure and management across 20+ industry issues with 200+ indicators and thousands of data points.",
-              icon: "🎯",
+              title: "Finance Emissions Calculator",
+              body: "Calculate emissions from loans, bonds, equity investments, and other financial instruments using industry-standard methodologies.",
+              icon: "🧮",
               color: "from-orange-500 to-red-500"
             },
             {
-              title: "Extensive coverage",
-              body: "Broad universe across public equity, fixed income, and private markets—ready for portfolio construction and reporting.",
-              icon: "🌍",
+              title: "Portfolio Dashboard",
+              body: "View all your counterparties, exposures, and emissions data in one centralized dashboard with filtering and search capabilities.",
+              icon: "📈",
               color: "from-blue-500 to-indigo-500"
             },
             {
-              title: "Five risk levels",
-              body: "Negligible to severe bands for quick communication, peer comparison, and policy thresholds.",
-              icon: "📊",
+              title: "ESG Health Check",
+              body: "Assess the ESG performance of your portfolio companies with comprehensive evaluation tools and scoring.",
+              icon: "✅",
               color: "from-green-500 to-emerald-500"
             },
           ].map((f) => (
@@ -240,21 +229,21 @@ const ESGFinancialInstitutions = () => {
       <section className="container mx-auto px-6 pb-16">
         <div className="rounded-3xl bg-gradient-to-br from-teal-50 to-blue-50 shadow-2xl ring-1 ring-teal-200/50 p-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-center border border-teal-100">
           {[{
-            k: "16k+",
-            v: "Companies covered",
-            icon: "🏢"
+            k: "100%",
+            v: "Web-based platform",
+            icon: "🌐"
           }, {
-            k: "200+",
-            v: "Indicators per issuer",
+            k: "Real-time",
+            v: "Calculations",
+            icon: "⚡"
+          }, {
+            k: "Portfolio",
+            v: "Management",
             icon: "📊"
           }, {
-            k: "5",
-            v: "Risk severity bands",
-            icon: "🎯"
-          }, {
-            k: "APIs",
-            v: "Feeds & web access",
-            icon: "🔌"
+            k: "ESG",
+            v: "Assessments",
+            icon: "🌱"
           }].map((m) => (
             <div key={m.v} className="group">
               <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">{m.icon}</div>
@@ -280,33 +269,33 @@ const ESGFinancialInstitutions = () => {
           <div className="grid md:grid-cols-2 gap-8">
             {[
               {
-                t: "Data Collection & Automation",
+                t: "Portfolio Data Management",
                 points: [
-                  "Standardize questionnaires across portfolios",
-                  "Automate reminders and reduce follow‑ups",
-                  "Centralize evidence and audit trails",
+                  "Add and manage counterparties with detailed information",
+                  "Track exposures by sector, geography, and risk metrics",
+                  "Import and export data via CSV for bulk operations",
                 ],
-                icon: "🤖",
+                icon: "💼",
                 color: "from-blue-500 to-cyan-500"
               },
               {
-                t: "Trends Analysis & Benchmarking",
+                t: "Emissions Tracking & Reporting",
                 points: [
-                  "Track progress against ESG targets over time",
-                  "Compare against internal cohorts and public peers",
-                  "Surface risks and opportunities at a glance",
+                  "Calculate finance and facilitated emissions for your portfolio",
+                  "View aggregated emissions by sector and geography",
+                  "Export data for regulatory reporting and internal analysis",
                 ],
                 icon: "📈",
                 color: "from-emerald-500 to-teal-500"
               },
               {
-                t: "Materiality Mapping",
+                t: "Counterparty Management",
                 points: [
-                  "Focus on financially material ESG topics",
-                  "Align metrics to sector‑specific material issues",
-                  "Enable portfolio‑level prioritization",
+                  "Store detailed information for each counterparty",
+                  "Track probability of default, loss given default, and tenor",
+                  "Organize by sector and geography for easy analysis",
                 ],
-                icon: "🗺️",
+                icon: "👥",
                 color: "from-orange-500 to-red-500"
               },
               {
@@ -356,16 +345,16 @@ const ESGFinancialInstitutions = () => {
         <div className="space-y-6 max-w-4xl mx-auto">
           {[
             {
-              q: "Can I integrate scores into my risk systems?",
-              a: "Yes. We provide REST APIs and scheduled data feeds (CSV/Parquet) along with identifiers for easy joins.",
+              q: "How do I calculate finance emissions?",
+              a: "Use our web-based calculator to input your portfolio data. The platform uses standardized methodologies (GHG Protocol, PCAF) to calculate finance and facilitated emissions automatically.",
             },
             {
-              q: "Do you support portfolio‑level reporting?",
-              a: "Portfolio aggregation, band distribution, peer benchmarking, and time‑series are available out‑of‑the‑box.",
+              q: "Can I export my portfolio data?",
+              a: "Yes. You can export your portfolio entries, emissions calculations, and reports in CSV format for use in other systems or for regulatory reporting.",
             },
             {
-              q: "How transparent is the methodology?",
-              a: "Each issuer includes exposure, management, controversy adjustments, and a decomposition of managed vs unmanaged risk.",
+              q: "What types of financial instruments are supported?",
+              a: "The platform supports calculations for loans, bonds, equity investments, and other financial instruments. You can track counterparties across different sectors and geographies.",
             },
           ].map((item, index) => (
             <details

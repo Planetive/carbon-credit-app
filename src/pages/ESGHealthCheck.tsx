@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Leaf, Users, Shield, CheckCircle, Clock, TrendingUp, ChevronDown, ChevronUp, Save, FileText } from "lucide-react";
+import { ArrowLeft, Leaf, Users, Shield, CheckCircle, Clock, TrendingUp, ChevronDown, ChevronUp, Save, FileText, Info, CheckCircle2, Circle, Sparkles, Target, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1090,45 +1090,73 @@ const ESGHealthCheck = () => {
 
   const renderField = (field: any, sectionId: string) => {
     const value = esgData[activeTab][field.key as keyof typeof esgData[typeof activeTab]];
+    const isFilled = value !== '';
     
     return (
-      <div key={field.key} className="space-y-2">
-        <div className="flex items-start space-x-3">
-          <div className={`w-4 h-4 rounded mt-1 flex-shrink-0 ${
-            field.type === 'yesno' ? 'bg-gray-400' : 
-            field.type === 'number' ? 'bg-yellow-400' : 'bg-blue-400'
-          }`}></div>
-          <div className="flex-1">
-            <Label htmlFor={field.key} className="text-sm font-semibold text-gray-700">
-              {field.label}
-              {field.unit && (
-                <span className="text-xs text-gray-500 ml-1">(Unit: {field.unit})</span>
+      <div key={field.key} className="group animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className={`p-5 rounded-xl border-2 transition-all duration-300 ${
+          isFilled 
+            ? 'border-teal-300 bg-gradient-to-br from-teal-50/50 to-cyan-50/30 shadow-sm scale-[1.01]' 
+            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:scale-[1.005]'
+        }`}>
+          <div className="flex items-start gap-4">
+            <div className={`mt-0.5 flex-shrink-0 transition-colors ${
+              isFilled 
+                ? 'text-teal-600' 
+                : 'text-slate-300 group-hover:text-slate-400'
+            }`}>
+              {isFilled ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <Circle className="h-5 w-5" />
               )}
-            </Label>
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <Label 
+                  htmlFor={field.key} 
+                  className="text-sm font-semibold text-slate-900 block mb-2 leading-snug"
+                >
+              {field.label}
+                </Label>
+              {field.unit && (
+                  <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-xs text-slate-600 font-medium">
+                    {field.unit}
+                  </span>
+              )}
+              </div>
             
             {field.type === 'yesno' && (
-              <div className="flex space-x-4 mt-2">
-                <label className="flex items-center space-x-2">
+                <div className="flex items-center gap-3 mt-3">
+                  <label className={`inline-flex items-center gap-2 cursor-pointer rounded-lg border-2 px-4 py-2 transition-all duration-300 ${
+                    value === 'yes'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm scale-105'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:scale-[1.02] text-slate-700'
+                  }`}>
                   <input
                     type="radio"
                     name={field.key}
                     value="yes"
                     checked={value === 'yes'}
                     onChange={(e) => handleInputChange(activeTab, field.key, e.target.value)}
-                    className="text-teal-600 focus:ring-teal-500"
+                      className="text-teal-600 focus:ring-teal-500 h-4 w-4 transition-all duration-300"
                   />
-                  <span className="text-sm text-gray-700">Yes</span>
+                    <span className="text-sm font-medium">Yes</span>
                 </label>
-                <label className="flex items-center space-x-2">
+                  <label className={`inline-flex items-center gap-2 cursor-pointer rounded-lg border-2 px-4 py-2 transition-all duration-300 ${
+                    value === 'no'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm scale-105'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:scale-[1.02] text-slate-700'
+                  }`}>
                   <input
                     type="radio"
                     name={field.key}
                     value="no"
                     checked={value === 'no'}
                     onChange={(e) => handleInputChange(activeTab, field.key, e.target.value)}
-                    className="text-teal-600 focus:ring-teal-500"
+                      className="text-teal-600 focus:ring-teal-500 h-4 w-4 transition-all duration-300"
                   />
-                  <span className="text-sm text-gray-700">No</span>
+                    <span className="text-sm font-medium">No</span>
                 </label>
               </div>
             )}
@@ -1138,212 +1166,310 @@ const ESGHealthCheck = () => {
                 id={field.key}
                 type="number"
                 step="any"
-                placeholder={`Enter value in ${field.unit}`}
+                  placeholder={`Enter value${field.unit ? ` in ${field.unit}` : ''}`}
                 value={value}
                 onChange={(e) => handleInputChange(activeTab, field.key, e.target.value)}
-                className="max-w-xs"
+                  className={`h-10 text-sm border-2 transition-colors ${
+                    isFilled 
+                      ? 'border-teal-300 focus:border-teal-500' 
+                      : 'border-slate-300 focus:border-teal-500'
+                  }`}
               />
             )}
             
             {field.type === 'text' && (
               <Textarea
                 id={field.key}
-                placeholder="Enter your response"
+                  placeholder="Enter your detailed response..."
                 value={value}
                 onChange={(e) => handleInputChange(activeTab, field.key, e.target.value)}
-                className="min-h-[80px] resize-none"
+                  className={`min-h-[90px] resize-none text-sm border-2 transition-colors ${
+                    isFilled 
+                      ? 'border-teal-300 focus:border-teal-500' 
+                      : 'border-slate-300 focus:border-teal-500'
+                  }`}
               />
             )}
+            </div>
           </div>
         </div>
       </div>
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/dashboard')}
-            className="mb-4 text-teal-600 hover:text-teal-700"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
+  const totalScore = Math.round((scores.environmental + scores.social + scores.governance) / 3);
+  
+  // Auto-expand first incomplete section when tab changes (only if no sections are expanded for this tab)
+  useEffect(() => {
+    const sections = getSectionsForTab(activeTab);
+    if (sections.length > 0) {
+      // Check if any section for current tab is expanded
+      const hasExpandedSection = sections.some(section => expandedSections.has(section.id));
+      
+      if (!hasExpandedSection) {
+        // Find first incomplete section, or first section if all complete
+        const firstIncomplete = sections.find(section => {
+          const sectionFields = esgData[activeTab];
+          const filledCount = section.fields.filter(
+            field => sectionFields[field.key as keyof typeof sectionFields] !== ''
+          ).length;
+          return filledCount < section.fields.length;
+        });
+        
+        const sectionToExpand = firstIncomplete || sections[0];
+        if (sectionToExpand) {
+          setExpandedSections(prev => new Set([...prev, sectionToExpand.id]));
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Update scores when data changes
+  useEffect(() => {
+    setScores({
+      environmental: calculateScore('environmental'),
+      social: calculateScore('social'),
+      governance: calculateScore('governance')
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esgData]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+        {/* Decorative background elements */}
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-teal-200/20 to-blue-300/20 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-indigo-200/20 to-purple-300/20 rounded-full blur-3xl"></div>
+          </div>
+        
+        <div className="text-center space-y-4 animate-in fade-in duration-500">
+          {/* Simple Loading Spinner */}
+          <div className="mx-auto w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
           
-          <div className="text-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              ESG Health Check Assessment
-            </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Evaluate your organization's Environmental, Social, and Governance performance 
-              with our comprehensive assessment tool.
-            </p>
+          {/* Loading Text */}
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-slate-800">
+              Loading Assessment
+            </h3>
+            <p className="text-slate-600 text-sm">Preparing your dashboard...</p>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Tips Section */}
-        <Card className="mt-8 bg-gradient-to-r mb-8 from-teal-500 to-cyan-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-start space-x-4">
-              <div className="h-12 w-12 bg-white/20 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-white" />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Top Navigation Bar */}
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-end h-16">
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-6 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-teal-500"></div>
+                  <span>E: {scores.environmental}%</span>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">ESG Assessment Tips</h3>
-                <ul className="space-y-1 text-sm text-teal-100">
-                  <li>• Click on each section to expand and fill out the questions</li>
-                  <li>• Be honest and accurate in your responses for better insights</li>
-                  <li>• Provide specific examples and measurable data where possible</li>
-                  <li>• Save your progress regularly to avoid losing data</li>
-                  <li>• If you are not sure about the answer, you can leave it blank or save as Draft to edit it later.</li>
-                </ul>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-cyan-500"></div>
+                  <span>S: {scores.social}%</span>
               </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                  <span>G: {scores.governance}%</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Progress Overview */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          {tabs.map((tab) => {
-            const score = calculateScore(tab.id as keyof ESGData);
-            const badge = getScoreBadge(score);
-            const Icon = tab.icon;
-            
-            return (
-              <Card 
-                key={tab.id} 
-                className="bg-white/80 backdrop-blur-sm border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-200 hover:scale-105"
-                onClick={() => setActiveTab(tab.id as keyof ESGData)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-teal-600" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{tab.label}</h3>
-                        <p className="text-sm text-gray-500">{tab.description}</p>
+              <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-teal-500/30">
+                {totalScore}%
                       </div>
                     </div>
-                    <Badge className={badge.color}>{badge.text}</Badge>
+          </div>
+        </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Completion</span>
-                      <span className={`font-semibold ${getScoreColor(score)}`}>{score}%</span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Hero Header */}
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-3">
+                <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+                  Health Check Assessment
+                </h1>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100 animate-in fade-in slide-in-from-right-4 duration-700 delay-150">
+                  <Sparkles className="h-3.5 w-3.5 text-teal-600 animate-pulse" />
+                  <span className="text-xs font-medium text-teal-700">ESG Assessment</span>
                     </div>
-                    <Progress value={score} className="h-2" />
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+              <p className="text-lg text-slate-600 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
+                Comprehensive evaluation of your organization's Environmental, Social, and Governance performance
+              </p>
+            </div>
         </div>
 
-        {/* Tabs */}
-        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
-          <CardHeader className="border-b border-gray-200">
-            <div className="flex flex-wrap gap-2">
-              {tabs.map((tab) => {
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {tabs.map((tab, index) => {
+              const score = calculateScore(tab.id as keyof ESGData);
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
-                const score = calculateScore(tab.id as keyof ESGData);
                 
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as keyof ESGData)}
-                    className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`group relative p-5 rounded-xl border-2 transition-all duration-300 text-left animate-in fade-in slide-in-from-bottom-4 ${
                       isActive
-                        ? 'bg-teal-600 text-white shadow-lg'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'border-teal-500 bg-gradient-to-br from-teal-50 to-cyan-50 shadow-md shadow-teal-500/10 scale-105'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:scale-[1.02]'
                     }`}
+                  style={{ animationDelay: `${index * 100}ms` }}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
-                    {score > 0 && (
-                      <Badge 
-                        variant="secondary" 
-                        className={`ml-2 ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-700'
-                        }`}
-                      >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center transition-all duration-300 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-lg rotate-3' 
+                        : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200 group-hover:rotate-3'
+                    }`}>
+                      <Icon className="h-5 w-5 transition-transform duration-300" />
+                    </div>
+                    <div className={`text-2xl font-bold transition-all duration-300 ${
+                      isActive ? 'text-teal-600 scale-110' : 'text-slate-400'
+                    }`}>
                         {score}%
-                      </Badge>
-                    )}
+                    </div>
+                  </div>
+                  <h3 className={`font-semibold mb-1 transition-colors duration-300 ${
+                    isActive ? 'text-slate-900' : 'text-slate-700'
+                  }`}>
+                    {tab.label}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">{tab.description}</p>
+                  <Progress 
+                    value={score} 
+                    className={`h-1.5 transition-all duration-300 ${
+                      isActive ? '' : 'opacity-60'
+                    }`} 
+                  />
                   </button>
                 );
               })}
             </div>
-          </CardHeader>
+        </div>
 
-          <CardContent className="p-8">
-            <div className="space-y-6">
-              {getSectionsForTab(activeTab).map((section) => {
+        {/* Main Content */}
+        <div>
+          {/* Main Content Area */}
+          <div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Section Header */}
+              <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                    <h2 className="text-xl font-bold text-slate-900 mb-1">
+                      {tabs.find(t => t.id === activeTab)?.label} Assessment
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      {tabs.find(t => t.id === activeTab)?.description}
+                    </p>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium animate-in fade-in slide-in-from-right-4 duration-500 delay-150">
+                    {getSectionsForTab(activeTab).length} Sections
+                  </div>
+                </div>
+              </div>
+
+              {/* Sections */}
+              <div className="p-6 space-y-4">
+                {getSectionsForTab(activeTab).map((section, index) => {
                 const isExpanded = expandedSections.has(section.id);
                 const sectionFields = esgData[activeTab];
-                const sectionScore = Math.round(
-                  (section.fields.filter(field => sectionFields[field.key as keyof typeof sectionFields] !== '').length / section.fields.length) * 100
-                );
+                  const filledCount = section.fields.filter(
+                    field => sectionFields[field.key as keyof typeof sectionFields] !== ''
+                  ).length;
+                  const sectionScore = Math.round((filledCount / section.fields.length) * 100);
+                  const isComplete = sectionScore === 100;
                 
                 return (
-                  <div key={section.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      key={section.id} 
+                      className={`rounded-xl border-2 overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 ${
+                        isExpanded 
+                          ? 'border-teal-400 shadow-lg shadow-teal-500/5 scale-[1.01]' 
+                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:scale-[1.005]'
+                      } ${isComplete ? 'bg-gradient-to-br from-teal-50/50 to-cyan-50/30' : 'bg-white'}`}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
                     <button
                       onClick={() => toggleSection(section.id)}
-                      className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                        className="w-full px-5 py-4 bg-white hover:bg-slate-50 transition-all duration-300 flex items-center justify-between group"
                     >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-3">
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5 text-gray-600" />
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                            isComplete
+                              ? 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-md scale-110'
+                              : isExpanded
+                                ? 'bg-teal-100 text-teal-700 scale-105'
+                                : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200 group-hover:scale-105'
+                          }`}>
+                            {isComplete ? (
+                              <CheckCircle2 className="h-5 w-5 animate-in zoom-in duration-300" />
                           ) : (
-                            <ChevronDown className="h-5 w-5 text-gray-600" />
+                              <span className="transition-transform duration-300">{index + 1}</span>
                           )}
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900 text-left">
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h3 className={`font-semibold mb-1 transition-colors duration-300 ${
+                              isComplete ? 'text-teal-700' : 'text-slate-900'
+                            }`}>
                               {section.title}
                             </h3>
-                            <p className="text-sm text-gray-600 text-left">
-                              {section.description}
-                            </p>
+                            <p className="text-sm text-slate-600">{section.description}</p>
                           </div>
                         </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right hidden sm:block animate-in fade-in slide-in-from-right-2 duration-300">
+                            <div className="text-sm font-semibold text-slate-700">
+                              {filledCount}/{section.fields.length}
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-gray-900">
-                            {section.fields.filter(field => sectionFields[field.key as keyof typeof sectionFields] !== '').length} / {section.fields.length}
+                            <div className="text-xs text-slate-500">Questions</div>
                           </div>
-                          <div className="text-xs text-gray-500">Questions</div>
-                        </div>
-                        
+                          <ChevronDown className={`h-5 w-5 text-slate-400 transition-all duration-300 ${
+                            isExpanded ? 'rotate-180 scale-110' : 'group-hover:scale-110'
+                          }`} />
                       </div>
                     </button>
                     
                     {isExpanded && (
-                      <div className="px-6 py-4 bg-white border-t border-gray-200">
-                        <div className="space-y-6">
+                        <div className="px-5 py-5 bg-slate-50/30 border-t-2 border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                          {sectionScore > 0 && (
+                            <div className="mb-5 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg border border-teal-200 animate-in fade-in slide-in-from-left-4 duration-500">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-teal-900">
+                                  Section Progress
+                                </span>
+                                <span className="text-sm font-bold text-teal-700 animate-in zoom-in duration-300">
+                                  {sectionScore}%
+                                </span>
+                              </div>
+                              <Progress value={sectionScore} className="h-2 transition-all duration-500" />
+                            </div>
+                          )}
+                          <div className="space-y-4">
                           {(() => {
                             let gatingYesNoKey: string | null = null;
                             const sectionFieldsState = esgData[activeTab];
                             const visibleFields = section.fields.filter((field: any) => {
                               if (field.type === 'yesno') {
-                                // Always show yes/no questions and reset the gate to this key
                                 gatingYesNoKey = field.key;
                                 return true;
                               }
-                              // For non-yesno fields, if there's an active gate, only show when gate is answered 'yes'
                               if (gatingYesNoKey) {
                                 const gateValue = sectionFieldsState[gatingYesNoKey as keyof typeof sectionFieldsState];
                                 return gateValue === 'yes';
                               }
-                              // No gating applied, show the field
                               return true;
                             });
                             return visibleFields.map((field: any) => renderField(field, section.id));
@@ -1357,27 +1483,33 @@ const ESGHealthCheck = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-6 border-t border-gray-200">
+              <div className="px-6 py-5 bg-slate-50/50 border-t border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 onClick={handleSaveDraft}
                 disabled={saving}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3"
+                    variant="outline"
+                    className="flex-1 h-11 text-sm font-medium border-2 border-slate-300 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-700 transition-all duration-300 hover:scale-[1.02]"
               >
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? "Saving..." : "Save Draft"}
+                    <Save className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:rotate-12" />
+                    {saving ? "Saving..." : "Save as Draft"}
               </Button>
               <Button
                 onClick={handleSubmitFinal}
                 disabled={saving}
-                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white py-3"
+                    className="flex-1 h-11 text-sm font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40 transition-all duration-300 hover:scale-[1.02]"
               >
-                <FileText className="h-4 w-4 mr-2" />
-                {saving ? "Submitting..." : "Submit Final Assessment"}
+                    <FileText className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:rotate-12" />
+                    {saving ? "Submitting..." : "Submit Assessment"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
+                <p className="text-xs text-slate-500 text-center mt-3 animate-in fade-in duration-500 delay-200">
+                  Your progress is automatically saved
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -3,8 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CompanyProtectedRoute } from "@/components/CompanyProtectedRoute";
+import { PermissionProtectedRoute } from "@/components/PermissionProtectedRoute";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import Footer from "@/components/ui/Footer";
@@ -53,14 +55,17 @@ import EmissionCalculator from "./pages/EmissionCalculator";
 import EmissionResults from "./pages/EmissionResults";
 import EmissionHistory from "./pages/EmissionHistory";
 import ESGFinancialInstitutions from "./pages/solutions/esg-financial-institutions";  
-import CCUSPage from "./pages/solutions/ccus.tsx";
-import DecarbonizationPage from "./pages/solutions/decarbonization.tsx";
-import ESGRiskAssessment from "./pages/solutions/esg-risk-assessment.tsx";
+import CorporateSolutions from "./pages/solutions/corporate";
 import Dashboard2 from "./pages/Dashboard2";
 // Removed ESGWizard import - now handled through IntegratedFinanceEmission
 import IntegratedFinanceEmission from "./pages/IntegratedFinanceEmission";
 import LoginChoice from "./pages/LoginChoice";
 import RegisterChoice from "./pages/RegisterChoice";
+import OrganizationManagement from "./pages/OrganizationManagement";
+import OrganizationSettings from "./pages/OrganizationSettings";
+import UserManagement from "./pages/UserManagement";
+import AcceptInvitation from "./pages/AcceptInvitation";
+import Settings from "./pages/Settings";
 
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
@@ -74,11 +79,11 @@ const AppRoutes = () => {
         <Route path="/register-choice" element={<RegisterChoice />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/about" element={<AboutUs />} />
-        <Route path="/solutions/esg-financial-institutions" element={<ESGFinancialInstitutions />} />
-          <Route path="/solutions/ccus" element={<CCUSPage />} />
-          <Route path="/solutions/decarbonization" element={<DecarbonizationPage />} />
-          <Route path="/solutions/esg-risk-assessment" element={<ESGRiskAssessment />} />
+        <Route path="/solutions/corporate" element={<CorporateSolutions />} />
+        <Route path="/solutions/financial-institutions" element={<ESGFinancialInstitutions />} />
+        <Route path="/solutions/esg-financial-institutions" element={<Navigate to="/solutions/financial-institutions" replace />} />
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -232,6 +237,27 @@ const AppRoutes = () => {
               <ESGResults />
             </CompanyProtectedRoute>
           } />
+          {/* Redirect old routes to Settings page */}
+          <Route path="/organization-management" element={
+            <CompanyProtectedRoute>
+              <Navigate to="/settings" replace />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/organization-settings" element={
+            <CompanyProtectedRoute>
+              <Navigate to="/settings" replace />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/user-management" element={
+            <CompanyProtectedRoute>
+              <Navigate to="/settings" replace />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <CompanyProtectedRoute>
+              <Settings />
+            </CompanyProtectedRoute>
+          } />
         </Route>
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="/filtered-projects-landing" element={
@@ -273,13 +299,15 @@ const AppRoutes = () => {
 
 const App = () => (
   <AuthProvider>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </TooltipProvider>
+    <OrganizationProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
+    </OrganizationProvider>
   </AuthProvider>
 );
 
