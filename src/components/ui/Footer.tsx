@@ -28,7 +28,7 @@ const Footer = () => {
             </p>
             <div className="flex space-x-4">
               <a
-                href="mailto:info@rethinkcarbon.com"
+                href="mailto:connect@rethinkcarbon.io"
                 className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors"
               >
                 <Mail className="h-5 w-5 text-gray-900" />
@@ -76,8 +76,8 @@ const Footer = () => {
             <ul className="space-y-2">
               <li className="flex items-center text-gray-300">
                 <Mail className="h-4 w-4 mr-2 text-teal-400" />
-                <a href="mailto:info@rethinkcarbon.com" className="hover:text-teal-400 transition-colors">
-                  info@rethinkcarbon.com
+                <a href="mailto:connect@rethinkcarbon.io" className="hover:text-teal-400 transition-colors">
+                  connect@rethinkcarbon.io
                 </a>
               </li>
               <li className="flex items-center text-gray-300">

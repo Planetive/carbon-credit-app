@@ -41,6 +41,7 @@ import MainLayout from "@/components/ui/MainLayout";
 import ExploreCCUSProjects from "./pages/ExploreCCUSProjects";
 import CCUSProjectDetails from "./pages/CCUSProjectDetails";
 import ExploreCCUSPolicies from "./pages/ExploreCCUSPolicies";
+import ExploreBESS from "./pages/ExploreBESS";
 import CCUSManagementStrategy from "./pages/CCUSManagementStrategy";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
@@ -179,6 +180,11 @@ const AppRoutes = () => {
           <Route path="/explore/ccus-policies" element={
             <ProtectedRoute>
               <ExploreCCUSPolicies />
+            </ProtectedRoute>
+          } />
+          <Route path="/explore/bess-projects" element={
+            <ProtectedRoute>
+              <ExploreBESS />
             </ProtectedRoute>
           } />
           <Route path="/emission-calculator" element={

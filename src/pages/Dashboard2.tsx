@@ -696,8 +696,8 @@ const Dashboard2 = () => {
   // Section title mapping
   const sectionTitles: Record<string, string> = {
     'overview': 'Company Overview',
-    'portfolio': userType === 'corporate' ? 'My Projects' : 'My Portfolio',
-    'start-project': userType === 'corporate' ? 'Start New Project' : 'Start New Portfolio',
+    'portfolio': 'My Projects',
+    'start-project': 'Start New Project',
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
     'emissions': 'Emission Calculator',
@@ -1246,8 +1246,8 @@ const Dashboard2 = () => {
                 </motion.div>
               </div>
 
-              {/* Quick Actions - Only for corporate users */}
-              {userType === 'corporate' && (
+              {/* Quick Actions - available to all users */}
+              {(userType === 'corporate' || userType === 'financial_institution') && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1306,8 +1306,8 @@ const Dashboard2 = () => {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Portfolio</h2>
-                    <p className="text-gray-600">View and manage all your portfolio companies</p>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Projects</h2>
+                    <p className="text-gray-600">View and manage all your projects</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, TrendingUp, Database, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { Globe, TrendingUp, Database, ArrowRight, Sparkles, CheckCircle2, Battery } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,17 @@ const ExploreHub: React.FC = () => {
       gradient: 'from-emerald-500 via-teal-500 to-emerald-600',
       bgGradient: 'from-emerald-50/50 via-teal-50/30 to-emerald-50/50',
       iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600'
+    },
+    {
+      id: 'bess-projects',
+      title: 'Battery Energy Storage Systems (BESS)',
+      description: 'Explore Battery Energy Storage Systems projects with detailed information on power capacity and energy storage.',
+      icon: Battery,
+      stats: 'BESS Projects',
+      features: ['Power capacity', 'Energy storage', 'Developer insights'],
+      gradient: 'from-teal-500 via-emerald-500 to-teal-600',
+      bgGradient: 'from-teal-50/50 via-emerald-50/30 to-teal-50/50',
+      iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600'
     }
   ];
 
@@ -236,7 +247,7 @@ const ExploreHub: React.FC = () => {
           </motion.div>
 
           {/* Enhanced Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-8">
             {exploreOptions.map((option, index) => (
               <motion.div
                 key={option.id}
@@ -244,6 +255,7 @@ const ExploreHub: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.6, delay: index * 0.15 }}
+                className="w-full md:w-[calc(50%-1rem)] lg:w-[380px] xl:w-[380px]"
               >
                 <Card 
                   className="group relative cursor-pointer border-0 bg-white/90 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] overflow-hidden"

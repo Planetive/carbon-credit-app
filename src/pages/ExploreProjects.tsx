@@ -89,6 +89,7 @@ function normalizeCountryName(name: string) {
 
 const ExploreProjects = () => {
   const navigate = useNavigate();
+  const [navigating, setNavigating] = useState(false);
   // Filter state
   const [regions, setRegions] = useState<string[]>([]);
   const [voluntaryStatuses, setVoluntaryStatuses] = useState<string[]>([]);
@@ -666,21 +667,33 @@ const ExploreProjects = () => {
             <Button
               className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg"
               onClick={async () => {
-                // Fetch full data when user clicks (only when needed)
-                const fullData = await fetchAllProjectsWithFilters({
-                  regions: selectedRegions,
-                  voluntaryStatuses: selectedVoluntaryStatuses,
-                  voluntaryRegistries: selectedVoluntaryRegistries,
-                  countries: selectedCountries,
-                  areasOfInterest: selectedAreasOfInterest,
-                });
-                navigate('/project-table', { state: { projects: fullData } });
+                try {
+                  setNavigating(true);
+                  // Fetch full data when user clicks (only when needed)
+                  const fullData = await fetchAllProjectsWithFilters({
+                    regions: selectedRegions,
+                    voluntaryStatuses: selectedVoluntaryStatuses,
+                    voluntaryRegistries: selectedVoluntaryRegistries,
+                    countries: selectedCountries,
+                    areasOfInterest: selectedAreasOfInterest,
+                  });
+                  navigate('/project-table', { state: { projects: fullData } });
+                } finally {
+                  setNavigating(false);
+                }
               }}
+              disabled={navigating}
             >
               <Eye className="h-4 w-4 mr-2" />
-              View Project Table
+              {navigating ? 'Loading...' : 'View Project Table'}
             </Button>
           </div>
+
+          {navigating && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+              <LoadingScreen message="Loading Project Table" subMessage="Preparing data..." />
+            </div>
+          )}
 
           {/* Stats Summary Cards - using existing data */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
