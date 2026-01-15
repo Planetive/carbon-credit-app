@@ -90,7 +90,7 @@ const MainHeader = () => {
               </svg>
             </button>
             {solutionsOpen && (
-              <div className="absolute left-0 mt-3 w-80 rounded-xl bg-white/80 backdrop-blur-md shadow-xl py-2 z-50 overflow-hidden">
+              <div className="absolute left-0 mt-3 w-80 rounded-xl bg-white shadow-xl py-2 z-50 overflow-hidden border border-gray-200">
                 <Link
                   to="/solutions/corporate"
                   className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors"
