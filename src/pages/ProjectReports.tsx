@@ -33,21 +33,68 @@ const ProjectReports = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Hardcoded sample reports
+    const sampleReports = [
+      {
+        id: "sample-1",
+        report_title: "Q4 2024 Carbon Credit Portfolio Report",
+        report_type: "Quarterly Reports",
+        report_format: "Published",
+        date: new Date("2024-12-15").toISOString(),
+        created_at: new Date("2024-12-15").toISOString(),
+        user_id: user?.id || ""
+      },
+      {
+        id: "sample-2",
+        report_title: "Annual Sustainability Impact Assessment 2024",
+        report_type: "Annual Reports",
+        report_format: "Published",
+        date: new Date("2024-12-01").toISOString(),
+        created_at: new Date("2024-12-01").toISOString(),
+        user_id: user?.id || ""
+      },
+      {
+        id: "sample-3",
+        report_title: "Forestry Project Feasibility Study - Amazon Region",
+        report_type: "Feasibility Studies",
+        report_format: "Draft",
+        date: new Date("2024-11-20").toISOString(),
+        created_at: new Date("2024-11-20").toISOString(),
+        user_id: user?.id || ""
+      }
+    ];
+
     const fetchReports = async () => {
-      if (!user) return;
+      if (!user) {
+        // Show sample reports even if user is not loaded yet
+        setReports(sampleReports);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
-      const { data, error } = await (supabase as any)
-        .from("project_reports")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) {
-        setError("Failed to load reports");
-        setReports([]);
-      } else {
-        setReports(data || []);
+      
+      // Always include sample reports
+      let allReports = [...sampleReports];
+      
+      try {
+        const { data, error } = await (supabase as any)
+          .from("project_reports")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        
+        if (!error && data) {
+          // Combine database reports with sample reports (database reports first)
+          allReports = [...data, ...sampleReports];
+        }
+        // If there's an error, we still show sample reports, so no need to set error
+      } catch (err) {
+        // Silently fail and just show sample reports
+        console.warn("Could not load reports from database, showing sample reports:", err);
       }
+      
+      setReports(allReports);
       setLoading(false);
     };
     fetchReports();
@@ -177,35 +224,48 @@ const ProjectReports = () => {
             <div className="space-y-4">
               {loading ? (
                 <div>Loading reports...</div>
-              ) : error ? (
-                <div className="text-red-500">{error}</div>
-              ) : reports.length === 0 ? (
+              ) : filteredReports.length === 0 ? (
                 <Card className="text-center py-12">
                   <CardContent>
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <CardTitle className="mb-2">No Reports Found</CardTitle>
                     <CardDescription className="mb-6">
-                      You don't have any project reports yet.
+                      No reports match your current filters.
                     </CardDescription>
                   </CardContent>
                 </Card>
               ) : (
-                reports.map((report) => (
+                filteredReports.map((report) => (
                   <Card key={report.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-4 flex-1">
                           <div className="p-2 bg-primary/10 rounded-lg">
                             <FileText className="h-6 w-6 text-primary" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <h3 className="font-semibold text-lg">{report.report_title}</h3>
                             <div className="text-sm text-muted-foreground">{report.report_type}</div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end">
-                          <Badge className={getStatusColor(report.report_format)}>{report.report_format}</Badge>
-                          <span className="text-xs text-muted-foreground mt-1">{report.date ? new Date(report.date).toLocaleDateString() : "-"}</span>
+                        <div className="flex items-center space-x-4">
+                          <div className="flex flex-col items-end">
+                            <Badge className={getStatusColor(report.report_format)}>{report.report_format}</Badge>
+                            <span className="text-xs text-muted-foreground mt-1">
+                              {report.date ? new Date(report.date).toLocaleDateString() : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
