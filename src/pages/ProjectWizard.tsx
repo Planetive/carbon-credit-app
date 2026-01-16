@@ -61,26 +61,45 @@ const ProjectWizard = () => {
       let from = 0;
       const batchSize = 1000;
       let keepFetching = true;
-      while (keepFetching) {
-        const { data, error } = await supabase.from('global_projects' as any).select('"Area of Interest"').range(from, from + batchSize - 1);
-        if (error) break;
-        if (data && data.length > 0) {
-          allRows = allRows.concat(data);
-          if (data.length < batchSize) {
-            keepFetching = false;
-          } else {
-            from += batchSize;
+      try {
+        while (keepFetching) {
+          const { data, error } = await supabase.from('global_projects_2025' as any).select('"Area of interest"').range(from, from + batchSize - 1);
+          if (error) {
+            console.error('Error fetching areas of interest:', error);
+            toast({
+              title: 'Error loading areas of interest',
+              description: error.message || 'Failed to load areas of interest. Please check your connection.',
+              variant: 'destructive',
+            });
+            break;
           }
-        } else {
-          keepFetching = false;
+          if (data && data.length > 0) {
+            allRows = allRows.concat(data);
+            if (data.length < batchSize) {
+              keepFetching = false;
+            } else {
+              from += batchSize;
+            }
+          } else {
+            keepFetching = false;
+          }
         }
+        const uniqueAreas = Array.from(new Set(allRows.map((d: any) => (d["Area of interest"] || '').trim()).filter(Boolean)));
+        console.log('Fetched areas of interest:', uniqueAreas.length, 'items');
+        setAreasOfInterest(uniqueAreas);
+      } catch (err: any) {
+        console.error('Unexpected error fetching areas of interest:', err);
+        toast({
+          title: 'Error loading areas of interest',
+          description: err.message || 'An unexpected error occurred.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingAreasOfInterest(false);
       }
-      const uniqueAreas = Array.from(new Set(allRows.map((d: any) => (d["Area of Interest"] || '').trim()).filter(Boolean)));
-      setAreasOfInterest(uniqueAreas);
-      setLoadingAreasOfInterest(false);
     }
     fetchAreasOfInterest();
-  }, []);
+  }, [toast]);
   const countryOptions = getNames();
   const [formData, setFormData] = useState({
     currentIndustry: '',
@@ -115,28 +134,45 @@ const ProjectWizard = () => {
       let from = 0;
       const batchSize = 1000;
       let keepFetching = true;
-      while (keepFetching) {
-        const { data, error } = await supabase.from('global_projects' as any).select('"End Goal"').range(from, from + batchSize - 1);
-        if (error) break;
-        if (data && data.length > 0) {
-          allRows = allRows.concat(data);
-          if (data.length < batchSize) {
-            keepFetching = false;
-          } else {
-            from += batchSize;
+      try {
+        while (keepFetching) {
+          const { data, error } = await supabase.from('global_projects_2025' as any).select('"End Goal"').range(from, from + batchSize - 1);
+          if (error) {
+            console.error('Error fetching goals:', error);
+            toast({
+              title: 'Error loading goals',
+              description: error.message || 'Failed to load goals. Please check your connection.',
+              variant: 'destructive',
+            });
+            break;
           }
-        } else {
-          keepFetching = false;
+          if (data && data.length > 0) {
+            allRows = allRows.concat(data);
+            if (data.length < batchSize) {
+              keepFetching = false;
+            } else {
+              from += batchSize;
+            }
+          } else {
+            keepFetching = false;
+          }
         }
+        const uniqueGoals = Array.from(new Set(allRows.map((d: any) => (d["End Goal"] || '').trim()).filter(Boolean)));
+        console.log('Fetched goals:', uniqueGoals.length, 'items');
+        setGoals(uniqueGoals);
+      } catch (err: any) {
+        console.error('Unexpected error fetching goals:', err);
+        toast({
+          title: 'Error loading goals',
+          description: err.message || 'An unexpected error occurred.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingGoals(false);
       }
-      // console.log("Raw End Goal data:", allRows); // Debug log for raw data
-      const uniqueGoals = Array.from(new Set(allRows.map((d: any) => (d["End Goal"] || '').trim()).filter(Boolean)));
-      // console.log("Fetched End Goals:", uniqueGoals); // Debug log
-      setGoals(uniqueGoals);
-      setLoadingGoals(false);
     }
     fetchGoals();
-  }, []);
+  }, [toast]);
   const [types, setTypes] = useState<string[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
   const [filteredTypes, setFilteredTypes] = useState<string[]>([]);
@@ -156,9 +192,9 @@ const ProjectWizard = () => {
 
       while (keepFetching) {
       const { data, error } = await supabase
-        .from("global_projects" as any)
+        .from("global_projects_2025" as any)
         .select('"Type"')
-        .eq('"Area of Interest"', areaOfInterest)
+        .eq('"Area of interest"', areaOfInterest)
         .range(from, from + batchSize - 1);
       
         if (error) break;
