@@ -4,6 +4,15 @@ import MainHeader from "../../components/ui/MainHeader";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Declare Supademo as a global
+declare global {
+  interface Window {
+    Supademo: {
+      open: (id: string) => void;
+    };
+  }
+}
+
 const CorporateSolutions = () => {
   const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
   const [visibleBenefits, setVisibleBenefits] = useState<Set<number>>(new Set());
@@ -211,13 +220,13 @@ const CorporateSolutions = () => {
                 Sign up free
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link
-                to="/contact"
+              <button
+                onClick={() => window.Supademo.open('cmkgryjv50ro41363wde68umh')}
                 className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 border-2 border-gray-900 rounded-lg font-medium text-base hover:bg-gray-50 transition-all duration-300 hover:scale-105 hover:shadow-xl"
               >
-                Request demo
+                See Demo
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
+              </button>
             </motion.div>
           </div>
         </div>

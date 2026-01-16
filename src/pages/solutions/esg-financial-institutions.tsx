@@ -4,6 +4,15 @@ import MainHeader from "../../components/ui/MainHeader";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Declare Supademo as a global
+declare global {
+  interface Window {
+    Supademo: {
+      open: (id: string) => void;
+    };
+  }
+}
+
 const ESGFinancialInstitutions = () => {
   const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -89,13 +98,13 @@ const ESGFinancialInstitutions = () => {
                 transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
                 className="flex flex-col sm:flex-row items-center justify-center gap-4"
               >
-                <Link
-                  to="/contact"
+                <button
+                  onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-base hover:bg-gray-800 transition-all duration-300 hover:scale-105 hover:shadow-xl"
                 >
-                  Request a Portfolio Demo
+                  See a Portfolio Demo
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </button>
                 <Link
                   to="/contact"
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 border-2 border-gray-900 rounded-lg font-medium text-base hover:bg-gray-50 transition-all duration-300 hover:scale-105 hover:shadow-xl"
@@ -654,13 +663,13 @@ const ESGFinancialInstitutions = () => {
                 transition={{ duration: 0.8, delay: 0.4 }}
                 className="flex flex-col sm:flex-row items-center justify-center gap-4"
               >
-                <Link
-                  to="/contact"
+                <button
+                  onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 rounded-lg font-medium text-base hover:bg-gray-100 transition-all duration-300 hover:scale-105 hover:shadow-xl"
                 >
-                  Request a Portfolio Demo
+                  See a Portfolio Demo
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </button>
                 <Link
                   to="/contact"
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-transparent text-white border-2 border-white rounded-lg font-medium text-base hover:bg-white/10 transition-all duration-300 hover:scale-105"
