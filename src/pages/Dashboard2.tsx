@@ -43,7 +43,7 @@ const Dashboard2 = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
-  const [profileForm, setProfileForm] = useState({ displayName: "", phone: "" });
+  const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [userType, setUserType] = useState<string>("financial_institution");
@@ -82,22 +82,26 @@ const Dashboard2 = () => {
       if (!user) return;
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, user_type, display_name, phone")
+        .select("id, user_type, organization_name, display_name, phone")
         .eq("user_id", user.id)
         .single();
       if (!data || error) {
         setProfileMissing(true);
         setDisplayName("");
       } else {
-        // Check if display_name and phone are missing or just default values
-        // If display_name is just the email prefix (from default) or phone is null, show the form
+        // Check if organization_name, display_name, or phone are missing or just default values
+        // If display_name is just the email prefix (from default), phone is null, or organization_name is missing, show the form
         const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
         const phoneIsMissing = !data.phone || data.phone.trim() === '';
+        const organizationNameIsMissing = !data.organization_name || data.organization_name.trim() === '' || data.organization_name === 'My Organization';
         
-        // Show questionnaire if display name or phone is missing
-        setProfileMissing(displayNameIsDefault || phoneIsMissing);
+        // Show questionnaire if any required field is missing
+        setProfileMissing(displayNameIsDefault || phoneIsMissing || organizationNameIsMissing);
         
         // Pre-fill the form with existing data if available
+        if (data.organization_name && !organizationNameIsMissing) {
+          setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
+        }
         if (data.display_name && !displayNameIsDefault) {
           setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
           setDisplayName(data.display_name);
@@ -121,8 +125,8 @@ const Dashboard2 = () => {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileForm.displayName || !profileForm.phone) {
-      toast({ title: "Missing fields", description: "Name and phone number are required.", variant: "destructive" });
+    if (!profileForm.organizationName || !profileForm.displayName || !profileForm.phone) {
+      toast({ title: "Missing fields", description: "Organization name, your name, and phone number are required.", variant: "destructive" });
       return;
     }
     setProfileSubmitting(true);
@@ -132,12 +136,29 @@ const Dashboard2 = () => {
       .from("profiles")
       .upsert({
         user_id: user.id,
+        organization_name: profileForm.organizationName,
         display_name: profileForm.displayName,
         phone: profileForm.phone || null,
         user_type: userType, // Preserve user type
       }, {
         onConflict: 'user_id'
       });
+    
+    // Also update the organization name if it exists
+    if (!error) {
+      const { data: profileData } = await (supabase as any)
+        .from("profiles")
+        .select("current_organization_id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (profileData?.current_organization_id) {
+        await (supabase as any)
+          .from("organizations")
+          .update({ name: profileForm.organizationName })
+          .eq("id", profileData.current_organization_id);
+      }
+    }
     
     setProfileSubmitting(false);
     if (error) {
@@ -327,120 +348,125 @@ const Dashboard2 = () => {
       }
 
       // Fetch and aggregate all Finance Emission calculations across all portfolios
-      // Temporarily removed organization filtering - just get all finance emissions for user
-      try {
-        // Query emission_calculations table - same as CompanyDetail does
-        const { data: financeData, error: financeError } = await (supabase as any)
-          .from('emission_calculations')
-          .select('financed_emissions, counterparty_id, calculation_type, status, updated_at')
-          .eq('user_id', user.id)
-          .eq('calculation_type', 'finance')
-          .neq('status', 'failed');
+      // Only fetch for financial_institution users
+      if (userType === 'financial_institution') {
+        try {
+          // Query emission_calculations table - same as CompanyDetail does
+          const { data: financeData, error: financeError } = await (supabase as any)
+            .from('emission_calculations')
+            .select('financed_emissions, counterparty_id, calculation_type, status, updated_at')
+            .eq('user_id', user.id)
+            .eq('calculation_type', 'finance')
+            .neq('status', 'failed');
 
-        if (financeError) {
-          console.error('❌ Dashboard - Error fetching finance emissions:', financeError);
-          setFinanceEmissionData(null);
-          return;
-        }
-
-        console.log('🔍 Dashboard - Finance emission records:', financeData?.length || 0, financeData);
-
-        // Filter out any invalid records and sum emissions
-        const validFinanceData = (financeData || []).filter((r: any) => {
-          const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
-          return emissions > 0 && isFinite(emissions);
-        });
-
-        // Get unique counterparty IDs to count companies
-        const uniqueCounterparties = new Set(
-          validFinanceData
-            .map((r: any) => r.counterparty_id)
-            .filter((id: any) => id !== null && id !== undefined)
-        );
-
-        if (validFinanceData.length > 0) {
-          // Sum all finance emissions from all companies
-          const totalFinanceEmissions = validFinanceData.reduce((sum: number, record: any) => {
-            const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
-            console.log('  ✅ Adding emissions:', emissions, 'from counterparty:', record.counterparty_id);
-            return sum + emissions;
-          }, 0);
-          
-          console.log('💰 Dashboard - Total finance emissions:', totalFinanceEmissions, 'from', uniqueCounterparties.size, 'companies');
-          
-          if (totalFinanceEmissions > 0) {
-            setFinanceEmissionData({
-              financed_emissions: totalFinanceEmissions,
-              total_companies: uniqueCounterparties.size || validFinanceData.length
-            });
-          } else {
+          if (financeError) {
+            console.error('❌ Dashboard - Error fetching finance emissions:', financeError);
             setFinanceEmissionData(null);
+          } else {
+            console.log('🔍 Dashboard - Finance emission records:', financeData?.length || 0, financeData);
+
+            // Filter out any invalid records and sum emissions
+            const validFinanceData = (financeData || []).filter((r: any) => {
+              const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
+              return emissions > 0 && isFinite(emissions);
+            });
+
+            // Get unique counterparty IDs to count companies
+            const uniqueCounterparties = new Set(
+              validFinanceData
+                .map((r: any) => r.counterparty_id)
+                .filter((id: any) => id !== null && id !== undefined)
+            );
+
+            if (validFinanceData.length > 0) {
+              // Sum all finance emissions from all companies
+              const totalFinanceEmissions = validFinanceData.reduce((sum: number, record: any) => {
+                const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
+                console.log('  ✅ Adding emissions:', emissions, 'from counterparty:', record.counterparty_id);
+                return sum + emissions;
+              }, 0);
+              
+              console.log('💰 Dashboard - Total finance emissions:', totalFinanceEmissions, 'from', uniqueCounterparties.size, 'companies');
+              
+              if (totalFinanceEmissions > 0) {
+                setFinanceEmissionData({
+                  financed_emissions: totalFinanceEmissions,
+                  total_companies: uniqueCounterparties.size || validFinanceData.length
+                });
+              } else {
+                setFinanceEmissionData(null);
+              }
+            } else {
+              console.log('❌ Dashboard - No valid finance data found');
+              setFinanceEmissionData(null);
+            }
           }
-        } else {
-          console.log('❌ Dashboard - No valid finance data found');
+        } catch (error) {
+          console.error('💥 Error fetching finance emissions:', error);
           setFinanceEmissionData(null);
         }
-      } catch (error) {
-        console.error('💥 Error fetching finance emissions:', error);
-        setFinanceEmissionData(null);
-      }
 
-      // Fetch and aggregate all Facilitated Emission calculations across all portfolios
-      // Temporarily removed organization filtering - just get all facilitated emissions for user
-      try {
-        // Query emission_calculations table only
-        const { data: facilitatedData, error: facilitatedError } = await (supabase as any)
-          .from('emission_calculations')
-          .select('financed_emissions, status, counterparty_id, calculation_type')
-          .eq('user_id', user.id)
-          .eq('calculation_type', 'facilitated')
-          .neq('status', 'failed');
+        // Fetch and aggregate all Facilitated Emission calculations across all portfolios
+        try {
+          // Query emission_calculations table only
+          const { data: facilitatedData, error: facilitatedError } = await (supabase as any)
+            .from('emission_calculations')
+            .select('financed_emissions, status, counterparty_id, calculation_type')
+            .eq('user_id', user.id)
+            .eq('calculation_type', 'facilitated')
+            .neq('status', 'failed');
 
-        console.log('🔍 Dashboard - Facilitated emissions:', facilitatedData?.length || 0, facilitatedData);
+          console.log('🔍 Dashboard - Facilitated emissions:', facilitatedData?.length || 0, facilitatedData);
 
-        // Filter out invalid records
-        const validFacilitatedData = (facilitatedData || []).filter((r: any) => {
-          const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
-          return emissions > 0 && isFinite(emissions);
-        });
+          // Filter out invalid records
+          const validFacilitatedData = (facilitatedData || []).filter((r: any) => {
+            const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
+            return emissions > 0 && isFinite(emissions);
+          });
 
-        // Get unique counterparty IDs to count companies
-        const uniqueCounterparties = new Set(
-          validFacilitatedData
-            .map((r: any) => r.counterparty_id)
-            .filter((id: any) => id !== null && id !== undefined)
-        );
+          // Get unique counterparty IDs to count companies
+          const uniqueCounterparties = new Set(
+            validFacilitatedData
+              .map((r: any) => r.counterparty_id)
+              .filter((id: any) => id !== null && id !== undefined)
+          );
 
-        if (validFacilitatedData.length > 0) {
-          // Sum all facilitated emissions from all companies
-          const totalFacilitatedEmissions = validFacilitatedData.reduce((sum: number, record: any) => {
-            const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
-            return sum + emissions;
-          }, 0);
-          
-          if (totalFacilitatedEmissions > 0) {
-            setFacilitatedEmissionData({
-              financed_emissions: totalFacilitatedEmissions,
-              total_companies: uniqueCounterparties.size || validFacilitatedData.length
-            });
+          if (validFacilitatedData.length > 0) {
+            // Sum all facilitated emissions from all companies
+            const totalFacilitatedEmissions = validFacilitatedData.reduce((sum: number, record: any) => {
+              const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
+              return sum + emissions;
+            }, 0);
+            
+            if (totalFacilitatedEmissions > 0) {
+              setFacilitatedEmissionData({
+                financed_emissions: totalFacilitatedEmissions,
+                total_companies: uniqueCounterparties.size || validFacilitatedData.length
+              });
+            } else {
+              setFacilitatedEmissionData(null);
+            }
           } else {
             setFacilitatedEmissionData(null);
           }
-        } else {
+        } catch (error) {
+          console.error('Error fetching facilitated emissions:', error);
           setFacilitatedEmissionData(null);
         }
-      } catch (error) {
-        console.error('Error fetching facilitated emissions:', error);
-        setFacilitatedEmissionData(null);
-      }
 
-      // TODO: Fetch Risk Assessment data (placeholder for now)
-      setRiskAssessmentData(null);
+        // TODO: Fetch Risk Assessment data (placeholder for now)
+        setRiskAssessmentData(null);
+      } else {
+        // Corporate users don't need these
+        setFinanceEmissionData(null);
+        setFacilitatedEmissionData(null);
+        setRiskAssessmentData(null);
+      }
       
       setLoading(false);
     };
     fetchData();
-    }, [user, profileMissing]);
+    }, [user, profileMissing, userType]);
 
   // Fetch portfolio companies when portfolio section is active (financial institution)
   useEffect(() => {
@@ -631,7 +657,7 @@ const Dashboard2 = () => {
                 Complete Your Profile
               </CardTitle>
               <CardDescription className="text-base text-gray-600">
-                To continue, please provide your name and phone number.
+                To continue, please provide your organization name, your name, and phone number.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -640,6 +666,22 @@ const Dashboard2 = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 }}
+                >
+                  <label className="block font-semibold text-gray-700 mb-2 text-sm">Organization Name <span className="text-red-500">*</span></label>
+                  <input
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
+                    name="organizationName"
+                    type="text"
+                    value={profileForm.organizationName}
+                    onChange={e => setProfileForm(f => ({ ...f, organizationName: e.target.value }))}
+                    required
+                    placeholder="Enter your organization name"
+                  />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 }}
                 >
                   <label className="block font-semibold text-gray-700 mb-2 text-sm">Your Name <span className="text-red-500">*</span></label>
                   <input
@@ -655,7 +697,7 @@ const Dashboard2 = () => {
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
+                  transition={{ delay: 0.5 }}
                 >
                   <label className="block font-semibold text-gray-700 mb-2 text-sm">Phone Number <span className="text-red-500">*</span></label>
                   <input
@@ -767,145 +809,147 @@ const Dashboard2 = () => {
                 </motion.div>
 
 
-              {/* Top Row - Main Metrics - Beautiful Animated Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
-                {/* Finance Emission Card */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  whileHover={{ y: -5, scale: 1.02 }}
-                  className="group"
-                >
-                  <Card 
-                    className="bg-white border border-gray-200/80 shadow-md hover:border-teal-300/60 hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 cursor-pointer overflow-hidden relative h-full flex flex-col"
-                    onClick={() => navigate('/bank-portfolio')}
+              {/* Top Row - Main Metrics - Beautiful Animated Cards (Financial Institution Only) */}
+              {userType === 'financial_institution' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
+                  {/* Finance Emission Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ y: -5, scale: 1.02 }}
+                    className="group"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                      <div className="flex items-center justify-between flex-1">
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-1">Finance Emission</p>
-                            <motion.p 
-                              key={financeEmissionData?.financed_emissions}
-                              initial={{ scale: 1.2, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent"
-                            >
-                              {financeEmissionData ? `${financeEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : '0.0 tCO2e'}
-                            </motion.p>
+                    <Card 
+                      className="bg-white border border-gray-200/80 shadow-md hover:border-teal-300/60 hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 cursor-pointer overflow-hidden relative h-full flex flex-col"
+                      onClick={() => navigate('/bank-portfolio')}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
+                        <div className="flex items-center justify-between flex-1">
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-500 mb-1">Finance Emission</p>
+                              <motion.p 
+                                key={financeEmissionData?.financed_emissions}
+                                initial={{ scale: 1.2, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent"
+                              >
+                                {financeEmissionData ? `${financeEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : '0.0 tCO2e'}
+                              </motion.p>
+                            </div>
+                            <div className="mt-2 min-h-[20px]">
+                              {financeEmissionData && financeEmissionData.total_companies > 0 ? (
+                                <p className="text-xs text-gray-500 flex items-center space-x-1">
+                                  <Activity className="h-3 w-3" />
+                                  <span>{financeEmissionData.total_companies} {financeEmissionData.total_companies === 1 ? 'company' : 'companies'}</span>
+                                </p>
+                              ) : (
+                                <div className="h-5"></div>
+                              )}
+                            </div>
                           </div>
-                          <div className="mt-2 min-h-[20px]">
-                            {financeEmissionData && financeEmissionData.total_companies > 0 ? (
-                              <p className="text-xs text-gray-500 flex items-center space-x-1">
-                                <Activity className="h-3 w-3" />
-                                <span>{financeEmissionData.total_companies} {financeEmissionData.total_companies === 1 ? 'company' : 'companies'}</span>
-                              </p>
-                            ) : (
+                          <motion.div 
+                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
+                            transition={{ duration: 0.5 }}
+                            className="w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/30"
+                          >
+                            <Factory className="h-7 w-7 text-white" />
+                          </motion.div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* Facilitated Emission Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    whileHover={{ y: -5, scale: 1.02 }}
+                    className="group"
+                  >
+                    <Card className="bg-white border border-gray-200/80 shadow-md hover:border-emerald-300/60 hover:shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
+                        <div className="flex items-center justify-between flex-1">
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-500 mb-1">Facilitated Emission</p>
+                              <motion.p 
+                                key={facilitatedEmissionData?.financed_emissions}
+                                initial={{ scale: 1.2, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"
+                              >
+                                {facilitatedEmissionData ? `${facilitatedEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : (
+                                  <span className="text-gray-400 text-xl">—</span>
+                                )}
+                              </motion.p>
+                            </div>
+                            <div className="mt-2 min-h-[20px]">
                               <div className="h-5"></div>
-                            )}
+                            </div>
                           </div>
+                          <motion.div 
+                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
+                            transition={{ duration: 0.5 }}
+                            className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30"
+                          >
+                            <BarChart3 className="h-7 w-7 text-white" />
+                          </motion.div>
                         </div>
-                        <motion.div 
-                          whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                          transition={{ duration: 0.5 }}
-                          className="w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/30"
-                        >
-                          <Factory className="h-7 w-7 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
 
-                {/* Facilitated Emission Card */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  whileHover={{ y: -5, scale: 1.02 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-emerald-300/60 hover:shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                      <div className="flex items-center justify-between flex-1">
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-1">Facilitated Emission</p>
-                            <motion.p 
-                              key={facilitatedEmissionData?.financed_emissions}
-                              initial={{ scale: 1.2, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"
-                            >
-                              {facilitatedEmissionData ? `${facilitatedEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : (
-                                <span className="text-gray-400 text-xl">—</span>
-                              )}
-                            </motion.p>
+                  {/* Risk Assessment Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    whileHover={{ y: -5, scale: 1.02 }}
+                    className="group"
+                  >
+                    <Card className="bg-white border border-gray-200/80 shadow-md hover:border-orange-300/60 hover:shadow-xl hover:shadow-orange-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
+                      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
+                        <div className="flex items-center justify-between flex-1">
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-500 mb-1">Risk Assessment</p>
+                              <motion.p 
+                                key={riskAssessmentData?.risk_score}
+                                initial={{ scale: 1.2, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent"
+                              >
+                                {riskAssessmentData ? `${riskAssessmentData.risk_score || '—'}` : (
+                                  <span className="text-gray-400 text-xl flex items-center gap-2">
+                                    <Sparkles className="h-5 w-5" />
+                                    Ready
+                                  </span>
+                                )}
+                              </motion.p>
+                            </div>
+                            <div className="mt-2 min-h-[20px]">
+                              <div className="h-5"></div>
+                            </div>
                           </div>
-                          <div className="mt-2 min-h-[20px]">
-                            <div className="h-5"></div>
-                          </div>
+                          <motion.div 
+                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
+                            transition={{ duration: 0.5 }}
+                            className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30"
+                          >
+                            <Shield className="h-7 w-7 text-white" />
+                          </motion.div>
                         </div>
-                        <motion.div 
-                          whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                          transition={{ duration: 0.5 }}
-                          className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30"
-                        >
-                          <BarChart3 className="h-7 w-7 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Risk Assessment Card */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  whileHover={{ y: -5, scale: 1.02 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-orange-300/60 hover:shadow-xl hover:shadow-orange-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
-                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                      <div className="flex items-center justify-between flex-1">
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-1">Risk Assessment</p>
-                            <motion.p 
-                              key={riskAssessmentData?.risk_score}
-                              initial={{ scale: 1.2, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent"
-                            >
-                              {riskAssessmentData ? `${riskAssessmentData.risk_score || '—'}` : (
-                                <span className="text-gray-400 text-xl flex items-center gap-2">
-                                  <Sparkles className="h-5 w-5" />
-                                  Ready
-                                </span>
-                              )}
-                            </motion.p>
-                          </div>
-                          <div className="mt-2 min-h-[20px]">
-                            <div className="h-5"></div>
-                          </div>
-                        </div>
-                        <motion.div 
-                          whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                          transition={{ duration: 0.5 }}
-                          className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30"
-                        >
-                          <Shield className="h-7 w-7 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </div>
+              )}
 
               {/* Bottom Row - Secondary Metrics - Beautiful Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

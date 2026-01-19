@@ -20,8 +20,6 @@ const Register = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    displayName: "",
-    phone: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,12 +89,13 @@ const Register = () => {
       // Use a small delay to ensure user is committed to auth.users
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const displayName = formData.displayName || formData.email.split('@')[0];
+      // Use email prefix as temporary display name - user will complete profile in dashboard
+      const displayName = formData.email.split('@')[0];
       
       const { error: profileError } = await (supabase.rpc as any)('create_profile_for_user', {
         p_user_id: user.id,
         p_display_name: displayName,
-        p_phone: formData.phone || null,
+        p_phone: null, // Will be collected in dashboard
         p_user_type: userType // Use the user_type from query params
       });
 
@@ -106,7 +105,7 @@ const Register = () => {
         // But log it for debugging
       }
 
-      // Create the original organization with the user's display name
+      // Create the original organization with a temporary name - user will update in dashboard
       // Wait a bit more to ensure profile is created
       await new Promise(resolve => setTimeout(resolve, 300));
       
@@ -115,7 +114,7 @@ const Register = () => {
           .from('organizations')
           .insert([
             {
-              name: displayName,
+              name: "My Organization", // Temporary name, user will update in dashboard
               description: null,
               parent_organization_id: null,
               is_original: true, // Mark as original
@@ -181,15 +180,6 @@ const Register = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleRegister} className="space-y-4">
-              <Label>Display Name</Label>
-              <Input
-                name="displayName"
-                type="text"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                placeholder="Your name"
-                required
-              />
               <Label>Email</Label>
               <Input
                 name="email"
