@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Filter } from "lucide-react";
+import { Filter, ArrowLeft } from "lucide-react";
 
 function MultiSelectDropdown({
   options, selected, setSelected, placeholder, loadingLabel = "Loading...", filtersLoading
@@ -59,6 +60,7 @@ function MultiSelectDropdown({
 }
 
 const ProjectTable = () => {
+  const navigate = useNavigate();
   // Filter options
   const [regions, setRegions] = useState<string[]>([]);
   const [voluntaryStatuses, setVoluntaryStatuses] = useState<string[]>([]);
@@ -78,6 +80,7 @@ const ProjectTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [filtersLoading, setFiltersLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
+  const [hasAreaOfInterestColumn, setHasAreaOfInterestColumn] = useState(false);
 
   // Helper function to fetch all unique values for a column in batches
   async function fetchAllUniqueColumnValues(column: string): Promise<string[]> {
@@ -88,8 +91,10 @@ const ProjectTable = () => {
     let keepFetching = true;
     while (keepFetching) {
       const { data, error } = await supabase.from("global_projects_2025" as any).select(`"${column}"`).range(from, to);
-      // console.log(`[DEBUG] Supabase fetch for column '${column}':`, { data, error });
-      if (error) throw error;
+      if (error) {
+        console.error(`Error fetching ${column} from global_projects_2025:`, error);
+        throw new Error(`Failed to fetch ${column}: ${error.message || error.code || 'Unknown error'}`);
+      }
       allRows = allRows.concat(data || []);
       if (!data || data.length < BATCH_SIZE) {
         keepFetching = false;
@@ -105,7 +110,6 @@ const ProjectTable = () => {
           .filter((val: string) => val.length > 0)
       )
     ).sort((a, b) => a.localeCompare(b));
-    // console.log(`[DEBUG] Unique values for '${column}':`, unique);
     return unique;
   }
 
@@ -114,20 +118,31 @@ const ProjectTable = () => {
     const fetchFilters = async () => {
       setFiltersLoading(true);
       try {
-        const [regionsData, statusesData, registriesData, countriesData, areasData] = await Promise.all([
+        // Fetch required columns
+        const [regionsData, statusesData, registriesData, countriesData] = await Promise.all([
           fetchAllUniqueColumnValues("Region"),
           fetchAllUniqueColumnValues("Voluntary Status"),
           fetchAllUniqueColumnValues("Voluntary Registry"),
           fetchAllUniqueColumnValues("Country"),
-          fetchAllUniqueColumnValues("Area of Interest"),
         ]);
         setRegions(regionsData);
         setVoluntaryStatuses(statusesData);
         setVoluntaryRegistries(registriesData);
         setCountries(countriesData);
-        setAreasOfInterest(areasData);
-      } catch (e) {
+        
+        // Try to fetch Area of Interest, but don't fail if it doesn't exist
+        try {
+          const areasData = await fetchAllUniqueColumnValues("Area of Interest");
+          setAreasOfInterest(areasData);
+          setHasAreaOfInterestColumn(true);
+        } catch (areaError: any) {
+          console.warn("Area of Interest column not found, skipping:", areaError);
+          setAreasOfInterest([]);
+          setHasAreaOfInterestColumn(false);
+        }
+      } catch (e: any) {
         console.error("Error fetching filter options:", e);
+        setError(`Failed to load filter options: ${e.message || 'Unknown error'}. Please check if the global_projects_2025 table exists and RLS policies are configured correctly.`);
       } finally {
         setFiltersLoading(false);
       }
@@ -139,23 +154,37 @@ const ProjectTable = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    let query: any = supabase.from("global_projects_2025" as any).select('"Project Name", Methodology, "Country", "Region", "Voluntary Status", "Voluntary Registry", "Area of Interest"');
+    // Build select columns - check if Area of Interest exists
+    const selectColumns = '"Project Name", Methodology, "Country", "Region", "Voluntary Status", "Voluntary Registry"';
+    
+    let query: any = supabase.from("global_projects_2025" as any).select(
+      hasAreaOfInterestColumn 
+        ? `${selectColumns}, "Area of Interest"`
+        : selectColumns
+    );
     
     // Apply all filters
     if (selectedRegions.length > 0) query = query.in("Region", selectedRegions);
     if (selectedVoluntaryStatuses.length > 0) query = query.in("Voluntary Status", selectedVoluntaryStatuses);
     if (selectedVoluntaryRegistries.length > 0) query = query.in("Voluntary Registry", selectedVoluntaryRegistries);
     if (selectedCountries.length > 0) query = query.in("Country", selectedCountries);
-    if (selectedAreasOfInterest.length > 0) query = query.in("Area of Interest", selectedAreasOfInterest);
+    if (selectedAreasOfInterest.length > 0 && hasAreaOfInterestColumn) query = query.in("Area of Interest", selectedAreasOfInterest);
     
     query
       .then(({ data, error }: { data: any[]; error: any }) => {
         if (error) {
-          setError("Failed to load projects");
+          console.error("Error loading projects:", error);
+          setError(`Failed to load projects: ${error.message || error.code || 'Unknown error'}`);
           setProjects([]);
         } else {
           setProjects(data || []);
         }
+        setLoading(false);
+      })
+      .catch((err: any) => {
+        console.error("Unexpected error loading projects:", err);
+        setError(`Failed to load projects: ${err.message || 'Unexpected error'}`);
+        setProjects([]);
         setLoading(false);
       });
   }, [selectedRegions, selectedVoluntaryStatuses, selectedVoluntaryRegistries, selectedCountries, selectedAreasOfInterest]);
@@ -230,7 +259,17 @@ const ProjectTable = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-4 md:py-8">
-        <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Global Project Table</h1>
+        <div className="flex items-start justify-between flex-wrap gap-4 mb-4 md:mb-6">
+          <h1 className="text-xl md:text-2xl font-bold">Global Project Table</h1>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/explore/global-projects')}
+            className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
         
         {/* Search Bar */}
         <div className="mb-4">
@@ -277,14 +316,16 @@ const ProjectTable = () => {
             loadingLabel="Loading registries..."
             filtersLoading={filtersLoading}
           />
-          <MultiSelectDropdown
-            options={areasOfInterest}
-            selected={selectedAreasOfInterest}
-            setSelected={setSelectedAreasOfInterest}
-            placeholder="All Areas of Interest"
-            loadingLabel="Loading areas..."
-            filtersLoading={filtersLoading}
-          />
+          {hasAreaOfInterestColumn && (
+            <MultiSelectDropdown
+              options={areasOfInterest}
+              selected={selectedAreasOfInterest}
+              setSelected={setSelectedAreasOfInterest}
+              placeholder="All Areas of Interest"
+              loadingLabel="Loading areas..."
+              filtersLoading={filtersLoading}
+            />
+          )}
         </div>
         {/* Mobile Card View */}
         <div className="block md:hidden space-y-4">
@@ -317,10 +358,12 @@ const ProjectTable = () => {
                   <h3 className="font-semibold text-gray-900 text-sm mb-1">Status</h3>
                   <p className="text-gray-700 text-sm">{project["Voluntary Status"] || "N/A"}</p>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm mb-1">Area of Interest</h3>
-                  <p className="text-gray-700 text-sm">{project["Area of Interest"] || "N/A"}</p>
-                </div>
+                {hasAreaOfInterestColumn && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1">Area of Interest</h3>
+                    <p className="text-gray-700 text-sm">{project["Area of Interest"] || "N/A"}</p>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -336,12 +379,14 @@ const ProjectTable = () => {
                 <th className="px-4 py-2 text-left font-semibold">Country</th>
                 <th className="px-4 py-2 text-left font-semibold">Region</th>
                 <th className="px-4 py-2 text-left font-semibold">Status</th>
-                <th className="px-4 py-2 text-left font-semibold">Area of Interest</th>
+                {hasAreaOfInterestColumn && (
+                  <th className="px-4 py-2 text-left font-semibold">Area of Interest</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-4 text-center">Loading...</td></tr>
+                <tr><td colSpan={hasAreaOfInterestColumn ? 6 : 5} className="px-4 py-4 text-center">Loading...</td></tr>
               ) : error ? (
                 <tr><td colSpan={6} className="px-4 py-4 text-center text-red-500">{error}</td></tr>
               ) : filteredProjects.length === 0 ? (
@@ -354,7 +399,9 @@ const ProjectTable = () => {
                     <td className="px-4 py-2">{project["Country"] || "N/A"}</td>
                     <td className="px-4 py-2">{project["Region"] || "N/A"}</td>
                     <td className="px-4 py-2">{project["Voluntary Status"] || "N/A"}</td>
-                    <td className="px-4 py-2">{project["Area of Interest"] || "N/A"}</td>
+                    {hasAreaOfInterestColumn && (
+                      <td className="px-4 py-2">{project["Area of Interest"] || "N/A"}</td>
+                    )}
                   </tr>
                 ))
               )}

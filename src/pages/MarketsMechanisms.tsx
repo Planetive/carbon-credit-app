@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Globe, TrendingUp, Building2, MapPin, Calendar, CheckCircle2, Clock, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, Globe, TrendingUp, Building2, MapPin, Calendar, CheckCircle2, Clock, XCircle, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const marketColumns = [
 ];
 
 const MarketsMechanisms: React.FC = () => {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'compliance' | 'market'>('compliance');
   const [complianceData, setComplianceData] = useState<any[]>([]);
   const [marketData, setMarketData] = useState<any[]>([]);
@@ -172,10 +174,22 @@ const MarketsMechanisms: React.FC = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8 animate-in fade-in duration-500">
-          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
-            Markets & Mechanisms
-          </h1>
-          <p className="text-gray-600 text-lg">Explore compliance mechanisms and carbon credit markets worldwide</p>
+          <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
+            <div className="flex-1">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+                Markets & Mechanisms
+              </h1>
+              <p className="text-gray-600 text-lg">Explore compliance mechanisms and carbon credit markets worldwide</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/explore')}
+              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

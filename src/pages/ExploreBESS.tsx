@@ -161,19 +161,21 @@ const ExploreBESS = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8 animate-in fade-in duration-500">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/explore')}
-            className="mb-6 text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 transition-all duration-300"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="mb-4">
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-cyan-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent mb-2">
-              Battery Energy Storage Systems (BESS)
-            </h1>
-            <p className="text-gray-600 text-lg">Explore Battery Energy Storage Systems projects with detailed power and energy capacity information</p>
+          <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
+            <div className="flex-1">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-cyan-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+                Battery Energy Storage Systems (BESS)
+              </h1>
+              <p className="text-gray-600 text-lg">Explore Battery Energy Storage Systems projects with detailed power and energy capacity information</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/explore')}
+              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
           </div>
         </div>
 

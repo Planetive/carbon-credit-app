@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 const ProjectDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -49,14 +50,21 @@ const ProjectDetails = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">Back</Button>
+        <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">{project.project_name || <span className="italic text-gray-400">(info not provided)</span>}</h1>
+            <p className="text-gray-600">Project draft details and input summary</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate(-1)}
+            className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        </div>
         <div className="grid gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">{project.project_name || <span className="italic text-gray-400">(info not provided)</span>}</CardTitle>
-              <CardDescription>Project draft details and input summary</CardDescription>
-            </CardHeader>
-          </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card className="bg-blue-50/60 border-blue-100">

@@ -648,46 +648,48 @@ const ExploreProjects = () => {
       <div className="relative flex-1">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Section - visual only */}
-          <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/explore')}
-                className="rounded-full hover:bg-teal-100"
-              >
-                <ArrowLeft className="h-5 w-5 text-teal-600" />
-              </Button>
-              <div>
+          <div className="mb-8">
+            <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
+              <div className="flex-1">
                 <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-gray-900 via-teal-800 to-emerald-800 bg-clip-text text-transparent">
                   Global Carbon Projects
                 </h1>
                 <p className="text-gray-600 mt-2">Explore and analyze verified carbon projects worldwide</p>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/explore')}
+                className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
             </div>
-            <Button
-              className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg"
-              onClick={async () => {
-                try {
-                  setNavigating(true);
-                  // Fetch full data when user clicks (only when needed)
-                  const fullData = await fetchAllProjectsWithFilters({
-                    regions: selectedRegions,
-                    voluntaryStatuses: selectedVoluntaryStatuses,
-                    voluntaryRegistries: selectedVoluntaryRegistries,
-                    countries: selectedCountries,
-                    areasOfInterest: selectedAreasOfInterest,
-                  });
-                  navigate('/project-table', { state: { projects: fullData } });
-                } finally {
-                  setNavigating(false);
-                }
-              }}
-              disabled={navigating}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              {navigating ? 'Loading...' : 'View Project Table'}
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg"
+                onClick={async () => {
+                  try {
+                    setNavigating(true);
+                    // Fetch full data when user clicks (only when needed)
+                    const fullData = await fetchAllProjectsWithFilters({
+                      regions: selectedRegions,
+                      voluntaryStatuses: selectedVoluntaryStatuses,
+                      voluntaryRegistries: selectedVoluntaryRegistries,
+                      countries: selectedCountries,
+                      areasOfInterest: selectedAreasOfInterest,
+                    });
+                    navigate('/project-table', { state: { projects: fullData } });
+                  } finally {
+                    setNavigating(false);
+                  }
+                }}
+                disabled={navigating}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {navigating ? 'Loading...' : 'View Project Table'}
+              </Button>
+            </div>
           </div>
 
           {navigating && (

@@ -346,19 +346,21 @@ const ExploreCCUSProjects = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8 animate-in fade-in duration-500">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-6 text-teal-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-300"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="mb-4">
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
-              CCUS Database
-            </h1>
-            <p className="text-gray-600 text-lg">Explore Carbon Capture, Utilization, and Storage projects worldwide</p>
+          <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
+            <div className="flex-1">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+                CCUS Database
+              </h1>
+              <p className="text-gray-600 text-lg">Explore Carbon Capture, Utilization, and Storage projects worldwide</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/explore')}
+              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
           </div>
           <div className="flex gap-4">
             <Button
