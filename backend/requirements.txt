@@ -1,7 +1,8 @@
 fastapi==0.111.0
 uvicorn[standard]==0.30.1
 # pydantic version must satisfy both FastAPI (<3.0, >=1.7.4) and supabase/realtime (>=2.11.7)
-pydantic==2.11.8
+# Use a compatible range so uv can select a pydantic-core that supports the build Python.
+pydantic>=2.11.8,<3.0.0
 supabase==2.18.1
 python-dotenv==1.0.0
 mangum==0.17.0
