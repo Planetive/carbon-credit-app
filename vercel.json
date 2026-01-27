@@ -2,6 +2,9 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "env": {
+    "PYTHON_VERSION": "3.12"
+  },
   "routes": [
     {
       "handle": "filesystem"
