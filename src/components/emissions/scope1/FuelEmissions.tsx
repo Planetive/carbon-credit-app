@@ -35,11 +35,81 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
+
+  // Use Supabase "Fuel EPA" table for dynamic fuel factors when available,
+  // but keep the hardcoded FACTORS as a safe fallback.
+  const effectiveFactors = fuelFactors || FACTORS;
 
   // Computed values
-  const types = Object.keys(FACTORS) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
+  const types = Object.keys(effectiveFactors) as FuelType[];
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(effectiveFactors[type]) : []);
+  const unitsFor = (type?: FuelType, fuel?: string) =>
+    type && fuel ? Object.keys(effectiveFactors[type][fuel]) : [];
+
+  // Load fuel factor reference data from Supabase ("Fuel EPA" table).
+  // Expected columns (based on your screenshot):
+  //   - "Fuel" (text)
+  //   - "kg CO2 per mmBtu" (float8)
+  //   - "Category" (text)
+  useEffect(() => {
+    const loadFuelFactors = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('Fuel EPA' as any)
+          .select('*');
+
+        if (error) {
+          console.error('Error loading Fuel EPA factors:', error);
+          return; // keep using hardcoded FACTORS
+        }
+
+        if (!data || data.length === 0) {
+          console.warn('Fuel EPA table returned no rows; falling back to hardcoded FACTORS');
+          return;
+        }
+
+        const map: Record<string, Record<string, Record<string, number>>> = {};
+
+        (data as any[]).forEach(row => {
+          const category = row.Category || row.category;
+          const fuel = row.Fuel || row.fuel;
+          const rawFactor =
+            row['kg CO2 per mmBtu'] ??
+            row['kg CO₂ per mmBtu'] ??
+            row.kg_co2_per_mmbtu ??
+            row.kg_co2_per_unit;
+
+          const factor =
+            typeof rawFactor === 'number'
+              ? rawFactor
+              : rawFactor != null
+                ? parseFloat(String(rawFactor))
+                : NaN;
+
+          if (!category || !fuel || !isFinite(factor)) {
+            return;
+          }
+
+          if (!map[category]) {
+            map[category] = {};
+          }
+          // All EPA factors are per mmBtu in your sheet
+          map[category][fuel] = { mmBtu: factor };
+        });
+
+        // Only override if we actually built something
+        if (Object.keys(map).length > 0) {
+          console.log('Loaded Fuel EPA factors from Supabase:', map);
+          setFuelFactors(map as typeof FACTORS);
+        }
+      } catch (err) {
+        console.error('Unexpected error loading Fuel EPA factors:', err);
+      }
+    };
+
+    loadFuelFactors();
+  }, []);
 
   // Load existing entries
   useEffect(() => {
@@ -162,7 +232,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
       if (r.id !== id) return r;
       const next: FuelRow = { ...r, ...patch };
       if (next.type && next.fuel && next.unit) {
-        const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+        const factor = effectiveFactors[next.type]?.[next.fuel]?.[next.unit];
         next.factor = typeof factor === 'number' ? factor : undefined;
       } else {
         next.factor = undefined;

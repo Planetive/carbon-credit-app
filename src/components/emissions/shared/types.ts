@@ -1,6 +1,28 @@
 // Shared types for emission calculations
 
-export type FuelType = "Gaseous fuels" | "Liquid fuels" | "Solid fuels" | "Biofuel" | "Biomass" | "Biogas" | "Other Fuels - Solid" | "Biomass Fuels - Solid";
+// FuelType is used for grouping fuels in Scope 1 (and some Scope 2 "other
+// sources"). Originally we only had UK-style groups (e.g. "Gaseous fuels"),
+// but we now also support EPA-style categories coming from Supabase (e.g.
+// "Coal and Coke", "Natural Gas", "Petroleum Products", etc.).
+// Keep this as a union of known values for type-safety, but it is OK if the
+// backend returns additional categories – the UI will still render them.
+export type FuelType =
+  | "Gaseous fuels"
+  | "Liquid fuels"
+  | "Solid fuels"
+  | "Biofuel"
+  | "Biomass"
+  | "Biogas"
+  | "Other Fuels - Solid"
+  | "Biomass Fuels - Solid"
+  // EPA-style groups used in the `Fuel EPA` reference table
+  | "Coal and Coke"
+  | "Natural Gas"
+  | "Other Fuels - Gaseous"
+  | "Biomass Fuels - Gaseous"
+  | "Petroleum Products"
+  | "Biomass Fuels - Liquid"
+  | "Biomass Fuels - Kraft Pulping Liquor, by Wood Furnish";
 
 export interface FuelRow {
   id: string;
