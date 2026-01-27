@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS scope3_processing_sold_products (
   mobile_kg_co2_per_unit NUMERIC,
   mobile_unit TEXT,
   -- Heat and Steam fields
+  heat_steam_standard TEXT, -- 'UK' | 'EBT' - Standard selection for emission factors
   heat_steam_type TEXT, -- 'Onsite heat and steam' | 'District heat and steam'
   heat_steam_kg_co2e NUMERIC,
   heat_steam_unit TEXT,

@@ -20,6 +20,7 @@ export interface ProcessingSoldProductsRow {
   mobileKgCo2PerUnit?: number;
   mobileUnit?: string;
   // Heat and Steam fields (for "Drying / Curing / Kilns" activity)
+  heatSteamStandard?: 'UK' | 'EBT'; // Standard selection (UK or EBT)
   heatSteamType?: string; // 'Onsite heat and steam' | 'District heat and steam'
   heatSteamKgCo2e?: number;
   heatSteamUnit?: string;

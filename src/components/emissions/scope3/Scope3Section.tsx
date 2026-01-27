@@ -90,6 +90,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     mobileFuelType: undefined,
     mobileKgCo2PerUnit: undefined,
     mobileUnit: undefined,
+    heatSteamStandard: undefined,
     heatSteamType: undefined,
     heatSteamKgCo2e: undefined,
     heatSteamUnit: undefined,
@@ -181,8 +182,14 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     'Unit': string;
   }>>([]);
   
-  // Heat and Steam data
-  const [heatSteamData, setHeatSteamData] = useState<Array<{
+  // Heat and Steam data - store data for both standards
+  const [heatSteamDataUK, setHeatSteamDataUK] = useState<Array<{
+    id: string | number;
+    'Type': string;
+    'Unit': string;
+    'kg CO₂e': number;
+  }>>([]);
+  const [heatSteamDataEBT, setHeatSteamDataEBT] = useState<Array<{
     id: string | number;
     'Type': string;
     'Unit': string;
@@ -458,61 +465,57 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     loadCombustionData();
   }, [activeCategory, toast]);
   
-  // Load Heat and Steam data
+  // Load Heat and Steam data for both standards
   useEffect(() => {
     const loadHeatSteamData = async () => {
       if (activeCategory !== 'processingUseOfSoldProducts') return;
       
+      // Load UK standard data
       try {
-        const { data: heatSteamData, error: heatSteamError } = await supabase
+        const { data: ukData, error: ukError } = await supabase
           .from('heat and steam' as any)
           .select('*', { count: 'exact' });
         
-        console.log('Query result for "heat and steam":', {
-          data: heatSteamData,
-          error: heatSteamError,
-          count: heatSteamData?.length
-        });
-        
-        if (heatSteamError) {
-          console.error('Heat and Steam error:', heatSteamError);
-          toast({
-            title: "Warning",
-            description: `Could not load Heat and Steam data: ${heatSteamError.message || 'Unknown error'}`,
-            variant: "destructive",
-          });
-        }
-        
-        if (heatSteamData && heatSteamData.length > 0) {
-          console.log('Heat and Steam data received:', heatSteamData);
-          console.log('First row sample:', heatSteamData[0]);
-          console.log('Available keys in first row:', Object.keys(heatSteamData[0]));
-          
-          // Format the data - handle different possible column name formats
-          const formatted = heatSteamData.map((row: any) => ({
+        if (ukError) {
+          console.error('Heat and Steam (UK) error:', ukError);
+        } else if (ukData && ukData.length > 0) {
+          const formatted = ukData.map((row: any) => ({
             id: row.id || row.ID || row.Id,
-            'Type': row['Type'] || row.type || row['type'],
+            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
             'Unit': row['Unit'] || row.unit || row['unit'],
-            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || 0),
+            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
+                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
+                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
+                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
           }));
-          
-          console.log('Formatted Heat and Steam data:', formatted);
-          setHeatSteamData(formatted as Array<{
-            id: string | number;
-            'Type': string;
-            'Unit': string;
-            'kg CO₂e': number;
-          }>);
-        } else {
-          console.warn('No Heat and Steam data found');
+          setHeatSteamDataUK(formatted);
         }
       } catch (error: any) {
-        console.error('Error loading heat and steam data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load heat and steam data",
-          variant: "destructive",
-        });
+        console.error('Error loading UK heat and steam data:', error);
+      }
+
+      // Load EBT standard data
+      try {
+        const { data: ebtData, error: ebtError } = await supabase
+          .from('heat and steam EBT' as any)
+          .select('*', { count: 'exact' });
+        
+        if (ebtError) {
+          console.error('Heat and Steam (EBT) error:', ebtError);
+        } else if (ebtData && ebtData.length > 0) {
+          const formatted = ebtData.map((row: any) => ({
+            id: row.id || row.ID || row.Id,
+            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
+            'Unit': row['Unit'] || row.unit || row['unit'],
+            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
+                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
+                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
+                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
+          }));
+          setHeatSteamDataEBT(formatted);
+        }
+      } catch (error: any) {
+        console.error('Error loading EBT heat and steam data:', error);
       }
     };
     
@@ -2153,6 +2156,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             mobileFuelType: entry.mobile_fuel_type || rowData.mobileFuelType,
             mobileKgCo2PerUnit: entry.mobile_kg_co2_per_unit || rowData.mobileKgCo2PerUnit,
             mobileUnit: entry.mobile_unit || rowData.mobileUnit,
+            heatSteamStandard: entry.heat_steam_standard || rowData.heatSteamStandard,
             heatSteamType: entry.heat_steam_type || rowData.heatSteamType,
             heatSteamKgCo2e: entry.heat_steam_kg_co2e || rowData.heatSteamKgCo2e,
             heatSteamUnit: entry.heat_steam_unit || rowData.heatSteamUnit,
@@ -2806,6 +2810,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               mobile_fuel_type: r.mobileFuelType,
               mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
               mobile_unit: r.mobileUnit,
+              heat_steam_standard: r.heatSteamStandard,
               heat_steam_type: r.heatSteamType,
               heat_steam_kg_co2e: r.heatSteamKgCo2e,
               heat_steam_unit: r.heatSteamUnit,
@@ -2965,6 +2970,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                           mobileKgCo2PerUnit: isHeatingMelting ? row.mobileKgCo2PerUnit : undefined,
                           mobileUnit: isHeatingMelting ? row.mobileUnit : undefined,
                           // Clear heat and steam fields if not Drying / Curing / Kilns
+                          // Initialize to 'UK' if selecting Drying / Curing / Kilns and standard is undefined
+                          heatSteamStandard: isDryingCuringKilns ? (row.heatSteamStandard || 'UK') : undefined,
                           heatSteamType: isDryingCuringKilns ? row.heatSteamType : undefined,
                           heatSteamKgCo2e: isDryingCuringKilns ? row.heatSteamKgCo2e : undefined,
                           heatSteamUnit: isDryingCuringKilns ? row.heatSteamUnit : undefined,
@@ -3280,46 +3287,111 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                 {row.processingActivity === 'Drying / Curing / Kilns' && (
                   <div className="space-y-4 mb-4 p-4 bg-white rounded-lg border border-gray-300">
                     <h4 className="text-sm font-semibold text-gray-900 mb-3">Heat and Steam Details</h4>
-                    {/* Debug info - remove in production */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-100 rounded">
-                        Data loaded: {heatSteamData.length} rows
-                      </div>
-                    )}
+                    {/* Standard Selection */}
+                    <div className="mb-4">
+                      <Label className="flex items-center gap-1 mb-2">
+                        Standard <FieldTooltip content="Select the emission factor standard (UK or EBT)" />
+                      </Label>
+                      <Select 
+                        value={row.heatSteamStandard || 'UK'} 
+                        onValueChange={(value: 'UK' | 'EBT') => {
+                          const currentStandard = value;
+                          const dataSource = currentStandard === 'UK' ? heatSteamDataUK : heatSteamDataEBT;
+                          
+                          // Auto-select if EBT has only one option
+                          let autoSelectedType: string | undefined;
+                          let autoSelectedData: any = undefined;
+                          
+                          if (value === 'EBT' && dataSource.length === 1) {
+                            autoSelectedData = dataSource[0];
+                            autoSelectedType = autoSelectedData['Type'];
+                          }
+                          
+                          updateProcessingRow(row.id, { 
+                            heatSteamStandard: value,
+                            heatSteamType: autoSelectedType,
+                            heatSteamKgCo2e: autoSelectedData?.['kg CO₂e'],
+                            heatSteamUnit: autoSelectedData?.['Unit'],
+                            quantity: undefined,
+                            emissions: undefined,
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-full md:w-[200px]">
+                          <SelectValue placeholder="Select standard" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UK">UK Standard</SelectItem>
+                          <SelectItem value="EBT">EBT Standard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <Label className="flex items-center gap-1 mb-2">
                           Heat and Steam Type <FieldTooltip content="Select heat and steam type" />
                         </Label>
-                        <Select 
-                          value={row.heatSteamType || ''} 
-                          onValueChange={(value) => {
-                            const selected = heatSteamData.find(d => d['Type'] === value);
-                            console.log('Selected heat and steam type:', selected);
-                            updateProcessingRow(row.id, { 
-                              heatSteamType: value,
-                              heatSteamKgCo2e: selected?.['kg CO₂e'],
-                              heatSteamUnit: selected?.['Unit'],
-                              quantity: undefined,
-                              emissions: undefined,
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select heat and steam type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {heatSteamData.length === 0 ? (
-                              <SelectItem value="no-data" disabled>Loading data...</SelectItem>
-                            ) : (
-                              heatSteamData.map(d => (
-                                <SelectItem key={d['Type']} value={d['Type']}>
-                                  {d['Type']}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const currentStandard = row.heatSteamStandard || 'UK';
+                          const dataSource = currentStandard === 'UK' ? heatSteamDataUK : heatSteamDataEBT;
+                          const isEBTWithOneOption = currentStandard === 'EBT' && dataSource.length === 1;
+                          
+                          // If EBT has only one option, show it as read-only input instead of dropdown
+                          if (isEBTWithOneOption && dataSource[0]) {
+                            const singleOption = dataSource[0];
+                            // Auto-select if not already selected
+                            if (!row.heatSteamType) {
+                              updateProcessingRow(row.id, { 
+                                heatSteamType: singleOption['Type'],
+                                heatSteamKgCo2e: singleOption['kg CO₂e'],
+                                heatSteamUnit: singleOption['Unit'],
+                              });
+                            }
+                            return (
+                              <Input
+                                type="text"
+                                value={singleOption['Type']}
+                                disabled
+                                className="bg-gray-100"
+                                readOnly
+                              />
+                            );
+                          }
+                          
+                          // Otherwise show dropdown
+                          return (
+                            <Select 
+                              value={row.heatSteamType || ''} 
+                              onValueChange={(value) => {
+                                const selected = dataSource.find(d => d['Type'] === value);
+                                console.log('Selected heat and steam type:', selected);
+                                updateProcessingRow(row.id, { 
+                                  heatSteamType: value,
+                                  heatSteamKgCo2e: selected?.['kg CO₂e'],
+                                  heatSteamUnit: selected?.['Unit'],
+                                  quantity: undefined,
+                                  emissions: undefined,
+                                });
+                              }}
+                              disabled={!row.heatSteamStandard}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select heat and steam type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {dataSource.length === 0 ? (
+                                  <SelectItem value="no-data" disabled>Loading data...</SelectItem>
+                                ) : (
+                                  dataSource.map(d => (
+                                    <SelectItem key={d['Type']} value={d['Type']}>
+                                      {d['Type']}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
                       </div>
                       <div>
                         <Label className="flex items-center gap-1 mb-2">

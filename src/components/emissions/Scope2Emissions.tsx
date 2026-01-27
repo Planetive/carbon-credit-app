@@ -48,18 +48,101 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   // Heat & Steam state
-  type HeatType = 'Onsite heat and steam' | 'District heat and steam';
-  interface HeatRow { id?: string; entryType: HeatType; unit: string; factor: number; quantity?: number; emissions?: number; dbId?: string; }
-  const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh
-  const [heatRows, setHeatRows] = useState<HeatRow[]>([
-    { entryType: 'Onsite heat and steam', unit: 'kWh', factor: HEAT_DEFAULT_FACTOR },
-    { entryType: 'District heat and steam', unit: 'kWh', factor: HEAT_DEFAULT_FACTOR },
-  ]);
+  interface HeatRow { id?: string; entryType: string; unit: string; factor: number; quantity?: number; emissions?: number; dbId?: string; }
+  const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh (fallback)
+  const [heatSteamStandard, setHeatSteamStandard] = useState<'UK' | 'EBT'>('UK');
+  const [heatSteamDataUK, setHeatSteamDataUK] = useState<Array<{
+    'Type': string;
+    'Unit': string;
+    'kg CO₂e': number;
+  }>>([]);
+  const [heatSteamDataEBT, setHeatSteamDataEBT] = useState<Array<{
+    'Type': string;
+    'Unit': string;
+    'kg CO₂e': number;
+  }>>([]);
+  const [heatRows, setHeatRows] = useState<HeatRow[]>([]);
   const [savingHeat, setSavingHeat] = useState(false);
 
   const fuelTypes = Object.keys(FACTORS) as FuelType[];
   const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
   const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
+
+  // Load heat and steam reference data for both standards
+  useEffect(() => {
+    const loadReferenceData = async () => {
+      try {
+        // Load UK standard data
+        const { data: ukData } = await supabase
+          .from('heat and steam' as any)
+          .select('*');
+        
+        if (ukData && ukData.length > 0) {
+          const formatted = ukData.map((row: any) => ({
+            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
+            'Unit': row['Unit'] || row.unit || row['unit'],
+            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
+                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
+                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
+                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
+          }));
+          setHeatSteamDataUK(formatted);
+        }
+
+        // Load EBT standard data
+        const { data: ebtData } = await supabase
+          .from('heat and steam EBT' as any)
+          .select('*');
+        
+        if (ebtData && ebtData.length > 0) {
+          const formatted = ebtData.map((row: any) => ({
+            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
+            'Unit': row['Unit'] || row.unit || row['unit'],
+            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
+                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
+                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
+                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
+          }));
+          setHeatSteamDataEBT(formatted);
+        }
+      } catch (error: any) {
+        console.error('Error loading heat and steam reference data:', error);
+      }
+    };
+    loadReferenceData();
+  }, []);
+
+  // Update rows when standard or data changes - dynamically create rows based on available types
+  useEffect(() => {
+    const dataSource = heatSteamStandard === 'UK' ? heatSteamDataUK : heatSteamDataEBT;
+    
+    if (dataSource.length === 0) {
+      // If no data yet, keep existing rows or set empty
+      return;
+    }
+    
+    // Create rows from the data source, preserving quantities if types match
+    setHeatRows(prev => {
+      const newRows: HeatRow[] = dataSource.map((dataItem, index) => {
+        // Try to find existing row with same type to preserve quantity
+        const existingRow = prev.find(r => r.entryType === dataItem['Type']);
+        
+        return {
+          id: existingRow?.id || `heat-${index}-${Date.now()}`,
+          entryType: dataItem['Type'],
+          unit: dataItem['Unit'] || 'kWh',
+          factor: dataItem['kg CO₂e'] || HEAT_DEFAULT_FACTOR,
+          quantity: existingRow?.quantity,
+          emissions: existingRow?.quantity && dataItem['kg CO₂e'] 
+            ? Number((existingRow.quantity * dataItem['kg CO₂e']).toFixed(6))
+            : undefined,
+          dbId: existingRow?.dbId,
+        };
+      });
+      
+      return newRows;
+    });
+  }, [heatSteamStandard, heatSteamDataUK, heatSteamDataEBT]);
 
   useEffect(() => {
     const load = async () => {
@@ -131,25 +214,26 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
             .order('created_at', { ascending: true });
           if (heatError) throw heatError;
 
-          const nextHeat: HeatRow[] = [
-            { entryType: 'Onsite heat and steam', unit: 'kWh', factor: HEAT_DEFAULT_FACTOR },
-            { entryType: 'District heat and steam', unit: 'kWh', factor: HEAT_DEFAULT_FACTOR },
-          ];
-          (heatData || []).forEach((row: any) => {
-            const idx = nextHeat.findIndex(h => h.entryType === row.entry_type);
-            if (idx >= 0) {
-              nextHeat[idx] = {
-                id: crypto.randomUUID(),
-                dbId: row.id,
-                entryType: row.entry_type as HeatType,
-                unit: row.unit,
-                factor: row.emission_factor ?? HEAT_DEFAULT_FACTOR,
-                quantity: row.quantity ?? undefined,
-                emissions: row.emissions ?? undefined,
-              };
-            }
-          });
-          setHeatRows(nextHeat);
+          // Load saved standard if available
+          if (heatData && heatData.length > 0 && heatData[0].standard) {
+            setHeatSteamStandard(heatData[0].standard);
+          }
+          
+          // Convert saved data to rows (will be updated when standard/data loads)
+          const savedRows: HeatRow[] = (heatData || []).map((row: any) => ({
+            id: crypto.randomUUID(),
+            dbId: row.id,
+            entryType: row.entry_type,
+            unit: row.unit,
+            factor: row.emission_factor ?? HEAT_DEFAULT_FACTOR,
+            quantity: row.quantity ?? undefined,
+            emissions: row.emissions ?? undefined,
+          }));
+          
+          // Only set if we have saved data, otherwise let the standard/data effect handle it
+          if (savedRows.length > 0) {
+            setHeatRows(savedRows);
+          }
         }
       } catch (e: any) {
         console.error(e);
@@ -344,7 +428,7 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
     if (onTotalChange) onTotalChange(totalScope2);
   }, [onTotalChange, totalScope2]);
 
-  const updateHeatRowQty = (entryType: HeatType, qty?: number) => {
+  const updateHeatRowQty = (entryType: string, qty?: number) => {
     setHeatRows(prev => prev.map(r => {
       if (r.entryType !== entryType) return r;
       const next = { ...r, quantity: qty } as HeatRow;
@@ -370,6 +454,7 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
         emission_factor: r.factor,
         quantity: r.quantity!,
         emissions: r.emissions!,
+        standard: heatSteamStandard,
       }));
       if (inserts.length > 0) {
         const { error } = await (supabase as any).from('scope2_heatsteam_entries').insert(inserts);
@@ -384,6 +469,7 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
             emission_factor: r.factor,
             quantity: r.quantity!,
             emissions: r.emissions!,
+            standard: heatSteamStandard,
           })
           .eq('id', r.dbId!)
       ));
@@ -647,71 +733,65 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
       <Card>
         <CardContent className="p-6 space-y-6">
           <h2 className="text-xl font-semibold">Scope 2 - Heat & Steam</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-              <Label>Onsite heat and steam (kWh)</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                max="999999999999.999999"
-                value={heatRows.find(r => r.entryType === 'Onsite heat and steam')?.quantity ?? ''}
-                onChange={e => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateHeatRowQty('Onsite heat and steam', undefined);
-                  } else {
-                    const numValue = Number(value);
-                    if (numValue >= 0 && numValue <= 999999999999.999999) {
-                      updateHeatRowQty('Onsite heat and steam', numValue);
-                    }
-                  }
-                }}
-                placeholder="Enter kWh"
-              />
-            </div>
-            {/* <div>
-              <Label>Factor (kg CO2e/kWh)</Label>
-              <Input readOnly value={HEAT_DEFAULT_FACTOR} />
-            </div> */}
-            <div>
-              <Label>Emissions</Label>
-              <Input readOnly value={(heatRows.find(r => r.entryType === 'Onsite heat and steam')?.emissions ?? '').toString()} />
-            </div>
+          {/* Standard Selection */}
+          <div className="mb-4">
+            <Label className="flex items-center gap-1 mb-2">
+              Standard
+            </Label>
+            <Select 
+              value={heatSteamStandard} 
+              onValueChange={(value: 'UK' | 'EBT') => {
+                setHeatSteamStandard(value);
+              }}
+            >
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Select standard" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="UK">UK Standard</SelectItem>
+                <SelectItem value="EBT">EBT Standard</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-              <Label>District heat and steam (kWh)</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                max="999999999999.999999"
-                value={heatRows.find(r => r.entryType === 'District heat and steam')?.quantity ?? ''}
-                onChange={e => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateHeatRowQty('District heat and steam', undefined);
-                  } else {
-                    const numValue = Number(value);
-                    if (numValue >= 0 && numValue <= 999999999999.999999) {
-                      updateHeatRowQty('District heat and steam', numValue);
-                    }
-                  }
-                }}
-                placeholder="Enter kWh"
-              />
-            </div>
-            {/* <div>
-              <Label>Factor (kg CO2e/kWh)</Label>
-              <Input readOnly value={HEAT_DEFAULT_FACTOR} />
-            </div> */}
-            <div>
-              <Label>Emissions</Label>
-              <Input readOnly value={(heatRows.find(r => r.entryType === 'District heat and steam')?.emissions ?? '').toString()} />
-            </div>
-          </div>
+          {/* Dynamically render rows based on selected standard */}
+          {heatRows.length === 0 ? (
+            <div className="text-sm text-gray-600">Loading heat and steam data...</div>
+          ) : (
+            heatRows.map((row) => (
+              <div key={row.id || row.entryType} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div>
+                  <Label>{row.entryType} ({row.unit})</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max="999999999999.999999"
+                    value={row.quantity ?? ''}
+                    onChange={e => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateHeatRowQty(row.entryType, undefined);
+                      } else {
+                        const numValue = Number(value);
+                        if (numValue >= 0 && numValue <= 999999999999.999999) {
+                          updateHeatRowQty(row.entryType, numValue);
+                        }
+                      }
+                    }}
+                    placeholder={`Enter ${row.unit}`}
+                  />
+                </div>
+                <div>
+                  <Label>Emissions</Label>
+                  <Input readOnly value={(row.emissions ?? '').toString()} />
+                </div>
+                <div>
+                  <Label>Factor (kg CO2e/{row.unit})</Label>
+                  <Input readOnly value={row.factor.toFixed(6)} />
+                </div>
+              </div>
+            ))
+          )}
 
           <div className="flex items-center justify-between pt-2">
             <div className="text-gray-900 font-medium">
