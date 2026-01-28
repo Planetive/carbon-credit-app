@@ -23,13 +23,18 @@ const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh (fallback)
 interface HeatSteamEmissionsProps {
   onTotalChange?: (total: number) => void;
   onSaveAndNext?: () => void;
+  /**
+   * When set, forces the standard (e.g. for EPA calculator).
+   * If provided, the selector is locked to this value.
+   */
+  forcedStandard?: 'UK' | 'EBT';
 }
 
-const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, onSaveAndNext }) => {
+const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, onSaveAndNext, forcedStandard }) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [heatSteamStandard, setHeatSteamStandard] = useState<'UK' | 'EBT'>('UK');
+  const [heatSteamStandard, setHeatSteamStandard] = useState<'UK' | 'EBT'>(forcedStandard ?? 'UK');
   const [heatSteamDataUK, setHeatSteamDataUK] = useState<Array<{
     'Type': string;
     'Unit': string;
@@ -133,8 +138,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           .order('created_at', { ascending: true });
         if (heatError) throw heatError;
 
-        // Load saved standard if available
-        if (heatData && heatData.length > 0 && heatData[0].standard) {
+        // Load saved standard if available, unless forced (EPA)
+        if (!forcedStandard && heatData && heatData.length > 0 && heatData[0].standard) {
           setHeatSteamStandard(heatData[0].standard);
         }
         
@@ -159,7 +164,14 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
       }
     };
     load();
-  }, [user, toast]);
+  }, [user, toast, forcedStandard]);
+
+  // If forced (EPA), lock the standard.
+  useEffect(() => {
+    if (forcedStandard) {
+      setHeatSteamStandard(forcedStandard);
+    }
+  }, [forcedStandard]);
 
   const updateHeatRowQty = (entryType: string, qty?: number) => {
     setHeatRows(prev => prev.map(r => {
@@ -242,26 +254,26 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         </div>
       </div>
 
-      {/* Standard Selection */}
-      <div className="mb-4">
-        <Label className="flex items-center gap-1 mb-2">
-          Standard
-        </Label>
-        <Select 
-          value={heatSteamStandard} 
-          onValueChange={(value: 'UK' | 'EBT') => {
-            setHeatSteamStandard(value);
-          }}
-        >
-          <SelectTrigger className="w-full md:w-[200px]">
-            <SelectValue placeholder="Select standard" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="UK">UK Standard</SelectItem>
-            <SelectItem value="EBT">EBT Standard</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Standard Selection (hidden when forced, e.g. EPA calculator) */}
+      {!forcedStandard && (
+        <div className="mb-4">
+          <Label className="flex items-center gap-1 mb-2">Standard</Label>
+          <Select
+            value={heatSteamStandard}
+            onValueChange={(value: "UK" | "EBT") => {
+              setHeatSteamStandard(value);
+            }}
+          >
+            <SelectTrigger className="w-full md:w-[200px]">
+              <SelectValue placeholder="Select standard" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UK">UK Standard</SelectItem>
+              <SelectItem value="EBT">EBT Standard</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Dynamically render rows based on selected standard */}
       {heatRows.length === 0 ? (

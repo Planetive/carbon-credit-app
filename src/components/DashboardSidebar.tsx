@@ -100,18 +100,26 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   };
 
   const isActive = (item: SidebarItem) => {
-    if (item.id === 'start-project' && (location.pathname === '/bank-portfolio' || location.pathname === '/project-wizard')) {
+    // Start Project/Portfolio is only active when on its specific path
+    if (item.id === 'start-project') {
+      return location.pathname === '/bank-portfolio' || location.pathname === '/project-wizard';
+    }
+    
+    // Portfolio is only active when activeSection is 'portfolio' AND we're on dashboard
+    if (item.id === 'portfolio') {
+      return location.pathname === '/dashboard' && activeSection === 'portfolio';
+    }
+    
+    // Overview is only active when on dashboard and activeSection is 'overview' or not set
+    if (item.id === 'overview') {
+      return location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview');
+    }
+    
+    // Other items are active when pathname matches their path
+    if (item.path && location.pathname === item.path) {
       return true;
     }
-    if (item.id === 'overview' && location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview')) {
-      return true;
-    }
-    if (item.id === 'portfolio' && activeSection === 'portfolio') {
-      return true;
-    }
-    if (item.path && location.pathname === item.path && item.id !== 'overview' && item.id !== 'portfolio') {
-      return true;
-    }
+    
     return false;
   };
 
