@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MobileFuelRow {
   id: string;
+  dbId?: string;
+  isExisting?: boolean;
   fuelType?: string;
   unit?: string;
   quantity?: number;
@@ -19,6 +22,8 @@ interface MobileFuelRow {
 interface MobileFuelEmissionsProps {
   onDataChange: (rows: MobileFuelRow[]) => void;
   onSaveAndNext?: () => void;
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
 interface MobileCombustionOption {
@@ -32,15 +37,70 @@ const newRow = (): MobileFuelRow => ({
   id: crypto.randomUUID(),
 });
 
+const tableName = "scope1_epa_mobile_fuel_entries";
+
 const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
   onDataChange,
   onSaveAndNext,
+  companyContext = false,
+  counterpartyId,
 }) => {
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [options, setOptions] = useState<MobileCombustionOption[]>([]);
   const [rows, setRows] = useState<MobileFuelRow[]>([]);
+  const [existingEntries, setExistingEntries] = useState<MobileFuelRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Load existing entries from Supabase
+  useEffect(() => {
+    const loadEntries = async () => {
+      if (!user) return;
+      if (companyContext && !counterpartyId) {
+        setRows([]);
+        setExistingEntries([]);
+        onDataChange([]);
+        setIsInitialLoad(false);
+        return;
+      }
+      try {
+        let q = supabase
+          .from(tableName as any)
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        if (companyContext && counterpartyId) {
+          q = q.eq("counterparty_id", counterpartyId);
+        } else {
+          q = q.is("counterparty_id", null);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        const mapped: MobileFuelRow[] = (data || []).map((entry: any) => ({
+          id: crypto.randomUUID(),
+          dbId: entry.id,
+          isExisting: true,
+          fuelType: entry.fuel_type,
+          unit: entry.unit,
+          quantity: entry.quantity,
+          factor: entry.factor,
+          emissions: entry.emissions,
+        }));
+        setExistingEntries(mapped);
+        setRows(mapped.length > 0 ? mapped : []);
+        if (mapped.length > 0) onDataChange(mapped);
+      } catch (err: any) {
+        console.error("Error loading scope1_epa_mobile_fuel_entries:", err);
+        toast({ title: "Error", description: err?.message || "Failed to load saved entries", variant: "destructive" });
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    loadEntries();
+  }, [user, companyContext, counterpartyId]);
 
   // Load reference data from "Mobile Combustion" table
   useEffect(() => {
@@ -129,15 +189,25 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
     loadMobileCombustion();
   }, [toast]);
 
-  // Keep parent in sync
   useEffect(() => {
-    onDataChange(rows);
-  }, [rows, onDataChange]);
+    if (!isInitialLoad) onDataChange(rows);
+  }, [rows, isInitialLoad, onDataChange]);
 
   const addRow = () => setRows((prev) => [...prev, newRow()]);
 
-  const removeRow = (id: string) =>
+  const removeRow = async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    if (row?.dbId && user) {
+      try {
+        const { error } = await supabase.from(tableName as any).delete().eq("id", row.dbId);
+        if (error) throw error;
+      } catch (e: any) {
+        toast({ title: "Error", description: e?.message || "Failed to delete entry", variant: "destructive" });
+        return;
+      }
+    }
     setRows((prev) => prev.filter((r) => r.id !== id));
+  };
 
   const updateRow = (id: string, patch: Partial<MobileFuelRow>) => {
     setRows((prev) =>
@@ -167,13 +237,81 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
-  const handleSaveAndNext = () => {
-    toast({
-      title: "Saved (local)",
-      description:
-        "Mobile fuel emissions are included in your Scope 1 total for this EPA calculator.",
-    });
-    onSaveAndNext?.();
+  const rowChanged = (r: MobileFuelRow, existing: MobileFuelRow[]): boolean => {
+    const ex = existing.find((e) => e.dbId === r.dbId);
+    if (!ex) return false;
+    return (
+      r.fuelType !== ex.fuelType ||
+      r.unit !== ex.unit ||
+      Number(r.quantity) !== Number(ex.quantity) ||
+      Number(r.factor) !== Number(ex.factor) ||
+      Number(r.emissions) !== Number(ex.emissions)
+    );
+  };
+
+  const handleSaveAndNext = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
+      return;
+    }
+    const newEntries = rows.filter(
+      (r) =>
+        r.fuelType &&
+        r.unit != null &&
+        typeof r.quantity === "number" &&
+        typeof r.factor === "number" &&
+        typeof r.emissions === "number" &&
+        !r.isExisting
+    );
+    const changedExisting = rows.filter((r) => r.isExisting && r.dbId && rowChanged(r, existingEntries));
+    if (newEntries.length === 0 && changedExisting.length === 0) {
+      toast({ title: "Nothing to save", description: "No new or changed mobile fuel entries." });
+      onSaveAndNext?.();
+      return;
+    }
+    setSaving(true);
+    try {
+      if (newEntries.length > 0) {
+        const payload = newEntries.map((v) => ({
+          user_id: user.id,
+          counterparty_id: companyContext ? counterpartyId ?? null : null,
+          fuel_type: v.fuelType!,
+          unit: v.unit!,
+          quantity: v.quantity!,
+          factor: v.factor!,
+          emissions: v.emissions!,
+        }));
+        const { error } = await supabase.from(tableName as any).insert(payload);
+        if (error) throw error;
+      }
+      if (changedExisting.length > 0) {
+        const results = await Promise.all(
+          changedExisting.map((v) =>
+            supabase
+              .from(tableName as any)
+              .update({
+                fuel_type: v.fuelType!,
+                unit: v.unit!,
+                quantity: v.quantity!,
+                factor: v.factor!,
+                emissions: v.emissions!,
+              })
+              .eq("id", v.dbId!)
+          )
+        );
+        const updateError = results.find((r: { error?: unknown }) => r.error)?.error;
+        if (updateError) throw updateError;
+      }
+      toast({
+        title: "Saved",
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} mobile fuel entries.`,
+      });
+      onSaveAndNext?.();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const uniqueFuelTypes = Array.from(
@@ -297,6 +435,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         <Button
           onClick={handleSaveAndNext}
           className="bg-teal-600 hover:bg-teal-700 text-white"
+          disabled={saving}
         >
           <Save className="h-4 w-4 mr-2" />
           Save and Next

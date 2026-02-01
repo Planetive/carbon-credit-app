@@ -959,6 +959,8 @@ const EmissionCalculatorEPA = () => {
                       <MobileFuelEmissions
                         onDataChange={handleMobileFuelDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>
@@ -973,6 +975,8 @@ const EmissionCalculatorEPA = () => {
                       <OnRoadGasolineEmissions
                         onDataChange={handleOnRoadGasolineDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>
@@ -987,6 +991,8 @@ const EmissionCalculatorEPA = () => {
                       <OnRoadDieselAltFuelEmissions
                         onDataChange={handleOnRoadDieselAltFuelDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>
@@ -1001,6 +1007,8 @@ const EmissionCalculatorEPA = () => {
                       <NonRoadVehicleEmissions
                         onDataChange={handleNonRoadVehicleDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>

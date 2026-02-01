@@ -115,6 +115,11 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
       return location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview');
     }
     
+    // Emission Calculator is active on choice page or either version (UK/EPA)
+    if (item.id === 'emissions' && item.path) {
+      return location.pathname === item.path || location.pathname === '/emission-calculator-uk' || location.pathname === '/emission-calculator-epa';
+    }
+
     // Other items are active when pathname matches their path
     if (item.path && location.pathname === item.path) {
       return true;

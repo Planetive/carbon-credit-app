@@ -53,6 +53,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminScoring from "./pages/AdminScoring";
 import EmissionCalculator from "./pages/EmissionCalculator";
+import EmissionCalculatorChoice from "./pages/EmissionCalculatorChoice";
 import EmissionCalculatorEPA from "./pages/EmissionCalculatorEPA";
 import EmissionResults from "./pages/EmissionResults";
 import EmissionHistory from "./pages/EmissionHistory";
@@ -190,6 +191,11 @@ const AppRoutes = () => {
             </ProtectedRoute>
           } />
           <Route path="/emission-calculator" element={
+            <CompanyProtectedRoute>
+              <EmissionCalculatorChoice />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/emission-calculator-uk" element={
             <CompanyProtectedRoute>
               <EmissionCalculator />
             </CompanyProtectedRoute>

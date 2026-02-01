@@ -4,8 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+const TABLE_NAME = "scope1_epa_on_road_diesel_alt_fuel_entries";
 
 // Same defaults as On-Road Gasoline component
 const GWP_CH4 = 28;
@@ -24,6 +27,8 @@ interface FactorRow {
 
 interface EntryRow {
   id: string;
+  dbId?: string;
+  isExisting?: boolean;
   vehicleType?: string;
   fuelType?: string;
   modelYear?: string;
@@ -34,6 +39,8 @@ interface EntryRow {
 interface Props {
   onDataChange: (rows: EntryRow[]) => void;
   onSaveAndNext?: () => void;
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
 const newRow = (): EntryRow => ({ id: crypto.randomUUID() });
@@ -64,11 +71,54 @@ const normalizeYear = (v: any): string | undefined => {
   return s.length > 0 ? s : undefined;
 };
 
-const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext }) => {
+const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext, companyContext = false, counterpartyId }) => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [factors, setFactors] = useState<FactorRow[]>([]);
   const [rows, setRows] = useState<EntryRow[]>([]);
+  const [existingEntries, setExistingEntries] = useState<EntryRow[]>([]);
+
+  useEffect(() => {
+    const loadEntries = async () => {
+      if (!user) return;
+      if (companyContext && !counterpartyId) {
+        setRows([]);
+        setExistingEntries([]);
+        onDataChange([]);
+        setIsInitialLoad(false);
+        return;
+      }
+      try {
+        let q = supabase.from(TABLE_NAME as any).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+        if (companyContext && counterpartyId) q = q.eq("counterparty_id", counterpartyId);
+        else q = q.is("counterparty_id", null);
+        const { data, error } = await q;
+        if (error) throw error;
+        const mapped: EntryRow[] = (data || []).map((entry: any) => ({
+          id: crypto.randomUUID(),
+          dbId: entry.id,
+          isExisting: true,
+          vehicleType: entry.vehicle_type,
+          fuelType: entry.fuel_type,
+          modelYear: entry.model_year ?? undefined,
+          miles: entry.miles,
+          emissions: entry.emissions,
+        }));
+        setExistingEntries(mapped);
+        setRows(mapped.length > 0 ? mapped : []);
+        if (mapped.length > 0) onDataChange(mapped);
+      } catch (err: any) {
+        console.error("Error loading scope1_epa_on_road_diesel_alt_fuel_entries:", err);
+        toast({ title: "Error", description: err?.message || "Failed to load saved entries", variant: "destructive" });
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    loadEntries();
+  }, [user, companyContext, counterpartyId]);
 
   useEffect(() => {
     const load = async () => {
@@ -149,8 +199,8 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
   }, [toast]);
 
   useEffect(() => {
-    onDataChange(rows);
-  }, [rows, onDataChange]);
+    if (!isInitialLoad) onDataChange(rows);
+  }, [rows, isInitialLoad, onDataChange]);
 
   const vehicleTypes = useMemo(
     () => Array.from(new Set(factors.map((f) => f.vehicleType))).sort((a, b) => a.localeCompare(b)),
@@ -178,7 +228,19 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
   };
 
   const addRow = () => setRows((prev) => [...prev, newRow()]);
-  const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
+  const removeRow = async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    if (row?.dbId && user) {
+      try {
+        const { error } = await supabase.from(TABLE_NAME as any).delete().eq("id", row.dbId);
+        if (error) throw error;
+      } catch (e: any) {
+        toast({ title: "Error", description: e?.message || "Failed to delete entry", variant: "destructive" });
+        return;
+      }
+    }
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
 
   const updateRow = (id: string, patch: Partial<EntryRow>) => {
     setRows((prev) =>
@@ -228,12 +290,80 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
-  const handleSaveAndNext = () => {
-    toast({
-      title: "Saved (local)",
-      description: "On-road diesel & alternative fuel emissions are included in Scope 1 total for the EPA calculator.",
-    });
-    onSaveAndNext?.();
+  const rowChanged = (r: EntryRow, existing: EntryRow[]): boolean => {
+    const ex = existing.find((e) => e.dbId === r.dbId);
+    if (!ex) return false;
+    return (
+      r.vehicleType !== ex.vehicleType ||
+      r.fuelType !== ex.fuelType ||
+      (r.modelYear ?? "") !== (ex.modelYear ?? "") ||
+      Number(r.miles) !== Number(ex.miles) ||
+      Number(r.emissions) !== Number(ex.emissions)
+    );
+  };
+
+  const handleSaveAndNext = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
+      return;
+    }
+    const newEntries = rows.filter(
+      (r) =>
+        r.vehicleType &&
+        r.fuelType &&
+        typeof r.miles === "number" &&
+        typeof r.emissions === "number" &&
+        !r.isExisting
+    );
+    const changedExisting = rows.filter((r) => r.isExisting && r.dbId && rowChanged(r, existingEntries));
+    if (newEntries.length === 0 && changedExisting.length === 0) {
+      toast({ title: "Nothing to save", description: "No new or changed on-road diesel & alt fuel entries." });
+      onSaveAndNext?.();
+      return;
+    }
+    setSaving(true);
+    try {
+      if (newEntries.length > 0) {
+        const payload = newEntries.map((v) => ({
+          user_id: user.id,
+          counterparty_id: companyContext ? counterpartyId ?? null : null,
+          vehicle_type: v.vehicleType!,
+          fuel_type: v.fuelType!,
+          model_year: v.modelYear ?? null,
+          miles: v.miles!,
+          emissions: v.emissions!,
+        }));
+        const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
+        if (error) throw error;
+      }
+      if (changedExisting.length > 0) {
+        const results = await Promise.all(
+          changedExisting.map((v) =>
+            supabase
+              .from(TABLE_NAME as any)
+              .update({
+                vehicle_type: v.vehicleType!,
+                fuel_type: v.fuelType!,
+                model_year: v.modelYear ?? null,
+                miles: v.miles!,
+                emissions: v.emissions!,
+              })
+              .eq("id", v.dbId!)
+          )
+        );
+        const updateError = results.find((r: { error?: unknown }) => r.error)?.error;
+        if (updateError) throw updateError;
+      }
+      toast({
+        title: "Saved",
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} on-road diesel & alt fuel entries.`,
+      });
+      onSaveAndNext?.();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -361,7 +491,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           Total On-Road Diesel & Alt Fuel Emissions:{" "}
           <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
         </div>
-        <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
           <Save className="h-4 w-4 mr-2" /> Save and Next
         </Button>
       </div>
