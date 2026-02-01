@@ -121,8 +121,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         console.log('Company context detected - loading company-specific fuel entries for:', counterpartyId);
         
         try {
-          // Load company-specific fuel entries
-          const { data: fuelData, error: fuelError } = await supabase
+          // Load company-specific fuel entries (supabase cast to avoid TS "excessively deep" inference on schema)
+          const { data: fuelData, error: fuelError } = await (supabase as any)
             .from('scope1_fuel_entries')
             .select('*')
             .eq('user_id', user.id)
@@ -172,7 +172,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
       // Load personal data for individual use
       try {
-        const { data: fuelData, error: fuelError } = await supabase
+        const { data: fuelData, error: fuelError } = await (supabase as any)
           .from('scope1_fuel_entries')
           .select('*')
           .eq('user_id', user.id)
@@ -257,7 +257,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('scope1_fuel_entries')
         .delete()
         .eq('id', row.dbId);
@@ -314,13 +314,13 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
       }));
 
       if (payload.length > 0) {
-        const { error } = await supabase.from('scope1_fuel_entries').insert(payload);
+        const { error } = await (supabase as any).from('scope1_fuel_entries').insert(payload);
         if (error) throw error;
       }
 
       if (changedExisting.length > 0) {
         const updates = changedExisting.map(v => (
-          supabase
+          (supabase as any)
             .from('scope1_fuel_entries')
             .update({
               fuel_type_group: v.type!,
@@ -346,7 +346,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
       onSaveAndNext?.();
 
       // Reload data
-      const { data: newData } = await supabase
+      const { data: newData } = await (supabase as any)
         .from('scope1_fuel_entries')
         .select('*')
         .eq('user_id', user.id)
