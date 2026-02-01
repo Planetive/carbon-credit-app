@@ -64,9 +64,10 @@ const Scope2Emissions: React.FC<Scope2EmissionsProps> = ({ onTotalChange }) => {
   const [heatRows, setHeatRows] = useState<HeatRow[]>([]);
   const [savingHeat, setSavingHeat] = useState(false);
 
-  const fuelTypes = Object.keys(FACTORS) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
+  const factorsSafe = FACTORS || {};
+  const fuelTypes = Object.keys(factorsSafe) as FuelType[];
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(factorsSafe[type] || {}) : []);
+  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : []);
 
   // Load heat and steam reference data for both standards
   useEffect(() => {

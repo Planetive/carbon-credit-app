@@ -38,14 +38,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
 
   // Use Supabase "Fuel EPA" table for dynamic fuel factors when available,
-  // but keep the hardcoded FACTORS as a safe fallback.
-  const effectiveFactors = fuelFactors || FACTORS;
+  // but keep the hardcoded FACTORS as a safe fallback. Guard against null/undefined for different envs.
+  const effectiveFactors = (fuelFactors || FACTORS || {}) as Record<string, Record<string, Record<string, number>>>;
 
-  // Computed values
+  // Computed values – never call Object.keys on null/undefined (fixes "Cannot convert undefined or null to object")
   const types = Object.keys(effectiveFactors) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(effectiveFactors[type]) : []);
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(effectiveFactors[type] || {}) : []);
   const unitsFor = (type?: FuelType, fuel?: string) =>
-    type && fuel ? Object.keys(effectiveFactors[type][fuel]) : [];
+    type && fuel ? Object.keys((effectiveFactors[type] || {})[fuel] || {}) : [];
 
   // Load fuel factor reference data from Supabase ("Fuel EPA" table).
   // Expected columns (based on your screenshot):

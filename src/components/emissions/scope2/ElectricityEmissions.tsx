@@ -49,9 +49,10 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
   const [saving, setSaving] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
-  const fuelTypes = Object.keys(FACTORS) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
+  const factorsSafe = FACTORS || {};
+  const fuelTypes = Object.keys(factorsSafe) as FuelType[];
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(factorsSafe[type] || {}) : []);
+  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : []);
 
   useEffect(() => {
     const load = async () => {

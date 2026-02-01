@@ -79,17 +79,21 @@ const Scope1Emissions: React.FC<Scope1EmissionsProps> = ({ onDataChange }) => {
     };
   }, []);
 
-  // Computed values
-  const types = Object.keys(FACTORS) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
-  const refrigerantTypes = Object.keys(REFRIGERANT_FACTORS);
-  const vehicleActivities = Object.keys(VEHICLE_FACTORS);
-  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(VEHICLE_FACTORS[activity]) : []);
-  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(VEHICLE_FACTORS[activity][vehicleType]) : []);
-  const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
-  const deliveryTypesFor = (activity?: string) => (activity ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity]) : []);
-  const deliveryUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(DELIVERY_VEHICLE_FACTORS[activity][vehicleType]) : []);
+  // Computed values – guard against undefined imports (fixes "Cannot convert undefined or null to object" in some envs)
+  const factorsSafe = FACTORS || {};
+  const refrigerantSafe = REFRIGERANT_FACTORS || {};
+  const vehicleSafe = VEHICLE_FACTORS || {};
+  const deliverySafe = DELIVERY_VEHICLE_FACTORS || {};
+  const types = Object.keys(factorsSafe) as FuelType[];
+  const fuelsFor = (type?: FuelType) => (type ? Object.keys(factorsSafe[type] || {}) : []);
+  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : []);
+  const refrigerantTypes = Object.keys(refrigerantSafe);
+  const vehicleActivities = Object.keys(vehicleSafe);
+  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(vehicleSafe[activity] || {}) : []);
+  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys((vehicleSafe[activity] || {})[vehicleType] || {}) : []);
+  const deliveryActivities = Object.keys(deliverySafe);
+  const deliveryTypesFor = (activity?: string) => (activity ? Object.keys(deliverySafe[activity] || {}) : []);
+  const deliveryUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys((deliverySafe[activity] || {})[vehicleType] || {}) : []);
 
   // Vehicle type descriptions
   const vehicleTypeDescriptions: Record<string, string> = {
