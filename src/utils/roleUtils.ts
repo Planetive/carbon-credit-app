@@ -1,21 +1,33 @@
 import { User } from '@supabase/supabase-js';
 
 /**
- * Company email domain that has full access
+ * Specific emails and domains that have full access (dashboard, all features, admin-level permissions).
+ * - it@majeedfabrics.com (specific client)
+ * - Any email with @planetive (e.g. @planetive.com, @planetive.org)
  */
-const COMPANY_EMAIL_DOMAIN = 'planetive.org';
+const FULL_ACCESS_EMAILS = ['it@majeedfabrics.com'] as const;
+const FULL_ACCESS_DOMAIN = '@planetive';
 
 /**
- * Check if a user has a company email address
+ * Check if an email has full access (allowlist: specific emails + @planetive domain).
+ */
+export function hasFullAccessByEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  const lower = email.toLowerCase();
+  if (FULL_ACCESS_EMAILS.some((e) => lower === e)) return true;
+  return lower.includes(FULL_ACCESS_DOMAIN);
+}
+
+/**
+ * Check if a user has a company / full-access email address
  * @param user - The user object from Supabase auth
- * @returns true if user has company email, false otherwise
+ * @returns true if user has full-access email (allowlist or @planetive), false otherwise
  */
 export function isCompanyUser(user: User | null): boolean {
   if (!user || !user.email) {
     return false;
   }
-
-  return user.email.toLowerCase().endsWith(`@${COMPANY_EMAIL_DOMAIN}`);
+  return hasFullAccessByEmail(user.email);
 }
 
 /**

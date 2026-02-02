@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { hasFullAccessByEmail } from '@/utils/roleUtils';
 
 // Permission types
 export interface Permissions {
@@ -65,6 +66,7 @@ interface OrganizationContextType {
   deleteOrganization: (orgId: string) => Promise<{ data: { success: boolean } | null; error: any }>;
   refreshOrganizations: () => Promise<void>;
   hasPermission: (permission: keyof Permissions) => boolean;
+  hasFullAccessByEmail: () => boolean;
   canManageUsers: () => boolean;
   canInviteUsers: () => boolean;
   // User management functions
@@ -435,8 +437,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Allowlist: it@majeedfabrics.com and any @planetive email get full access (dashboard + all features)
+  const hasFullAccessByEmailCheck = useCallback((): boolean => {
+    return !!user?.email && hasFullAccessByEmail(user.email);
+  }, [user?.email]);
+
   // Permission checking functions
   const hasPermission = useCallback((permission: keyof Permissions): boolean => {
+    // Allowlist emails get all permissions
+    if (hasFullAccessByEmailCheck()) return true;
     if (!currentOrganization) return false;
     
     // Admins have all permissions
@@ -446,7 +455,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     
     // Check specific permission
     return currentOrganization.permissions[permission] === true;
-  }, [currentOrganization]);
+  }, [currentOrganization, hasFullAccessByEmailCheck]);
 
   const canManageUsers = useCallback((): boolean => {
     return hasPermission('can_manage_users');
@@ -886,6 +895,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     deleteOrganization,
     refreshOrganizations,
     hasPermission,
+    hasFullAccessByEmail: hasFullAccessByEmailCheck,
     canManageUsers,
     canInviteUsers,
     fetchOrganizationUsers,

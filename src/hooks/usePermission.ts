@@ -9,7 +9,7 @@ export type { Permissions };
  * @returns Object with permission checking functions and state
  */
 export function usePermission() {
-  const { currentOrganization, hasPermission, loading } = useOrganization();
+  const { currentOrganization, hasPermission, hasFullAccessByEmail, loading } = useOrganization();
 
   const checkPermission = useCallback((permission: keyof Permissions): boolean => {
     if (loading || !currentOrganization) {
@@ -68,11 +68,13 @@ export function usePermission() {
   }, [permissions.canEditPermissions]);
 
   const isAdmin = useCallback(() => {
+    // Allowlist emails (it@majeedfabrics.com, *@planetive) get admin-level access
+    if (hasFullAccessByEmail?.()) return true;
     if (loading || !currentOrganization) {
       return false;
     }
     return currentOrganization.role === 'admin';
-  }, [currentOrganization, loading]);
+  }, [currentOrganization, loading, hasFullAccessByEmail]);
 
   // Check if user has any of the specified permissions (OR logic)
   const hasAnyPermission = useCallback((perms: (keyof Permissions)[]): boolean => {
