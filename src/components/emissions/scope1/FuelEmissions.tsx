@@ -86,6 +86,28 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
     return formatEmission(converted);
   };
 
+  const convertEmissionNumeric = (value: number | undefined, unit: OutputUnit): number | undefined => {
+    if (value == null || !isFinite(value)) return undefined;
+    let converted = value;
+    switch (unit) {
+      case "kg":
+        converted = value;
+        break;
+      case "tonnes":
+        converted = value / 1000;
+        break;
+      case "g":
+        converted = value * 1000;
+        break;
+      case "short_ton":
+        converted = value / 907.18474;
+        break;
+      default:
+        converted = value;
+    }
+    return Number(converted.toFixed(6));
+  };
+
   // Load fuel factor reference data from Supabase EPA tables:
   //   - "Fuel EPA 1"
   //   - "Fuel EPA 2"
@@ -132,8 +154,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
             row.Category ?? row.category ?? row["Fuel Category"] ?? row.fuel_category;
           const fuel: string | undefined =
             row["Fuel Type"] ?? row.Fuel ?? row.fuel_type ?? row.fuel;
+          if (!category || !fuel) return;
 
-          // Heat content and unit (used to derive MMSCF factors for gaseous fuels)
+          // Heat content and unit (used to derive MMSCF from mmBtu when HHV is per scf)
           const hhv = parseNumber(
             row["Heat Content (HHV)"] ??
               row["Heat Content"] ??
@@ -141,71 +164,85 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
               row.heat_content_hhv ??
               row.hhv
           );
-          // Some tables were created with a typo "HIV Unit" instead of "HHV Unit",
-          // so support both spellings plus common variants.
           const hhvUnitRaw =
-            row["HHV Unit"] ??
-            row["HIV Unit"] ??
-            row.hhv_unit ??
-            row.hiv_unit ??
-            row.heat_content_unit;
+            row["HHV Unit"] ?? row["HIV Unit"] ?? row.hhv_unit ?? row.hiv_unit ?? row.heat_content_unit;
           const hhvUnit = typeof hhvUnitRaw === "string" ? hhvUnitRaw.toLowerCase() : "";
           const isScfBasedHHV = hhv != null && hhvUnit.includes("scf");
 
-          const co2Factor = parseNumber(row["CO2 Factor"] ?? row.co2_factor);
-          const ch4Factor = parseNumber(row["CH4 Factor"] ?? row.ch4_factor);
-          const n2oFactor = parseNumber(row["N2O Factor"] ?? row.n2o_factor);
+          // First set: CO2/CH4/N2O Factor + Unit (Unit says "per mmBtu")
+          const co2Unit = String(row["CO2 Unit"] ?? "").toLowerCase();
+          const ch4Unit = String(row["CH4 Unit"] ?? "").toLowerCase();
+          const n2oUnitFirst = String(row["N20 Unit"] ?? row["N2O Unit"] ?? "").toLowerCase(); // N20 typo in Fuel EPA 1
+          const useFirstSetMmbtu = co2Unit.includes("mmbtu");
 
-          const co2UnitRaw = row["CO2 Unit"] ?? row.co2_unit;
-          const ch4UnitRaw = row["CH4 Unit"] ?? row.ch4_unit;
-          const n2oUnitRaw = row["N2O Unit"] ?? row.n2o_unit;
+          const co2PerMmbtu = useFirstSetMmbtu ? parseNumber(row["CO2 Factor"]) : undefined;
+          const ch4PerMmbtu = ch4Unit.includes("mmbtu") ? parseNumber(row["CH4 Factor"]) : undefined;
+          const n2oPerMmbtu = n2oUnitFirst.includes("mmbtu") ? parseNumber(row["N2O Factor"]) : undefined;
 
-          if (!category || !fuel) return;
+          // Second set: Factor_1 + Unit_1 (Unit_1 can be "per short ton", "per scf", "per gallon")
+          const co2Unit1 = String(row["CO2 Unit_1"] ?? "").toLowerCase();
+          const ch4Unit1 = String(row["CH4 Unit_1"] ?? "").toLowerCase();
+          const n2oUnit1 = String(row["N2O Unit_1"] ?? row["N2O Unit"] ?? "").toLowerCase(); // EPA 1 has no N2O Unit_1
+          const co2Factor1 = parseNumber(row["CO2 Factor_1"]);
+          const ch4Factor1 = parseNumber(row["CH4 Factor_1"]);
+          const n2oFactor1 = parseNumber(row["N2O Factor_1"]);
 
-          if (!map[category]) {
-            map[category] = {};
-          }
-          if (!map[category][fuel]) {
-            map[category][fuel] = {};
-          }
-
+          if (!map[category]) map[category] = {};
+          if (!map[category][fuel]) map[category][fuel] = {};
           const fuelMap = map[category][fuel];
 
-          if (co2Factor !== undefined) {
-            const baseLabel = co2UnitRaw
-              ? `CO2 (${String(co2UnitRaw)})`
-              : "CO2 factor";
-            fuelMap[baseLabel] = co2Factor;
-
-            // If HHV is per scf, also expose a derived MMSCF unit for user convenience
+          // mmBtu factors (first set)
+          if (co2PerMmbtu !== undefined) {
+            fuelMap["CO2 (kg CO2 / mmBtu)"] = co2PerMmbtu;
             if (isScfBasedHHV) {
-              // 1 MMSCF = 1,000,000 scf; energy (mmBtu) = HHV (mmBtu/scf) * 1e6
-              // factor_per_MMSCF = (kg CO2 / mmBtu) * (mmBtu / MMSCF)
-              const factorPerMMSCF = co2Factor * hhv! * 1_000_000;
+              const factorPerMMSCF = co2PerMmbtu * hhv! * 1_000_000;
               fuelMap["CO2 (kg CO2 / MMSCF)"] = factorPerMMSCF;
             }
           }
-          if (ch4Factor !== undefined) {
-            const baseLabel = ch4UnitRaw
-              ? `CH4 (${String(ch4UnitRaw)})`
-              : "CH4 factor";
-            fuelMap[baseLabel] = ch4Factor;
-
+          if (ch4PerMmbtu !== undefined) {
+            fuelMap["CH4 (g CH4 / mmBtu)"] = ch4PerMmbtu;
             if (isScfBasedHHV) {
-              const factorPerMMSCF = ch4Factor * hhv! * 1_000_000;
-              fuelMap["CH4 (g CH4 / MMSCF)"] = factorPerMMSCF;
+              fuelMap["CH4 (g CH4 / MMSCF)"] = ch4PerMmbtu * hhv! * 1_000_000;
             }
           }
-          if (n2oFactor !== undefined) {
-            const baseLabel = n2oUnitRaw
-              ? `N2O (${String(n2oUnitRaw)})`
-              : "N2O factor";
-            fuelMap[baseLabel] = n2oFactor;
-
+          if (n2oPerMmbtu !== undefined) {
+            fuelMap["N2O (g N2O / mmBtu)"] = n2oPerMmbtu;
             if (isScfBasedHHV) {
-              const factorPerMMSCF = n2oFactor * hhv! * 1_000_000;
-              fuelMap["N2O (g N2O / MMSCF)"] = factorPerMMSCF;
+              fuelMap["N2O (g N2O / MMSCF)"] = n2oPerMmbtu * hhv! * 1_000_000;
             }
+          }
+
+          // Second set: short ton (Factor_1 when Unit_1 contains "short ton")
+          if (co2Unit1.includes("short ton") && co2Factor1 !== undefined) {
+            fuelMap["CO2 (kg CO2 / short ton)"] = co2Factor1;
+          }
+          if (ch4Unit1.includes("short ton") && ch4Factor1 !== undefined) {
+            fuelMap["CH4 (g CH4 / short ton)"] = ch4Factor1;
+          }
+          if (n2oUnit1.includes("short ton") && n2oFactor1 !== undefined) {
+            fuelMap["N2O (g N2O / short ton)"] = n2oFactor1;
+          }
+
+          // Second set: per scf → derive MMSCF (factor per scf * 1e6 = per MMSCF), when not already set from mmBtu
+          if (co2Unit1.includes("scf") && co2Factor1 !== undefined && fuelMap["CO2 (kg CO2 / MMSCF)"] == null) {
+            fuelMap["CO2 (kg CO2 / MMSCF)"] = co2Factor1 * 1_000_000;
+          }
+          if (ch4Unit1.includes("scf") && ch4Factor1 !== undefined && fuelMap["CH4 (g CH4 / MMSCF)"] == null) {
+            fuelMap["CH4 (g CH4 / MMSCF)"] = ch4Factor1 * 1_000_000;
+          }
+          if (n2oUnit1.includes("scf") && n2oFactor1 !== undefined && fuelMap["N2O (g N2O / MMSCF)"] == null) {
+            fuelMap["N2O (g N2O / MMSCF)"] = n2oFactor1 * 1_000_000;
+          }
+
+          // Second set: per gallon (optional)
+          if (co2Unit1.includes("gallon") && co2Factor1 !== undefined) {
+            fuelMap["CO2 (kg CO2 / gallon)"] = co2Factor1;
+          }
+          if (ch4Unit1.includes("gallon") && ch4Factor1 !== undefined) {
+            fuelMap["CH4 (g CH4 / gallon)"] = ch4Factor1;
+          }
+          if (n2oUnit1.includes("gallon") && n2oFactor1 !== undefined) {
+            fuelMap["N2O (g N2O / gallon)"] = n2oFactor1;
           }
         });
 
@@ -308,6 +345,10 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
         if (existingFuelRows.length > 0) {
           onDataChange(existingFuelRows);
+          const u = String((fuelData![0] as any).emissions_output_unit || "") as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+          }
         }
       } catch (error: any) {
         console.error('Error loading existing entries:', error);
@@ -347,8 +388,12 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
       } else {
         next.factor = undefined;
       }
+      // Emission = quantity × factor. Output is in the selected gas only (no CO2e conversion).
+      // CO2 units use factor in kg/unit → result in kg CO2. CH4/N2O use factor in g/unit → convert to kg of that gas.
       if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
-        next.emissions = Number((next.quantity * next.factor).toFixed(6));
+        const raw = next.quantity * next.factor;
+        const isGPerUnit = typeof next.unit === 'string' && (next.unit.startsWith('CH4') || next.unit.startsWith('N2O'));
+        next.emissions = Number((isGPerUnit ? raw / 1000 : raw).toFixed(6));
       } else {
         next.emissions = undefined;
       }
@@ -421,6 +466,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         quantity: v.quantity!,
         factor: v.factor!,
         emissions: v.emissions!,
+        emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+        emissions_output_unit: outputUnit,
       }));
 
       if (payload.length > 0) {
@@ -439,6 +486,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
               quantity: v.quantity!,
               factor: v.factor!,
               emissions: v.emissions!,
+              emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+              emissions_output_unit: outputUnit,
             })
             .eq('id', v.dbId!)
         ));

@@ -47,8 +47,8 @@ const parseNumber = (value: any): number | undefined => {
   return isFinite(n) ? n : undefined;
 };
 
-// Compute emissions in kg for the selected gas.
-// CO2 factor is in kg / unit, CH4 & N2O factors are in g / unit.
+// Compute emissions in kg for the selected gas only (no CO2e conversion).
+// CO2 factor is in kg/unit; CH4 & N2O factors are in g/unit (converted to kg below).
 const computeEmissionsKg = (
   gas: "co2" | "ch4" | "n2o",
   factorPerUnit: number,
@@ -319,6 +319,10 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         if (savedRows.length > 0) {
           setHeatRows(savedRows);
           setHasUserRows(true);
+          const u = String((heatData![0] as any).emissions_output_unit || "") as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+          }
         }
       } catch (e: any) {
         console.error(e);
@@ -389,6 +393,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         quantity: r.quantity!,
         emissions: r.emissions!,
         standard: heatSteamStandard,
+        emissions_output: convertEmissionNumeric(r.emissions, outputUnit),
+        emissions_output_unit: outputUnit,
       }));
       if (inserts.length > 0) {
         const { error } = await (supabase as any).from('scope2_heatsteam_entries').insert(inserts);
@@ -405,6 +411,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
             quantity: r.quantity!,
             emissions: r.emissions!,
             standard: heatSteamStandard,
+            emissions_output: convertEmissionNumeric(r.emissions, outputUnit),
+            emissions_output_unit: outputUnit,
           })
           .eq('id', r.dbId!)
       ));
@@ -469,6 +477,28 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
       default:
         return formatEmission(value);
     }
+  };
+
+  const convertEmissionNumeric = (value: number | undefined, unit: OutputUnit): number | undefined => {
+    if (value == null || !isFinite(value)) return undefined;
+    let converted = value;
+    switch (unit) {
+      case "kg":
+        converted = value;
+        break;
+      case "tonnes":
+        converted = value / 1000;
+        break;
+      case "g":
+        converted = value * 1000;
+        break;
+      case "short_ton":
+        converted = value / 907.18474;
+        break;
+      default:
+        converted = value;
+    }
+    return Number(converted.toFixed(6));
   };
 
   // Map any display entry type back to one of the two canonical

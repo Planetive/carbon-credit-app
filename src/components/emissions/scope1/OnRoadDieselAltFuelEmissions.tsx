@@ -112,6 +112,12 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         }));
         setExistingEntries(mapped);
         setRows(mapped.length > 0 ? mapped : []);
+        if (mapped.length > 0 && (data?.[0] as any)?.emissions_output_unit) {
+          const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+          }
+        }
         if (mapped.length > 0) onDataChange(mapped);
       } catch (err: any) {
         console.error("Error loading scope1_epa_on_road_diesel_alt_fuel_entries:", err);
@@ -276,7 +282,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
         if (typeof next.miles === "number" && factorRow) {
           const miles = next.miles;
-          // Use only the selected gas factor (CH4 or N2O), result in kg CH4 or kg N2O
+          // Output in selected gas only (kg CH4 or kg N2O); no CO2e conversion.
           const selection: EmissionSelection = next.emissionSelection ?? "ch4";
           if (selection === "ch4") {
             next.emissions = ((factorRow.ch4_g_per_mile || 0) * miles) / 1000;
@@ -324,6 +330,28 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
     return formatEmission(converted);
   };
 
+  const convertEmissionNumeric = (value: number | undefined, unit: OutputUnit): number | undefined => {
+    if (value == null || !isFinite(value)) return undefined;
+    let converted = value;
+    switch (unit) {
+      case "kg":
+        converted = value;
+        break;
+      case "tonnes":
+        converted = value / 1000;
+        break;
+      case "g":
+        converted = value * 1000;
+        break;
+      case "short_ton":
+        converted = value / 907.18474;
+        break;
+      default:
+        converted = value;
+    }
+    return Number(converted.toFixed(6));
+  };
+
   const rowChanged = (r: EntryRow, existing: EntryRow[]): boolean => {
     const ex = existing.find((e) => e.dbId === r.dbId);
     if (!ex) return false;
@@ -368,6 +396,8 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           emission_selection: v.emissionSelection ?? "ch4",
           miles: v.miles!,
           emissions: v.emissions!,
+          emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+          emissions_output_unit: outputUnit,
         }));
         const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
         if (error) throw error;
@@ -384,6 +414,8 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
                 emission_selection: v.emissionSelection ?? "ch4",
                 miles: v.miles!,
                 emissions: v.emissions!,
+                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+                emissions_output_unit: outputUnit,
               })
               .eq("id", v.dbId!)
           )

@@ -107,6 +107,12 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         setExistingEntries(mapped);
         setRows(mapped.length > 0 ? mapped : []);
         if (mapped.length > 0) onDataChange(mapped);
+        if (mapped.length > 0 && (data?.[0] as any)?.emissions_output_unit) {
+          const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+          }
+        }
       } catch (err: any) {
         console.error("Error loading scope1_epa_mobile_fuel_entries:", err);
         toast({ title: "Error", description: err?.message || "Failed to load saved entries", variant: "destructive" });
@@ -300,6 +306,28 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
     return formatEmission(converted);
   };
 
+  const convertEmissionNumeric = (value: number | undefined, unit: OutputUnit): number | undefined => {
+    if (value == null || !isFinite(value)) return undefined;
+    let converted = value;
+    switch (unit) {
+      case "kg":
+        converted = value;
+        break;
+      case "tonnes":
+        converted = value / 1000;
+        break;
+      case "g":
+        converted = value * 1000;
+        break;
+      case "short_ton":
+        converted = value / 907.18474;
+        break;
+      default:
+        converted = value;
+    }
+    return Number(converted.toFixed(6));
+  };
+
   const rowChanged = (r: MobileFuelRow, existing: MobileFuelRow[]): boolean => {
     const ex = existing.find((e) => e.dbId === r.dbId);
     if (!ex) return false;
@@ -343,6 +371,8 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           quantity: v.quantity!,
           factor: v.factor!,
           emissions: v.emissions!,
+          emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+          emissions_output_unit: outputUnit,
         }));
         const { error } = await supabase.from(tableName as any).insert(payload);
         if (error) throw error;
@@ -358,6 +388,8 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
                 quantity: v.quantity!,
                 factor: v.factor!,
                 emissions: v.emissions!,
+                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+                emissions_output_unit: outputUnit,
               })
               .eq("id", v.dbId!)
           )

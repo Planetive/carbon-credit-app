@@ -20,14 +20,23 @@ const EmissionResults = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isEPA = searchParams.get('source') === 'epa';
   const [results, setResults] = useState<EmissionResultsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fuelEmissions, setFuelEmissions] = useState<number>(0);
   const [refrigerantEmissions, setRefrigerantEmissions] = useState<number>(0);
   const [passengerEmissions, setPassengerEmissions] = useState<number>(0);
   const [deliveryEmissions, setDeliveryEmissions] = useState<number>(0);
+  // EPA-specific Scope 1 buckets
+  const [epaMobileEmissions, setEpaMobileEmissions] = useState<number>(0);
+  const [epaOnRoadGasEmissions, setEpaOnRoadGasEmissions] = useState<number>(0);
+  const [epaOnRoadDieselEmissions, setEpaOnRoadDieselEmissions] = useState<number>(0);
+  const [epaNonRoadEmissions, setEpaNonRoadEmissions] = useState<number>(0);
   const [electricityEmissions, setElectricityEmissions] = useState<number>(0);
   const [heatSteamEmissions, setHeatSteamEmissions] = useState<number>(0);
+  // For EPA view, treat heat & steam as Scope 1
+  const [epaHeatSteamEmissions, setEpaHeatSteamEmissions] = useState<number>(0);
   const [mounted, setMounted] = useState(false);
   
   // Scope 3 emissions by category
@@ -47,34 +56,86 @@ const EmissionResults = () => {
   const [scope3LCADownstream, setScope3LCADownstream] = useState<number>(0);
 
   const scope1Total = useMemo(() => {
+    if (isEPA) {
+      return (
+        fuelEmissions +
+        epaMobileEmissions +
+        epaOnRoadGasEmissions +
+        epaOnRoadDieselEmissions +
+        epaNonRoadEmissions +
+        epaHeatSteamEmissions
+      );
+    }
     return fuelEmissions + refrigerantEmissions + passengerEmissions + deliveryEmissions;
-  }, [fuelEmissions, refrigerantEmissions, passengerEmissions, deliveryEmissions]);
+  }, [
+    isEPA,
+    fuelEmissions,
+    refrigerantEmissions,
+    passengerEmissions,
+    deliveryEmissions,
+    epaMobileEmissions,
+    epaOnRoadGasEmissions,
+    epaOnRoadDieselEmissions,
+    epaNonRoadEmissions,
+    epaHeatSteamEmissions,
+  ]);
 
   const formatKg = (value: number) => {
     return value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   };
 
   const breakdown = useMemo(() => {
-    const data = [
-      { label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
-      { label: 'Refrigerant', value: refrigerantEmissions, color: 'bg-amber-500' },
-      { label: 'Passenger', value: passengerEmissions, color: 'bg-sky-500' },
-      { label: 'Delivery', value: deliveryEmissions, color: 'bg-emerald-500' },
-    ];
-    return data.map(d => ({ ...d, pct: scope1Total > 0 ? (d.value / scope1Total) * 100 : 0 }));
-  }, [fuelEmissions, refrigerantEmissions, passengerEmissions, deliveryEmissions, scope1Total]);
+    const baseData = isEPA
+      ? [
+          { label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
+          { label: 'Mobile fuel (EPA)', value: epaMobileEmissions, color: 'bg-amber-500' },
+          { label: 'On-road gasoline (EPA)', value: epaOnRoadGasEmissions, color: 'bg-sky-500' },
+          { label: 'On-road diesel & alt fuel (EPA)', value: epaOnRoadDieselEmissions, color: 'bg-emerald-500' },
+          { label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-teal-500' },
+          { label: 'Heat & Steam (EPA)', value: epaHeatSteamEmissions, color: 'bg-amber-600' },
+        ]
+      : [
+          { label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
+          { label: 'Refrigerant', value: refrigerantEmissions, color: 'bg-amber-500' },
+          { label: 'Passenger', value: passengerEmissions, color: 'bg-sky-500' },
+          { label: 'Delivery', value: deliveryEmissions, color: 'bg-emerald-500' },
+        ];
+    return baseData.map(d => ({ ...d, pct: scope1Total > 0 ? (d.value / scope1Total) * 100 : 0 }));
+  }, [
+    isEPA,
+    fuelEmissions,
+    refrigerantEmissions,
+    passengerEmissions,
+    deliveryEmissions,
+    epaMobileEmissions,
+    epaOnRoadGasEmissions,
+    epaOnRoadDieselEmissions,
+    epaNonRoadEmissions,
+    epaHeatSteamEmissions,
+    scope1Total,
+  ]);
 
   const topContributor = useMemo(() => breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [breakdown]);
 
   // Scope 2 breakdown
-  const scope2Total = useMemo(() => electricityEmissions + heatSteamEmissions, [electricityEmissions, heatSteamEmissions]);
+  const scope2Total = useMemo(
+    () => (isEPA ? electricityEmissions : electricityEmissions + heatSteamEmissions),
+    [isEPA, electricityEmissions, heatSteamEmissions]
+  );
   const scope2Breakdown = useMemo(() => {
+    if (isEPA) {
+      const data = [
+        { label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
+      ];
+      const total = electricityEmissions;
+      return data.map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }));
+    }
     const data = [
       { label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
       { label: 'Heat & Steam', value: heatSteamEmissions, color: 'bg-amber-600' },
     ];
     return data.map(d => ({ ...d, pct: scope2Total > 0 ? (d.value / scope2Total) * 100 : 0 }));
-  }, [electricityEmissions, heatSteamEmissions, scope2Total]);
+  }, [isEPA, electricityEmissions, heatSteamEmissions, scope2Total]);
   const topContributorS2 = useMemo(() => scope2Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [scope2Breakdown]);
 
   // Scope 3 total and breakdown (excluding LCA entries as they are separate)
@@ -223,16 +284,43 @@ const EmissionResults = () => {
         return;
       }
       try {
-        const [fuelRes, refRes, passRes, delRes] = await Promise.all([
+        const [
+          fuelRes,
+          refRes,
+          passRes,
+          delRes,
+          mobileEpaRes,
+          onRoadGasRes,
+          onRoadDieselRes,
+          nonRoadEpaRes,
+        ] = await Promise.all([
           supabase.from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
           supabase.from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id),
           supabase.from('scope1_passenger_vehicle_entries').select('emissions').eq('user_id', user.id),
           supabase.from('scope1_delivery_vehicle_entries').select('emissions').eq('user_id', user.id),
+          // EPA Scope 1 tables (new calculators)
+          (supabase as any).from('scope1_epa_mobile_fuel_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_epa_on_road_gasoline_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_epa_on_road_diesel_alt_fuel_entries').select('emissions').eq('user_id', user.id),
+          (supabase as any).from('scope1_epa_non_road_vehicle_entries').select('emissions').eq('user_id', user.id),
         ]);
 
         const sum = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
 
+        // Include EPA Scope 1 calculators inside the "Fuel" bucket so they show
+        // up in the existing Scope 1 breakdown and totals.
+        const epaMobile = sum(mobileEpaRes.data);
+        const epaOnRoadGas = sum(onRoadGasRes.data);
+        const epaOnRoadDiesel = sum(onRoadDieselRes.data);
+        const epaNonRoad = sum(nonRoadEpaRes.data);
+
+        // Base fuel always includes stationary fuel entries.
         setFuelEmissions(sum(fuelRes.data));
+        // Store EPA-specific scope 1 buckets separately for EPA results view.
+        setEpaMobileEmissions(epaMobile);
+        setEpaOnRoadGasEmissions(epaOnRoadGas);
+        setEpaOnRoadDieselEmissions(epaOnRoadDiesel);
+        setEpaNonRoadEmissions(epaNonRoad);
         setRefrigerantEmissions(sum(refRes.data));
         setPassengerEmissions(sum(passRes.data));
         setDeliveryEmissions(sum(delRes.data));
@@ -276,7 +364,10 @@ const EmissionResults = () => {
           .select('emissions')
           .eq('user_id', user.id);
         const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        setHeatSteamEmissions(Number(heatTotal.toFixed(6)));
+        const heatTotalRounded = Number(heatTotal.toFixed(6));
+        setHeatSteamEmissions(heatTotalRounded);
+        // For EPA view, we treat all heat & steam as Scope 1 contribution.
+        setEpaHeatSteamEmissions(heatTotalRounded);
 
         // Scope 3 - Load all categories
         const [
@@ -397,8 +488,8 @@ const EmissionResults = () => {
         </div>
         <div className="text-center relative z-10">
           <p className="text-gray-700 mb-4 text-lg">No emission results found</p>
-          <Button onClick={() => navigate('/emission-calculator')} className="bg-teal-600 hover:bg-teal-700">
-            Go to Emission Calculator
+          <Button onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')} className="bg-teal-600 hover:bg-teal-700">
+            Go to {isEPA ? 'EPA Calculator' : 'Emission Calculator'}
           </Button>
         </div>
       </div>
@@ -569,7 +660,7 @@ const EmissionResults = () => {
       <Button
         variant="outline"
                   size="lg"
-        onClick={() => navigate('/emission-calculator')}
+        onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
                   className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 transition-all duration-300 hover:scale-105"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1041,8 +1132,8 @@ const EmissionResults = () => {
               }`}
               style={{ animationDelay: '1.2s' }}
             >
-          <Button 
-            onClick={() => navigate('/emission-calculator')}
+      <Button 
+        onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
                 className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
                 size="lg"
           >

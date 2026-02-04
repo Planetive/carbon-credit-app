@@ -94,13 +94,14 @@ const EMISSION_SELECTION_OPTIONS: { value: EmissionSelection; label: string }[] 
   { value: "n2o_only", label: "N2O" },
 ];
 
+// Result is always in the selected gas only (kg CH4 or kg N2O); no CO2e conversion.
 const computeEmissions = (
   factorRow: OnRoadFactorRow | undefined,
   miles: number | undefined,
   selection: EmissionSelection
 ): number | undefined => {
   if (typeof miles !== "number" || !factorRow) return undefined;
-  // When user selects CH4, result is kg CH4. When N2O, result is kg N2O.
+  // CH4 → kg CH4; N2O → kg N2O.
   if (selection === "ch4_only") {
     return ((factorRow.ch4_g_per_mile || 0) * miles) / 1000;
   }
@@ -142,6 +143,28 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     }
   };
 
+  const convertEmissionNumeric = (value: number | undefined, unit: OutputUnit): number | undefined => {
+    if (value == null || !isFinite(value)) return undefined;
+    let converted = value;
+    switch (unit) {
+      case "kg":
+        converted = value;
+        break;
+      case "tonnes":
+        converted = value / 1000;
+        break;
+      case "g":
+        converted = value * 1000;
+        break;
+      case "short_ton":
+        converted = value / 907.18474;
+        break;
+      default:
+        converted = value;
+    }
+    return Number(converted.toFixed(6));
+  };
+
   // Load saved entries from Supabase
   useEffect(() => {
     const loadEntries = async () => {
@@ -172,6 +195,13 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         }));
         setExistingEntries(mapped);
         setRows(mapped.length > 0 ? mapped : []);
+        // If rows have a stored display unit, restore it; otherwise keep default "kg".
+        if (mapped.length > 0 && (data?.[0] as any)?.emissions_output_unit) {
+          const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+          }
+        }
         if (mapped.length > 0) onDataChange(mapped);
       } catch (err: any) {
         console.error("Error loading scope1_epa_on_road_gasoline_entries:", err);
@@ -203,8 +233,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         }
 
         const data = result.data || [];
-        const mapped: OnRoadFactorRow[] = data
-          .map((r: any) => {
+        const raw: Array<OnRoadFactorRow | null> = data.map((r: any): OnRoadFactorRow | null => {
             const vehicleType =
               pickFirstKey(r, [/^Vehicle\s*Type$/i, /vehicle[_\s]*type/i]) ??
               r["VehicleType"] ??
@@ -233,8 +262,11 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               ch4_g_per_mile: ch4,
               n2o_g_per_mile: n2o,
             };
-          })
-          .filter((x): x is OnRoadFactorRow => !!x);
+          });
+
+        const mapped: OnRoadFactorRow[] = raw.filter(
+          (x): x is OnRoadFactorRow => x !== null
+        );
 
         setFactors(mapped);
         if (mapped.length === 0) {
@@ -347,6 +379,8 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           emission_selection: v.emissionSelection ?? "ch4_only",
           miles: v.miles!,
           emissions: v.emissions!,
+          emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+          emissions_output_unit: outputUnit,
         }));
         const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
         if (error) throw error;
@@ -362,6 +396,8 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
                 emission_selection: v.emissionSelection ?? "ch4_only",
                 miles: v.miles!,
                 emissions: v.emissions!,
+                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+                emissions_output_unit: outputUnit,
               })
               .eq("id", v.dbId!)
           )

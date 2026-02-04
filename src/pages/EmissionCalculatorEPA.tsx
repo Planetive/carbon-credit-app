@@ -568,7 +568,7 @@ const EmissionCalculatorEPA = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => navigate("/emission-results")}
+                onClick={() => navigate("/emission-results?source=epa")}
                 className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
               >
                 <span className="text-sm font-medium">Results</span>
@@ -583,7 +583,6 @@ const EmissionCalculatorEPA = () => {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   EPA Emission Calculator
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">Scope 1 fuel (EPA) + Scope 2 electricity + Scope 3</p>
               </div>
             </div>
           </div>
@@ -627,37 +626,65 @@ const EmissionCalculatorEPA = () => {
 
           {/* Summary cards */}
           <div className="p-6 border-b border-gray-200/50 bg-gradient-to-b from-white to-gray-50/30" key={`summary-${resetKey}`}>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 mb-4">
               <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-2 border-red-200/50">
-                <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-extrabold text-red-600 mb-1">
-                    {scopeTotals.scope1.toFixed(1)}
+                <CardContent className="p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-2xl font-extrabold text-red-600">
+                      {scopeTotals.scope1.toLocaleString(undefined, {
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
+                      })}
+                    </div>
+                    <div className="text-xs font-semibold text-red-700/80 uppercase tracking-wide text-right">
+                      Scope 1
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-red-700/80 uppercase tracking-wide">Scope 1 (Fuel)</div>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-2 border-yellow-200/50">
-                <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-extrabold text-yellow-600 mb-1">
-                    {scopeTotals.scope2.toFixed(1)}
+                <CardContent className="p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-2xl font-extrabold text-yellow-600">
+                      {scopeTotals.scope2.toLocaleString(undefined, {
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
+                      })}
+                    </div>
+                    <div className="text-xs font-semibold text-yellow-700/80 uppercase tracking-wide text-right">
+                      Scope 2
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-yellow-700/80 uppercase tracking-wide">Scope 2 (Electricity)</div>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-2 border-blue-200/50">
-                <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-extrabold text-blue-600 mb-1">
-                    {scopeTotals.scope3.toFixed(1)}
+                <CardContent className="p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-2xl font-extrabold text-blue-600">
+                      {scopeTotals.scope3.toLocaleString(undefined, {
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
+                      })}
+                    </div>
+                    <div className="text-xs font-semibold text-blue-700/80 uppercase tracking-wide text-right">
+                      Scope 3
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-blue-700/80 uppercase tracking-wide">Scope 3</div>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-2 border-teal-300/50">
-                <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent mb-1">
-                    {scopeTotals.total.toFixed(1)}
+                <CardContent className="p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-2xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                      {scopeTotals.total.toLocaleString(undefined, {
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
+                      })}
+                    </div>
+                    <div className="text-xs font-semibold text-teal-700/80 uppercase tracking-wide text-right">
+                      Total
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-teal-700/80 uppercase tracking-wide">Total</div>
                 </CardContent>
               </Card>
             </div>
