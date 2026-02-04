@@ -143,8 +143,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         }
 
         const data = result.data || [];
-        const mapped: FactorRow[] = data
-          .map((r: any) => {
+        const raw: Array<FactorRow | null> = data.map((r: any): FactorRow | null => {
             const vehicleType =
               pickFirstKey(r, [/^Vehicle\s*Type$/i, /vehicle[_\s]*type/i]) ??
               r.vehicle_type ??
@@ -175,8 +174,11 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
               ch4_g_per_mile: ch4,
               n2o_g_per_mile: n2o,
             };
-          })
-          .filter((x): x is FactorRow => !!x);
+          });
+
+        const mapped: FactorRow[] = raw.filter(
+          (x): x is FactorRow => x !== null
+        );
 
         setFactors(mapped);
         if (mapped.length === 0) {
@@ -292,20 +294,34 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
+  const formatEmission = (raw: number): string => {
+    if (!isFinite(raw)) return "";
+    return raw.toLocaleString(undefined, {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+  };
+
   const convertEmission = (value?: number): string => {
     if (value == null) return "";
+    let converted = value;
     switch (outputUnit) {
       case "kg":
-        return value.toFixed(6);
+        converted = value;
+        break;
       case "tonnes":
-        return (value / 1000).toFixed(6);
+        converted = value / 1000;
+        break;
       case "g":
-        return (value * 1000).toFixed(6);
+        converted = value * 1000;
+        break;
       case "short_ton":
-        return (value / 907.18474).toFixed(6);
+        converted = value / 907.18474;
+        break;
       default:
-        return value.toFixed(6);
+        converted = value;
     }
+    return formatEmission(converted);
   };
 
   const rowChanged = (r: EntryRow, existing: EntryRow[]): boolean => {

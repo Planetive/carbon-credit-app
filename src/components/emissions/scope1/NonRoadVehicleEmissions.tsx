@@ -281,20 +281,34 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
+  const formatEmission = (raw: number): string => {
+    if (!isFinite(raw)) return "";
+    return raw.toLocaleString(undefined, {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+  };
+
   const convertEmission = (value?: number): string => {
     if (value == null) return "";
+    let converted = value;
     switch (outputUnit) {
       case "kg":
-        return value.toFixed(6);
+        converted = value;
+        break;
       case "tonnes":
-        return (value / 1000).toFixed(6);
+        converted = value / 1000;
+        break;
       case "g":
-        return (value * 1000).toFixed(6);
+        converted = value * 1000;
+        break;
       case "short_ton":
-        return (value / 907.18474).toFixed(6);
+        converted = value / 907.18474;
+        break;
       default:
-        return value.toFixed(6);
+        converted = value;
     }
+    return formatEmission(converted);
   };
 
   const rowChanged = (r: EntryRow, existing: EntryRow[]): boolean => {

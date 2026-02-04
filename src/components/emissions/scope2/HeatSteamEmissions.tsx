@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -118,6 +118,9 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
   const [heatRows, setHeatRows] = useState<HeatRow[]>([]);
   const [savingHeat, setSavingHeat] = useState(false);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
+  // When true, we already have user-specific rows from the DB and should
+  // not overwrite them with auto-generated rows from the reference tables.
+  const [hasUserRows, setHasUserRows] = useState(false);
 
   // Load heat and steam reference data for both standards
   useEffect(() => {
@@ -220,24 +223,34 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     loadReferenceData();
   }, []);
 
-  // Update rows when standard or data changes - dynamically create rows based on available types
+  // Update rows when standard or data changes - dynamically create rows based on
+  // available types, but only when we don't already have user-specific rows loaded.
   useEffect(() => {
-    const dataSource = heatSteamStandard === "UK" ? heatSteamDataUK : heatSteamDataEBT;
-    
+    const dataSource =
+      heatSteamStandard === "UK" ? heatSteamDataUK : heatSteamDataEBT;
+
     if (dataSource.length === 0) {
       // If no data yet, keep existing rows or set empty
       return;
     }
-    
+
+    if (hasUserRows) {
+      // We've already loaded rows from scope2_heatsteam_entries; don't override them.
+      return;
+    }
+
     // Create rows from the data source, preserving quantities if types match
-    setHeatRows(prev => {
+    setHeatRows((prev) => {
       const newRows: HeatRow[] = dataSource.map((dataItem, index) => {
         // Try to find existing row with same type to preserve quantity
         const existingRow = prev.find((r) => r.entryType === dataItem.Type);
 
         const gas: "co2" | "ch4" | "n2o" = existingRow?.gas ?? "co2";
-        const supportsMMSCF = typeof dataItem.Unit === "string" && dataItem.Unit.toLowerCase().includes("mmbtu");
-        const quantityUnit: "base" | "mmscf" = existingRow?.quantityUnit ?? "base";
+        const supportsMMSCF =
+          typeof dataItem.Unit === "string" &&
+          dataItem.Unit.toLowerCase().includes("mmbtu");
+        const quantityUnit: "base" | "mmscf" =
+          existingRow?.quantityUnit ?? "base";
 
         const baseRow: HeatRow = {
           id: existingRow?.id || `heat-${index}-${Date.now()}`,
@@ -265,13 +278,13 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
               : baseRow.quantity;
           baseRow.emissions = computeEmissionsKg(gas, factorForGas, qtyInBase);
         }
-        
+
         return baseRow;
       });
-      
+
       return newRows;
     });
-  }, [heatSteamStandard, heatSteamDataUK, heatSteamDataEBT]);
+  }, [heatSteamStandard, heatSteamDataUK, heatSteamDataEBT, hasUserRows]);
 
   // Load saved user data
   useEffect(() => {
@@ -291,7 +304,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           setHeatSteamStandard(heatData[0].standard);
         }
         
-        // Convert saved data to rows (will be updated when standard/data loads)
+        // Convert saved data to rows.
         const savedRows: HeatRow[] = (heatData || []).map((row: any) => ({
           id: crypto.randomUUID(),
           dbId: row.id,
@@ -301,10 +314,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           quantity: row.quantity ?? undefined,
           emissions: row.emissions ?? undefined,
         }));
-        
-        // Only set if we have saved data, otherwise let the standard/data effect handle it
+
+        // If we have saved data, prefer it over auto-generated reference rows.
         if (savedRows.length > 0) {
           setHeatRows(savedRows);
+          setHasUserRows(true);
         }
       } catch (e: any) {
         console.error(e);
@@ -369,7 +383,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     try {
       const inserts = validRows.filter(r => !r.dbId).map(r => ({
         user_id: user.id,
-        entry_type: r.entryType,
+        entry_type: mapEntryTypeForDb(r.entryType),
         unit: r.unit,
         emission_factor: r.factor,
         quantity: r.quantity!,
@@ -385,6 +399,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         (supabase as any)
           .from('scope2_heatsteam_entries')
           .update({
+            entry_type: mapEntryTypeForDb(r.entryType),
             unit: r.unit,
             emission_factor: r.factor,
             quantity: r.quantity!,
@@ -408,22 +423,65 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     }
   };
 
+  const deleteHeatRow = async (row: HeatRow) => {
+    // If this row exists in the DB, delete it there as well.
+    if (row.dbId) {
+      try {
+        const { error } = await (supabase as any)
+          .from("scope2_heatsteam_entries")
+          .delete()
+          .eq("id", row.dbId);
+        if (error) throw error;
+      } catch (e: any) {
+        toast({
+          title: "Error",
+          description: e?.message || "Failed to delete heat & steam entry",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setHeatRows((prev) => prev.filter((r) => r.id !== row.id && r.entryType !== row.entryType));
+  };
+
   const totalHeatEmissions = heatRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+
+  const formatEmission = (raw: number): string => {
+    if (!isFinite(raw)) return "";
+    return raw.toLocaleString(undefined, {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+  };
 
   const convertEmission = (value?: number): string => {
     if (value == null) return "";
     switch (outputUnit) {
       case "kg":
-        return value.toFixed(6);
+        return formatEmission(value);
       case "tonnes":
-        return (value / 1000).toFixed(6);
+        return formatEmission(value / 1000);
       case "g":
-        return (value * 1000).toFixed(6);
+        return formatEmission(value * 1000);
       case "short_ton":
-        return (value / 907.18474).toFixed(6);
+        return formatEmission(value / 907.18474);
       default:
-        return value.toFixed(6);
+        return formatEmission(value);
     }
+  };
+
+  // Map any display entry type back to one of the two canonical
+  // values allowed by the DB CHECK constraint on scope2_heatsteam_entries.entry_type.
+  const mapEntryTypeForDb = (
+    entryType: string
+  ): "Onsite heat and steam" | "District heat and steam" => {
+    const lower = (entryType || "").toLowerCase();
+    if (lower.includes("district")) {
+      return "District heat and steam";
+    }
+    // Default to onsite when we can't tell
+    return "Onsite heat and steam";
   };
 
   useEffect(() => {
@@ -626,8 +684,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
                 </div>
               </div>
 
-              {/* Row 2: Emissions + Factor */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              {/* Row 2: Emissions + Factor + Delete */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
                   <Label>Emissions ({outputUnit})</Label>
                   <Input readOnly value={convertEmission(row.emissions)} />
@@ -635,6 +693,17 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
                 <div>
                   <Label>{factorLabel}</Label>
                   <Input readOnly value={row.factor.toFixed(6)} />
+                </div>
+                <div className="flex items-end justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-red-600"
+                    onClick={() => deleteHeatRow(row)}
+                    aria-label="Delete heat & steam row"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>

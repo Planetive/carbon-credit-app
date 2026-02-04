@@ -118,19 +118,27 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   const [existingEntries, setExistingEntries] = useState<OnRoadRow[]>([]);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
 
+  const formatEmission = (raw: number): string => {
+    if (!isFinite(raw)) return "";
+    return raw.toLocaleString(undefined, {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+  };
+
   const convertEmission = (value?: number): string => {
     if (value == null) return "";
     switch (outputUnit) {
       case "kg":
-        return value.toFixed(6);
+        return formatEmission(value);
       case "tonnes":
-        return (value / 1000).toFixed(6);
+        return formatEmission(value / 1000);
       case "g":
-        return (value * 1000).toFixed(6);
+        return formatEmission(value * 1000);
       case "short_ton":
-        return (value / 907.18474).toFixed(6);
+        return formatEmission(value / 907.18474);
       default:
-        return value.toFixed(6);
+        return formatEmission(value);
     }
   };
 
