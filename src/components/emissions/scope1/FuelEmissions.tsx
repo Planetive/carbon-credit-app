@@ -127,7 +127,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
               row.heat_content_hhv ??
               row.hhv
           );
-          const hhvUnitRaw = row["HHV Unit"] ?? row.hhv_unit ?? row.heat_content_unit;
+          // Some tables were created with a typo "HIV Unit" instead of "HHV Unit",
+          // so support both spellings plus common variants.
+          const hhvUnitRaw =
+            row["HHV Unit"] ??
+            row["HIV Unit"] ??
+            row.hhv_unit ??
+            row.hiv_unit ??
+            row.heat_content_unit;
           const hhvUnit = typeof hhvUnitRaw === "string" ? hhvUnitRaw.toLowerCase() : "";
           const isScfBasedHHV = hhv != null && hhvUnit.includes("scf");
 

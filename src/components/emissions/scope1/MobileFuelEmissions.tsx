@@ -14,6 +14,12 @@ interface MobileFuelRow {
   isExisting?: boolean;
   fuelType?: string;
   unit?: string;
+  /**
+   * Quantity is always stored in the base unit from the reference table (e.g. gallons).
+   * inputUnit tracks what the user selected in the UI (gallon or liter) so we can
+   * convert liters -> gallons internally when needed.
+   */
+  inputUnit?: "gallon" | "liter";
   quantity?: number;
   factor?: number;
   emissions?: number;
@@ -82,16 +88,22 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         }
         const { data, error } = await q;
         if (error) throw error;
-        const mapped: MobileFuelRow[] = (data || []).map((entry: any) => ({
-          id: crypto.randomUUID(),
-          dbId: entry.id,
-          isExisting: true,
-          fuelType: entry.fuel_type,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
-        }));
+        const mapped: MobileFuelRow[] = (data || []).map((entry: any) => {
+          const unit: string | undefined = entry.unit;
+          const isGallonBase =
+            typeof unit === "string" && unit.toLowerCase().includes("gallon");
+          return {
+            id: crypto.randomUUID(),
+            dbId: entry.id,
+            isExisting: true,
+            fuelType: entry.fuel_type,
+            unit,
+            inputUnit: isGallonBase ? "gallon" : undefined,
+            quantity: entry.quantity,
+            factor: entry.factor,
+            emissions: entry.emissions,
+          };
+        });
         setExistingEntries(mapped);
         setRows(mapped.length > 0 ? mapped : []);
         if (mapped.length > 0) onDataChange(mapped);
@@ -224,11 +236,29 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           if (opt) {
             next.unit = opt.unit;
             next.factor = opt.factor;
+            const isGallonBase =
+              typeof opt.unit === "string" &&
+              opt.unit.toLowerCase().includes("gallon");
+            next.inputUnit = isGallonBase ? "gallon" : undefined;
           }
         }
 
         if (typeof next.quantity === "number" && typeof next.factor === "number") {
-          next.emissions = Number((next.quantity * next.factor).toFixed(6));
+          let effectiveQuantity = next.quantity;
+          const baseUnit = next.unit;
+          const isGallonBase =
+            typeof baseUnit === "string" &&
+            baseUnit.toLowerCase().includes("gallon");
+          const inputUnit =
+            next.inputUnit ?? (isGallonBase ? "gallon" : undefined);
+
+          // If the reference factor is per gallon but the user entered liters,
+          // convert liters -> gallons before multiplying by the factor.
+          if (isGallonBase && inputUnit === "liter") {
+            effectiveQuantity = next.quantity / 3.78541;
+          }
+
+          next.emissions = Number((effectiveQuantity * next.factor).toFixed(6));
         } else {
           next.emissions = undefined;
         }
@@ -377,11 +407,19 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           const currentOption =
             r.fuelType && options.find((o) => o.fuelType === r.fuelType);
 
+          const baseUnit = currentOption?.unit || r.unit || "";
+          const isGallonBase =
+            typeof baseUnit === "string" &&
+            baseUnit.toLowerCase().includes("gallon");
+          const inputUnit: "gallon" | "liter" | undefined =
+            r.inputUnit ?? (isGallonBase ? "gallon" : undefined);
+
           return (
             <div
               key={r.id}
               className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50"
             >
+              {/* Fuel type */}
               <Select
                 value={r.fuelType}
                 onValueChange={(v) => updateRow(r.id, { fuelType: v })}
@@ -399,12 +437,27 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
                 </SelectContent>
               </Select>
 
-              <Input
-                value={currentOption?.unit || r.unit || ""}
-                readOnly
-                placeholder="Unit"
-              />
+              {/* Unit / quantity unit (single field) */}
+              {isGallonBase ? (
+                <Select
+                  value={inputUnit}
+                  onValueChange={(v) =>
+                    updateRow(r.id, { inputUnit: v as "gallon" | "liter" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gallon">gallon</SelectItem>
+                    <SelectItem value="liter">liter</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={baseUnit} readOnly placeholder="Unit" />
+              )}
 
+              {/* Quantity input (interpreted in chosen inputUnit when base is gallon) */}
               <Input
                 type="number"
                 step="any"
@@ -422,15 +475,16 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
                     }
                   }
                 }}
-                placeholder="Enter quantity"
+                placeholder={
+                  isGallonBase && inputUnit === "liter"
+                    ? "Enter liters"
+                    : "Enter quantity"
+                }
               />
 
+              {/* Emissions + delete */}
               <div className="flex items-center gap-2">
-                <Input
-                  value={r.emissions ?? ""}
-                  readOnly
-                  placeholder="Auto"
-                />
+                <Input value={r.emissions ?? ""} readOnly placeholder="Auto" />
                 <Button
                   variant="ghost"
                   className="text-red-600"

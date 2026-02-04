@@ -8,17 +8,76 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-interface HeatRow { 
-  id?: string; 
+interface HeatRow {
+  id?: string;
   entryType: string; // Dynamic type based on standard
-  unit: string; 
-  factor: number; 
-  quantity?: number; 
-  emissions?: number; 
-  dbId?: string; 
+  unit: string;
+  factor: number;
+  quantity?: number;
+  emissions?: number;
+  dbId?: string;
+  // Selected gas for this row; defaults to CO2 when not set
+  gas?: "co2" | "ch4" | "n2o";
+  // What unit the user is entering the quantity in:
+  // "base"  -> as stored in Supabase (usually mmBtu)
+  // "mmscf" -> MMSCF, internally converted to mmBtu
+  quantityUnit?: "base" | "mmscf";
+  // Whether this row supports MMSCF input (when the base unit is mmBtu)
+  supportsMMSCF?: boolean;
+  // Per‑mmBtu factors from Supabase:
+  // - CO2 is stored as kg CO2 / mmBtu
+  // - CH4 and N2O are typically stored as g gas / mmBtu
+  co2Factor?: number;
+  ch4Factor?: number;
+  n2oFactor?: number;
 }
 
+// Fallback factor if we cannot read anything from Supabase
 const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh (fallback)
+
+// Approximate energy content of natural gas:
+// 1 MMSCF ≈ 1037 mmBtu (1 scf ≈ 1037 Btu)
+const MMBTU_PER_MMSCF = 1037;
+
+const parseNumber = (value: any): number | undefined => {
+  if (typeof value === "number") return isFinite(value) ? value : undefined;
+  if (value == null) return undefined;
+  const cleaned = String(value).replace(/,/g, "");
+  const n = parseFloat(cleaned);
+  return isFinite(n) ? n : undefined;
+};
+
+// Compute emissions in kg for the selected gas.
+// CO2 factor is in kg / unit, CH4 & N2O factors are in g / unit.
+const computeEmissionsKg = (
+  gas: "co2" | "ch4" | "n2o",
+  factorPerUnit: number,
+  quantityInBaseUnit: number
+): number => {
+  if (!isFinite(factorPerUnit) || !isFinite(quantityInBaseUnit)) {
+    return 0;
+  }
+  if (gas === "co2") {
+    return Number((quantityInBaseUnit * factorPerUnit).toFixed(6));
+  }
+  return Number(((quantityInBaseUnit * factorPerUnit) / 1000).toFixed(6));
+};
+
+const getFactorForGas = (row: HeatRow, gas: "co2" | "ch4" | "n2o"): number => {
+  if (gas === "co2") {
+    if (typeof row.co2Factor === "number") return row.co2Factor;
+    return row.factor ?? HEAT_DEFAULT_FACTOR;
+  }
+  if (gas === "ch4") {
+    if (typeof row.ch4Factor === "number") return row.ch4Factor;
+    return row.factor ?? HEAT_DEFAULT_FACTOR;
+  }
+  if (gas === "n2o") {
+    if (typeof row.n2oFactor === "number") return row.n2oFactor;
+    return row.factor ?? HEAT_DEFAULT_FACTOR;
+  }
+  return row.factor ?? HEAT_DEFAULT_FACTOR;
+};
 
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
 
@@ -36,17 +95,25 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [heatSteamStandard, setHeatSteamStandard] = useState<'UK' | 'EBT'>(forcedStandard ?? 'UK');
-  const [heatSteamDataUK, setHeatSteamDataUK] = useState<Array<{
-    'Type': string;
-    'Unit': string;
-    'kg CO₂e': number;
-  }>>([]);
-  const [heatSteamDataEBT, setHeatSteamDataEBT] = useState<Array<{
-    'Type': string;
-    'Unit': string;
-    'kg CO₂e': number;
-  }>>([]);
+  const [heatSteamStandard, setHeatSteamStandard] = useState<"UK" | "EBT">(forcedStandard ?? "UK");
+  const [heatSteamDataUK, setHeatSteamDataUK] = useState<
+    Array<{
+      Type: string;
+      Unit: string;
+      co2Factor?: number; // kg CO2 / mmBtu
+      ch4Factor?: number; // g CH4 / mmBtu
+      n2oFactor?: number; // g N2O / mmBtu
+    }>
+  >([]);
+  const [heatSteamDataEBT, setHeatSteamDataEBT] = useState<
+    Array<{
+      Type: string;
+      Unit: string;
+      co2Factor?: number;
+      ch4Factor?: number;
+      n2oFactor?: number;
+    }>
+  >([]);
 
   const [heatRows, setHeatRows] = useState<HeatRow[]>([]);
   const [savingHeat, setSavingHeat] = useState(false);
@@ -62,14 +129,44 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           .select('*');
         
         if (ukData && ukData.length > 0) {
-          const formatted = ukData.map((row: any) => ({
-            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
-            'Unit': row['Unit'] || row.unit || row['unit'],
-            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
-                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
-                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
-                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
-          }));
+          const formatted = ukData.map((row: any) => {
+            const type =
+              row["Type"] || row.type || row["type"] || row["Activity"] || row.activity;
+            const unit = row["Unit"] || row.unit || row["unit"];
+
+            const co2Raw =
+              row["kg CO2 / mmBtu"] ??
+              row["kg CO₂e"] ??
+              row["kg CO2e"] ??
+              row.kg_co2e;
+            const ch4Raw =
+              row["CH4"] ??
+              row["CH₄"] ??
+              row.ch4 ??
+              row["CH4 Factor"] ??
+              row.ch4_factor;
+            const n2oRaw =
+              row["N2O"] ??
+              row["N20"] ??
+              row.n2o ??
+              row["N2O Factor"] ??
+              row.n2o_factor;
+
+            const co2Factor = parseNumber(co2Raw);
+            const ch4Factor = parseNumber(ch4Raw);
+            const n2oFactor = parseNumber(n2oRaw);
+
+            return {
+              Type: type,
+              Unit: unit,
+              // CO2 is already kg CO2 / mmBtu
+              co2Factor: co2Factor ?? HEAT_DEFAULT_FACTOR,
+              // CH4 & N2O are stored as g / mmBtu; keep them as‑is, and convert to kg
+              // only when computing emissions.
+              ch4Factor: ch4Factor ?? undefined,
+              n2oFactor: n2oFactor ?? undefined,
+            };
+          });
           setHeatSteamDataUK(formatted);
         }
 
@@ -79,14 +176,41 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           .select('*');
         
         if (ebtData && ebtData.length > 0) {
-          const formatted = ebtData.map((row: any) => ({
-            'Type': row['Type'] || row.type || row['type'] || row['Activity'] || row.activity,
-            'Unit': row['Unit'] || row.unit || row['unit'],
-            'kg CO₂e': typeof row['kg CO₂e'] === 'number' ? row['kg CO₂e'] : 
-                      typeof row['kg CO2 / mmBtu'] === 'number' ? row['kg CO2 / mmBtu'] :
-                      typeof row['kg CO2 / mmBtu'] === 'string' ? parseFloat(row['kg CO2 / mmBtu']) :
-                      parseFloat(row['kg CO₂e'] || row['kg CO2e'] || row.kg_co2e || row['kg CO2 / mmBtu'] || 0),
-          }));
+          const formatted = ebtData.map((row: any) => {
+            const type =
+              row["Type"] || row.type || row["type"] || row["Activity"] || row.activity;
+            const unit = row["Unit"] || row.unit || row["unit"];
+
+            const co2Raw =
+              row["kg CO2 / mmBtu"] ??
+              row["kg CO₂e"] ??
+              row["kg CO2e"] ??
+              row.kg_co2e;
+            const ch4Raw =
+              row["CH4"] ??
+              row["CH₄"] ??
+              row.ch4 ??
+              row["CH4 Factor"] ??
+              row.ch4_factor;
+            const n2oRaw =
+              row["N2O"] ??
+              row["N20"] ??
+              row.n2o ??
+              row["N2O Factor"] ??
+              row.n2o_factor;
+
+            const co2Factor = parseNumber(co2Raw);
+            const ch4Factor = parseNumber(ch4Raw);
+            const n2oFactor = parseNumber(n2oRaw);
+
+            return {
+              Type: type,
+              Unit: unit,
+              co2Factor: co2Factor ?? HEAT_DEFAULT_FACTOR,
+              ch4Factor: ch4Factor ?? undefined,
+              n2oFactor: n2oFactor ?? undefined,
+            };
+          });
           setHeatSteamDataEBT(formatted);
         }
       } catch (error: any) {
@@ -98,7 +222,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
 
   // Update rows when standard or data changes - dynamically create rows based on available types
   useEffect(() => {
-    const dataSource = heatSteamStandard === 'UK' ? heatSteamDataUK : heatSteamDataEBT;
+    const dataSource = heatSteamStandard === "UK" ? heatSteamDataUK : heatSteamDataEBT;
     
     if (dataSource.length === 0) {
       // If no data yet, keep existing rows or set empty
@@ -109,19 +233,40 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     setHeatRows(prev => {
       const newRows: HeatRow[] = dataSource.map((dataItem, index) => {
         // Try to find existing row with same type to preserve quantity
-        const existingRow = prev.find(r => r.entryType === dataItem['Type']);
-        
-        return {
+        const existingRow = prev.find((r) => r.entryType === dataItem.Type);
+
+        const gas: "co2" | "ch4" | "n2o" = existingRow?.gas ?? "co2";
+        const supportsMMSCF = typeof dataItem.Unit === "string" && dataItem.Unit.toLowerCase().includes("mmbtu");
+        const quantityUnit: "base" | "mmscf" = existingRow?.quantityUnit ?? "base";
+
+        const baseRow: HeatRow = {
           id: existingRow?.id || `heat-${index}-${Date.now()}`,
-          entryType: dataItem['Type'],
-          unit: dataItem['Unit'] || 'kWh',
-          factor: dataItem['kg CO₂e'] || HEAT_DEFAULT_FACTOR,
+          entryType: dataItem.Type,
+          unit: dataItem.Unit || "mmBtu",
+          factor: 0,
           quantity: existingRow?.quantity,
-          emissions: existingRow?.quantity && dataItem['kg CO₂e'] 
-            ? Number((existingRow.quantity * dataItem['kg CO₂e']).toFixed(6))
-            : undefined,
+          emissions: undefined,
           dbId: existingRow?.dbId,
+          gas,
+          quantityUnit,
+          supportsMMSCF,
+          co2Factor: dataItem.co2Factor ?? HEAT_DEFAULT_FACTOR,
+          ch4Factor: dataItem.ch4Factor,
+          n2oFactor: dataItem.n2oFactor,
         };
+
+        const factorForGas = getFactorForGas(baseRow, gas);
+        baseRow.factor = factorForGas;
+
+        if (typeof baseRow.quantity === "number") {
+          const qtyInBase =
+            quantityUnit === "mmscf" && supportsMMSCF
+              ? baseRow.quantity * MMBTU_PER_MMSCF
+              : baseRow.quantity;
+          baseRow.emissions = computeEmissionsKg(gas, factorForGas, qtyInBase);
+        }
+        
+        return baseRow;
       });
       
       return newRows;
@@ -177,16 +322,37 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
   }, [forcedStandard]);
 
   const updateHeatRowQty = (entryType: string, qty?: number) => {
-    setHeatRows(prev => prev.map(r => {
-      if (r.entryType !== entryType) return r;
-      const next = { ...r, quantity: qty } as HeatRow;
-      if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
-        next.emissions = Number((next.quantity * next.factor).toFixed(6));
-      } else {
-        next.emissions = undefined;
-      }
-      return next;
-    }));
+    setHeatRows((prev) =>
+      prev.map((r) => {
+        if (r.entryType !== entryType) return r;
+        const gas: "co2" | "ch4" | "n2o" = r.gas ?? "co2";
+        const quantityUnit: "base" | "mmscf" = r.quantityUnit ?? "base";
+        const supportsMMSCF = !!r.supportsMMSCF;
+
+        const next: HeatRow = {
+          ...r,
+          quantity: qty,
+          gas,
+          quantityUnit,
+          supportsMMSCF,
+        };
+
+        const factorForGas = getFactorForGas(next, gas);
+        next.factor = factorForGas;
+
+        if (typeof next.quantity === "number") {
+          const qtyInBase =
+            quantityUnit === "mmscf" && supportsMMSCF
+              ? next.quantity * MMBTU_PER_MMSCF
+              : next.quantity;
+          next.emissions = computeEmissionsKg(gas, factorForGas, qtyInBase);
+        } else {
+          next.emissions = undefined;
+        }
+
+        return next;
+      })
+    );
   };
 
   const saveHeat = async () => {
@@ -298,40 +464,182 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
       {heatRows.length === 0 ? (
         <div className="text-sm text-gray-600">Loading heat and steam data...</div>
       ) : (
-        heatRows.map((row) => (
-          <div key={row.id || row.entryType} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-              <Label>{row.entryType} ({row.unit})</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                max="999999999999.999999"
-                value={row.quantity ?? ''}
-                onChange={e => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateHeatRowQty(row.entryType, undefined);
-                  } else {
-                    const numValue = Number(value);
-                    if (numValue >= 0 && numValue <= 999999999999.999999) {
-                      updateHeatRowQty(row.entryType, numValue);
-                    }
-                  }
-                }}
-                placeholder={`Enter ${row.unit}`}
-              />
+        heatRows.map((row) => {
+          const gas: "co2" | "ch4" | "n2o" = row.gas ?? "co2";
+          const quantityUnit: "base" | "mmscf" = row.quantityUnit ?? "base";
+          const supportsMMSCF = !!row.supportsMMSCF;
+
+          const factorLabel =
+            gas === "co2"
+              ? `Factor (kg CO2 / ${row.unit})`
+              : gas === "ch4"
+              ? `Factor (g CH4 / ${row.unit})`
+              : `Factor (g N2O / ${row.unit})`;
+
+          return (
+            <div
+              key={row.id || row.entryType}
+              className="space-y-3 rounded-lg bg-gray-50 p-3"
+            >
+              {/* Row 1: Activity + Emission type */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div>
+                  <Label>
+                    {forcedStandard ? "Steam and Heat" : row.entryType}
+                  </Label>
+                  {supportsMMSCF ? (
+                    <div className="mt-1 flex gap-2">
+                      <Select
+                        value={quantityUnit}
+                        onValueChange={(value: "base" | "mmscf") => {
+                          setHeatRows((prev) =>
+                            prev.map((r) => {
+                              if (r.entryType !== row.entryType) return r;
+                              const gasForRow: "co2" | "ch4" | "n2o" = r.gas ?? "co2";
+                              const next: HeatRow = {
+                                ...r,
+                                quantityUnit: value,
+                                gas: gasForRow,
+                                supportsMMSCF: true,
+                              };
+                            const factorForGas = getFactorForGas(
+                              next,
+                              gasForRow
+                            );
+                            next.factor = factorForGas;
+
+                            if (typeof next.quantity === "number") {
+                              const qtyInBase =
+                                value === "mmscf"
+                                  ? next.quantity * MMBTU_PER_MMSCF
+                                  : next.quantity;
+                              next.emissions = computeEmissionsKg(
+                                gasForRow,
+                                factorForGas,
+                                qtyInBase
+                              );
+                              } else {
+                                next.emissions = undefined;
+                              }
+                              return next;
+                            })
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="base">{row.unit}</SelectItem>
+                          <SelectItem value="mmscf">MMSCF</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        max="999999999999.999999"
+                        value={row.quantity ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "") {
+                            updateHeatRowQty(row.entryType, undefined);
+                          } else {
+                            const numValue = Number(value);
+                            if (numValue >= 0 && numValue <= 999999999999.999999) {
+                              updateHeatRowQty(row.entryType, numValue);
+                            }
+                          }
+                        }}
+                        placeholder={
+                          quantityUnit === "mmscf"
+                            ? "Enter MMSCF"
+                            : `Enter ${row.unit}`
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <Input
+                      className="mt-1"
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="999999999999.999999"
+                      value={row.quantity ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "") {
+                          updateHeatRowQty(row.entryType, undefined);
+                        } else {
+                          const numValue = Number(value);
+                          if (numValue >= 0 && numValue <= 999999999999.999999) {
+                            updateHeatRowQty(row.entryType, numValue);
+                          }
+                        }
+                      }}
+                      placeholder={`Enter ${row.unit}`}
+                    />
+                  )}
+                </div>
+                <div>
+                  <Label>Emission type</Label>
+                  <Select
+                    value={gas}
+                    onValueChange={(value: "co2" | "ch4" | "n2o") => {
+                      setHeatRows((prev) =>
+                        prev.map((r) => {
+                          if (r.entryType !== row.entryType) return r;
+                          const next: HeatRow = {
+                            ...r,
+                            gas: value,
+                          };
+                          const factorForGas = getFactorForGas(next, value);
+                          next.factor = factorForGas;
+
+                          if (typeof next.quantity === "number") {
+                            const qtyInBase =
+                              next.quantityUnit === "mmscf" && next.supportsMMSCF
+                                ? next.quantity * MMBTU_PER_MMSCF
+                                : next.quantity;
+                            next.emissions = computeEmissionsKg(
+                              value,
+                              factorForGas,
+                              qtyInBase
+                            );
+                          } else {
+                            next.emissions = undefined;
+                          }
+                          return next;
+                        })
+                      );
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="co2">CO2</SelectItem>
+                      <SelectItem value="ch4">CH4</SelectItem>
+                      <SelectItem value="n2o">N2O</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 2: Emissions + Factor */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div>
+                  <Label>Emissions ({outputUnit})</Label>
+                  <Input readOnly value={convertEmission(row.emissions)} />
+                </div>
+                <div>
+                  <Label>{factorLabel}</Label>
+                  <Input readOnly value={row.factor.toFixed(6)} />
+                </div>
+              </div>
             </div>
-            <div>
-              <Label>Emissions</Label>
-              <Input readOnly value={(row.emissions ?? '').toString()} />
-            </div>
-            <div>
-              <Label>Factor (kg CO2e/{row.unit})</Label>
-              <Input readOnly value={row.factor.toFixed(6)} />
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       <div className="flex items-center justify-between pt-4 border-t">
