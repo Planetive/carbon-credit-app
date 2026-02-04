@@ -20,6 +20,8 @@ interface HeatRow {
 
 const HEAT_DEFAULT_FACTOR = 0.17355; // kg CO2e per kWh (fallback)
 
+type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+
 interface HeatSteamEmissionsProps {
   onTotalChange?: (total: number) => void;
   onSaveAndNext?: () => void;
@@ -48,6 +50,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
 
   const [heatRows, setHeatRows] = useState<HeatRow[]>([]);
   const [savingHeat, setSavingHeat] = useState(false);
+  const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
 
   // Load heat and steam reference data for both standards
   useEffect(() => {
@@ -241,6 +244,22 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
 
   const totalHeatEmissions = heatRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
+  const convertEmission = (value?: number): string => {
+    if (value == null) return "";
+    switch (outputUnit) {
+      case "kg":
+        return value.toFixed(6);
+      case "tonnes":
+        return (value / 1000).toFixed(6);
+      case "g":
+        return (value * 1000).toFixed(6);
+      case "short_ton":
+        return (value / 907.18474).toFixed(6);
+      default:
+        return value.toFixed(6);
+    }
+  };
+
   useEffect(() => {
     if (onTotalChange) onTotalChange(totalHeatEmissions);
   }, [onTotalChange, totalHeatEmissions]);
@@ -317,11 +336,30 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-900 font-medium">
-          Total heat & steam emissions: <span className="font-semibold">{totalHeatEmissions.toFixed(6)} kg CO2e</span>
+          Total heat & steam emissions:{" "}
+          <span className="font-semibold">
+            {convertEmission(totalHeatEmissions)} {outputUnit}
+          </span>
         </div>
-        <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
-          <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save and Next'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Output unit</span>
+            <Select value={outputUnit} onValueChange={(v) => setOutputUnit(v as OutputUnit)}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="tonnes">tonnes</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="short_ton">short ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save and Next'}
+          </Button>
+        </div>
       </div>
     </div>
   );

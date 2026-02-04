@@ -25,12 +25,18 @@ interface FactorRow {
   n2o_g_per_gallon?: number;
 }
 
+type NonRoadUnit = "gallon" | "liter";
+type EmissionSelection = "ch4" | "n2o";
+type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+
 interface EntryRow {
   id: string;
   dbId?: string;
   isExisting?: boolean;
   vehicleType?: string;
   fuelType?: string;
+  unit?: NonRoadUnit;
+  emissionSelection?: EmissionSelection;
   gallons?: number;
   emissions?: number; // kg CO2e
 }
@@ -42,12 +48,13 @@ interface Props {
   counterpartyId?: string;
 }
 
-const newRow = (): EntryRow => ({ id: crypto.randomUUID() });
+const newRow = (): EntryRow => ({ id: crypto.randomUUID(), unit: "gallon", emissionSelection: "ch4" });
 
 const parseNum = (v: any): number | undefined => {
   if (typeof v === "number") return isFinite(v) ? v : undefined;
   if (v == null) return undefined;
-  const n = parseFloat(String(v).replaceAll(",", ""));
+  const cleaned = String(v).replace(/,/g, "");
+  const n = parseFloat(cleaned);
   return isFinite(n) ? n : undefined;
 };
 
@@ -74,6 +81,7 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   const [factors, setFactors] = useState<FactorRow[]>([]);
   const [rows, setRows] = useState<EntryRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<EntryRow[]>([]);
+  const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
 
   useEffect(() => {
     const loadEntries = async () => {
@@ -97,6 +105,8 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           isExisting: true,
           vehicleType: entry.vehicle_type,
           fuelType: entry.fuel_type,
+          unit: (entry.unit as NonRoadUnit) ?? "gallon",
+          emissionSelection: (entry.emission_selection as EmissionSelection) ?? "ch4",
           gallons: entry.gallons,
           emissions: entry.emissions,
         }));
@@ -230,14 +240,17 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         }
 
         if (typeof next.gallons === "number" && factorRow) {
-          const gallons = next.gallons;
-          if (typeof factorRow.co2e_g_per_gallon === "number") {
-            next.emissions = (factorRow.co2e_g_per_gallon * gallons) / 1000;
+          const quantity = next.gallons;
+          const unit: NonRoadUnit = next.unit ?? "gallon";
+          const gallons = unit === "gallon" ? quantity : quantity / 3.78541; // convert liters -> gallons
+
+          // When user selects CH4, result is in kg CH4.
+          // When user selects N2O, result is in kg N2O.
+          const selection: EmissionSelection = next.emissionSelection ?? "ch4";
+          if (selection === "ch4") {
+            next.emissions = ((factorRow.ch4_g_per_gallon || 0) * gallons) / 1000;
           } else {
-            const co2_kg = ((factorRow.co2_g_per_gallon || 0) * gallons) / 1000;
-            const ch4_kgco2e = (((factorRow.ch4_g_per_gallon || 0) * gallons) / 1000) * GWP_CH4;
-            const n2o_kgco2e = (((factorRow.n2o_g_per_gallon || 0) * gallons) / 1000) * GWP_N2O;
-            next.emissions = co2_kg + ch4_kgco2e + n2o_kgco2e;
+            next.emissions = ((factorRow.n2o_g_per_gallon || 0) * gallons) / 1000;
           }
 
           // If everything is still 0, warn (usually means factor columns weren't read)
@@ -268,12 +281,30 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
+  const convertEmission = (value?: number): string => {
+    if (value == null) return "";
+    switch (outputUnit) {
+      case "kg":
+        return value.toFixed(6);
+      case "tonnes":
+        return (value / 1000).toFixed(6);
+      case "g":
+        return (value * 1000).toFixed(6);
+      case "short_ton":
+        return (value / 907.18474).toFixed(6);
+      default:
+        return value.toFixed(6);
+    }
+  };
+
   const rowChanged = (r: EntryRow, existing: EntryRow[]): boolean => {
     const ex = existing.find((e) => e.dbId === r.dbId);
     if (!ex) return false;
     return (
       r.vehicleType !== ex.vehicleType ||
       r.fuelType !== ex.fuelType ||
+      (r.unit ?? "gallon") !== (ex.unit ?? "gallon") ||
+      (r.emissionSelection ?? "ch4") !== (ex.emissionSelection ?? "ch4") ||
       Number(r.gallons) !== Number(ex.gallons) ||
       Number(r.emissions) !== Number(ex.emissions)
     );
@@ -306,6 +337,8 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           counterparty_id: companyContext ? counterpartyId ?? null : null,
           vehicle_type: v.vehicleType!,
           fuel_type: v.fuelType!,
+          unit: v.unit ?? "gallon",
+          emission_selection: v.emissionSelection ?? "ch4",
           gallons: v.gallons!,
           emissions: v.emissions!,
         }));
@@ -320,6 +353,8 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               .update({
                 vehicle_type: v.vehicleType!,
                 fuel_type: v.fuelType!,
+                unit: v.unit ?? "gallon",
+                emission_selection: v.emissionSelection ?? "ch4",
                 gallons: v.gallons!,
                 emissions: v.emissions!,
               })
@@ -357,18 +392,20 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
 
       {loading && <div className="text-sm text-gray-600">Loading reference data...</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Label className="md:col-span-1 text-gray-500">Vehicle type</Label>
         <Label className="md:col-span-1 text-gray-500">Fuel type</Label>
-        <Label className="md:col-span-1 text-gray-500">Fuel used (gallons)</Label>
-        <Label className="md:col-span-1 text-gray-500">Emissions (kg CO2e)</Label>
+        <Label className="md:col-span-1 text-gray-500">Fuel amount</Label>
+        <Label className="md:col-span-1 text-gray-500">Unit</Label>
+        <Label className="md:col-span-1 text-gray-500">Emission type</Label>
+        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnit})</Label>
       </div>
 
       <div className="space-y-3">
         {rows.map((r) => (
           <div
-            key={r.id}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50"
+          key={r.id}
+          className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-3 rounded-lg bg-gray-50"
           >
               <Select
                 value={r.vehicleType}
@@ -421,11 +458,37 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
                     }
                   }
                 }}
-                placeholder="Enter gallons"
+                placeholder="Enter fuel amount"
               />
 
+              <Select
+                value={r.unit ?? "gallon"}
+                onValueChange={(v) => updateRow(r.id, { unit: v as NonRoadUnit })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gallon">gallon</SelectItem>
+                  <SelectItem value="liter">liter</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={r.emissionSelection ?? "ch4"}
+                onValueChange={(v) => updateRow(r.id, { emissionSelection: v as EmissionSelection })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ch4">CH4 (g CH4 / gallon)</SelectItem>
+                  <SelectItem value="n2o">N2O (g N2O / gallon)</SelectItem>
+                </SelectContent>
+              </Select>
+
               <div className="flex items-center gap-2">
-                <Input readOnly value={r.emissions != null ? r.emissions.toFixed(6) : ""} placeholder="Auto" />
+                <Input readOnly value={convertEmission(r.emissions)} placeholder="Auto" />
                 <Button variant="ghost" className="text-red-600" onClick={() => removeRow(r.id)} aria-label="Remove row">
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -437,11 +500,29 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
           Total Non-Road Vehicle Emissions:{" "}
-          <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
+          <span className="font-semibold">
+            {convertEmission(totalEmissions)} {outputUnit}
+          </span>
         </div>
-        <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
-          <Save className="h-4 w-4 mr-2" /> Save and Next
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Output unit</span>
+            <Select value={outputUnit} onValueChange={(v) => setOutputUnit(v as OutputUnit)}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="tonnes">tonnes</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="short_ton">short ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
+            <Save className="h-4 w-4 mr-2" /> Save and Next
+          </Button>
+        </div>
       </div>
     </div>
   );

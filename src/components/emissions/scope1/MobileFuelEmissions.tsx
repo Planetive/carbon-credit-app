@@ -33,6 +33,8 @@ interface MobileCombustionOption {
   factor: number;
 }
 
+type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+
 const newRow = (): MobileFuelRow => ({
   id: crypto.randomUUID(),
 });
@@ -54,6 +56,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
 
   // Load existing entries from Supabase
   useEffect(() => {
@@ -236,6 +239,22 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
   };
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+
+  const convertEmission = (value?: number): string => {
+    if (value == null) return "";
+    switch (outputUnit) {
+      case "kg":
+        return value.toFixed(6);
+      case "tonnes":
+        return (value / 1000).toFixed(6);
+      case "g":
+        return (value * 1000).toFixed(6);
+      case "short_ton":
+        return (value / 907.18474).toFixed(6);
+      default:
+        return value.toFixed(6);
+    }
+  };
 
   const rowChanged = (r: MobileFuelRow, existing: MobileFuelRow[]): boolean => {
     const ex = existing.find((e) => e.dbId === r.dbId);
@@ -429,17 +448,33 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         <div className="text-gray-700 font-medium">
           Total Mobile Fuel Emissions:{" "}
           <span className="font-semibold">
-            {totalEmissions.toFixed(6)} kg CO2e
+            {convertEmission(totalEmissions)} {outputUnit}
           </span>
         </div>
-        <Button
-          onClick={handleSaveAndNext}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
-          disabled={saving}
-        >
-          <Save className="h-4 w-4 mr-2" />
-          Save and Next
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Output unit</span>
+            <Select value={outputUnit} onValueChange={(v) => setOutputUnit(v as OutputUnit)}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="tonnes">tonnes</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="short_ton">short ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleSaveAndNext}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={saving}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save and Next
+          </Button>
+        </div>
       </div>
     </div>
   );

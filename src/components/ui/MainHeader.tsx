@@ -138,7 +138,7 @@ const MainHeader = () => {
             className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
             asChild
           >
-            <Link to="/register-choice">Sign Up</Link>
+            <Link to="/contact">Contact Us</Link>
           </Button>
         </div>
 
@@ -250,7 +250,7 @@ const MainHeader = () => {
               className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
               asChild
             >
-              <Link to="/register-choice" onClick={() => setIsMobileMenuOpen(false)}>Sign Up</Link>
+              <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
             </Button>
           </div>
         </div>

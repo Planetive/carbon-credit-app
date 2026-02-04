@@ -214,10 +214,10 @@ const CorporateSolutions = () => {
               className="flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <Link
-                to="/register?user_type=corporate"
+                to="/contact"
                 className="group inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-base hover:bg-gray-800 transition-all duration-300 hover:scale-105 hover:shadow-xl"
               >
-                Sign up free
+                Contact us
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <button

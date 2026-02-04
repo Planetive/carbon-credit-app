@@ -12,19 +12,15 @@ const TABLE_NAME = "scope1_epa_on_road_gasoline_entries";
 
 /**
  * Scope 1 - On-Road Gasoline
- * Reference data source: Supabase table "On-Road Gasoline"
+ * Reference data source: Supabase table "On-Road Gasoline" (or on_road_gasoline)
  *
- * Expected columns (flexible parsing):
+ * Expected columns (match your Supabase schema; parsing is flexible):
  * - "Vehicle Type" (text)
  * - "Model Year" (text)
- * - "CO2 Factor (g CO2 / vehicle-mile)" (optional)
- * - "CH4 Factor (g CH4 / vehicle-mile)"
- * - "N2O Factor (g N2O / vehicle-mile)" (optional)
+ * - "CH4 Factor (g CH4 / vehicle-mile)" (float8)
+ * - "N2O Factor (g N2O / vehicle-mile)" (float8)
+ * - "CO2 Factor (g CO2 / vehicle-mile)" (float8, optional – if present, total CO2e includes CO2 + CH4 + N2O)
  */
-
-// Common GWP-100 defaults (AR5). Adjust later if you standardize elsewhere.
-const GWP_CH4 = 28;
-const GWP_N2O = 265;
 
 interface OnRoadFactorRow {
   id: string | number;
@@ -36,14 +32,21 @@ interface OnRoadFactorRow {
   n2o_g_per_mile?: number;
 }
 
+// Only CH4 or N2O — your "On-Road Gasoline" table has those factor columns
+export type EmissionSelection = "ch4_only" | "n2o_only";
+type DistanceUnit = "mile" | "km";
+type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+
 interface OnRoadRow {
   id: string;
   dbId?: string;
   isExisting?: boolean;
   vehicleType?: string;
   modelYear?: string;
+  emissionSelection?: EmissionSelection;
+   distanceUnit?: DistanceUnit;
   miles?: number;
-  emissions?: number; // kg CO2e
+  emissions?: number; // kg CH4 or kg N2O
 }
 
 interface Props {
@@ -53,12 +56,17 @@ interface Props {
   counterpartyId?: string;
 }
 
-const newRow = (): OnRoadRow => ({ id: crypto.randomUUID() });
+const newRow = (): OnRoadRow => ({
+  id: crypto.randomUUID(),
+  emissionSelection: "ch4_only",
+  distanceUnit: "mile",
+});
 
 const parseNum = (v: any): number | undefined => {
   if (typeof v === "number") return isFinite(v) ? v : undefined;
   if (v == null) return undefined;
-  const n = parseFloat(String(v).replaceAll(",", ""));
+  const cleaned = String(v).replace(/,/g, "");
+  const n = parseFloat(cleaned);
   return isFinite(n) ? n : undefined;
 };
 
@@ -76,6 +84,29 @@ const pickNumber = (row: any, patterns: RegExp[]): number | undefined => {
   return parseNum(v);
 };
 
+function toEmissionSelection(value: unknown): EmissionSelection {
+  if (value === "ch4_only" || value === "n2o_only") return value;
+  return "ch4_only";
+}
+
+const EMISSION_SELECTION_OPTIONS: { value: EmissionSelection; label: string }[] = [
+  { value: "ch4_only", label: "CH4" },
+  { value: "n2o_only", label: "N2O" },
+];
+
+const computeEmissions = (
+  factorRow: OnRoadFactorRow | undefined,
+  miles: number | undefined,
+  selection: EmissionSelection
+): number | undefined => {
+  if (typeof miles !== "number" || !factorRow) return undefined;
+  // When user selects CH4, result is kg CH4. When N2O, result is kg N2O.
+  if (selection === "ch4_only") {
+    return ((factorRow.ch4_g_per_mile || 0) * miles) / 1000;
+  }
+  return ((factorRow.n2o_g_per_mile || 0) * miles) / 1000;
+};
+
 const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext, companyContext = false, counterpartyId }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -85,6 +116,23 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   const [factors, setFactors] = useState<OnRoadFactorRow[]>([]);
   const [rows, setRows] = useState<OnRoadRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<OnRoadRow[]>([]);
+  const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
+
+  const convertEmission = (value?: number): string => {
+    if (value == null) return "";
+    switch (outputUnit) {
+      case "kg":
+        return value.toFixed(6);
+      case "tonnes":
+        return (value / 1000).toFixed(6);
+      case "g":
+        return (value * 1000).toFixed(6);
+      case "short_ton":
+        return (value / 907.18474).toFixed(6);
+      default:
+        return value.toFixed(6);
+    }
+  };
 
   // Load saved entries from Supabase
   useEffect(() => {
@@ -109,6 +157,8 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           isExisting: true,
           vehicleType: entry.vehicle_type,
           modelYear: entry.model_year,
+          emissionSelection: toEmissionSelection(entry.emission_selection),
+          distanceUnit: "mile",
           miles: entry.miles,
           emissions: entry.emissions,
         }));
@@ -234,32 +284,16 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
       prev.map((r) => {
         if (r.id !== id) return r;
         const next: OnRoadRow = { ...r, ...patch };
-
         const factorRow =
           next.vehicleType && next.modelYear
             ? factors.find((f) => f.vehicleType === next.vehicleType && f.modelYear === next.modelYear)
             : undefined;
-
-        if (typeof next.miles === "number" && factorRow) {
-          const miles = next.miles;
-
-          // If the table provides a direct CO2e factor (g CO2e / mile), use it.
-          if (typeof factorRow.co2e_g_per_mile === "number") {
-            next.emissions = (factorRow.co2e_g_per_mile * miles) / 1000;
-          } else {
-            const co2_kg = ((factorRow.co2_g_per_mile || 0) * miles) / 1000;
-            const ch4_kgco2e = (((factorRow.ch4_g_per_mile || 0) * miles) / 1000) * GWP_CH4;
-            const n2o_kgco2e = (((factorRow.n2o_g_per_mile || 0) * miles) / 1000) * GWP_N2O;
-            next.emissions = co2_kg + ch4_kgco2e + n2o_kgco2e;
-          }
-        } else {
-          next.emissions = undefined;
-        }
-
+        next.emissions = computeEmissions(factorRow, next.miles, next.emissionSelection ?? "ch4_only");
         return next;
       }),
     );
   };
+
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
@@ -269,6 +303,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     return (
       r.vehicleType !== ex.vehicleType ||
       r.modelYear !== ex.modelYear ||
+      r.emissionSelection !== ex.emissionSelection ||
       Number(r.miles) !== Number(ex.miles) ||
       Number(r.emissions) !== Number(ex.emissions)
     );
@@ -301,6 +336,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           counterparty_id: companyContext ? counterpartyId ?? null : null,
           vehicle_type: v.vehicleType!,
           model_year: v.modelYear!,
+          emission_selection: v.emissionSelection ?? "ch4_only",
           miles: v.miles!,
           emissions: v.emissions!,
         }));
@@ -315,6 +351,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               .update({
                 vehicle_type: v.vehicleType!,
                 model_year: v.modelYear!,
+                emission_selection: v.emissionSelection ?? "ch4_only",
                 miles: v.miles!,
                 emissions: v.emissions!,
               })
@@ -352,16 +389,23 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
 
       {loading && <div className="text-sm text-gray-600">Loading on-road gasoline reference data...</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Label className="md:col-span-1 text-gray-500">Vehicle type</Label>
         <Label className="md:col-span-1 text-gray-500">Model year</Label>
-        <Label className="md:col-span-1 text-gray-500">Vehicle miles</Label>
-        <Label className="md:col-span-1 text-gray-500">Emissions (kg CO2e)</Label>
+        <Label className="md:col-span-1 text-gray-500">Emission type</Label>
+        <Label className="md:col-span-1 text-gray-500">Distance unit</Label>
+        <Label className="md:col-span-1 text-gray-500">Distance</Label>
+        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnit})</Label>
       </div>
 
       <div className="space-y-3">
-        {rows.map((r) => (
-          <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50">
+        {rows.map((r) => {
+          const unit: DistanceUnit = r.distanceUnit ?? "mile";
+          const distanceDisplay =
+            r.miles != null ? (unit === "mile" ? r.miles : r.miles * 1.60934) : "";
+
+          return (
+          <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-3 rounded-lg bg-gray-50">
             <Select
               value={r.vehicleType}
               onValueChange={(v) => updateRow(r.id, { vehicleType: v, modelYear: undefined })}
@@ -396,12 +440,41 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               </SelectContent>
             </Select>
 
+            <Select
+              value={r.emissionSelection ?? "ch4_only"}
+              onValueChange={(v) => updateRow(r.id, { emissionSelection: v as EmissionSelection })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select emission" />
+              </SelectTrigger>
+              <SelectContent>
+                {EMISSION_SELECTION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={unit}
+              onValueChange={(v) => updateRow(r.id, { distanceUnit: v as DistanceUnit })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mile">mile</SelectItem>
+                <SelectItem value="km">km</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Input
               type="number"
               step="any"
               min="0"
               max="999999999999.999999"
-              value={r.miles ?? ""}
+              value={distanceDisplay}
               onChange={(e) => {
                 const v = e.target.value;
                 if (v === "") {
@@ -409,31 +482,50 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
                 } else {
                   const num = Number(v);
                   if (num >= 0 && num <= 999999999999.999999) {
-                    updateRow(r.id, { miles: num });
+                    const miles = unit === "mile" ? num : num * 0.621371;
+                    updateRow(r.id, { miles });
                   }
                 }
               }}
-              placeholder="Enter miles"
+              placeholder="Enter distance"
             />
 
-            <div className="flex items-center gap-2">
-              <Input readOnly value={r.emissions != null ? r.emissions.toFixed(6) : ""} placeholder="Auto" />
+            <div className="flex items-center gap-2 md:col-span-1">
+              <Input readOnly value={convertEmission(r.emissions)} placeholder="Auto" />
               <Button variant="ghost" className="text-red-600" onClick={() => removeRow(r.id)} aria-label="Remove row">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
           Total On-Road Gasoline Emissions:{" "}
-          <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
+          <span className="font-semibold">
+            {convertEmission(totalEmissions)} {outputUnit}
+          </span>
         </div>
-        <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
-          <Save className="h-4 w-4 mr-2" /> Save and Next
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Output unit</span>
+            <Select value={outputUnit} onValueChange={(v) => setOutputUnit(v as OutputUnit)}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="tonnes">tonnes</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="short_ton">short ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
+            <Save className="h-4 w-4 mr-2" /> Save and Next
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -11,13 +11,13 @@ import {
   FuelRow, 
   FuelType 
 } from "../shared/types";
-import { 
-  FACTORS
-} from "../shared/EmissionFactors";
+import { FACTORS } from "../shared/EmissionFactors";
 import { 
   newFuelRow,
   fuelRowChanged
 } from "../shared/utils";
+
+type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
 
 interface FuelEmissionsProps {
   onDataChange: (data: FuelRow[]) => void;
@@ -36,8 +36,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
+  const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
 
-  // Use Supabase "Fuel EPA" table for dynamic fuel factors when available,
+  // Use Supabase EPA fuel tables for dynamic fuel factors when available,
   // but keep the hardcoded FACTORS as a safe fallback. Guard against null/undefined for different envs.
   const effectiveFactors = (fuelFactors || FACTORS || {}) as Record<string, Record<string, Record<string, number>>>;
 
@@ -47,64 +48,152 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const unitsFor = (type?: FuelType, fuel?: string) =>
     type && fuel ? Object.keys((effectiveFactors[type] || {})[fuel] || {}) : [];
 
-  // Load fuel factor reference data from Supabase ("Fuel EPA" table).
-  // Expected columns (based on your screenshot):
-  //   - "Fuel" (text)
-  //   - "kg CO2 per mmBtu" (float8)
-  //   - "Category" (text)
+  const parseNumber = (value: any): number | undefined => {
+    if (typeof value === "number") return isFinite(value) ? value : undefined;
+    if (value == null) return undefined;
+    const cleaned = String(value).replace(/,/g, "");
+    const n = parseFloat(cleaned);
+    return isFinite(n) ? n : undefined;
+  };
+
+  const convertEmission = (value?: number): string => {
+    if (value == null) return "";
+    switch (outputUnit) {
+      case "kg":
+        return value.toFixed(6);
+      case "tonnes":
+        return (value / 1000).toFixed(6);
+      case "g":
+        return (value * 1000).toFixed(6);
+      case "short_ton":
+        return (value / 907.18474).toFixed(6);
+      default:
+        return value.toFixed(6);
+    }
+  };
+
+  // Load fuel factor reference data from Supabase EPA tables:
+  //   - "Fuel EPA 1"
+  //   - "Fuel EPA 2"
+  //   - "Fuel EPA 3"
+  //
+  // Each table has (case-insensitive) columns similar to:
+  //   - "Category"
+  //   - "Fuel Type"
+  //   - "Heat Content (HHV)", "HHV Unit"
+  //   - "CO2 Factor", "CO2 Unit"
+  //   - "CH4 Factor", "CH4 Unit"
+  //   - "N2O Factor", "N2O Unit"
+  //
+  // We expose one selectable "unit" per gas and unit, e.g.:
+  //   - "CO2 (kg CO2 / mmBtu)"
+  //   - "CH4 (g CH4 / mmBtu)"
+  //   - "N2O (g N2O / mmBtu)"
   useEffect(() => {
     const loadFuelFactors = async () => {
       try {
-        const { data, error } = await supabase
-          .from('Fuel EPA' as any)
-          .select('*');
+        const tableNames = ["Fuel EPA 1", "Fuel EPA 2", "Fuel EPA 3"];
+        const allRows: any[] = [];
 
-        if (error) {
-          console.error('Error loading Fuel EPA factors:', error);
-          return; // keep using hardcoded FACTORS
+        for (const table of tableNames) {
+          const { data, error } = await supabase.from(table as any).select("*");
+          if (error) {
+            console.error(`Error loading ${table} factors:`, error);
+            continue;
+          }
+          if (data && data.length > 0) {
+            allRows.push(...data);
+          }
         }
 
-        if (!data || data.length === 0) {
-          console.warn('Fuel EPA table returned no rows; falling back to hardcoded FACTORS');
+        if (allRows.length === 0) {
+          console.warn("Fuel EPA 1/2/3 tables returned no rows; falling back to hardcoded FACTORS");
           return;
         }
 
         const map: Record<string, Record<string, Record<string, number>>> = {};
 
-        (data as any[]).forEach(row => {
-          const category = row.Category || row.category;
-          const fuel = row.Fuel || row.fuel;
-          const rawFactor =
-            row['kg CO2 per mmBtu'] ??
-            row['kg CO₂ per mmBtu'] ??
-            row.kg_co2_per_mmbtu ??
-            row.kg_co2_per_unit;
+        allRows.forEach((row: any) => {
+          const category: string | undefined =
+            row.Category ?? row.category ?? row["Fuel Category"] ?? row.fuel_category;
+          const fuel: string | undefined =
+            row["Fuel Type"] ?? row.Fuel ?? row.fuel_type ?? row.fuel;
 
-          const factor =
-            typeof rawFactor === 'number'
-              ? rawFactor
-              : rawFactor != null
-                ? parseFloat(String(rawFactor))
-                : NaN;
+          // Heat content and unit (used to derive MMSCF factors for gaseous fuels)
+          const hhv = parseNumber(
+            row["Heat Content (HHV)"] ??
+              row["Heat Content"] ??
+              row.HeatContent ??
+              row.heat_content_hhv ??
+              row.hhv
+          );
+          const hhvUnitRaw = row["HHV Unit"] ?? row.hhv_unit ?? row.heat_content_unit;
+          const hhvUnit = typeof hhvUnitRaw === "string" ? hhvUnitRaw.toLowerCase() : "";
+          const isScfBasedHHV = hhv != null && hhvUnit.includes("scf");
 
-          if (!category || !fuel || !isFinite(factor)) {
-            return;
-          }
+          const co2Factor = parseNumber(row["CO2 Factor"] ?? row.co2_factor);
+          const ch4Factor = parseNumber(row["CH4 Factor"] ?? row.ch4_factor);
+          const n2oFactor = parseNumber(row["N2O Factor"] ?? row.n2o_factor);
+
+          const co2UnitRaw = row["CO2 Unit"] ?? row.co2_unit;
+          const ch4UnitRaw = row["CH4 Unit"] ?? row.ch4_unit;
+          const n2oUnitRaw = row["N2O Unit"] ?? row.n2o_unit;
+
+          if (!category || !fuel) return;
 
           if (!map[category]) {
             map[category] = {};
           }
-          // All EPA factors are per mmBtu in your sheet
-          map[category][fuel] = { mmBtu: factor };
+          if (!map[category][fuel]) {
+            map[category][fuel] = {};
+          }
+
+          const fuelMap = map[category][fuel];
+
+          if (co2Factor !== undefined) {
+            const baseLabel = co2UnitRaw
+              ? `CO2 (${String(co2UnitRaw)})`
+              : "CO2 factor";
+            fuelMap[baseLabel] = co2Factor;
+
+            // If HHV is per scf, also expose a derived MMSCF unit for user convenience
+            if (isScfBasedHHV) {
+              // 1 MMSCF = 1,000,000 scf; energy (mmBtu) = HHV (mmBtu/scf) * 1e6
+              // factor_per_MMSCF = (kg CO2 / mmBtu) * (mmBtu / MMSCF)
+              const factorPerMMSCF = co2Factor * hhv! * 1_000_000;
+              fuelMap["CO2 (kg CO2 / MMSCF)"] = factorPerMMSCF;
+            }
+          }
+          if (ch4Factor !== undefined) {
+            const baseLabel = ch4UnitRaw
+              ? `CH4 (${String(ch4UnitRaw)})`
+              : "CH4 factor";
+            fuelMap[baseLabel] = ch4Factor;
+
+            if (isScfBasedHHV) {
+              const factorPerMMSCF = ch4Factor * hhv! * 1_000_000;
+              fuelMap["CH4 (g CH4 / MMSCF)"] = factorPerMMSCF;
+            }
+          }
+          if (n2oFactor !== undefined) {
+            const baseLabel = n2oUnitRaw
+              ? `N2O (${String(n2oUnitRaw)})`
+              : "N2O factor";
+            fuelMap[baseLabel] = n2oFactor;
+
+            if (isScfBasedHHV) {
+              const factorPerMMSCF = n2oFactor * hhv! * 1_000_000;
+              fuelMap["N2O (g N2O / MMSCF)"] = factorPerMMSCF;
+            }
+          }
         });
 
-        // Only override if we actually built something
         if (Object.keys(map).length > 0) {
-          console.log('Loaded Fuel EPA factors from Supabase:', map);
+          console.log("Loaded Fuel EPA 1/2/3 factors from Supabase:", map);
           setFuelFactors(map as typeof FACTORS);
         }
       } catch (err) {
-        console.error('Unexpected error loading Fuel EPA factors:', err);
+        console.error("Unexpected error loading Fuel EPA factors:", err);
       }
     };
 
@@ -479,23 +568,42 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          Total Fuel Emissions: <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
+          Total Fuel Emissions:{" "}
+          <span className="font-semibold">
+            {convertEmission(totalEmissions)} {outputUnit}
+          </span>
         </div>
-        {(() => {
-          const pendingNew = rows.filter(r => !r.isExisting).length;
-          const pendingUpdates = rows.filter(r => r.isExisting && fuelRowChanged(r, existingEntries)).length;
-          const totalPending = pendingNew + pendingUpdates;
-          return (
-            <Button 
-              onClick={saveFuelEntries} 
-              disabled={saving || totalPending === 0} 
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
-            </Button>
-          );
-        })()}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Output unit</span>
+            <Select value={outputUnit} onValueChange={(v) => setOutputUnit(v as OutputUnit)}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="kg">kg</SelectItem>
+                <SelectItem value="tonnes">tonnes</SelectItem>
+                <SelectItem value="g">g</SelectItem>
+                <SelectItem value="short_ton">short ton</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {(() => {
+            const pendingNew = rows.filter(r => !r.isExisting).length;
+            const pendingUpdates = rows.filter(r => r.isExisting && fuelRowChanged(r, existingEntries)).length;
+            const totalPending = pendingNew + pendingUpdates;
+            return (
+              <Button 
+                onClick={saveFuelEntries} 
+                disabled={saving || totalPending === 0} 
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : `Save and Next (${totalPending})`}
+              </Button>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );

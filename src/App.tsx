@@ -12,7 +12,6 @@ import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import Footer from "@/components/ui/Footer";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import Dashboard from "./pages/Dashboard";
@@ -63,7 +62,7 @@ import Dashboard2 from "./pages/Dashboard2";
 // Removed ESGWizard import - now handled through IntegratedFinanceEmission
 import IntegratedFinanceEmission from "./pages/IntegratedFinanceEmission";
 import LoginChoice from "./pages/LoginChoice";
-import RegisterChoice from "./pages/RegisterChoice";
+// import RegisterChoice from "./pages/RegisterChoice";
 import OrganizationManagement from "./pages/OrganizationManagement";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import UserManagement from "./pages/UserManagement";
@@ -80,9 +79,8 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login-choice" element={<LoginChoice />} />
-        <Route path="/register-choice" element={<RegisterChoice />} />
+        {/* Registration is disabled; users must be invited or contacted */}
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/solutions/corporate" element={<CorporateSolutions />} />
