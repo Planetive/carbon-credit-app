@@ -37,6 +37,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
+  const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
 
   // Use Supabase EPA fuel tables for dynamic fuel factors when available,
   // but keep the hardcoded FACTORS as a safe fallback. Guard against null/undefined for different envs.
@@ -293,7 +294,15 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
           setExistingEntries(companyFuelRows);
           setRows(companyFuelRows.length > 0 ? companyFuelRows : []);
           onDataChange(companyFuelRows);
-          
+
+          // Align output unit with existing company entries, if present
+          if (companyFuelRows.length > 0) {
+            const u = String((fuelData![0] as any).emissions_output_unit || "") as OutputUnit;
+            if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+              setOutputUnit(u);
+              setInitialOutputUnit(u);
+            }
+          }
           console.log(`Loaded ${companyFuelRows.length} company-specific fuel entries`);
         } catch (error) {
           console.error('Error loading company fuel entries:', error);
@@ -348,6 +357,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
           const u = String((fuelData![0] as any).emissions_output_unit || "") as OutputUnit;
           if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
             setOutputUnit(u);
+            setInitialOutputUnit(u);
           }
         }
       } catch (error: any) {
@@ -450,7 +460,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
     const changedExisting = rows.filter(r => r.isExisting && r.dbId && fuelRowChanged(r, existingEntries));
 
-    if (newEntries.length === 0 && changedExisting.length === 0) {
+    const unitChanged = outputUnit !== initialOutputUnit;
+
+    if (!unitChanged && newEntries.length === 0 && changedExisting.length === 0) {
       toast({ title: "Nothing to save", description: "No new or changed fuel entries." });
       return;
     }
@@ -475,8 +487,13 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         if (error) throw error;
       }
 
-      if (changedExisting.length > 0) {
-        const updates = changedExisting.map(v => (
+      // Rows that need updating in the DB
+      const rowsToUpdate = unitChanged
+        ? rows.filter(r => r.isExisting && r.dbId && typeof r.emissions === 'number')
+        : changedExisting;
+
+      if (rowsToUpdate.length > 0) {
+        const updates = rowsToUpdate.map(v => (
           (supabase as any)
             .from('scope1_fuel_entries')
             .update({
@@ -498,7 +515,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
       toast({ 
         title: "Saved", 
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
+        description: unitChanged && newEntries.length === 0 && changedExisting.length === 0
+          ? "Updated output unit for existing fuel entries."
+          : `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
       // Navigate to next category
@@ -525,6 +544,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         }));
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
+
+        if (updatedExistingRows.length > 0) {
+          const u = String((newData[0] as any).emissions_output_unit || "") as OutputUnit;
+          if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+            setOutputUnit(u);
+            setInitialOutputUnit(u);
+          }
+        }
       }
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
@@ -660,16 +687,18 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
           </div>
           {(() => {
             const pendingNew = rows.filter(r => !r.isExisting).length;
-            const pendingUpdates = rows.filter(r => r.isExisting && fuelRowChanged(r, existingEntries)).length;
+            const pendingUpdates = rows.filter(r => r.isExisting && r.dbId && fuelRowChanged(r, existingEntries)).length;
+            const unitChanged = outputUnit !== initialOutputUnit;
             const totalPending = pendingNew + pendingUpdates;
+            const canSave = !saving && (totalPending > 0 || unitChanged);
             return (
               <Button 
                 onClick={saveFuelEntries} 
-                disabled={saving || totalPending === 0} 
+                disabled={!canSave} 
                 className="bg-teal-600 hover:bg-teal-700 text-white"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : `Save and Next (${totalPending})`}
+                {saving ? 'Saving...' : 'Save and Next'}
               </Button>
             );
           })()}

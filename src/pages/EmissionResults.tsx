@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,10 @@ const EmissionResults = () => {
   const [scope3UseOfSold, setScope3UseOfSold] = useState<number>(0);
   const [scope3LCAUpstream, setScope3LCAUpstream] = useState<number>(0);
   const [scope3LCADownstream, setScope3LCADownstream] = useState<number>(0);
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const [detailRows, setDetailRows] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const scope1Total = useMemo(() => {
     if (isEPA) {
@@ -84,21 +88,153 @@ const EmissionResults = () => {
     return value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   };
 
+  const formatTonnes = (value: number) => {
+    const tonnes = value / 1000;
+    return tonnes.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  };
+
+  const HIDDEN_DETAIL_COLUMNS = [
+    "id",
+    "user_id",
+    "organization_id",
+    "created_at",
+    "updated_at",
+    "counterparty_id",
+    "factor",
+    "emission_factor",
+    "emissions_output",
+    "emissions_output_unit",
+    "standard",
+  ];
+
+  const prettifyColumnLabel = (col: string) => {
+    return col
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const loadCategoryDetails = async (key: string) => {
+    if (!user) return;
+    // Toggle off if same key clicked again
+    if (detailKey === key) {
+      setDetailKey(null);
+      setDetailRows([]);
+      setDetailError(null);
+      return;
+    }
+    setDetailKey(key);
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      let query: any = null;
+      switch (key) {
+        // Scope 1
+        case 'fuel':
+          query = (supabase as any).from('scope1_fuel_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'refrigerant':
+          query = (supabase as any).from('scope1_refrigerant_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'passenger':
+          query = (supabase as any).from('scope1_passenger_vehicle_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'delivery':
+          query = (supabase as any).from('scope1_delivery_vehicle_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'epa_mobile':
+          query = (supabase as any).from('scope1_epa_mobile_fuel_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'epa_on_road_gas':
+          query = (supabase as any).from('scope1_epa_on_road_gasoline_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'epa_on_road_diesel':
+          query = (supabase as any).from('scope1_epa_on_road_diesel_alt_fuel_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'epa_non_road':
+          query = (supabase as any).from('scope1_epa_non_road_vehicle_entries').select('*').eq('user_id', user.id);
+          break;
+        case 'epa_heat_steam':
+          query = (supabase as any).from('scope2_heatsteam_entries').select('*').eq('user_id', user.id);
+          break;
+        // Scope 2
+        case 'scope2_electricity':
+          query = (supabase as any).from('scope2_electricity_subanswers').select('*').eq('user_id', user.id);
+          break;
+        case 'scope2_heatsteam':
+          query = (supabase as any).from('scope2_heatsteam_entries').select('*').eq('user_id', user.id);
+          break;
+        // Scope 3 upstream
+        case 'scope3_purchased_goods':
+          query = (supabase as any).from('scope3_purchased_goods_services').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_capital_goods':
+          query = (supabase as any).from('scope3_capital_goods').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_fuel_energy':
+          query = (supabase as any).from('scope3_fuel_energy_activities').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_upstream_transport':
+          query = (supabase as any).from('scope3_upstream_transportation').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_waste_generated':
+          query = (supabase as any).from('scope3_waste_generated').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_business_travel':
+          query = (supabase as any).from('scope3_business_travel').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_employee_commuting':
+          query = (supabase as any).from('scope3_employee_commuting').select('*').eq('user_id', user.id);
+          break;
+        // Scope 3 downstream
+        case 'scope3_downstream_transport':
+          query = (supabase as any).from('scope3_downstream_transportation').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_processing_sold':
+          query = (supabase as any).from('scope3_processing_sold_products').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_use_of_sold':
+          query = (supabase as any).from('scope3_use_of_sold_products').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_end_of_life':
+          query = (supabase as any).from('scope3_end_of_life_treatment').select('*').eq('user_id', user.id);
+          break;
+        case 'scope3_investments':
+          query = (supabase as any).from('scope3_investments').select('*').eq('user_id', user.id);
+          break;
+        default:
+          query = null;
+      }
+
+      if (!query) {
+        setDetailRows([]);
+        return;
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setDetailRows(data || []);
+    } catch (e: any) {
+      setDetailError(e.message || 'Failed to load details');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const breakdown = useMemo(() => {
     const baseData = isEPA
       ? [
-          { label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
-          { label: 'Mobile fuel (EPA)', value: epaMobileEmissions, color: 'bg-amber-500' },
-          { label: 'On-road gasoline (EPA)', value: epaOnRoadGasEmissions, color: 'bg-sky-500' },
-          { label: 'On-road diesel & alt fuel (EPA)', value: epaOnRoadDieselEmissions, color: 'bg-emerald-500' },
-          { label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-teal-500' },
-          { label: 'Heat & Steam (EPA)', value: epaHeatSteamEmissions, color: 'bg-amber-600' },
+          { key: 'fuel', label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
+          { key: 'epa_mobile', label: 'Mobile fuel (EPA)', value: epaMobileEmissions, color: 'bg-amber-500' },
+          { key: 'epa_on_road_gas', label: 'On-road gasoline (EPA)', value: epaOnRoadGasEmissions, color: 'bg-sky-500' },
+          { key: 'epa_on_road_diesel', label: 'On-road diesel & alt fuel (EPA)', value: epaOnRoadDieselEmissions, color: 'bg-emerald-500' },
+          { key: 'epa_non_road', label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-teal-500' },
+          { key: 'epa_heat_steam', label: 'Heat & Steam (EPA)', value: epaHeatSteamEmissions, color: 'bg-amber-600' },
         ]
       : [
-          { label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
-          { label: 'Refrigerant', value: refrigerantEmissions, color: 'bg-amber-500' },
-          { label: 'Passenger', value: passengerEmissions, color: 'bg-sky-500' },
-          { label: 'Delivery', value: deliveryEmissions, color: 'bg-emerald-500' },
+          { key: 'fuel', label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
+          { key: 'refrigerant', label: 'Refrigerant', value: refrigerantEmissions, color: 'bg-amber-500' },
+          { key: 'passenger', label: 'Passenger', value: passengerEmissions, color: 'bg-sky-500' },
+          { key: 'delivery', label: 'Delivery', value: deliveryEmissions, color: 'bg-emerald-500' },
         ];
     return baseData.map(d => ({ ...d, pct: scope1Total > 0 ? (d.value / scope1Total) * 100 : 0 }));
   }, [
@@ -125,14 +261,14 @@ const EmissionResults = () => {
   const scope2Breakdown = useMemo(() => {
     if (isEPA) {
       const data = [
-        { label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
+        { key: 'scope2_electricity', label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
       ];
       const total = electricityEmissions;
       return data.map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }));
     }
     const data = [
-      { label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
-      { label: 'Heat & Steam', value: heatSteamEmissions, color: 'bg-amber-600' },
+      { key: 'scope2_electricity', label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
+      { key: 'scope2_heatsteam', label: 'Heat & Steam', value: heatSteamEmissions, color: 'bg-amber-600' },
     ];
     return data.map(d => ({ ...d, pct: scope2Total > 0 ? (d.value / scope2Total) * 100 : 0 }));
   }, [isEPA, electricityEmissions, heatSteamEmissions, scope2Total]);
@@ -165,13 +301,13 @@ const EmissionResults = () => {
 
   const scope3UpstreamBreakdown = useMemo(() => {
     const data = [
-      { label: 'Purchased Goods & Services', value: scope3PurchasedGoods, color: 'bg-purple-500', category: 'upstream' },
-      { label: 'Capital Goods', value: scope3CapitalGoods, color: 'bg-indigo-500', category: 'upstream' },
-      { label: 'Fuel & Energy Activities', value: scope3FuelEnergy, color: 'bg-violet-500', category: 'upstream' },
-      { label: 'Upstream Transportation', value: scope3UpstreamTransport, color: 'bg-blue-500', category: 'upstream' },
-      { label: 'Waste Generated', value: scope3WasteGenerated, color: 'bg-cyan-500', category: 'upstream' },
-      { label: 'Business Travel', value: scope3BusinessTravel, color: 'bg-teal-500', category: 'upstream' },
-      { label: 'Employee Commuting', value: scope3EmployeeCommuting, color: 'bg-green-500', category: 'upstream' },
+      { key: 'scope3_purchased_goods', label: 'Purchased Goods & Services', value: scope3PurchasedGoods, color: 'bg-purple-500', category: 'upstream' },
+      { key: 'scope3_capital_goods', label: 'Capital Goods', value: scope3CapitalGoods, color: 'bg-indigo-500', category: 'upstream' },
+      { key: 'scope3_fuel_energy', label: 'Fuel & Energy Activities', value: scope3FuelEnergy, color: 'bg-violet-500', category: 'upstream' },
+      { key: 'scope3_upstream_transport', label: 'Upstream Transportation', value: scope3UpstreamTransport, color: 'bg-blue-500', category: 'upstream' },
+      { key: 'scope3_waste_generated', label: 'Waste Generated', value: scope3WasteGenerated, color: 'bg-cyan-500', category: 'upstream' },
+      { key: 'scope3_business_travel', label: 'Business Travel', value: scope3BusinessTravel, color: 'bg-teal-500', category: 'upstream' },
+      { key: 'scope3_employee_commuting', label: 'Employee Commuting', value: scope3EmployeeCommuting, color: 'bg-green-500', category: 'upstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3UpstreamTotal > 0 ? (d.value / scope3UpstreamTotal) * 100 : 0 }));
   }, [scope3PurchasedGoods, scope3CapitalGoods, scope3FuelEnergy, scope3UpstreamTransport, 
@@ -179,11 +315,11 @@ const EmissionResults = () => {
 
   const scope3DownstreamBreakdown = useMemo(() => {
     const data = [
-      { label: 'Downstream Transportation', value: scope3DownstreamTransport, color: 'bg-lime-500', category: 'downstream' },
-      { label: 'Processing of Sold Products', value: scope3ProcessingSold, color: 'bg-orange-500', category: 'downstream' },
-      { label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
-      { label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
-      { label: 'Investments', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
+      { key: 'scope3_downstream_transport', label: 'Downstream Transportation', value: scope3DownstreamTransport, color: 'bg-lime-500', category: 'downstream' },
+      { key: 'scope3_processing_sold', label: 'Processing of Sold Products', value: scope3ProcessingSold, color: 'bg-orange-500', category: 'downstream' },
+      { key: 'scope3_use_of_sold', label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
+      { key: 'scope3_end_of_life', label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
+      { key: 'scope3_investments', label: 'Investments', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
@@ -699,9 +835,9 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent tracking-tight">
-                    {formatKg(scope1Total)}
+                    {formatTonnes(scope1Total)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
+                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
             </CardContent>
           </Card>
 
@@ -722,9 +858,9 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent tracking-tight">
-                    {formatKg(electricityEmissions + heatSteamEmissions)}
+                    {formatTonnes(electricityEmissions + heatSteamEmissions)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
+                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
             </CardContent>
           </Card>
 
@@ -745,9 +881,9 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
-                    {formatKg(scope3Total)}
+                    {formatTonnes(scope3Total)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">kg CO2e</div>
+                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
             </CardContent>
           </Card>
 
@@ -768,9 +904,9 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent tracking-tight">
-                    {formatKg(scope1Total + electricityEmissions + heatSteamEmissions + scope3Total)}
+                    {formatTonnes(scope1Total + electricityEmissions + heatSteamEmissions + scope3Total)}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">kg CO2e (All Scopes)</div>
+                  <div className="text-sm text-gray-600 mt-1">t CO2e (All Scopes)</div>
             </CardContent>
           </Card>
         </div>
@@ -789,43 +925,131 @@ const EmissionResults = () => {
                   </CardTitle>
             </CardHeader>
             <CardContent>
-                  <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
-                <table className="min-w-full">
+                  <div className="overflow-x-auto rounded-2xl border border-gray-200/60 bg-white/70 shadow-sm">
+                <table className="min-w-full text-sm">
                   <thead>
-                        <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                          <th className="py-3 px-4 font-semibold">Category</th>
-                          <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
-                          <th className="py-3 px-4 font-semibold">Share</th>
+                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50/90">
+                          <th className="py-3 px-4">Category</th>
+                          <th className="py-3 px-4 text-right">Emissions (t CO2e)</th>
+                          <th className="py-3 px-4 text-right">Share</th>
+                          <th className="py-3 px-4 text-right">Details</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100">
                         {breakdown.map((b, idx) => (
-                          <tr 
-                            key={b.label} 
-                            className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
-                            style={{ animationDelay: `${0.7 + idx * 0.1}s` }}
-                          >
-                            <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
-                            <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
-                            <td className="py-4 px-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
-                                    style={{ width: `${b.pct}%` }}
-                                  ></div>
-                            </div>
-                                <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <Fragment key={b.label}>
+                            <tr 
+                              className="hover:bg-gray-50 transition-colors"
+                              style={{ animationDelay: `${0.7 + idx * 0.1}s` }}
+                            >
+                              <td className="py-3 px-4 font-medium text-gray-900">{b.label}</td>
+                              <td className="py-3 px-4 font-semibold text-right text-gray-800">{formatTonnes(b.value)}</td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`${b.color} h-2.5 rounded-full progress-bar-animate shadow-sm`} 
+                                      style={{ width: `${b.pct}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => loadCategoryDetails(b.key)}
+                                >
+                                  {detailKey === b.key ? 'Hide' : 'View'}
+                                </Button>
+                              </td>
+                            </tr>
+                            {detailKey === b.key && !detailLoading && !detailError && detailRows.length > 0 && (
+                              <tr>
+                                <td colSpan={4} className="bg-white/60 px-4 pb-4">
+                                  <div className="mt-2 space-y-2 text-xs text-gray-700">
+                                    <div className="text-gray-500">
+                                      {detailRows.length.toLocaleString()} entries • Total emissions{' '}
+                                      <span className="font-semibold">
+                                        {formatKg(
+                                          detailRows.reduce(
+                                            (sum: number, r: any) => sum + (Number(r.emissions) || 0),
+                                            0
+                                          )
+                                        )}{' '}
+                                        kg CO2e
+                                      </span>
+                                    </div>
+                                    <div className="overflow-x-auto border border-gray-200 rounded-md bg-white/80">
+                                      <table className="min-w-full text-[11px]">
+                                        <thead>
+                                          <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-600">
+                                            {Object.keys(detailRows[0] || {})
+                                              .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
+                                              .map((col) => (
+                                                <th
+                                                  key={col}
+                                                  className="px-3 py-2 text-left font-semibold"
+                                                >
+                                                  {prettifyColumnLabel(col)}
+                                                </th>
+                                              ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {detailRows.map((row: any, ridx: number) => (
+                                            <tr key={ridx} className="bg-white/70">
+                                              {Object.keys(detailRows[0] || {})
+                                                .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
+                                                .map((col) => {
+                                                  const isNumeric = typeof row[col] === 'number' || col === 'emissions' || col === 'quantity';
+                                                  const baseClasses = 'px-3 py-1.5 whitespace-nowrap text-[11px]';
+                                                  const alignClasses = isNumeric ? 'text-right tabular-nums' : 'text-left';
+                                                  return (
+                                                    <td key={col} className={`${baseClasses} ${alignClasses}`}>
+                                                      {col === 'emissions'
+                                                        ? `${formatKg(Number(row[col]) || 0)} kg CO2e`
+                                                        : typeof row[col] === 'number'
+                                                        ? row[col].toLocaleString()
+                                                        : row[col] != null
+                                                        ? String(row[col])
+                                                        : ''}
+                                                    </td>
+                                                  );
+                                                })}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {detailKey === b.key && detailLoading && (
+                              <tr>
+                                <td colSpan={4} className="px-4 pb-4 text-xs text-gray-500">
+                                  Loading details...
+                                </td>
+                              </tr>
+                            )}
+                            {detailKey === b.key && detailError && (
+                              <tr>
+                                <td colSpan={4} className="px-4 pb-4 text-xs text-red-600">
+                                  {detailError}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))}
                   </tbody>
                   <tfoot>
-                        <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                          <td className="py-4 px-4 font-bold text-gray-900">Total</td>
-                          <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope1Total)}</td>
-                          <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
+                        <tr className="bg-gray-50/80">
+                          <td className="py-3 px-4 font-bold text-gray-900">Total</td>
+                          <td className="py-3 px-4 font-bold text-right text-gray-900">{formatTonnes(scope1Total)}</td>
+                          <td className="py-3 px-4 text-xs font-semibold text-gray-700 text-right pr-4">100%</td>
+                          <td />
                     </tr>
                   </tfoot>
                 </table>
@@ -851,7 +1075,7 @@ const EmissionResults = () => {
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
                       <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
                       <span className="text-gray-700">
-                        Total Scope 1: <span className="font-bold text-gray-900">{formatKg(scope1Total)} kg CO2e</span>
+                        Total Scope 1: <span className="font-bold text-gray-900">{formatTonnes(scope1Total)} t CO2e</span>
                       </span>
                 </li>
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
@@ -892,36 +1116,119 @@ const EmissionResults = () => {
                           <th className="py-3 px-4 font-semibold">Category</th>
                           <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
                           <th className="py-3 px-4 font-semibold">Share</th>
+                          <th className="py-3 px-4 font-semibold text-right">Details</th>
                     </tr>
                   </thead>
                   <tbody>
                         {scope2Breakdown.map((b, idx) => (
-                          <tr 
-                            key={b.label} 
-                            className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
-                            style={{ animationDelay: `${0.9 + idx * 0.1}s` }}
-                          >
-                            <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
-                            <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
-                            <td className="py-4 px-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
-                                    style={{ width: `${b.pct}%` }}
-                                  ></div>
-                            </div>
-                                <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <Fragment key={b.label}>
+                            <tr 
+                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
+                              style={{ animationDelay: `${0.9 + idx * 0.1}s` }}
+                            >
+                              <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
+                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
+                                      style={{ width: `${b.pct}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => loadCategoryDetails(b.key)}
+                                >
+                                  {detailKey === b.key ? 'Hide' : 'View'}
+                                </Button>
+                              </td>
+                            </tr>
+                            {detailKey === b.key && !detailLoading && !detailError && detailRows.length > 0 && (
+                              <tr>
+                                <td colSpan={4} className="bg-white/60 px-4 pb-4">
+                                  <div className="mt-2 space-y-2 text-xs text-gray-700">
+                                    <div className="text-gray-500">
+                                      {detailRows.length.toLocaleString()} entries • Total emissions{' '}
+                                      <span className="font-semibold">
+                                        {formatKg(
+                                          detailRows.reduce(
+                                            (sum: number, r: any) => sum + (Number(r.emissions) || 0),
+                                            0
+                                          )
+                                        )}{' '}
+                                        kg CO2e
+                                      </span>
+                                    </div>
+                                    <div className="overflow-x-auto border border-gray-200 rounded-md bg-white/80">
+                                      <table className="min-w-full text-[11px]">
+                                        <thead>
+                                          <tr className="bg-gray-50">
+                                            {Object.keys(detailRows[0] || {})
+                                              .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
+                                              .map((col) => (
+                                                <th
+                                                  key={col}
+                                                  className="px-2 py-1 text-left font-semibold text-gray-700"
+                                                >
+                                                  {prettifyColumnLabel(col)}
+                                                </th>
+                                              ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {detailRows.map((row: any, ridx: number) => (
+                                            <tr key={ridx} className="border-t border-gray-200">
+                                              {Object.keys(detailRows[0] || {})
+                                                .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
+                                                .map((col) => (
+                                                  <td key={col} className="px-2 py-1 whitespace-nowrap">
+                                                    {col === 'emissions'
+                                                      ? `${formatKg(Number(row[col]) || 0)} kg CO2e`
+                                                      : typeof row[col] === 'number'
+                                                      ? row[col].toLocaleString()
+                                                      : row[col] != null
+                                                      ? String(row[col])
+                                                      : ''}
+                                                  </td>
+                                                ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {detailKey === b.key && detailLoading && (
+                              <tr>
+                                <td colSpan={4} className="px-4 pb-4 text-xs text-gray-500">
+                                  Loading details...
+                                </td>
+                              </tr>
+                            )}
+                            {detailKey === b.key && detailError && (
+                              <tr>
+                                <td colSpan={4} className="px-4 pb-4 text-xs text-red-600">
+                                  {detailError}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))}
                   </tbody>
                   <tfoot>
                         <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
                           <td className="py-4 px-4 font-bold text-gray-900">Total</td>
                           <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope2Total)}</td>
                           <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
+                          <td className="py-4 px-4" />
                         </tr>
                       </tfoot>
                     </table>

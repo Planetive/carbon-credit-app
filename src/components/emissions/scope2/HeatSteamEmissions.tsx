@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,17 @@ const parseNumber = (value: any): number | undefined => {
   return isFinite(n) ? n : undefined;
 };
 
+// Find the first column value whose key matches any of the provided patterns.
+const pickFirstValue = (row: any, patterns: RegExp[]): any => {
+  if (!row || typeof row !== "object") return undefined;
+  const keys = Object.keys(row);
+  for (const p of patterns) {
+    const key = keys.find((k) => p.test(k));
+    if (key) return row[key];
+  }
+  return undefined;
+};
+
 // Compute emissions in kg for the selected gas only (no CO2e conversion).
 // CO2 factor is in kg/unit; CH4 & N2O factors are in g/unit (converted to kg below).
 const computeEmissionsKg = (
@@ -77,6 +88,17 @@ const getFactorForGas = (row: HeatRow, gas: "co2" | "ch4" | "n2o"): number => {
     return row.factor ?? HEAT_DEFAULT_FACTOR;
   }
   return row.factor ?? HEAT_DEFAULT_FACTOR;
+};
+
+// Map DB entry_type back to display Activity used in the reference tables.
+const mapEntryTypeFromDb = (
+  entryType: string
+): string => {
+  const lower = (entryType || "").toLowerCase();
+  if (lower.includes("district")) {
+    return "District steam and heat";
+  }
+  return "Steam and Heat";
 };
 
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
@@ -138,17 +160,19 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
             const unit = row["Unit"] || row.unit || row["unit"];
 
             const co2Raw =
-              row["kg CO2 / mmBtu"] ??
+              pickFirstValue(row, [/^kg\s*CO2\s*\/\s*mmBtu$/i, /CO2.*mmBtu/i]) ??
               row["kg CO₂e"] ??
               row["kg CO2e"] ??
               row.kg_co2e;
             const ch4Raw =
+              pickFirstValue(row, [/CH4.*mmBtu/i, /g\s*CH4.*mmBtu/i]) ??
               row["CH4"] ??
               row["CH₄"] ??
               row.ch4 ??
               row["CH4 Factor"] ??
               row.ch4_factor;
             const n2oRaw =
+              pickFirstValue(row, [/N2O.*mmBtu/i, /g\s*N2O.*mmBtu/i]) ??
               row["N2O"] ??
               row["N20"] ??
               row.n2o ??
@@ -185,17 +209,19 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
             const unit = row["Unit"] || row.unit || row["unit"];
 
             const co2Raw =
-              row["kg CO2 / mmBtu"] ??
+              pickFirstValue(row, [/^kg\s*CO2\s*\/\s*mmBtu$/i, /CO2.*mmBtu/i]) ??
               row["kg CO₂e"] ??
               row["kg CO2e"] ??
               row.kg_co2e;
             const ch4Raw =
+              pickFirstValue(row, [/CH4.*mmBtu/i, /g\s*CH4.*mmBtu/i]) ??
               row["CH4"] ??
               row["CH₄"] ??
               row.ch4 ??
               row["CH4 Factor"] ??
               row.ch4_factor;
             const n2oRaw =
+              pickFirstValue(row, [/N2O.*mmBtu/i, /g\s*N2O.*mmBtu/i]) ??
               row["N2O"] ??
               row["N20"] ??
               row.n2o ??
@@ -286,6 +312,55 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     });
   }, [heatSteamStandard, heatSteamDataUK, heatSteamDataEBT, hasUserRows]);
 
+  // When we *do* have user-specific rows (loaded from scope2_heatsteam_entries),
+  // re‑attach the latest per‑gas factors and MMSCF support flags from the
+  // reference tables so that factor/emission calculations stay consistent.
+  useEffect(() => {
+    if (!hasUserRows) return;
+    const dataSource =
+      heatSteamStandard === "UK" ? heatSteamDataUK : heatSteamDataEBT;
+    if (dataSource.length === 0) return;
+
+    setHeatRows((prev) =>
+      prev.map((row) => {
+        const ref = dataSource.find((d) => d.Type === row.entryType);
+        if (!ref) return row;
+
+        const gas: "co2" | "ch4" | "n2o" = row.gas ?? "co2";
+        const quantityUnit: "base" | "mmscf" = row.quantityUnit ?? "base";
+        const supportsMMSCF =
+          typeof ref.Unit === "string" &&
+          ref.Unit.toLowerCase().includes("mmbtu");
+
+        const next: HeatRow = {
+          ...row,
+          unit: ref.Unit || row.unit,
+          co2Factor: ref.co2Factor ?? row.co2Factor,
+          ch4Factor: ref.ch4Factor ?? row.ch4Factor,
+          n2oFactor: ref.n2oFactor ?? row.n2oFactor,
+          gas,
+          quantityUnit,
+          supportsMMSCF,
+        };
+
+        const factorForGas = getFactorForGas(next, gas);
+        next.factor = factorForGas;
+
+        if (typeof next.quantity === "number") {
+          const qtyInBase =
+            quantityUnit === "mmscf" && supportsMMSCF
+              ? next.quantity * MMBTU_PER_MMSCF
+              : next.quantity;
+          next.emissions = computeEmissionsKg(gas, factorForGas, qtyInBase);
+        } else {
+          next.emissions = undefined;
+        }
+
+        return next;
+      })
+    );
+  }, [hasUserRows, heatSteamStandard, heatSteamDataUK, heatSteamDataEBT]);
+
   // Load saved user data
   useEffect(() => {
     const load = async () => {
@@ -305,15 +380,27 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         }
         
         // Convert saved data to rows.
-        const savedRows: HeatRow[] = (heatData || []).map((row: any) => ({
-          id: crypto.randomUUID(),
-          dbId: row.id,
-          entryType: row.entry_type,
-          unit: row.unit,
-          factor: row.emission_factor ?? HEAT_DEFAULT_FACTOR,
-          quantity: row.quantity ?? undefined,
-          emissions: row.emissions ?? undefined,
-        }));
+        const savedRows: HeatRow[] = (heatData || []).map((row: any) => {
+          const unit: string | undefined = row.unit;
+          const supportsMMSCF =
+            typeof unit === "string" && unit.toLowerCase().includes("mmbtu");
+
+          const displayEntryType = mapEntryTypeFromDb(row.entry_type);
+
+          return {
+            id: crypto.randomUUID(),
+            dbId: row.id,
+            entryType: displayEntryType,
+            unit,
+            factor: row.emission_factor ?? HEAT_DEFAULT_FACTOR,
+            quantity: row.quantity ?? undefined,
+            emissions: row.emissions ?? undefined,
+            // Persisted rows historically only stored CO2; default gas & quantity unit.
+            gas: "co2",
+            quantityUnit: "base",
+            supportsMMSCF,
+          };
+        });
 
         // If we have saved data, prefer it over auto-generated reference rows.
         if (savedRows.length > 0) {
@@ -518,6 +605,41 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     if (onTotalChange) onTotalChange(totalHeatEmissions);
   }, [onTotalChange, totalHeatEmissions]);
 
+  const addHeatRow = () => {
+    const dataSource =
+      heatSteamStandard === "UK" ? heatSteamDataUK : heatSteamDataEBT;
+
+    setHeatRows((prev) => {
+      const template =
+        dataSource.find((d) => d.Type) || dataSource[0] || null;
+
+      const gas: "co2" | "ch4" | "n2o" = "co2";
+      const unit = template?.Unit || "mmBtu";
+      const supportsMMSCF =
+        typeof unit === "string" && unit.toLowerCase().includes("mmbtu");
+
+      const baseRow: HeatRow = {
+        id: crypto.randomUUID(),
+        entryType: template?.Type || "Steam and Heat",
+        unit,
+        factor: 0,
+        quantity: undefined,
+        emissions: undefined,
+        gas,
+        quantityUnit: "base",
+        supportsMMSCF,
+        co2Factor: template?.co2Factor ?? HEAT_DEFAULT_FACTOR,
+        ch4Factor: template?.ch4Factor,
+        n2oFactor: template?.n2oFactor,
+      };
+
+      const factorForGas = getFactorForGas(baseRow, gas);
+      baseRow.factor = factorForGas;
+
+      return [...prev, baseRow];
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -525,6 +647,9 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
           <h4 className="text-lg font-semibold text-gray-900">Heat & Steam Consumption</h4>
           <p className="text-sm text-gray-600">Enter your organization's heat and steam consumption data</p>
         </div>
+        <Button onClick={addHeatRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Plus className="h-4 w-4 mr-2" /> Add Row
+        </Button>
       </div>
 
       {/* Standard Selection (hidden when forced, e.g. EPA calculator) */}
@@ -619,7 +744,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="base">{row.unit}</SelectItem>
-                          <SelectItem value="mmscf">MMSCF</SelectItem>
+                          <SelectItem value="mmscf">mmScf</SelectItem>
                         </SelectContent>
                       </Select>
                       <Input
@@ -641,7 +766,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
                         }}
                         placeholder={
                           quantityUnit === "mmscf"
-                            ? "Enter MMSCF"
+                            ? "Enter mmScf"
                             : `Enter ${row.unit}`
                         }
                       />
