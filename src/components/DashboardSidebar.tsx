@@ -32,23 +32,30 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   const location = useLocation();
   const { user } = useAuth();
   const [userType, setUserType] = useState<string>("financial_institution");
+  const [userTypeResolved, setUserTypeResolved] = useState(false);
 
   useEffect(() => {
     const fetchUserType = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", user.id)
-        .single();
-      if (data?.user_type) {
-        setUserType(data.user_type);
+      try {
+        const { data } = (await (supabase as any)
+          .from("profiles")
+          .select("user_type")
+          .eq("user_id", user.id)
+          .single()) as { data: { user_type?: string } | null };
+        if (data?.user_type) {
+          setUserType(data.user_type);
+        }
+      } finally {
+        setUserTypeResolved(true);
       }
     };
     fetchUserType();
   }, [user]);
 
-  const sidebarItems: SidebarItem[] = userType === 'financial_institution'
+  // Until profile is loaded, show corporate layout so corporate users don't see FI flash
+  const effectiveUserType = userTypeResolved ? userType : "corporate";
+  const sidebarItems: SidebarItem[] = effectiveUserType === 'financial_institution'
     ? [
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'projects', title: 'My Projects', icon: FolderOpen, path: '/dashboard' },

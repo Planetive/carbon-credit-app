@@ -47,6 +47,7 @@ const Dashboard2 = () => {
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [userType, setUserType] = useState<string>("financial_institution");
+  const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
@@ -117,6 +118,7 @@ const Dashboard2 = () => {
       } else {
         setUserType("financial_institution"); // Default to financial_institution
       }
+      setUserTypeResolved(true);
 
       // Onboarding completion check removed
     };
@@ -812,7 +814,7 @@ const Dashboard2 = () => {
 
 
               {/* Top Row - Main Metrics - Beautiful Animated Cards (Financial Institution Only) */}
-              {userType === 'financial_institution' && (
+              {userTypeResolved && userType === 'financial_institution' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
                   {/* Finance Emission Card */}
                   <motion.div
@@ -1292,8 +1294,8 @@ const Dashboard2 = () => {
                 </motion.div>
               </div>
 
-              {/* Quick Actions - available to all users */}
-              {(userType === 'corporate' || userType === 'financial_institution') && (
+              {/* Quick Actions - show once resolved, or immediately (same card for both types) */}
+              {(userTypeResolved ? (userType === 'corporate' || userType === 'financial_institution') : true) && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

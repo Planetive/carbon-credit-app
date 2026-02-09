@@ -98,16 +98,16 @@ const AppHeader = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Load user type for dashboard section labels/routes
+  // Load user type for dashboard section labels/routes (profiles may have user_id/user_type in DB; types.ts can be out of sync)
   useEffect(() => {
     const fetchUserType = async () => {
       if (!user) return;
       try {
-        const { data } = await supabase
+        const { data } = (await (supabase as any)
           .from("profiles")
           .select("user_type")
           .eq("user_id", user.id)
-          .single();
+          .single()) as { data: { user_type?: string } | null };
         if (data?.user_type) {
           setUserType(data.user_type);
         }
