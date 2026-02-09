@@ -335,17 +335,17 @@ const ProjectWizard = () => {
       )}
 
       {/* Main Form Card */}
-      <div className="flex-1 flex items-center justify-center py-8 px-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl border border-gray-100">
+      <div className="flex-1 flex items-center justify-center py-6 sm:py-8 px-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-4xl border border-gray-100">
           {/* Header Section */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6 sm:mb-8">
             <div className="flex justify-center mb-4">
               <div className="h-16 w-16 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center">
                 <FileText className="h-8 w-8 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Project Wizard</h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Project Wizard</h1>
+            <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto">
               Create your carbon reduction project with our comprehensive wizard. Fill in your details and get personalized recommendations.
             </p>
           </div>
@@ -375,12 +375,12 @@ const ProjectWizard = () => {
           <form onSubmit={handleSubmit} className="space-y-8">
             {activePart === 'user' && (
               <div className="space-y-8">
-                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-100">
+                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-4 sm:p-6 border border-teal-100">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <User className="h-6 w-6 mr-3 text-teal-600" />
                     User Information
                   </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="currentIndustry" className="font-semibold text-gray-700">Current Industry</Label>
                       <Input 
@@ -408,7 +408,12 @@ const ProjectWizard = () => {
                   </div>
                   <div className="md:col-span-2">
                       <Label className="font-semibold text-gray-700 mb-3 block">Do you have data available on your organization's current emissions, wastewater discharge, or other discharges?</Label>
-                      <RadioGroup value={formData.hasEmissionsKnowledge} onValueChange={value => handleInputChange('hasEmissionsKnowledge', value)} className="flex flex-row gap-6" required>
+                      <RadioGroup
+                        value={formData.hasEmissionsKnowledge}
+                        onValueChange={value => handleInputChange('hasEmissionsKnowledge', value)}
+                        className="flex flex-col sm:flex-row gap-3 sm:gap-6"
+                        required
+                      >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="yes" id="emissions-yes" />
                           <Label htmlFor="emissions-yes" className="text-gray-700">Yes</Label>

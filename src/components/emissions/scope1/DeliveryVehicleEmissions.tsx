@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trash2, Save, Info } from "lucide-react";
+import { Plus, Trash2, Save, Info, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -29,12 +29,19 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
   const { user } = useAuth();
   const { toast } = useToast();
   
+  const userId = user?.id || null;
   const [rows, setRows] = useState<DeliveryVehicleRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<DeliveryVehicleRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hoveredInfo, setHoveredInfo] = useState<{value: string, description: string, position: {x: number, y: number}, side: 'left' | 'right'} | null>(null);
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    if (userId) return `deliveryVehicleDraft:user:${userId}`;
+    return "deliveryVehicleDraft:anon";
+  };
 
   // Computed values
   const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
@@ -66,13 +73,13 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
   // Load existing entries
   useEffect(() => {
     const loadExistingEntries = async () => {
-      if (!user) return;
+      if (!userId) return;
 
       try {
         const { data: delData, error: delError } = await supabase
           .from('scope1_delivery_vehicle_entries')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
         if (delError) throw delError;
@@ -104,7 +111,7 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
     };
 
     loadExistingEntries();
-  }, [user, toast]);
+  }, [userId, toast]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -112,6 +119,70 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
       onDataChange(rows);
     }
   }, [rows, isInitialLoad, onDataChange]);
+
+  // Restore unsaved draft rows after initial DB load
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setRows(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              isExisting: false,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to restore DeliveryVehicleEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+  }, [isInitialLoad, userId]);
+
+  // Persist unsaved draft rows
+  useEffect(() => {
+    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = rows.filter(r => !r.isExisting);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist DeliveryVehicleEmissions draft to sessionStorage:", e);
+    }
+  }, [rows, isInitialLoad, userId]);
 
   // Row management functions
   const addRow = () => setRows(prev => [...prev, newDeliveryVehicleRow()]);
@@ -227,7 +298,6 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
       }
       
       toast({ title: "Saved", description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` });
-      onSaveAndNext?.();
       
       // Reload data
       const { data: newData } = await supabase
@@ -251,6 +321,11 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
       }
+      // Clear draft now that entries are saved
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -454,14 +529,21 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({ onD
           const pendingUpdates = rows.filter(r => r.isExisting && deliveryVehicleRowChanged(r, existingEntries)).length;
           const totalPending = pendingNew + pendingUpdates;
           return (
-            <Button 
-              onClick={saveDeliveryEntries} 
-              disabled={saving || totalPending === 0} 
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveDeliveryEntries}
+                disabled={saving || totalPending === 0}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Saving..." : `Save (${totalPending})`}
+              </Button>
+              {onSaveAndNext && (
+                <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
           );
         })()}
       </div>

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import type { WasteGeneratedRow } from "../types/scope3Types";
 import type { WasteMaterial, DisposalMethod } from "../wasteTypes";
 import { getAvailableDisposalMethods } from "../wasteTypes";
@@ -20,6 +20,7 @@ interface WasteGeneratedSectionProps {
   onDeleteRow: (id: string) => void;
   onSave: () => void;
   saving: boolean;
+  onSaveAndNext?: () => void;
 }
 
 export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
@@ -34,6 +35,7 @@ export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
   onDeleteRow,
   onSave,
   saving,
+  onSaveAndNext,
 }) => {
   const pendingNew = rows.filter(
     (r) =>
@@ -195,16 +197,21 @@ export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
             {totalEmissions.toFixed(2)} kg CO₂e
           </span>
         </div>
-        <Button
-          onClick={onSave}
-          disabled={saving || totalPending === 0}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saving
-            ? "Saving..."
-            : `Save and Next (${totalPending})`}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={onSave}
+            disabled={saving || totalPending === 0}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Saving..." : `Save (${totalPending})`}
+          </Button>
+          {onSaveAndNext && (
+            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

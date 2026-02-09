@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Save, Trash2, Info } from "lucide-react";
+import { Plus, Save, Trash2, Info, ChevronRight } from "lucide-react";
 import type { DownstreamTransportRow } from "../types/scope3Types";
 import type { VehicleType } from "../vehicleTypes";
 import { getVehicleTypeNote, getVehicleTypeSuperscript, cleanVehicleTypeName } from "../utils/vehicleTypeHelpers";
@@ -21,6 +21,7 @@ interface DownstreamTransportationSectionProps {
   onDeleteRow: (id: string) => void;
   onSave: () => void;
   saving: boolean;
+  onSaveAndNext?: () => void;
 }
 
 export const DownstreamTransportationSection: React.FC<DownstreamTransportationSectionProps> = ({
@@ -35,6 +36,7 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
   onDeleteRow,
   onSave,
   saving,
+  onSaveAndNext,
 }) => {
   const pendingNew = rows.filter(
     (r) =>
@@ -227,14 +229,21 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
             {totalEmissions.toFixed(2)} kg CO2e
           </span>
         </div>
-        <Button
-          onClick={onSave}
-          disabled={saving || totalPending === 0}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Saving..." : `Save and Next (${totalPending})`}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={onSave}
+            disabled={saving || totalPending === 0}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? "Saving..." : `Save (${totalPending})`}
+          </Button>
+          {onSaveAndNext && (
+            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

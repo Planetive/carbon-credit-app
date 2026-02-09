@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Save } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Save, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -28,11 +28,18 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
   const { user } = useAuth();
   const { toast } = useToast();
   
+  const userId = user?.id || null;
   const [rows, setRows] = useState<RefrigerantRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<RefrigerantRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    if (userId) return `refrigerantDraft:user:${userId}`;
+    return "refrigerantDraft:anon";
+  };
 
   // Computed values
   const refrigerantTypes = Object.keys(REFRIGERANT_FACTORS);
@@ -40,7 +47,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
   // Load existing entries
   useEffect(() => {
     const loadExistingEntries = async () => {
-      if (!user) return;
+      if (!userId) return;
 
       // Skip loading data when in company context - start with blank form
       if (companyContext) {
@@ -56,7 +63,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
         const { data: refrigerantData, error: refrigerantError } = await supabase
           .from('scope1_refrigerant_entries')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
 
         if (refrigerantError) throw refrigerantError;
@@ -86,7 +93,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
     };
 
     loadExistingEntries();
-  }, [user, toast, companyContext]);
+  }, [userId, toast, companyContext]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -94,6 +101,70 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
       onDataChange(rows);
     }
   }, [rows, isInitialLoad, onDataChange]);
+
+  // Restore unsaved draft rows from sessionStorage after initial DB load
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setRows(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              isExisting: false,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to restore RefrigerantEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+  }, [isInitialLoad, userId]);
+
+  // Persist unsaved draft rows (non-existing rows) to sessionStorage
+  useEffect(() => {
+    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = rows.filter(r => !r.isExisting);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist RefrigerantEmissions draft to sessionStorage:", e);
+    }
+  }, [rows, isInitialLoad, userId]);
 
   // Row management functions
   const addRow = () => setRows(prev => [...prev, newRefrigerantRow()]);
@@ -210,8 +281,11 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      // Navigate to next category
-      onSaveAndNext?.();
+      // Clear draft now that rows are saved
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
 
       // Reload data
       const { data: newData } = await supabase
@@ -325,14 +399,21 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({ onDataChang
           const pendingUpdates = rows.filter(r => r.isExisting && refrigerantRowChanged(r, existingEntries)).length;
           const totalPending = pendingNew + pendingUpdates;
           return (
-            <Button 
-              onClick={saveRefrigerantEntries} 
-              disabled={saving || totalPending === 0} 
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : `Save and Next (${totalPending})`}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveRefrigerantEntries}
+                disabled={saving || totalPending === 0}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Saving..." : `Save (${totalPending})`}
+              </Button>
+              {onSaveAndNext && (
+                <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
           );
         })()}
       </div>

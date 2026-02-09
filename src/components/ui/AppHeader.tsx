@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus, Grid3X3, Factory } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -23,6 +23,7 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
 
 const navLinks = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -40,6 +41,8 @@ const AppHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const [userType, setUserType] = useState<string>("financial_institution");
+  const [isMobileDashboardOpen, setIsMobileDashboardOpen] = useState(false);
 
     const handleLogout = async () => {
     try {
@@ -95,8 +98,30 @@ const AppHeader = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Load user type for dashboard section labels/routes
+  useEffect(() => {
+    const fetchUserType = async () => {
+      if (!user) return;
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("user_type")
+          .eq("user_id", user.id)
+          .single();
+        if (data?.user_type) {
+          setUserType(data.user_type);
+        }
+      } catch (e) {
+        console.warn("Failed to load user type for AppHeader:", e);
+      }
+    };
+    fetchUserType();
+  }, [user]);
+
   // Determine logo link destination based on user role
   const logoLink = isCompanyUser(user) ? "/dashboard" : "/explore";
+  const locationState = location.state as any;
+  const activeDashboardSection = locationState?.activeSection;
 
   const handleSwitchOrganization = async (orgId: string) => {
     if (orgId === currentOrganization?.id) return;
@@ -286,13 +311,100 @@ const AppHeader = () => {
             </div>
             
             <DropdownMenuSeparator />
-            
             <DropdownMenuItem asChild>
               <Link to="/dashboard" className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </Link>
             </DropdownMenuItem>
+            {/* Dashboard sections quick access */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer mx-1 my-0.5 rounded-md">
+                <div className="flex items-center">
+                  <Home className="mr-2 h-4 w-4" />
+                  <span>Dashboard sections</span>
+                </div>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-64">
+                <DropdownMenuItem
+                  onClick={() => navigate("/dashboard", { state: { activeSection: "overview" } })}
+                  className="cursor-pointer"
+                >
+                  <Grid3X3 className="mr-2 h-4 w-4" />
+                  <span>Company Overview</span>
+                </DropdownMenuItem>
+                {userType === "financial_institution" ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard", { state: { activeSection: "projects" } })}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>My Projects</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard", { state: { activeSection: "portfolio" } })}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>My Portfolio</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/project-wizard")}
+                      className="cursor-pointer"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Start New Project</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/bank-portfolio")}
+                      className="cursor-pointer"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Start New Portfolio</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard", { state: { activeSection: "portfolio" } })}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>My Projects</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/project-wizard")}
+                      className="cursor-pointer"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Start New Project</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={() => navigate("/reports")}
+                  className="cursor-pointer"
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  <span>Reports &amp; Analytics</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/esg-health-check")}
+                  className="cursor-pointer"
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  <span>ESG Assessment</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/emission-calculator")}
+                  className="cursor-pointer"
+                >
+                  <Factory className="mr-2 h-4 w-4" />
+                  <span>Emission Calculator</span>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem asChild>
               <Link to="/settings" className="cursor-pointer">
                 <SettingsIcon className="mr-2 h-4 w-4" />
@@ -353,6 +465,244 @@ const AppHeader = () => {
                   const isRestricted = isRestrictedRoute(to);
                   const hasAccess = isCompanyUser(user);
                   const isLocked = isRestricted && !hasAccess;
+
+                  // Special handling for Dashboard: show nested dashboard sections
+                  if (to === "/dashboard") {
+                    const isInDashboardGroup =
+                      location.pathname === "/dashboard" ||
+                      location.pathname === "/project-wizard" ||
+                      location.pathname === "/bank-portfolio" ||
+                      location.pathname === "/reports" ||
+                      location.pathname === "/esg-health-check" ||
+                      location.pathname === "/emission-calculator" ||
+                      location.pathname === "/emission-calculator-uk" ||
+                      location.pathname === "/emission-calculator-epa";
+
+                    const isOverviewActive =
+                      location.pathname === "/dashboard" &&
+                      (!activeDashboardSection ||
+                        activeDashboardSection === "overview");
+                    const isProjectsActive =
+                      location.pathname === "/dashboard" &&
+                      activeDashboardSection === "projects";
+                    const isPortfolioActive =
+                      location.pathname === "/dashboard" &&
+                      activeDashboardSection === "portfolio";
+                    const isStartProjectActive = location.pathname === "/project-wizard";
+                    const isStartPortfolioActive = location.pathname === "/bank-portfolio";
+                    const isReportsActive = location.pathname === "/reports";
+                    const isEsgActive =
+                      location.pathname === "/esg-health-check";
+                    const isEmissionsActive =
+                      location.pathname === "/emission-calculator" ||
+                      location.pathname === "/emission-calculator-uk" ||
+                      location.pathname === "/emission-calculator-epa";
+
+                    return (
+                      <div key={to} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate("/dashboard");
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                            isInDashboardGroup
+                              ? "bg-primary text-white"
+                              : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span>{label}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsMobileDashboardOpen((open) => !open);
+                            }}
+                            className="ml-auto text-inherit"
+                            aria-label="Toggle dashboard sections"
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${
+                                isMobileDashboardOpen ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+                        </button>
+
+                        {isMobileDashboardOpen && (
+                          <div className="ml-8 space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/dashboard", {
+                                  state: { activeSection: "overview" },
+                                });
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isOverviewActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <Grid3X3 className="h-4 w-4" />
+                              <span>Company Overview</span>
+                            </button>
+                            {userType === "financial_institution" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/dashboard", {
+                                      state: { activeSection: "projects" },
+                                    });
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isProjectsActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span>My Projects</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/dashboard", {
+                                      state: { activeSection: "portfolio" },
+                                    });
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isPortfolioActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span>My Portfolio</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/project-wizard");
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isStartProjectActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span>Start New Project</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/bank-portfolio");
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isStartPortfolioActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span>Start New Portfolio</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/dashboard", {
+                                      state: { activeSection: "portfolio" },
+                                    });
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isPortfolioActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span>My Projects</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate("/project-wizard");
+                                    setIsMobileMenuOpen(false);
+                                  }}
+                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                    isStartProjectActive
+                                      ? "bg-primary text-white"
+                                      : "text-gray-700 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span>Start New Project</span>
+                                </button>
+                              </>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/reports");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isReportsActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                              <span>Reports &amp; Analytics</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/esg-health-check");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isEsgActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                              <span>ESG Assessment</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/emission-calculator");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isEmissionsActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <Factory className="h-4 w-4" />
+                              <span>Emission Calculator</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
 
                   const linkContent = (
                     <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${

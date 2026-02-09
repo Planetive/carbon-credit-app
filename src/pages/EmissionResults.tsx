@@ -33,9 +33,11 @@ const EmissionResults = () => {
   const [epaOnRoadGasEmissions, setEpaOnRoadGasEmissions] = useState<number>(0);
   const [epaOnRoadDieselEmissions, setEpaOnRoadDieselEmissions] = useState<number>(0);
   const [epaNonRoadEmissions, setEpaNonRoadEmissions] = useState<number>(0);
+  // Scope 1 Heat and Steam (EPA) – same form as Fuel, separate table
+  const [epaScope1HeatSteamEmissions, setEpaScope1HeatSteamEmissions] = useState<number>(0);
   const [electricityEmissions, setElectricityEmissions] = useState<number>(0);
   const [heatSteamEmissions, setHeatSteamEmissions] = useState<number>(0);
-  // For EPA view, treat heat & steam as Scope 1
+  // Scope 2 Purchased Heat and Steam (EPA)
   const [epaHeatSteamEmissions, setEpaHeatSteamEmissions] = useState<number>(0);
   const [mounted, setMounted] = useState(false);
   
@@ -67,7 +69,7 @@ const EmissionResults = () => {
         epaOnRoadGasEmissions +
         epaOnRoadDieselEmissions +
         epaNonRoadEmissions +
-        epaHeatSteamEmissions
+        epaScope1HeatSteamEmissions
       );
     }
     return fuelEmissions + refrigerantEmissions + passengerEmissions + deliveryEmissions;
@@ -81,7 +83,7 @@ const EmissionResults = () => {
     epaOnRoadGasEmissions,
     epaOnRoadDieselEmissions,
     epaNonRoadEmissions,
-    epaHeatSteamEmissions,
+    epaScope1HeatSteamEmissions,
   ]);
 
   const formatKg = (value: number) => {
@@ -153,8 +155,11 @@ const EmissionResults = () => {
         case 'epa_non_road':
           query = (supabase as any).from('scope1_epa_non_road_vehicle_entries').select('*').eq('user_id', user.id);
           break;
+        case 'epa_scope1_heat_steam':
+          query = (supabase as any).from('scope1_heatsteam_entries_epa').select('*').eq('user_id', user.id);
+          break;
         case 'epa_heat_steam':
-          query = (supabase as any).from('scope2_heatsteam_entries').select('*').eq('user_id', user.id);
+          query = (supabase as any).from('scope2_heatsteam_entries_epa').select('*').eq('user_id', user.id);
           break;
         // Scope 2
         case 'scope2_electricity':
@@ -228,7 +233,7 @@ const EmissionResults = () => {
           { key: 'epa_on_road_gas', label: 'On-road gasoline (EPA)', value: epaOnRoadGasEmissions, color: 'bg-sky-500' },
           { key: 'epa_on_road_diesel', label: 'On-road diesel & alt fuel (EPA)', value: epaOnRoadDieselEmissions, color: 'bg-emerald-500' },
           { key: 'epa_non_road', label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-teal-500' },
-          { key: 'epa_heat_steam', label: 'Heat & Steam (EPA)', value: epaHeatSteamEmissions, color: 'bg-amber-600' },
+          { key: 'epa_scope1_heat_steam', label: 'Heat and Steam', value: epaScope1HeatSteamEmissions, color: 'bg-amber-600' },
         ]
       : [
           { key: 'fuel', label: 'Fuel', value: fuelEmissions, color: 'bg-rose-500' },
@@ -247,23 +252,24 @@ const EmissionResults = () => {
     epaOnRoadGasEmissions,
     epaOnRoadDieselEmissions,
     epaNonRoadEmissions,
-    epaHeatSteamEmissions,
+    epaScope1HeatSteamEmissions,
     scope1Total,
   ]);
 
   const topContributor = useMemo(() => breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [breakdown]);
 
-  // Scope 2 breakdown
+  // Scope 2 breakdown (EPA: Electricity + Purchased Heat & Steam from scope2_heatsteam_entries_epa)
   const scope2Total = useMemo(
-    () => (isEPA ? electricityEmissions : electricityEmissions + heatSteamEmissions),
-    [isEPA, electricityEmissions, heatSteamEmissions]
+    () => (isEPA ? electricityEmissions + epaHeatSteamEmissions : electricityEmissions + heatSteamEmissions),
+    [isEPA, electricityEmissions, heatSteamEmissions, epaHeatSteamEmissions]
   );
   const scope2Breakdown = useMemo(() => {
     if (isEPA) {
       const data = [
         { key: 'scope2_electricity', label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
+        { key: 'epa_heat_steam', label: 'Heat and Steam', value: epaHeatSteamEmissions, color: 'bg-amber-600' },
       ];
-      const total = electricityEmissions;
+      const total = scope2Total;
       return data.map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }));
     }
     const data = [
@@ -271,7 +277,7 @@ const EmissionResults = () => {
       { key: 'scope2_heatsteam', label: 'Heat & Steam', value: heatSteamEmissions, color: 'bg-amber-600' },
     ];
     return data.map(d => ({ ...d, pct: scope2Total > 0 ? (d.value / scope2Total) * 100 : 0 }));
-  }, [isEPA, electricityEmissions, heatSteamEmissions, scope2Total]);
+  }, [isEPA, electricityEmissions, heatSteamEmissions, epaHeatSteamEmissions, scope2Total]);
   const topContributorS2 = useMemo(() => scope2Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [scope2Breakdown]);
 
   // Scope 3 total and breakdown (excluding LCA entries as they are separate)
@@ -336,8 +342,8 @@ const EmissionResults = () => {
   );
 
   const exportCsv = () => {
-    const scope2Total = electricityEmissions + heatSteamEmissions;
-    const grandTotal = scope1Total + scope2Total + scope3Total;
+    const scope2TotalLocal = scope2Total;
+    const grandTotal = scope1Total + scope2TotalLocal + scope3Total;
 
     // Build a comprehensive CSV across all scopes
     const rows: (string | number)[][] = [];
@@ -354,11 +360,12 @@ const EmissionResults = () => {
     rows.push(['Scope 1', 'Total', scope1Total.toFixed(6), '100.00']);
     rows.push([]);
 
-    // Scope 2 breakdown
-    rows.push(['Scope', 'Category', 'Emissions (kg CO2e)']);
-    rows.push(['Scope 2', 'Electricity', electricityEmissions.toFixed(6)]);
-    rows.push(['Scope 2', 'Heat & Steam', heatSteamEmissions.toFixed(6)]);
-    rows.push(['Scope 2', 'Total', scope2Total.toFixed(6)]);
+    // Scope 2 breakdown (respect EPA vs UK breakdown)
+    rows.push(['Scope', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
+    scope2Breakdown.forEach(b => {
+      rows.push(['Scope 2', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
+    });
+    rows.push(['Scope 2', 'Total', scope2TotalLocal.toFixed(6), '100.00']);
     rows.push([]);
 
     // Scope 3 breakdown - Upstream
@@ -494,7 +501,7 @@ const EmissionResults = () => {
         }
         setElectricityEmissions(elecTotal);
 
-        // Scope 2 - Heat & Steam
+        // Scope 2 - Heat & Steam (UK table)
         const { data: heatRows } = await (supabase as any)
           .from('scope2_heatsteam_entries')
           .select('emissions')
@@ -502,8 +509,22 @@ const EmissionResults = () => {
         const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
         const heatTotalRounded = Number(heatTotal.toFixed(6));
         setHeatSteamEmissions(heatTotalRounded);
-        // For EPA view, we treat all heat & steam as Scope 1 contribution.
-        setEpaHeatSteamEmissions(heatTotalRounded);
+
+        // Scope 2 - Heat & Steam (EPA table, separate storage)
+        const { data: epaHeatRows } = await (supabase as any)
+          .from('scope2_heatsteam_entries_epa')
+          .select('emissions')
+          .eq('user_id', user.id);
+        const epaHeatTotal = (epaHeatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
+        setEpaHeatSteamEmissions(Number(epaHeatTotal.toFixed(6)));
+
+        // Scope 1 - Heat and Steam (EPA, same form as Fuel, separate table)
+        const { data: scope1HeatSteamRows } = await (supabase as any)
+          .from('scope1_heatsteam_entries_epa')
+          .select('emissions')
+          .eq('user_id', user.id);
+        const scope1HeatSteamTotal = (scope1HeatSteamRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
+        setEpaScope1HeatSteamEmissions(Number(scope1HeatSteamTotal.toFixed(6)));
 
         // Scope 3 - Load all categories
         const [
@@ -841,7 +862,7 @@ const EmissionResults = () => {
             </CardContent>
           </Card>
 
-          {/* Scope 2 */}
+              {/* Scope 2 */}
               <Card 
                 className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
                   mounted ? 'animate-fade-in-up' : 'opacity-0'
@@ -858,7 +879,7 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(electricityEmissions + heatSteamEmissions)}
+                    {formatTonnes(scope2Total)}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">t CO2e</div>
             </CardContent>
@@ -904,7 +925,7 @@ const EmissionResults = () => {
             </CardHeader>
             <CardContent className="pt-0">
                   <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(scope1Total + electricityEmissions + heatSteamEmissions + scope3Total)}
+                    {formatTonnes(scope1Total + scope2Total + scope3Total)}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">t CO2e (All Scopes)</div>
             </CardContent>

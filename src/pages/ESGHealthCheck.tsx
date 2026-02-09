@@ -1263,54 +1263,59 @@ const ESGHealthCheck = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Top Navigation Bar */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm">
+      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-end h-16">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="hidden xs:inline text-xs sm:text-sm font-medium text-slate-600">
+                ESG Score
+              </span>
+              <div className="px-3 sm:px-4 py-1.5 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-teal-500/30">
+                {totalScore}%
+              </div>
+            </div>
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-6 text-xs text-slate-500">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-teal-500"></div>
                   <span>E: {scores.environmental}%</span>
-              </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-cyan-500"></div>
                   <span>S: {scores.social}%</span>
-              </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-blue-500"></div>
                   <span>G: {scores.governance}%</span>
+                </div>
+              </div>
             </div>
-                      </div>
-              <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-teal-500/30">
-                {totalScore}%
-                      </div>
-                    </div>
           </div>
         </div>
-                  </div>
-                  
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Hero Header */}
-        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-start justify-between mb-6">
+        <div className="mb-6 sm:mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 mb-4">
             <div className="flex-1">
-              <div className="flex items-center gap-4 mb-3">
-                <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+              <div className="flex items-center gap-3 sm:gap-4 mb-3">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
                   Health Check Assessment
                 </h1>
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100 animate-in fade-in slide-in-from-right-4 duration-700 delay-150">
                   <Sparkles className="h-3.5 w-3.5 text-teal-600 animate-pulse" />
                   <span className="text-xs font-medium text-teal-700">ESG Assessment</span>
-                    </div>
-                  </div>
-              <p className="text-lg text-slate-600 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
+                </div>
+              </div>
+              <p className="text-sm sm:text-base md:text-lg text-slate-600 max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100">
                 Comprehensive evaluation of your organization's Environmental, Social, and Governance performance
               </p>
             </div>
-        </div>
+          </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             {tabs.map((tab, index) => {
               const score = calculateScore(tab.id as keyof ESGData);
                 const Icon = tab.icon;

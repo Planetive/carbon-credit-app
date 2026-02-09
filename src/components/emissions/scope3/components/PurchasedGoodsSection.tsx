@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierAutocomplete } from "../SupplierAutocomplete";
@@ -234,8 +234,6 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
       });
 
-      onSaveAndNext?.();
-
       // Reload data
       const { data: newData } = await supabase
         .from("scope3_purchased_goods_services")
@@ -442,16 +440,21 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
           }).length;
           const totalPending = pendingNew + pendingUpdates;
           return (
-            <Button
-              onClick={savePurchasedGoods}
-              disabled={savingPurchasedGoods || totalPending === 0}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {savingPurchasedGoods
-                ? "Saving..."
-                : `Save and Next (${totalPending})`}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={savePurchasedGoods}
+                disabled={savingPurchasedGoods || totalPending === 0}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {savingPurchasedGoods ? "Saving..." : `Save (${totalPending})`}
+              </Button>
+              {onSaveAndNext && (
+                <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </div>
           );
         })()}
       </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Save } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Save, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -24,12 +24,27 @@ interface FuelEmissionsProps {
   companyContext?: boolean; // Add company context prop
   counterpartyId?: string; // Add counterparty ID for company-specific data
   onSaveAndNext?: () => void;
+  /** Override section title (e.g. "Heat and Steam" for Scope 1 Heat and Steam) */
+  sectionTitle?: string;
+  /** Override section description */
+  sectionDescription?: string;
+  /** When "scope1HeatSteam", same form as Fuel but no DB persist; uses draft only */
+  variant?: "fuel" | "scope1HeatSteam";
 }
 
-const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyContext = false, counterpartyId, onSaveAndNext }) => {
+const FuelEmissions: React.FC<FuelEmissionsProps> = ({
+  onDataChange,
+  companyContext = false,
+  counterpartyId,
+  onSaveAndNext,
+  sectionTitle = "Fuel Entries",
+  sectionDescription = "Add your organization's fuel consumption data",
+  variant = "fuel",
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   
+  const userId = user?.id || null;
   const [rows, setRows] = useState<FuelRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<FuelRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -38,6 +53,18 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
   const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    const suffix = variant === "scope1HeatSteam" ? "scope1HeatSteam" : "fuel";
+    if (companyContext && counterpartyId) {
+      return `fuelEmissionsDraft:${suffix}:company:${counterpartyId}:${user?.id || "anon"}`;
+    }
+    if (user?.id) {
+      return `fuelEmissionsDraft:${suffix}:user:${user.id}`;
+    }
+    return `fuelEmissionsDraft:${suffix}:anon`;
+  };
 
   // Use Supabase EPA fuel tables for dynamic fuel factors when available,
   // but keep the hardcoded FACTORS as a safe fallback. Guard against null/undefined for different envs.
@@ -262,7 +289,48 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
   // Load existing entries
   useEffect(() => {
     const loadExistingEntries = async () => {
-      if (!user) return;
+      if (!userId) return;
+
+      // Scope 1 Heat and Steam variant: load from scope1_heatsteam_entries_epa
+      if (variant === "scope1HeatSteam") {
+        try {
+          let q = (supabase as any)
+            .from("scope1_heatsteam_entries_epa")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false });
+          if (companyContext && counterpartyId) q = q.eq("counterparty_id", counterpartyId);
+          else q = q.is("counterparty_id", null);
+          const { data: heatData, error: heatError } = await q;
+          if (heatError) throw heatError;
+          const heatRows = (heatData || []).map((entry: any) => ({
+            id: crypto.randomUUID(),
+            dbId: entry.id,
+            type: entry.fuel_type_group as FuelType,
+            fuel: entry.fuel,
+            unit: entry.unit,
+            quantity: entry.quantity,
+            factor: entry.factor,
+            emissions: entry.emissions,
+            isExisting: true,
+          }));
+          setExistingEntries(heatRows);
+          setRows(heatRows.length > 0 ? heatRows : []);
+          if (heatRows.length > 0) {
+            onDataChange(heatRows);
+            const u = String(heatData?.[0]?.emissions_output_unit || "") as OutputUnit;
+            if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
+              setOutputUnit(u);
+              setInitialOutputUnit(u);
+            }
+          }
+        } catch (err: any) {
+          console.error("Error loading Scope 1 Heat and Steam entries:", err);
+          toast({ title: "Error", description: "Failed to load Heat and Steam entries", variant: "destructive" });
+        }
+        setIsInitialLoad(false);
+        return;
+      }
 
       // Load company-specific data when in company context
       if (companyContext && counterpartyId) {
@@ -273,7 +341,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
           const { data: fuelData, error: fuelError } = await (supabase as any)
             .from('scope1_fuel_entries')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .eq('counterparty_id', counterpartyId)
             .order('created_at', { ascending: false });
 
@@ -331,7 +399,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
         const { data: fuelData, error: fuelError } = await (supabase as any)
           .from('scope1_fuel_entries')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .is('counterparty_id', null) // Only personal entries (no counterparty_id)
           .order('created_at', { ascending: false });
 
@@ -373,7 +441,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
     };
 
     loadExistingEntries();
-  }, [user, toast, companyContext, counterpartyId]);
+  }, [userId, toast, companyContext, counterpartyId, variant]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -382,6 +450,75 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, isInitialLoad]);
+
+  // Restore unsaved draft rows from sessionStorage after initial DB load completes
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true; // 24h window
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setRows((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              isExisting: false,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+        // onDataChange will be triggered by rows effect above
+      }
+    } catch (e) {
+      console.warn("Failed to restore FuelEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+    // We intentionally omit getDraftKey from deps to keep key stable per context
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoad, companyContext, counterpartyId, user]);
+
+  // Persist unsaved draft rows (non-existing rows) to sessionStorage
+  useEffect(() => {
+    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = rows.filter((r) => !r.isExisting);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        outputUnit,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist FuelEmissions draft to sessionStorage:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, outputUnit, isInitialLoad, companyContext, counterpartyId, user]);
 
   // Row management functions
   const addRow = () => setRows(prev => [...prev, newFuelRow()]);
@@ -446,6 +583,121 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
 
   // Save functions
   const saveFuelEntries = async () => {
+    if (variant === "scope1HeatSteam") {
+      if (!user) {
+        toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
+        return;
+      }
+      const table = "scope1_heatsteam_entries_epa";
+      // Coerce quantity/factor so draft or string inputs still qualify; allow factor derived from emissions/quantity
+      const newEntries = rows.filter((r) => {
+        if (r.isExisting) return false;
+        if (!r.type || !r.fuel || !r.unit) return false;
+        const q = typeof r.quantity === "number" ? r.quantity : parseFloat(String(r.quantity ?? ""));
+        if (Number.isNaN(q) || q < 0) return false;
+        let f = typeof r.factor === "number" ? r.factor : parseFloat(String(r.factor ?? ""));
+        if (Number.isNaN(f) || f < 0) {
+          const em = typeof r.emissions === "number" ? r.emissions : parseFloat(String(r.emissions ?? ""));
+          if (!Number.isNaN(em) && q > 0) f = em / q;
+          else return false;
+        }
+        return true;
+      });
+      const changedExisting = rows.filter((r) => r.isExisting && r.dbId && fuelRowChanged(r, existingEntries));
+      const unitChanged = outputUnit !== initialOutputUnit;
+      if (!unitChanged && newEntries.length === 0 && changedExisting.length === 0) {
+        toast({ title: "Nothing to save", description: "No new or changed Heat and Steam entries." });
+        return;
+      }
+      setSaving(true);
+      try {
+        const payload = newEntries.map((v) => {
+          const q = typeof v.quantity === "number" ? v.quantity : parseFloat(String(v.quantity ?? "")) || 0;
+          let f = typeof v.factor === "number" ? v.factor : parseFloat(String(v.factor ?? ""));
+          if (Number.isNaN(f) && typeof v.emissions === "number" && q > 0) f = v.emissions / q;
+          const em = typeof v.emissions === "number" ? v.emissions : (q * (Number.isNaN(f) ? 0 : f));
+          return {
+            user_id: user.id,
+            counterparty_id: companyContext ? counterpartyId ?? null : null,
+            fuel_type_group: v.type!,
+            fuel: v.fuel!,
+            unit: v.unit!,
+            quantity: Number(q),
+            factor: Number(f),
+            emissions: Number(em),
+            emissions_output: convertEmissionNumeric(em, outputUnit),
+            emissions_output_unit: outputUnit,
+          };
+        });
+        if (payload.length > 0) {
+          const { data: inserted, error } = await (supabase as any).from(table).insert(payload).select("id");
+          if (error) throw error;
+          if (!inserted?.length && payload.length > 0) {
+            console.warn("Scope 1 Heat and Steam insert returned no rows; table may not exist or RLS may block insert.");
+          }
+        }
+        const rowsToUpdate = unitChanged
+          ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
+          : changedExisting;
+        if (rowsToUpdate.length > 0) {
+          const updates = rowsToUpdate.map((v) =>
+            (supabase as any)
+              .from(table)
+              .update({
+                fuel_type_group: v.type!,
+                fuel: v.fuel!,
+                unit: v.unit!,
+                quantity: v.quantity!,
+                factor: v.factor!,
+                emissions: v.emissions!,
+                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+                emissions_output_unit: outputUnit,
+              })
+              .eq("id", v.dbId!)
+          );
+          const results = await Promise.all(updates);
+          const updateError = results.find((r: any) => r.error)?.error;
+          if (updateError) throw updateError;
+        }
+        toast({
+          title: "Saved",
+          description:
+            unitChanged && newEntries.length === 0 && changedExisting.length === 0
+              ? "Updated output unit for existing Heat and Steam entries."
+              : `Saved ${newEntries.length} new and updated ${changedExisting.length} Heat and Steam entries.`,
+        });
+        try {
+          const key = getDraftKey();
+          sessionStorage.removeItem(key);
+        } catch {}
+        let reloadQ = (supabase as any).from(table).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+        if (companyContext && counterpartyId) reloadQ = reloadQ.eq("counterparty_id", counterpartyId);
+        else reloadQ = reloadQ.is("counterparty_id", null);
+        const { data: newData } = await reloadQ;
+        const updatedRows = (newData || []).map((entry: any) => ({
+          id: crypto.randomUUID(),
+          dbId: entry.id,
+          type: entry.fuel_type_group as FuelType,
+          fuel: entry.fuel,
+          unit: entry.unit,
+          quantity: entry.quantity,
+          factor: entry.factor,
+          emissions: entry.emissions,
+          isExisting: true,
+        }));
+        setExistingEntries(updatedRows);
+        setRows(updatedRows);
+        onDataChange(updatedRows);
+      } catch (e: any) {
+        const msg = e?.message || e?.error_description || String(e);
+        console.error("Scope 1 Heat and Steam save error:", e);
+        toast({ title: "Error", description: msg || "Failed to save Heat and Steam entries. Run the migration for scope1_heatsteam_entries_epa if the table is missing.", variant: "destructive" });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!user) {
       toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
       return;
@@ -520,8 +772,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
           : `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      // Navigate to next category
-      onSaveAndNext?.();
+      // Clear any stale draft now that rows are persisted
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
 
       // Reload data
       const { data: newData } = await (supabase as any)
@@ -567,8 +822,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Fuel Entries</h4>
-          <p className="text-sm text-gray-600">Add your organization's fuel consumption data</p>
+          <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
+          <p className="text-sm text-gray-600">{sectionDescription}</p>
         </div>
         <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white">
           <Plus className="h-4 w-4 mr-2" />Add New Entry
@@ -692,14 +947,21 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({ onDataChange, companyCont
             const totalPending = pendingNew + pendingUpdates;
             const canSave = !saving && (totalPending > 0 || unitChanged);
             return (
-              <Button 
-                onClick={saveFuelEntries} 
-                disabled={!canSave} 
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save and Next'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={saveFuelEntries}
+                  disabled={!canSave}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+                {onSaveAndNext && (
+                  <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
             );
           })()}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
@@ -84,6 +84,7 @@ const EmissionCalculator = () => {
     scope2: [],
     scope3: [],
   });
+  const hasRestoredDraftRef = useRef(false);
 
   // Calculate totals - handle both LCA and manual modes
   const scopeTotals: ScopeTotals = {
@@ -226,6 +227,10 @@ const EmissionCalculator = () => {
 
       // Clear company context
       sessionStorage.removeItem('companyEmissionsContext');
+      // Clear any stale calculator draft now that data is saved
+      try {
+        sessionStorage.removeItem('emissionCalculatorDraft');
+      } catch {}
       
       // Navigate back to finance form with counterpartyId using React Router
       const returnUrl = `${companyContext.returnUrl}?counterpartyId=${companyContext.counterpartyId}`;
@@ -407,6 +412,70 @@ const EmissionCalculator = () => {
       resetCalculatorState();
     }
   }, []);
+
+  // Restore unsaved calculator draft from sessionStorage when not in wizard/company context
+  useEffect(() => {
+    // Only attempt restore once per component mount
+    if (hasRestoredDraftRef.current) return;
+
+    try {
+      // Only restore draft for individual calculator use (no wizard/company context)
+      if (hasWizardContext || companyContext) return;
+
+      const raw = sessionStorage.getItem('emissionCalculatorDraft');
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+
+      // Optional: 24h freshness window
+      const recentEnough = typeof parsed?.ts === 'number'
+        ? (Date.now() - parsed.ts) < 1000 * 60 * 60 * 24
+        : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem('emissionCalculatorDraft');
+        return;
+      }
+
+      if (parsed.emissionData) {
+        setEmissionData(parsed.emissionData);
+      }
+      if (parsed.activeScope) {
+        setActiveScope(parsed.activeScope);
+      }
+      if (parsed.activeCategory) {
+        setActiveCategory(parsed.activeCategory);
+      }
+      if (parsed.calculationMode === 'lca' || parsed.calculationMode === 'manual') {
+        setCalculationMode(parsed.calculationMode);
+      }
+    } catch (error) {
+      console.warn('Failed to restore emission calculator draft from sessionStorage:', error);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+  }, [hasWizardContext, companyContext]);
+
+  // Persist calculator draft to sessionStorage so it survives refreshes / tab discards
+  useEffect(() => {
+    // Don't persist until we've had a chance to restore any existing draft
+    if (!hasRestoredDraftRef.current) return;
+    // Don't persist when calculator is in wizard/company-driven flows
+    if (hasWizardContext || companyContext) return;
+
+    try {
+      const payload = {
+        emissionData,
+        activeScope,
+        activeCategory,
+        calculationMode,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem('emissionCalculatorDraft', JSON.stringify(payload));
+    } catch (error) {
+      console.warn('Failed to persist emission calculator draft to sessionStorage:', error);
+    }
+  }, [emissionData, activeScope, activeCategory, calculationMode, hasWizardContext, companyContext]);
 
   // Load existing company emission data
   const loadExistingCompanyEmissions = async (counterpartyId: string) => {

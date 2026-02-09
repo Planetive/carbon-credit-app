@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -103,6 +103,9 @@ const mapEntryTypeFromDb = (
 
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
 
+const HEATSTEAM_TABLE_UK = "scope2_heatsteam_entries";
+const HEATSTEAM_TABLE_EPA = "scope2_heatsteam_entries_epa";
+
 interface HeatSteamEmissionsProps {
   onTotalChange?: (total: number) => void;
   onSaveAndNext?: () => void;
@@ -110,13 +113,24 @@ interface HeatSteamEmissionsProps {
    * When set, forces the standard (e.g. for EPA calculator).
    * If provided, the selector is locked to this value.
    */
-  forcedStandard?: 'UK' | 'EBT';
+  forcedStandard?: "UK" | "EBT";
+  /**
+   * When "epa", data is stored in scope2_heatsteam_entries_epa so UK and EPA data are separate.
+   */
+  storageVariant?: "uk" | "epa";
 }
 
-const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, onSaveAndNext, forcedStandard }) => {
+const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
+  onTotalChange,
+  onSaveAndNext,
+  forcedStandard,
+  storageVariant = "uk",
+}) => {
+  const heatSteamTable = storageVariant === "epa" ? HEATSTEAM_TABLE_EPA : HEATSTEAM_TABLE_UK;
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const userId = user?.id || null;
   const [heatSteamStandard, setHeatSteamStandard] = useState<"UK" | "EBT">(forcedStandard ?? "UK");
   const [heatSteamDataUK, setHeatSteamDataUK] = useState<
     Array<{
@@ -143,6 +157,15 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
   // When true, we already have user-specific rows from the DB and should
   // not overwrite them with auto-generated rows from the reference tables.
   const [hasUserRows, setHasUserRows] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    const standardKey = heatSteamStandard || "UK";
+    const storageKey = storageVariant === "epa" ? "epa" : "uk";
+    if (userId) return `heatSteamDraft:${storageKey}:${standardKey}:user:${userId}`;
+    return `heatSteamDraft:${storageKey}:${standardKey}:anon`;
+  };
 
   // Load heat and steam reference data for both standards
   useEffect(() => {
@@ -364,13 +387,13 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
   // Load saved user data
   useEffect(() => {
     const load = async () => {
-      if (!user) return;
+      if (!userId) return;
       try {
-        // Load Heat & Steam entries
+        // Load Heat & Steam entries (UK table or EPA table per storageVariant)
         const { data: heatData, error: heatError } = await (supabase as any)
-          .from('scope2_heatsteam_entries')
+          .from(heatSteamTable)
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: true });
         if (heatError) throw heatError;
 
@@ -414,10 +437,73 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
       } catch (e: any) {
         console.error(e);
         toast({ title: "Error", description: e.message || "Failed to load Heat & Steam data", variant: "destructive" });
+      } finally {
+        setIsInitialLoad(false);
       }
     };
     load();
-  }, [user, toast, forcedStandard]);
+  }, [userId, toast, forcedStandard, heatSteamTable]);
+
+  // Restore draft only when there are no user rows yet
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current || !userId) return;
+    if (hasUserRows) {
+      hasRestoredDraftRef.current = true;
+      return;
+    }
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setHeatRows(draftRows.map((r: any) => ({ ...r, dbId: undefined })));
+      }
+    } catch (e) {
+      console.warn("Failed to restore HeatSteamEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+  }, [isInitialLoad, hasUserRows, userId, heatSteamStandard]);
+
+  // Persist draft rows (non-DB rows) to sessionStorage
+  useEffect(() => {
+    if (!hasRestoredDraftRef.current || !userId) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = heatRows.filter(r => !r.dbId);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        outputUnit,
+        heatSteamStandard,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist HeatSteamEmissions draft to sessionStorage:", e);
+    }
+  }, [heatRows, outputUnit, heatSteamStandard, userId]);
 
   // If forced (EPA), lock the standard.
   useEffect(() => {
@@ -484,13 +570,13 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
         emissions_output_unit: outputUnit,
       }));
       if (inserts.length > 0) {
-        const { error } = await (supabase as any).from('scope2_heatsteam_entries').insert(inserts);
+        const { error } = await (supabase as any).from(heatSteamTable).insert(inserts);
         if (error) throw error;
       }
 
       const updates = validRows.filter(r => r.dbId).map(r => (
         (supabase as any)
-          .from('scope2_heatsteam_entries')
+          .from(heatSteamTable)
           .update({
             entry_type: mapEntryTypeForDb(r.entryType),
             unit: r.unit,
@@ -510,7 +596,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
       }
 
       toast({ title: "Saved", description: "Heat & Steam saved." });
-      onSaveAndNext?.();
+      // Clear draft after successful save
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -523,7 +613,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
     if (row.dbId) {
       try {
         const { error } = await (supabase as any)
-          .from("scope2_heatsteam_entries")
+          .from(heatSteamTable)
           .delete()
           .eq("id", row.dbId);
         if (error) throw error;
@@ -888,9 +978,16 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({ onTotalChange, 
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
-            <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save and Next'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Save className="h-4 w-4 mr-2" /> {savingHeat ? "Saving..." : "Save"}
+            </Button>
+            {onSaveAndNext && (
+              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -111,6 +111,7 @@ const computeEmissions = (
 const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext, companyContext = false, counterpartyId }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const userId = user?.id || null;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -118,6 +119,18 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   const [rows, setRows] = useState<OnRoadRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<OnRoadRow[]>([]);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
+  const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    if (companyContext && counterpartyId && userId) {
+      return `epaOnRoadGasolineDraft:company:${counterpartyId}:${userId}`;
+    }
+    if (userId) {
+      return `epaOnRoadGasolineDraft:user:${userId}`;
+    }
+    return "epaOnRoadGasolineDraft:anon";
+  };
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
@@ -168,7 +181,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   // Load saved entries from Supabase
   useEffect(() => {
     const loadEntries = async () => {
-      if (!user) return;
+      if (!userId) return;
       if (companyContext && !counterpartyId) {
         setRows([]);
         setExistingEntries([]);
@@ -200,6 +213,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
           if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
             setOutputUnit(u);
+            setInitialOutputUnit(u);
           }
         }
         if (mapped.length > 0) onDataChange(mapped);
@@ -211,7 +225,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
       }
     };
     loadEntries();
-  }, [user, companyContext, counterpartyId]);
+  }, [userId, companyContext, counterpartyId]);
 
   useEffect(() => {
     const load = async () => {
@@ -294,6 +308,73 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     if (!isInitialLoad) onDataChange(rows);
   }, [rows, isInitialLoad, onDataChange]);
 
+  // Restore draft after initial load
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setRows((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              isExisting: false,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to restore OnRoadGasolineEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoad, companyContext, counterpartyId, userId]);
+
+  // Persist draft rows
+  useEffect(() => {
+    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = rows.filter((r) => !r.isExisting);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        outputUnit,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist OnRoadGasolineEmissions draft to sessionStorage:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, outputUnit, isInitialLoad, companyContext, counterpartyId, userId]);
+
   const vehicleTypes = useMemo(
     () => Array.from(new Set(factors.map((f) => f.vehicleType))).sort((a, b) => a.localeCompare(b)),
     [factors],
@@ -349,7 +430,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     );
   };
 
-  const handleSaveAndNext = async () => {
+  const handleSave = async () => {
     if (!user) {
       toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
       return;
@@ -363,9 +444,9 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         !r.isExisting
     );
     const changedExisting = rows.filter((r) => r.isExisting && r.dbId && rowChanged(r, existingEntries));
-    if (newEntries.length === 0 && changedExisting.length === 0) {
+    const unitChanged = outputUnit !== initialOutputUnit;
+    if (!unitChanged && newEntries.length === 0 && changedExisting.length === 0) {
       toast({ title: "Nothing to save", description: "No new or changed on-road gasoline entries." });
-      onSaveAndNext?.();
       return;
     }
     setSaving(true);
@@ -385,9 +466,12 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
         if (error) throw error;
       }
-      if (changedExisting.length > 0) {
+      const rowsToUpdate = unitChanged
+        ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
+        : changedExisting;
+      if (rowsToUpdate.length > 0) {
         const results = await Promise.all(
-          changedExisting.map((v) =>
+          rowsToUpdate.map((v) =>
             supabase
               .from(TABLE_NAME as any)
               .update({
@@ -407,9 +491,16 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
       }
       toast({
         title: "Saved",
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} on-road gasoline entries.`,
+        description:
+          unitChanged && newEntries.length === 0 && changedExisting.length === 0
+            ? "Updated output unit for existing on-road gasoline entries."
+            : `Saved ${newEntries.length} new and updated ${changedExisting.length} on-road gasoline entries.`,
       });
-      onSaveAndNext?.();
+      if (unitChanged) setInitialOutputUnit(outputUnit);
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
     } catch (e: any) {
       toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -566,9 +657,16 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
-            <Save className="h-4 w-4 mr-2" /> Save and Next
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
+              <Save className="h-4 w-4 mr-2" /> {saving ? "Saving..." : "Save"}
+            </Button>
+            {onSaveAndNext && (
+              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

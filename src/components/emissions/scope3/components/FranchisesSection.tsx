@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import { FieldTooltip } from "@/pages/finance_facilitated/components/FieldTooltip";
@@ -183,20 +183,26 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
             Total Franchise Entries:{" "}
             <span className="font-semibold">{totalPending}</span>
           </div>
-          <Button
-            onClick={() => {
-              toast({
-                title: "Saved",
-                description: "Franchise entries saved (frontend only for now).",
-              });
-              onSaveAndNext?.();
-            }}
-            disabled={totalPending === 0}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {`Save and Next (${totalPending})`}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                toast({
+                  title: "Saved",
+                  description: "Franchise entries saved (frontend only for now).",
+                });
+              }}
+              disabled={totalPending === 0}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {`Save (${totalPending})`}
+            </Button>
+            {onSaveAndNext && (
+              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Save, Plus, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Save, Plus, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const userId = user?.id || null;
   const [mainId, setMainId] = useState<string | null>(null);
   const [totalKwh, setTotalKwh] = useState<number | undefined>();
   const [gridPct, setGridPct] = useState<number | undefined>();
@@ -48,6 +49,13 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
   const [otherRows, setOtherRows] = useState<OtherSourceRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    if (userId) return `electricityDraft:user:${userId}`;
+    return "electricityDraft:anon";
+  };
 
   const factorsSafe = FACTORS || {};
   const fuelTypes = Object.keys(factorsSafe) as FuelType[];
@@ -56,13 +64,13 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
 
   useEffect(() => {
     const load = async () => {
-      if (!user) return;
+      if (!userId) return;
       try {
         // Load latest main row
         const { data: mainData, error: mainError } = await (supabase as any)
           .from('scope2_electricity_main')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -84,7 +92,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
           const { data: subData, error: subError } = await (supabase as any)
             .from('scope2_electricity_subanswers')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .eq('main_id', mainData.id)
             .order('created_at', { ascending: true });
           if (subError) throw subError;
@@ -117,10 +125,100 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
       } catch (e: any) {
         console.error(e);
         toast({ title: "Error", description: e.message || "Failed to load Scope 2 data", variant: "destructive" });
+      } finally {
+        setIsInitialLoad(false);
       }
     };
     load();
-  }, [user, toast]);
+  }, [userId, toast]);
+
+  // Restore draft after initial load when there is no saved DB data yet
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current || !userId) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      // Only restore top-level fields when there is no existing main row
+      if (!mainId) {
+        if (typeof parsed.totalKwh === "number") setTotalKwh(parsed.totalKwh);
+        if (typeof parsed.gridPct === "number") setGridPct(parsed.gridPct);
+        if (typeof parsed.renewablePct === "number") setRenewablePct(parsed.renewablePct);
+        if (typeof parsed.otherPct === "number") setOtherPct(parsed.otherPct);
+        if (parsed.gridCountry === "UAE" || parsed.gridCountry === "Pakistan") {
+          setGridCountry(parsed.gridCountry);
+        }
+      }
+
+      // Merge unsaved "other" rows
+      const draftRows = Array.isArray(parsed.otherRows) ? parsed.otherRows : [];
+      if (draftRows.length > 0) {
+        setOtherRows(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              dbId: undefined,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to restore ElectricityEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+  }, [isInitialLoad, userId, mainId]);
+
+  // Persist draft form + unsaved other rows
+  useEffect(() => {
+    if (!hasRestoredDraftRef.current || !userId) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = otherRows.filter(r => !r.dbId);
+      const hasTopLevel =
+        typeof totalKwh === "number" ||
+        typeof gridPct === "number" ||
+        typeof renewablePct === "number" ||
+        typeof otherPct === "number" ||
+        !!gridCountry;
+
+      if (!hasTopLevel && draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        totalKwh,
+        gridPct,
+        renewablePct,
+        otherPct,
+        gridCountry,
+        otherRows: draftRows,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist ElectricityEmissions draft to sessionStorage:", e);
+    }
+  }, [userId, totalKwh, gridPct, renewablePct, otherPct, gridCountry, otherRows]);
 
   const updateOtherRow = (id: string, patch: Partial<OtherSourceRow>) => {
     setOtherRows(prev => prev.map(r => {
@@ -290,7 +388,11 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
       }
 
       toast({ title: "Saved", description: "Scope 2 electricity data saved." });
-      onSaveAndNext?.();
+      // Clear draft once saved
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -542,9 +644,16 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
         <div className="text-gray-900 font-medium">
           Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
         </div>
-        <Button onClick={saveAll} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
-          <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save and Next'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={saveAll} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Save className="h-4 w-4 mr-2" /> {saving ? "Saving..." : "Save"}
+          </Button>
+          {onSaveAndNext && (
+            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

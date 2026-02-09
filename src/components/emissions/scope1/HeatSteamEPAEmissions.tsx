@@ -11,7 +11,7 @@ interface Props {
  * reuse Heat & Steam UI but lock it to EPA/EBT standard.
  */
 const HeatSteamEPAEmissions: React.FC<Props> = (props) => {
-  return <HeatSteamEmissions {...props} forcedStandard="EBT" />;
+  return <HeatSteamEmissions {...props} forcedStandard="EBT" storageVariant="epa" />;
 };
 
 export default HeatSteamEPAEmissions;

@@ -12,7 +12,9 @@ import {
   Truck,
   Building2,
   X,
+  Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,9 +84,8 @@ const EmissionCalculatorEPA = () => {
   const [onRoadGasolineRows, setOnRoadGasolineRows] = useState<Array<{ emissions?: number }>>([]);
   const [onRoadDieselAltFuelRows, setOnRoadDieselAltFuelRows] = useState<Array<{ emissions?: number }>>([]);
   const [nonRoadVehicleRows, setNonRoadVehicleRows] = useState<Array<{ emissions?: number }>>([]);
-  const [heatSteamTotal, setHeatSteamTotal] = useState<number>(0);
-
-  // Totals – Scope 1 uses only fuel, Scope 2 uses electricity total, Scope 3 unchanged
+  const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
+  // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
     scope1:
       calculationMode === "lca"
@@ -94,7 +95,7 @@ const EmissionCalculatorEPA = () => {
           onRoadGasolineRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           onRoadDieselAltFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           nonRoadVehicleRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          heatSteamTotal,
+          scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0),
     scope2:
       calculationMode === "lca"
         ? emissionData.scope3.find((r) => r.category === "lca_scope2")?.emissions || 0
@@ -121,7 +122,7 @@ const EmissionCalculatorEPA = () => {
   const handleElectricityDataChange = (total: number) => {
     setEmissionData((prev) => ({
       ...prev,
-      scope2: [{ id: "electricity-total", emissions: total }] as any,
+      scope2: [...prev.scope2.filter((item: any) => item.id !== "electricity-total"), { id: "electricity-total", emissions: total }] as any,
     }));
   };
 
@@ -141,8 +142,15 @@ const EmissionCalculatorEPA = () => {
     setNonRoadVehicleRows(rows);
   };
 
+  const handleScope1HeatSteamDataChange = (data: Array<{ emissions?: number }>) => {
+    setScope1HeatSteamRows(data);
+  };
+
   const handleHeatSteamTotalChange = (total: number) => {
-    setHeatSteamTotal(total);
+    setEmissionData((prev) => ({
+      ...prev,
+      scope2: [...prev.scope2.filter((item: any) => item.id !== "heat-total"), { id: "heat-total", emissions: total }] as any,
+    }));
   };
 
   // Save company emissions to database (same as main calculator)
@@ -346,7 +354,7 @@ const EmissionCalculatorEPA = () => {
     });
   };
 
-  // Sidebar – EPA version: Scope 1 only Fuel, Scope 2 only Electricity, Scope 3 unchanged
+  // Sidebar – EPA version: Scope 1 Fuel only, Scope 2 Electricity + Heat & Steam, Scope 3 unchanged
   const sidebarItems = [
     {
       id: "scope1",
@@ -355,20 +363,21 @@ const EmissionCalculatorEPA = () => {
       description: "Direct emissions from fuel combustion (EPA factors)",
       categories: [
         { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)" },
+        { id: "scope1HeatSteam", title: "Heat and Steam", icon: Thermometer, description: "Heat and steam (Scope 1, same form as Fuel)" },
         { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table" },
         { id: "onRoadGasoline", title: "On-Road Gasoline", icon: Truck, description: "On-road gasoline using On-Road Gasoline table" },
         { id: "onRoadDieselAltFuel", title: "On-Road Diesel & Alt Fuel", icon: Truck, description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table" },
         { id: "nonRoadVehicle", title: "Non-Road Vehicle", icon: Truck, description: "Non-road vehicle fuel using Non-Road Vehicle table" },
-        { id: "heatSteam", title: "Heat & Steam", icon: Thermometer, description: "Heat & steam (EPA standard)" },
       ],
     },
     {
       id: "scope2",
-      title: "Scope 2 (Electricity)",
+      title: "Scope 2",
       icon: Zap,
-      description: "Indirect emissions from purchased electricity",
+      description: "Indirect emissions from purchased energy",
       categories: [
         { id: "electricity", title: "Electricity", icon: Zap, description: "Purchased electricity consumption" },
+        { id: "heatSteam", title: "Heat & Steam", icon: Thermometer, description: "Purchased Heat and Steam" },
       ],
     },
     {
@@ -552,12 +561,12 @@ const EmissionCalculatorEPA = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row">
       {/* Sidebar (hidden in LCA mode) */}
       {calculationMode !== "lca" && (
-        <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200/50 flex flex-col shadow-sm">
-          <div className="p-8 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
-            <div className="flex items-center justify-between mb-6">
+        <div className="w-full lg:w-80 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
+          <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <Button
                 variant="ghost"
                 onClick={() => navigate("/dashboard")}
@@ -575,12 +584,12 @@ const EmissionCalculatorEPA = () => {
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-2xl shadow-lg">
-                <Factory className="h-7 w-7 text-white" />
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-3 sm:p-3.5 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-2xl shadow-lg">
+                <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   EPA Emission Calculator
                 </h1>
               </div>
@@ -691,7 +700,7 @@ const EmissionCalculatorEPA = () => {
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar">
             <nav className="space-y-3">
               {sidebarItems.map((scope) => (
                 <div key={scope.id}>
@@ -744,7 +753,19 @@ const EmissionCalculatorEPA = () => {
                                   : "text-gray-500"
                               }`}
                             />
-                            <span className="text-left">{category.title}</span>
+                            <span className="flex items-center gap-1.5 text-left">
+                              {category.title}
+                              {scope.id === "scope2" && category.id === "heatSteam" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="h-3.5 w-3.5 text-gray-400 hover:text-teal-600" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="text-xs max-w-xs">
+                                    Purchased Heat and Steam
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </span>
                           </button>
                         ))
                       ) : (
@@ -854,19 +875,19 @@ const EmissionCalculatorEPA = () => {
       <div className="flex-1 flex flex-col">
         {/* Header with mode switch */}
         {(calculationMode === "manual" || calculationMode === "lca") && (
-          <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-8 py-6 shadow-sm">
-            <div className="flex items-center justify-between">
+          <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-4 sm:py-6 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
               <div className="flex-1">
                 {calculationMode === "manual" ? (
                   <>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
                       {(() => {
                         const scope = sidebarItems.find((s) => s.id === activeScope);
                         const category = scope?.categories.find((c) => c.id === activeCategory);
                         return category ? `${scope?.title} - ${category.title}` : "Select a Category";
                       })()}
                     </h2>
-                    <p className="text-gray-600 text-base">
+                    <p className="text-gray-600 text-sm sm:text-base">
                       {(() => {
                         const scope = sidebarItems.find((s) => s.id === activeScope);
                         const category = scope?.categories.find((c) => c.id === activeCategory);
@@ -879,17 +900,17 @@ const EmissionCalculatorEPA = () => {
                   </>
                 ) : (
                   <>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
                       LCA Input Mode
                     </h2>
-                    <p className="text-gray-600 text-base">
+                    <p className="text-gray-600 text-sm sm:text-base">
                       Enter your emissions data directly from your lifecycle assessment studies
                     </p>
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-4 px-4 py-2 bg-gray-50 rounded-full border border-gray-200/50">
-                <span className="text-sm font-semibold text-gray-700">Manual</span>
+              <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 bg-gray-50 rounded-full border border-gray-200/50 self-start md:self-auto">
+                <span className="text-xs sm:text-sm font-semibold text-gray-700">Manual</span>
                 <Switch
                   checked={calculationMode === "lca"}
                   onCheckedChange={(checked) => {
@@ -901,7 +922,7 @@ const EmissionCalculatorEPA = () => {
                   }}
                   className="data-[state=checked]:bg-teal-600"
                 />
-                <span className="text-sm font-semibold text-gray-700">LCA</span>
+                <span className="text-xs sm:text-sm font-semibold text-gray-700">LCA</span>
               </div>
             </div>
           </header>
@@ -940,7 +961,7 @@ const EmissionCalculatorEPA = () => {
         </AlertDialog>
 
         {/* Content */}
-        <main className="flex-1 p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50" data-content-area>
+        <main className="flex-1 p-4 sm:p-6 md:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50" data-content-area>
           {calculationMode === "lca" && (
             <div className="max-w-5xl mx-auto">
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
@@ -972,6 +993,25 @@ const EmissionCalculatorEPA = () => {
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
                         onSaveAndNext={navigateToNextCategory}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Scope 1 – Heat and Steam (same as Fuel, different name; no hover icon) */}
+              {activeScope === "scope1" && activeCategory === "scope1HeatSteam" && (
+                <div className="w-full" key={`scope1-heat-steam-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-8">
+                      <FuelEmissions
+                        onDataChange={handleScope1HeatSteamDataChange}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
+                        onSaveAndNext={navigateToNextCategory}
+                        sectionTitle="Heat and Steam"
+                        sectionDescription="Add your organization's heat and steam consumption data"
+                        variant="scope1HeatSteam"
                       />
                     </CardContent>
                   </Card>
@@ -1042,8 +1082,8 @@ const EmissionCalculatorEPA = () => {
                 </div>
               )}
 
-              {/* Scope 1 – Heat & Steam (EPA Standard) */}
-              {activeScope === "scope1" && activeCategory === "heatSteam" && (
+              {/* Scope 2 – Heat & Steam (EPA Standard) */}
+              {activeScope === "scope2" && activeCategory === "heatSteam" && (
                 <div className="w-full" key={`heat-steam-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-8">
@@ -1056,7 +1096,7 @@ const EmissionCalculatorEPA = () => {
                 </div>
               )}
 
-              {/* Scope 2 – Electricity only */}
+              {/* Scope 2 – Electricity */}
               {activeScope === "scope2" && activeCategory === "electricity" && (
                 <div className="w-full" key={`electricity-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Save, Trash2, Info } from "lucide-react";
+import { Plus, Save, Trash2, Info, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
 import { FieldTooltip } from "@/pages/finance_facilitated/components/FieldTooltip";
@@ -1340,8 +1340,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      onSaveAndNext?.();
-
       const { data: newData } = await supabase
         .from('scope3_upstream_transportation' as any)
         .select('*')
@@ -1478,8 +1476,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         title: "Saved", 
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
-
-      onSaveAndNext?.();
 
       const { data: newData } = await supabase
         .from('scope3_waste_generated' as any)
@@ -1620,8 +1616,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         title: "Saved", 
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
-
-      onSaveAndNext?.();
 
       const { data: newData } = await supabase
         .from('scope3_business_travel' as any)
@@ -1765,8 +1759,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      onSaveAndNext?.();
-
       const { data: newData } = await supabase
         .from('scope3_employee_commuting' as any)
         .select('*')
@@ -1901,8 +1893,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         title: "Saved", 
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
-
-      onSaveAndNext?.();
 
       const { data: newData } = await (supabase
         .from('scope3_downstream_transportation') as any)
@@ -2047,8 +2037,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         title: "Saved", 
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
-
-      onSaveAndNext?.();
 
       const { data: newData } = await supabase
         .from('scope3_end_of_life_treatment' as any)
@@ -2335,6 +2323,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         onDeleteRow={deleteUpstreamTransportRow}
         onSave={saveUpstreamTransport}
         saving={savingUpstreamTransport}
+        onSaveAndNext={onSaveAndNext}
       />
     );
   }
@@ -2357,6 +2346,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         onDeleteRow={deleteDownstreamTransportRow}
         onSave={saveDownstreamTransport}
         saving={savingDownstreamTransport}
+        onSaveAndNext={onSaveAndNext}
       />
     );
   }
@@ -2379,6 +2369,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         onDeleteRow={deleteWasteGeneratedRow}
         onSave={saveWasteGenerated}
         saving={savingWasteGenerated}
+        onSaveAndNext={onSaveAndNext}
       />
     );
   }
@@ -2401,6 +2392,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         onDeleteRow={deleteBusinessTravelRow}
         onSave={saveBusinessTravel}
         saving={savingBusinessTravel}
+        onSaveAndNext={onSaveAndNext}
       />
     );
   }
@@ -2423,6 +2415,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         onDeleteRow={deleteEmployeeCommutingRow}
         onSave={saveEmployeeCommuting}
         saving={savingEmployeeCommuting}
+        onSaveAndNext={onSaveAndNext}
       />
     );
   }
@@ -2887,7 +2880,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           }
 
           toast({ title: "Saved", description: "Processing of sold products saved successfully." });
-          onSaveAndNext?.();
         } catch (e: any) {
           toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
         } finally {
@@ -3822,17 +3814,24 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </span>
                   )}
                 </div>
-                <Button 
-                  onClick={saveProcessingLocal}
-                  disabled={processingRows.length === 0 || savingProcessing} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {savingProcessing ? 'Saving...' : `Save and Next (${processingRows.length})`}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={saveProcessingLocal}
+                    disabled={processingRows.length === 0 || savingProcessing}
+                    className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {savingProcessing ? "Saving..." : `Save (${processingRows.length})`}
+                  </Button>
+                  {onSaveAndNext && (
+                    <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
-          </Card>
+            </Card>
       </div>
     );
   }
@@ -4321,7 +4320,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           }
 
           toast({ title: "Saved", description: "Use of sold products saved successfully." });
-          onSaveAndNext?.();
         } catch (e: any) {
           toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
         } finally {
@@ -6218,14 +6216,21 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
                     </span>
                   )}
                 </div>
-                <Button 
-                  onClick={saveUseLocal}
-                  disabled={useRows.length === 0 || savingUse} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {savingUse ? 'Saving...' : `Save and Next (${useRows.length})`}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={saveUseLocal}
+                    disabled={useRows.length === 0 || savingUse}
+                    className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {savingUse ? "Saving..." : `Save (${useRows.length})`}
+                  </Button>
+                  {onSaveAndNext && (
+                    <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -6410,14 +6415,21 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             }).length;
             const totalPending = pendingNew + pendingUpdates;
             return (
-              <Button 
-                onClick={saveEndOfLife} 
-                disabled={savingEndOfLife || totalPending === 0} 
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {savingEndOfLife ? 'Saving...' : `Save and Next (${totalPending})`}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={saveEndOfLife}
+                  disabled={savingEndOfLife || totalPending === 0}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {savingEndOfLife ? "Saving..." : `Save (${totalPending})`}
+                </Button>
+                {onSaveAndNext && (
+                  <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
             );
           })()}
         </div>

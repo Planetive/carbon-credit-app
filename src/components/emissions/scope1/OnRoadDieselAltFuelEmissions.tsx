@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,7 @@ const normalizeYear = (v: any): string | undefined => {
 const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext, companyContext = false, counterpartyId }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const userId = user?.id || null;
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -90,10 +91,22 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
   const [rows, setRows] = useState<EntryRow[]>([]);
   const [existingEntries, setExistingEntries] = useState<EntryRow[]>([]);
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
+  const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
+  const hasRestoredDraftRef = useRef(false);
+
+  const getDraftKey = () => {
+    if (companyContext && counterpartyId && userId) {
+      return `epaOnRoadDieselAltDraft:company:${counterpartyId}:${userId}`;
+    }
+    if (userId) {
+      return `epaOnRoadDieselAltDraft:user:${userId}`;
+    }
+    return "epaOnRoadDieselAltDraft:anon";
+  };
 
   useEffect(() => {
     const loadEntries = async () => {
-      if (!user) return;
+      if (!userId) return;
       if (companyContext && !counterpartyId) {
         setRows([]);
         setExistingEntries([]);
@@ -102,7 +115,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         return;
       }
       try {
-        let q = supabase.from(TABLE_NAME as any).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+        let q = supabase.from(TABLE_NAME as any).select("*").eq("user_id", userId).order("created_at", { ascending: false });
         if (companyContext && counterpartyId) q = q.eq("counterparty_id", counterpartyId);
         else q = q.is("counterparty_id", null);
         const { data, error } = await q;
@@ -125,6 +138,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
           if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
             setOutputUnit(u);
+            setInitialOutputUnit(u);
           }
         }
         if (mapped.length > 0) onDataChange(mapped);
@@ -136,7 +150,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
       }
     };
     loadEntries();
-  }, [user, companyContext, counterpartyId]);
+  }, [userId, companyContext, counterpartyId]);
 
   useEffect(() => {
     const load = async () => {
@@ -221,6 +235,73 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
   useEffect(() => {
     if (!isInitialLoad) onDataChange(rows);
   }, [rows, isInitialLoad, onDataChange]);
+
+  // Restore draft after initial load
+  useEffect(() => {
+    if (isInitialLoad || hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const raw = sessionStorage.getItem(key);
+      if (!raw) {
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      const recentEnough =
+        typeof parsed?.ts === "number" ? Date.now() - parsed.ts < 1000 * 60 * 60 * 24 : true;
+
+      if (!recentEnough) {
+        sessionStorage.removeItem(key);
+        hasRestoredDraftRef.current = true;
+        return;
+      }
+
+      const draftRows = Array.isArray(parsed.rows) ? parsed.rows : [];
+      if (draftRows.length > 0) {
+        setRows((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const mergedDraft = draftRows
+            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .map((r: any) => ({
+              ...r,
+              isExisting: false,
+            }));
+          return mergedDraft.length > 0 ? [...prev, ...mergedDraft] : prev;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to restore OnRoadDieselAltFuelEmissions draft from sessionStorage:", e);
+    } finally {
+      hasRestoredDraftRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialLoad, companyContext, counterpartyId, userId]);
+
+  // Persist draft rows
+  useEffect(() => {
+    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+
+    try {
+      const key = getDraftKey();
+      const draftRows = rows.filter((r) => !r.isExisting);
+      if (draftRows.length === 0) {
+        sessionStorage.removeItem(key);
+        return;
+      }
+
+      const payload = {
+        rows: draftRows,
+        outputUnit,
+        ts: Date.now(),
+      };
+      sessionStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("Failed to persist OnRoadDieselAltFuelEmissions draft to sessionStorage:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, outputUnit, isInitialLoad, companyContext, counterpartyId, userId]);
 
   const vehicleTypes = useMemo(
     () => Array.from(new Set(factors.map((f) => f.vehicleType))).sort((a, b) => a.localeCompare(b)),
@@ -375,7 +456,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
     );
   };
 
-  const handleSaveAndNext = async () => {
+  const handleSave = async () => {
     if (!user) {
       toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
       return;
@@ -389,9 +470,9 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         !r.isExisting
     );
     const changedExisting = rows.filter((r) => r.isExisting && r.dbId && rowChanged(r, existingEntries));
-    if (newEntries.length === 0 && changedExisting.length === 0) {
+    const unitChanged = outputUnit !== initialOutputUnit;
+    if (!unitChanged && newEntries.length === 0 && changedExisting.length === 0) {
       toast({ title: "Nothing to save", description: "No new or changed on-road diesel & alt fuel entries." });
-      onSaveAndNext?.();
       return;
     }
     setSaving(true);
@@ -412,9 +493,12 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
         if (error) throw error;
       }
-      if (changedExisting.length > 0) {
+      const rowsToUpdate = unitChanged
+        ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
+        : changedExisting;
+      if (rowsToUpdate.length > 0) {
         const results = await Promise.all(
-          changedExisting.map((v) =>
+          rowsToUpdate.map((v) =>
             supabase
               .from(TABLE_NAME as any)
               .update({
@@ -435,9 +519,16 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
       }
       toast({
         title: "Saved",
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} on-road diesel & alt fuel entries.`,
+        description:
+          unitChanged && newEntries.length === 0 && changedExisting.length === 0
+            ? "Updated output unit for existing on-road diesel & alt fuel entries."
+            : `Saved ${newEntries.length} new and updated ${changedExisting.length} on-road diesel & alt fuel entries.`,
       });
-      onSaveAndNext?.();
+      if (unitChanged) setInitialOutputUnit(outputUnit);
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {}
     } catch (e: any) {
       toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -447,21 +538,27 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">On-Road Diesel & Alt Fuel (Scope 1)</h4>
-          <p className="text-sm text-gray-600">
+          <h4 className="text-lg sm:text-xl font-semibold text-gray-900">
+            On-Road Diesel & Alt Fuel (Scope 1)
+          </h4>
+          <p className="text-xs sm:text-sm text-gray-600">
             Factors loaded from <span className="font-medium">On-Road Diesel & Alt Fuel</span>.
           </p>
         </div>
-        <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={loading}>
+        <Button
+          onClick={addRow}
+          className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+          disabled={loading}
+        >
           <Plus className="h-4 w-4 mr-2" /> Add Row
         </Button>
       </div>
 
       {loading && <div className="text-sm text-gray-600">Loading reference data...</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+      <div className="hidden md:grid md:grid-cols-7 gap-4 text-xs font-medium text-gray-500 tracking-wide">
         <Label className="md:col-span-1 text-gray-500">Vehicle type</Label>
         <Label className="md:col-span-1 text-gray-500">Fuel type</Label>
         <Label className="md:col-span-1 text-gray-500">Model year</Label>
@@ -482,7 +579,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           return (
             <div
               key={r.id}
-              className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center p-3 rounded-lg bg-gray-50"
+              className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 items-start p-4 rounded-2xl bg-white shadow-sm border border-gray-100"
             >
               <Select
                 value={r.vehicleType}
@@ -587,8 +684,18 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
               />
 
               <div className="flex items-center gap-2">
-                <Input readOnly value={convertEmission(r.emissions)} placeholder="Auto" />
-                <Button variant="ghost" className="text-red-600" onClick={() => removeRow(r.id)} aria-label="Remove row">
+                <Input
+                  readOnly
+                  value={convertEmission(r.emissions)}
+                  placeholder="Auto"
+                  className="bg-gray-50"
+                />
+                <Button
+                  variant="ghost"
+                  className="text-red-600 hover:bg-red-50"
+                  onClick={() => removeRow(r.id)}
+                  aria-label="Remove row"
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -619,9 +726,16 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleSaveAndNext} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
-            <Save className="h-4 w-4 mr-2" /> Save and Next
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
+              <Save className="h-4 w-4 mr-2" /> {saving ? "Saving..." : "Save"}
+            </Button>
+            {onSaveAndNext && (
+              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

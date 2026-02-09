@@ -351,9 +351,9 @@ const CompanyDetail: React.FC = () => {
           className="mb-6"
         >
           <Card className="border border-teal-100/50 shadow-xl bg-gradient-to-r from-teal-50/50 via-cyan-50/30 to-teal-50/50 backdrop-blur-sm rounded-3xl">
-            <CardContent className="px-6 py-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-5 flex-1">
+            <CardContent className="px-4 sm:px-6 py-6 sm:py-8">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6">
+                <div className="flex items-start gap-4 sm:gap-5 flex-1">
                   <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-xl">
                     <Building2 className="h-10 w-10 text-white" />
                   </div>
@@ -380,7 +380,7 @@ const CompanyDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-start md:justify-end gap-3 mt-4 md:mt-0">
                   <Button 
                     variant="outline"
                     onClick={() => navigate('/dashboard', { state: { activeSection: 'portfolio' } })}

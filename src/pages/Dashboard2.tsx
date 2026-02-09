@@ -738,8 +738,10 @@ const Dashboard2 = () => {
   // Section title mapping
   const sectionTitles: Record<string, string> = {
     'overview': 'Company Overview',
-    'portfolio': 'My Projects',
+    'portfolio': userType === 'financial_institution' ? 'My Portfolio' : 'My Projects',
+    'projects': 'My Projects',
     'start-project': 'Start New Project',
+    'start-portfolio': 'Start New Portfolio',
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
     'emissions': 'Emission Calculator',
@@ -1350,8 +1352,8 @@ const Dashboard2 = () => {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Projects</h2>
-                    <p className="text-gray-600">View and manage all your projects</p>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Portfolio</h2>
+                    <p className="text-gray-600">View and manage your portfolio companies</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -1547,9 +1549,9 @@ const Dashboard2 = () => {
                 </motion.div>
               )}
             </motion.div>
-          ) : activeSection === 'portfolio' && userType === 'corporate' ? (
+          ) : (activeSection === 'portfolio' && userType === 'corporate') || (activeSection === 'projects' && userType === 'financial_institution') ? (
             <motion.div
-              key="projects"
+              key={activeSection === 'projects' ? 'fi-projects' : 'projects'}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -1563,15 +1565,21 @@ const Dashboard2 = () => {
                 transition={{ delay: 0.2 }}
                 className="mb-8"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">My Projects</h2>
-                    <p className="text-gray-600">View and manage all your carbon credit projects</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Projects</h2>
+                    <p className="text-sm sm:text-base text-gray-600">
+                      View and manage all your carbon credit projects
+                    </p>
                   </div>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="md:flex-shrink-0"
+                  >
                     <Button
                       onClick={() => navigate('/project-wizard')}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                      className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Start New Project

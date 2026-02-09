@@ -6,7 +6,9 @@ import {
   Plus,
   BarChart3,
   Factory,
-  ArrowRight
+  ArrowRight,
+  FolderOpen,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -46,49 +48,30 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     fetchUserType();
   }, [user]);
 
-  const sidebarItems: SidebarItem[] = [
-    {
-      id: 'overview',
-      title: 'Company Overview',
-      icon: Grid3X3,
-      path: '/dashboard'
-    },
-    {
-      id: 'portfolio',
-      title: userType === 'corporate' ? 'My Projects' : 'My Portfolio',
-      icon: FileText,
-      path: '/dashboard'
-    },
-    {
-      id: 'start-project',
-      title: userType === 'corporate' ? 'Start New Project' : 'Start New Portfolio',
-      icon: Plus,
-      path: userType === 'corporate' ? '/project-wizard' : '/bank-portfolio'
-    },
-    {
-      id: 'reports',
-      title: 'Reports & Analytics',
-      icon: BarChart3,
-      path: '/reports'
-    },
-    {
-      id: 'esg',
-      title: 'ESG Assessment',
-      icon: BarChart3,
-      path: '/esg-health-check'
-    },
-    {
-      id: 'emissions',
-      title: 'Emission Calculator',
-      icon: Factory,
-      path: '/emission-calculator'
-    },
-  ];
+  const sidebarItems: SidebarItem[] = userType === 'financial_institution'
+    ? [
+        { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
+        { id: 'projects', title: 'My Projects', icon: FolderOpen, path: '/dashboard' },
+        { id: 'portfolio', title: 'My Portfolio', icon: Building2, path: '/dashboard' },
+        { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
+        { id: 'start-portfolio', title: 'Start New Portfolio', icon: Plus, path: '/bank-portfolio' },
+        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
+        { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
+        { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
+      ]
+    : [
+        { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
+        { id: 'portfolio', title: 'My Projects', icon: FileText, path: '/dashboard' },
+        { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
+        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
+        { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
+        { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
+      ];
 
   const handleSidebarClick = (item: SidebarItem) => {
     if (item.path) {
-      if (item.id === 'portfolio') {
-        navigate('/dashboard', { state: { activeSection: 'portfolio' } });
+      if (item.id === 'portfolio' || item.id === 'projects') {
+        navigate('/dashboard', { state: { activeSection: item.id } });
       } else if (item.id === 'overview') {
         navigate('/dashboard', { state: { activeSection: 'overview' } });
       } else {
@@ -100,31 +83,27 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   };
 
   const isActive = (item: SidebarItem) => {
-    // Start Project/Portfolio is only active when on its specific path
     if (item.id === 'start-project') {
-      return location.pathname === '/bank-portfolio' || location.pathname === '/project-wizard';
+      return location.pathname === '/project-wizard';
     }
-    
-    // Portfolio is only active when activeSection is 'portfolio' AND we're on dashboard
+    if (item.id === 'start-portfolio') {
+      return location.pathname === '/bank-portfolio';
+    }
     if (item.id === 'portfolio') {
       return location.pathname === '/dashboard' && activeSection === 'portfolio';
     }
-    
-    // Overview is only active when on dashboard and activeSection is 'overview' or not set
+    if (item.id === 'projects') {
+      return location.pathname === '/dashboard' && activeSection === 'projects';
+    }
     if (item.id === 'overview') {
       return location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview');
     }
-    
-    // Emission Calculator is active on choice page or either version (UK/EPA)
     if (item.id === 'emissions' && item.path) {
       return location.pathname === item.path || location.pathname === '/emission-calculator-uk' || location.pathname === '/emission-calculator-epa';
     }
-
-    // Other items are active when pathname matches their path
     if (item.path && location.pathname === item.path) {
       return true;
     }
-    
     return false;
   };
 
