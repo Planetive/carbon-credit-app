@@ -5,7 +5,10 @@ import { User } from '@supabase/supabase-js';
  * - it@majeedfabrics.com (specific client)
  * - Any email with @planetive (e.g. @planetive.com, @planetive.org)
  */
-const FULL_ACCESS_EMAILS = ['it@majeedfabrics.com'] as const;
+const FULL_ACCESS_EMAILS = [
+  'it@majeedfabrics.com',
+  'asghar.hayat@marienergies.com.pk',
+] as const;
 const FULL_ACCESS_DOMAIN = '@planetive';
 
 /**

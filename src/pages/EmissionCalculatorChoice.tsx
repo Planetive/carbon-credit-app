@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Factory, Leaf, Building2, ArrowRight } from "lucide-react";
+import { Factory, Leaf, Building2, Globe2, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +15,7 @@ const EmissionCalculatorChoice = () => {
 
   const goToEPA = () => navigate(`/emission-calculator-epa${query}`);
   const goToUK = () => navigate(`/emission-calculator-uk${query}`);
+  const goToIPCC = () => navigate(`/emission-calculator-ipcc${query}`);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -33,27 +34,29 @@ const EmissionCalculatorChoice = () => {
 
         <div className="grid sm:grid-cols-2 gap-6">
           <Card
-            className="group cursor-pointer border-2 border-teal-200/60 hover:border-teal-400 hover:shadow-xl transition-all duration-300 overflow-hidden"
-            onClick={goToEPA}
+            className="group cursor-pointer border-2 border-emerald-200/60 hover:border-emerald-400 hover:shadow-xl transition-all duration-300 overflow-hidden"
+            onClick={goToIPCC}
           >
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-start gap-4">
-                <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors flex-shrink-0">
-                  <Leaf className="h-8 w-8 text-teal-600" />
+                <div className="p-3 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 transition-colors flex-shrink-0">
+                  <Globe2 className="h-8 w-8 text-emerald-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-bold text-gray-900 mb-1">EPA Version</h2>
+                  <h2 className="text-lg font-bold text-gray-900 mb-1">IPCC Version</h2>
                   <p className="text-sm text-gray-600 mb-4">
-                    US EPA emission factors and methodology. Best for US reporting and EPA-aligned disclosures.
+                    IPCC emission factors and global climate methodology.
+                    Based on Intergovernmental Panel on Climate Change guidelines.
+                    Best for international reporting, national inventories, and globally aligned carbon accounting frameworks.
                   </p>
                   <Button
-                    className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white group-hover:shadow-md"
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white group-hover:shadow-md"
                     onClick={(e) => {
                       e.stopPropagation();
-                      goToEPA();
+                      goToIPCC();
                     }}
                   >
-                    Open EPA Calculator
+                    Open IPCC Calculator
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
@@ -83,6 +86,35 @@ const EmissionCalculatorChoice = () => {
                     }}
                   >
                     Open UK Calculator
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="group cursor-pointer border-2 border-teal-200/60 hover:border-teal-400 hover:shadow-xl transition-all duration-300 overflow-hidden"
+            onClick={goToEPA}
+          >
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors flex-shrink-0">
+                  <Leaf className="h-8 w-8 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold text-gray-900 mb-1">EPA Version</h2>
+                  <p className="text-sm text-gray-600 mb-4">
+                    US EPA emission factors and methodology. Best for US reporting and EPA-aligned disclosures.
+                  </p>
+                  <Button
+                    className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white group-hover:shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goToEPA();
+                    }}
+                  >
+                    Open EPA Calculator
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>

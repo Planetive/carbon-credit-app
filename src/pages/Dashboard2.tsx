@@ -25,7 +25,7 @@ import {
   Trash2,
   MoreVertical,
   Calendar,
-  Leaf
+  Leaf,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -747,6 +747,7 @@ const Dashboard2 = () => {
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
     'emissions': 'Emission Calculator',
+    'supply-chain-intel': 'Supply Chain intelligence',
   };
 
   return (
@@ -1725,29 +1726,54 @@ const Dashboard2 = () => {
               transition={{ duration: 0.3 }}
               className="max-w-4xl mx-auto"
             >
-              <div className="text-center py-16">
-                <motion.div
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                  className="w-20 h-20 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg"
-                >
-                  <Grid3X3 className="h-10 w-10 text-teal-600" />
-                </motion.div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                  {sectionTitles[activeSection] || 'Dashboard'}
-                </h3>
-                <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                  This section will show detailed information and tools for {(sectionTitles[activeSection] || 'dashboard').toLowerCase()}.
-                </p>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button 
-                    onClick={() => setActiveSection('overview')}
-                    className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+              {activeSection === 'supply-chain-intel' ? (
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg border border-red-100">
+                    <Factory className="h-10 w-10 text-red-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                    Supply Chain intelligence
+                  </h3>
+                  <p className="text-red-600 mb-4 max-w-md mx-auto">
+                    You do not currently have access to the Supply Chain intelligence module in this dashboard.
+                  </p>
+                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                    Please contact your administrator if you believe you should have access to this part of the tool.
+                  </p>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      onClick={() => setActiveSection('overview')}
+                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                    >
+                      Back to Overview
+                    </Button>
+                  </motion.div>
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    className="w-20 h-20 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg"
                   >
-                    Back to Overview
-                  </Button>
-                </motion.div>
-              </div>
+                    <Grid3X3 className="h-10 w-10 text-teal-600" />
+                  </motion.div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                    {sectionTitles[activeSection] || 'Dashboard'}
+                  </h3>
+                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                    This section will show detailed information and tools for {(sectionTitles[activeSection] || 'dashboard').toLowerCase()}.
+                  </p>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      onClick={() => setActiveSection('overview')}
+                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                    >
+                      Back to Overview
+                    </Button>
+                  </motion.div>
+                </div>
+              )}
             </motion.div>
           )}
       </AnimatePresence>

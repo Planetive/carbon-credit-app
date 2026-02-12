@@ -9,6 +9,7 @@ import {
   ArrowRight,
   FolderOpen,
   Building2,
+  Globe2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -60,6 +61,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'projects', title: 'My Projects', icon: FolderOpen, path: '/dashboard' },
         { id: 'portfolio', title: 'My Portfolio', icon: Building2, path: '/dashboard' },
+        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: null },
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'start-portfolio', title: 'Start New Portfolio', icon: Plus, path: '/bank-portfolio' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
@@ -69,6 +71,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     : [
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'portfolio', title: 'My Projects', icon: FileText, path: '/dashboard' },
+        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: null },
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
         { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
