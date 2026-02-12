@@ -69,6 +69,7 @@ import OrganizationSettings from "./pages/OrganizationSettings";
 import UserManagement from "./pages/UserManagement";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Settings from "./pages/Settings";
+import SupplyChainIntelligence from "./pages/SupplyChainIntelligence";
 
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
@@ -279,6 +280,11 @@ const AppRoutes = () => {
           <Route path="/settings" element={
             <CompanyProtectedRoute>
               <Settings />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/supply-chain-intelligence" element={
+            <CompanyProtectedRoute>
+              <SupplyChainIntelligence />
             </CompanyProtectedRoute>
           } />
         </Route>

@@ -1727,27 +1727,33 @@ const Dashboard2 = () => {
               className="max-w-4xl mx-auto"
             >
               {activeSection === 'supply-chain-intel' ? (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg border border-red-100">
-                    <Factory className="h-10 w-10 text-red-500" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                    Supply Chain intelligence
-                  </h3>
-                  <p className="text-red-600 mb-4 max-w-md mx-auto">
-                    You do not currently have access to the Supply Chain intelligence module in this dashboard.
-                  </p>
-                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    Please contact your administrator if you believe you should have access to this part of the tool.
-                  </p>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button 
-                      onClick={() => setActiveSection('overview')}
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
-                    >
-                      Back to Overview
-                    </Button>
-                  </motion.div>
+                <div className="min-h-[60vh] flex items-center justify-center px-4">
+                  <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
+                    <CardContent className="p-8">
+                      <div className="flex flex-col items-center text-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 mb-2">
+                          <Factory className="h-8 w-8 text-red-500" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          Supply Chain intelligence access restricted
+                        </h2>
+                        <p className="text-sm text-red-700 max-w-md">
+                          You do not currently have access to the Supply Chain intelligence module in this account.
+                        </p>
+                        <p className="text-sm text-gray-600 max-w-md">
+                          Please contact your administrator if you believe you should have access to this part of the platform.
+                        </p>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                          <Button
+                            onClick={() => setActiveSection("overview")}
+                            className="mt-2 bg-teal-600 hover:bg-teal-700 text-white shadow-lg"
+                          >
+                            Back to Dashboard
+                          </Button>
+                        </motion.div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               ) : (
                 <div className="text-center py-16">

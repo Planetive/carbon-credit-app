@@ -21,6 +21,37 @@ const EmissionCalculatorIPCC = () => {
     ? `?${searchParams.toString()}`
     : "";
 
+  if (isRestrictedUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 mb-2">
+                <Factory className="h-8 w-8 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Emission calculator access restricted
+              </h2>
+              <p className="text-sm text-red-700 max-w-md">
+                You do not currently have access to the emission calculator modules (UK, EPA, or IPCC) in this account.
+              </p>
+              <p className="text-sm text-gray-600 max-w-md">
+                Please contact your administrator if you believe you should have access to this part of the platform.
+              </p>
+              <Button
+                className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={() => navigate("/dashboard")}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col">
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 sm:px-8 py-4 sm:py-6 shadow-sm">
@@ -43,7 +74,7 @@ const EmissionCalculatorIPCC = () => {
               IPCC Emission Calculator
             </h1>
             <p className="text-gray-600 mt-1 text-sm sm:text-base">
-              IPCC emission factors and global climate methodology. Based on Intergovernmental Panel on Climate Change guidelines.
+              IPCC emission factors and methodology for globally aligned reporting and national inventories.
             </p>
           </div>
         </div>
@@ -68,12 +99,7 @@ const EmissionCalculatorIPCC = () => {
                   </div>
                 </div>
 
-                {isRestrictedUser ? (
-                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-700">
-                    You do not currently have access to the IPCC emission factors and methodology in this calculator.
-                    Please contact your administrator if you believe you should have access to this part of the tool.
-                  </div>
-                ) : (
+                {!isRestrictedUser && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-800">
                     The IPCC calculator module is being rolled out to selected accounts.
                     For now, please continue using the UK or EPA versions for your detailed calculations.

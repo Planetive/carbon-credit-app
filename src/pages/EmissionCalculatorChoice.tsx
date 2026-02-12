@@ -45,9 +45,7 @@ const EmissionCalculatorChoice = () => {
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-bold text-gray-900 mb-1">IPCC Version</h2>
                   <p className="text-sm text-gray-600 mb-4">
-                    IPCC emission factors and global climate methodology.
-                    Based on Intergovernmental Panel on Climate Change guidelines.
-                    Best for international reporting, national inventories, and globally aligned carbon accounting frameworks.
+                    IPCC emission factors and methodology for globally aligned reporting and national inventories.
                   </p>
                   <Button
                     className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white group-hover:shadow-md"

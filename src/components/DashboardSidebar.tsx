@@ -56,27 +56,39 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
 
   // Until profile is loaded, show corporate layout so corporate users don't see FI flash
   const effectiveUserType = userTypeResolved ? userType : "corporate";
-  const sidebarItems: SidebarItem[] = effectiveUserType === 'financial_institution'
+  const restrictedPortfolioEmails = ["asghar.hayat@marienergies.com.pk"];
+  const isPortfolioRestrictedUser = user?.email
+    ? restrictedPortfolioEmails.includes(user.email.toLowerCase())
+    : false;
+
+  let sidebarItems: SidebarItem[] = effectiveUserType === 'financial_institution'
     ? [
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'projects', title: 'My Projects', icon: FolderOpen, path: '/dashboard' },
         { id: 'portfolio', title: 'My Portfolio', icon: Building2, path: '/dashboard' },
-        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: null },
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'start-portfolio', title: 'Start New Portfolio', icon: Plus, path: '/bank-portfolio' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
         { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
+        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
       ]
     : [
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'portfolio', title: 'My Projects', icon: FileText, path: '/dashboard' },
-        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: null },
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
         { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
+        { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
       ];
+
+  // Hide portfolio entries for specific restricted ID
+  if (isPortfolioRestrictedUser) {
+    sidebarItems = sidebarItems.filter(
+      (item) => item.id !== 'portfolio' && item.id !== 'start-portfolio'
+    );
+  }
 
   const handleSidebarClick = (item: SidebarItem) => {
     if (item.path) {

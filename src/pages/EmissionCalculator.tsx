@@ -681,6 +681,42 @@ const EmissionCalculator = () => {
     );
   }
 
+  const restrictedEmissionEmails = ["asghar.hayat@marienergies.com.pk"];
+  const isEmissionRestrictedUser = user.email
+    ? restrictedEmissionEmails.includes(user.email.toLowerCase())
+    : false;
+
+  if (isEmissionRestrictedUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
+        <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 mb-2">
+                <Factory className="h-8 w-8 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Emission calculator access restricted
+              </h2>
+              <p className="text-sm text-red-700 max-w-md">
+                You do not currently have access to the emission calculator modules (UK, EPA, or IPCC) in this account.
+              </p>
+              <p className="text-sm text-gray-600 max-w-md">
+                Please contact your administrator if you believe you should have access to this part of the platform.
+              </p>
+              <Button
+                className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={() => navigate("/dashboard")}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Show loading state while preferences are being loaded
   if (loadingPreferences) {
     return (
