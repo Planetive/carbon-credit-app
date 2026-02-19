@@ -27,26 +27,46 @@ import {
   DollarSign,
   ChevronRight,
   ChevronLeft,
-  Plus,
-  Minus,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Landing = () => {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
-  const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
+  const [activeFeatureSlide, setActiveFeatureSlide] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showGetStarted, setShowGetStarted] = useState(false);
   
-  // Features images array using direct URLs
-  const featureImages = [
-    "Features/15.png",
-    "Features/16.png", 
-    "Features/17.png",
-    "Features/18.png",
-    "Features/19.png",
-    "Features/20.png"
+  // Keep explicit image-to-feature mapping so text always matches screenshot
+  const featureSlides = [
+    {
+      image: "/Features/AI%20Advisor.png",
+      title: "AI-Powered Strategist",
+      description:
+        "Evaluating eligibility against global standards and estimating emission reductions in minutes.",
+    },
+    {
+      image: "/Features/Decarbonization.png",
+      title: "Global Decarbonization & Energy Transition Databases",
+      description: "Offers strategic insights from worldwide projects.",
+    },
+    {
+      image: "/Features/emission%20result.png",
+      title: "Emissions Modeling",
+      description:
+        "Providing accurate precise estimates for overall business value and carbon credit potential.",
+    },
+    {
+      image: "/Features/ESG%20health%20check.png",
+      title: "ESG Healthcheck",
+      description:
+        "Efficiently measure ESG performance with a clear snapshot of management status and risks.",
+    },
+    {
+      image: "/Features/Reports.png",
+      title: "Comprehensive Reporting",
+      description: "Converting insights to reports for executive decisions.",
+    },
   ];
 
   // Handle scroll to change header background and show/hide Get Started button
@@ -66,6 +86,14 @@ const Landing = () => {
     
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActiveFeatureSlide((prev) => (prev + 1) % featureSlides.length);
+    }, 3200);
+
+    return () => window.clearInterval(interval);
+  }, [featureSlides.length]);
 
 
   const testimonials = [
@@ -100,7 +128,7 @@ const Landing = () => {
       id: 0,
       title: "Discover",
       description:
-        "Access a global repository of energy transition and CCUS projects for compliance insights.",
+          "Access a global repository of decarbonisation and energy transition insights.",
     },
     {
       id: 1,
@@ -165,6 +193,7 @@ const Landing = () => {
     { number: "100+", label: "Countries" },
     { number: "1.2M", label: "tCO2e Reduced" },
   ];
+  const activeFeatureIndex = activeFeatureSlide;
 
   return (
     <div className="min-h-screen bg-background">
@@ -199,7 +228,7 @@ const Landing = () => {
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4 font-normal" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, letterSpacing: '0.01em' }}>
-              Transforming the future of Carbon markets with sophistication and authority
+              Advancing Decarbonisation Through Market Intelligence.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
               <Button
@@ -244,63 +273,69 @@ const Landing = () => {
               </span>
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-              Accelerating your decarbonization journey with AI-driven assessments, optimization, tracking, and a global database
+              Accelerating your decarbonization journey with AI-driven assessments, optimization, tracking, and market intelligence
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-8 sm:gap-12 items-start">
-            {/* Accordion Section - Left 1/3 */}
-            <div className="lg:col-span-1 order-2 lg:order-1">
-              <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-lg">
-                {accordionFeatures.map((feature, index) => (
-                  <div key={feature.id} className="mb-4 sm:mb-6 last:mb-0">
-                    <button
-                      onClick={() =>
-                        setExpandedFeature(
-                          expandedFeature === feature.id ? -1 : feature.id
-                        )
-                      }
-                      className="w-full text-left flex items-center justify-between py-2 sm:py-3 hover:text-teal-600 transition-colors"
-                    >
-                      <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 pr-2">
-                        {feature.title}
-                      </h3>
-                      <div className="flex items-center flex-shrink-0">
-                        {expandedFeature === feature.id ? (
-                          <Minus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                        ) : (
-                          <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                        )}
-                      </div>
-                    </button>
-                    {expandedFeature === feature.id && (
-                      <div className="mt-2 sm:mt-3 pb-3 sm:pb-4">
-                        <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
-                          {feature.description}
-                        </p>
-                      </div>
-                    )}
-                    {index < accordionFeatures.length - 1 && (
-                      <div className="border-b border-gray-200 mt-3 sm:mt-4"></div>
-                    )}
+          <div className="flex justify-center items-center">
+            <div className="w-full max-w-5xl">
+              <div className="rounded-3xl bg-transparent p-0 shadow-[0_20px_60px_rgba(15,23,42,0.16)]">
+                <div className="rounded-2xl bg-slate-900 p-1.5 sm:p-2">
+                  <div className="mb-1.5 flex items-center justify-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
                   </div>
-                ))}
+                  <div className="overflow-hidden rounded-xl border border-slate-700/60">
+                    <div
+                      className="flex transition-transform duration-700 ease-out"
+                      style={{
+                        transform: `translateX(-${activeFeatureIndex * 100}%)`,
+                      }}
+                    >
+                      {featureSlides.map((slide, index) => (
+                        <div
+                          key={slide.image}
+                          className="w-full flex-shrink-0 p-1 sm:p-1.5"
+                        >
+                          <div className="rounded-lg bg-white/95 p-1.5 sm:p-2 shadow-md">
+                            <img
+                              src={slide.image}
+                              alt={slide.title}
+                              className="h-64 sm:h-80 md:h-[27rem] lg:h-[30rem] w-full object-cover rounded-md"
+                              style={{ objectPosition: "center" }}
+                              onError={(e) => {
+                                e.currentTarget.src = featureSlides[0].image;
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Image Section - Right 2/3 */}
-            <div className="lg:col-span-2 order-1 lg:order-2 flex justify-center items-center">
-              <div className="h-64 sm:h-80 md:h-96 lg:h-[600px] w-full rounded-xl overflow-hidden">
-                <img
-                  src={featureImages[expandedFeature !== null && expandedFeature >= 0 ? expandedFeature : 0]}
-                  alt={`Feature ${expandedFeature !== null && expandedFeature >= 0 ? expandedFeature + 1 : 1}`}
-                  className="h-full w-full object-cover rounded-xl"
-                  style={{ objectPosition: 'right center' }}
-                  onError={(e) => {
-                    // Fallback to first image if current image fails
-                    e.currentTarget.src = featureImages[0];
-                  }}
-                />
+              <div className="mt-5 text-center">
+                <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">
+                  {featureSlides[activeFeatureIndex]?.title}
+                </p>
+                <p className="mt-2 text-xs sm:text-sm md:text-base text-gray-600 max-w-3xl mx-auto">
+                  {featureSlides[activeFeatureIndex]?.description}
+                </p>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  {featureSlides.map((slide, index) => (
+                    <button
+                      key={`feature-dot-${index}`}
+                      type="button"
+                      onClick={() => setActiveFeatureSlide(index)}
+                      aria-label={`Show ${slide.title}`}
+                      className={`h-2.5 rounded-full transition-all duration-300 ${
+                        index === activeFeatureIndex
+                          ? "w-8 bg-teal-600"
+                          : "w-2.5 bg-gray-300 hover:bg-gray-400"
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
