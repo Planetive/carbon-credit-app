@@ -26,6 +26,7 @@ type StationaryCalculatorRow = {
 };
 
 type FlaringUnit = "m3" | "MMSCF";
+type MassDisplayUnit = "tonnes" | "MeT";
 type FlaringGasComponent = {
   id: string;
   formula: string;
@@ -261,6 +262,8 @@ const CHAP2_INDUSTRIES = [
 
 const M3_PER_MMSCF = 28316.846592;
 const MOLES_PER_M3 = 44.615;
+const FLARING_TEMPERATURE_CORRECTION = 273.15 / 288.71;
+const CO2_MOLAR_MASS_G_PER_MOL = 44.01;
 
 const VENTING_GWP: Record<VentingGas, number> = {
   N2: 0,
@@ -283,6 +286,10 @@ const VENTING_GAS_LABELS: Record<VentingGas, string> = {
   C4H10: "Butane (C4H10)",
   C5H12: "Pentane (C5H12)",
   C6H14: "Hexane (C6H14)",
+};
+const MASS_DISPLAY_UNIT_LABEL: Record<MassDisplayUnit, string> = {
+  tonnes: "tonnes",
+  MeT: "MeT",
 };
 
 const FLARING_GAS_PRESETS = [
@@ -479,7 +486,8 @@ const calculateFlaringEmissions = (
   }
 
   const volumeM3 = unit === "MMSCF" ? volume * M3_PER_MMSCF : volume;
-  const total_moles = volumeM3 * MOLES_PER_M3;
+  // Apply requested temperature correction factor for flaring.
+  const total_moles = volumeM3 * MOLES_PER_M3 * FLARING_TEMPERATURE_CORRECTION;
 
   const breakdown: FlaringBreakdownItem[] = [];
   let totalCo2Moles = 0;
@@ -529,7 +537,7 @@ const calculateFlaringEmissions = (
     });
   }
 
-  const CO2_kg = (totalCo2Moles * 44) / 1000;
+  const CO2_kg = (totalCo2Moles * CO2_MOLAR_MASS_G_PER_MOL) / 1000;
   const CO2_tonnes = CO2_kg / 1000;
 
   return {
@@ -624,6 +632,7 @@ const EmissionCalculatorIPCC = () => {
   const [flaringSaving, setFlaringSaving] = useState(false);
   const [flaringHistoryLoading, setFlaringHistoryLoading] = useState(false);
   const [flaringHistory, setFlaringHistory] = useState<FlaringSavedEntry[]>([]);
+  const [flaringMassDisplayUnit, setFlaringMassDisplayUnit] = useState<MassDisplayUnit>("tonnes");
   const [ventingVolume, setVentingVolume] = useState<number | undefined>(undefined);
   const [ventingUnit, setVentingUnit] = useState<FlaringUnit>("m3");
   const [ventingComponents, setVentingComponents] = useState<VentingGasComponent[]>([
@@ -635,6 +644,7 @@ const EmissionCalculatorIPCC = () => {
   const [ventingSaving, setVentingSaving] = useState(false);
   const [ventingHistoryLoading, setVentingHistoryLoading] = useState(false);
   const [ventingHistory, setVentingHistory] = useState<VentingSavedEntry[]>([]);
+  const [ventingMassDisplayUnit, setVentingMassDisplayUnit] = useState<MassDisplayUnit>("tonnes");
   const [selectedIndustry, setSelectedIndustry] = useState<string>(CHAP2_INDUSTRIES[0]);
   const [loadingEnergyIndustry, setLoadingEnergyIndustry] = useState(false);
   const [energyIndustryRows, setEnergyIndustryRows] = useState<EnergyIndustryFactorRow[]>([]);
@@ -955,6 +965,65 @@ const EmissionCalculatorIPCC = () => {
       ),
     [ventingComponents]
   );
+
+  const flaringReview = useMemo(() => {
+    if (!flaringCalculated || typeof flaringVolume !== "number" || flaringVolume <= 0) return null;
+    const volumeM3 = flaringUnit === "MMSCF" ? flaringVolume * M3_PER_MMSCF : flaringVolume;
+    const correctedMoles = volumeM3 * MOLES_PER_M3 * FLARING_TEMPERATURE_CORRECTION;
+    const weightedCarbonSum = flaringComponents.reduce((sum, component) => {
+      const percentage = typeof component.percentage === "number" ? component.percentage : 0;
+      const parsed = parseChemicalFormula(component.formula || "");
+      if (!parsed) return sum;
+      const carbonFactor = parsed.isExistingCo2 ? 1 : parsed.carbonAtoms > 0 ? parsed.carbonAtoms : 0;
+      return sum + (percentage / 100) * carbonFactor;
+    }, 0);
+    const combustionCo2Moles = flaringCalculated.breakdown
+      .filter((item) => item.type === "combustion")
+      .reduce((sum, item) => sum + item.co2Moles, 0);
+    const existingCo2Moles = flaringCalculated.breakdown
+      .filter((item) => item.type === "existing_co2")
+      .reduce((sum, item) => sum + item.co2Moles, 0);
+
+    return {
+      volumeM3,
+      correctedMoles,
+      weightedCarbonSum,
+      combustionCo2Moles,
+      existingCo2Moles,
+      totalCo2Moles: combustionCo2Moles + existingCo2Moles,
+      co2Kg: flaringCalculated.CO2_kg,
+      co2Tonnes: flaringCalculated.CO2_tonnes,
+    };
+  }, [flaringCalculated, flaringVolume, flaringUnit, flaringComponents]);
+
+  const ventingReview = useMemo(() => {
+    if (!ventingCalculated || typeof ventingVolume !== "number" || ventingVolume <= 0) return null;
+    const volumeM3 = ventingUnit === "MMSCF" ? ventingVolume * M3_PER_MMSCF : ventingVolume;
+    const totalMoles = volumeM3 * MOLES_PER_M3;
+    const percentageByGas = ventingComponents.reduce<Record<VentingGas, number>>(
+      (acc, component) => {
+        const percentage = typeof component.percentage === "number" ? component.percentage : 0;
+        acc[component.gas] += percentage;
+        return acc;
+      },
+      { N2: 0, CO2: 0, CH4: 0, C2H6: 0, C3H8: 0, C4H10: 0, C5H12: 0, C6H14: 0 }
+    );
+    const rows = VENTING_GAS_OPTIONS.filter((gas) => percentageByGas[gas] > 0).map((gas) => {
+      const gasMoles = totalMoles * (percentageByGas[gas] / 100);
+      const gwp = VENTING_GWP[gas];
+      const co2eMoles = gasMoles * gwp;
+      return { gas, percentage: percentageByGas[gas], gasMoles, gwp, co2eMoles };
+    });
+
+    return {
+      volumeM3,
+      totalMoles,
+      rows,
+      totalCo2eMoles: rows.reduce((sum, row) => sum + row.co2eMoles, 0),
+      totalCo2eKg: ventingCalculated.totalCO2e_kg,
+      totalCo2eTonnes: ventingCalculated.totalCO2e_tonnes,
+    };
+  }, [ventingCalculated, ventingVolume, ventingUnit, ventingComponents]);
 
   const addVentingComponent = () => {
     setVentingComponents((prev) => [...prev, newVentingGasComponent()]);
@@ -2667,8 +2736,26 @@ const EmissionCalculatorIPCC = () => {
                     {Math.abs(flaringPercentageTotal - 100) > 0.001 &&
                       " (must equal 100%)"}
                   </div>
+                  <div className="text-xs text-gray-500">
+                    Flaring temperature correction applied: (273.15 / 288.71)
+                  </div>
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="w-full max-w-[180px]">
+                      <label className="text-sm text-gray-600 mb-1 block">Result unit</label>
+                      <Select
+                        value={flaringMassDisplayUnit}
+                        onValueChange={(value: MassDisplayUnit) => setFlaringMassDisplayUnit(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tonnes">tonnes</SelectItem>
+                          <SelectItem value="MeT">MeT</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       onClick={handleSaveFlaringMonth}
                       disabled={flaringSaving}
@@ -2689,7 +2776,9 @@ const EmissionCalculatorIPCC = () => {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-                          <div className="text-sm text-gray-600">CO2 Emissions (tonnes)</div>
+                          <div className="text-sm text-gray-600">
+                            CO2 Emissions ({MASS_DISPLAY_UNIT_LABEL[flaringMassDisplayUnit]})
+                          </div>
                           <div className="text-2xl font-bold text-gray-900">
                             {formatNumber(flaringCalculated.CO2_tonnes, 2)}
                           </div>
@@ -2726,6 +2815,46 @@ const EmissionCalculatorIPCC = () => {
                           Total moles processed: {formatNumber(flaringCalculated.total_moles, 2)}
                         </div>
                       </div>
+
+                      {flaringReview && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+                          <div className="text-sm font-semibold text-blue-900 mb-2">
+                            Calculation Review (Testing)
+                          </div>
+                          <div className="space-y-1 text-xs text-blue-900 font-mono">
+                            <div>
+                              volume_m3 = {formatNumber(flaringVolume || 0, 4)}{" "}
+                              {flaringUnit === "MMSCF" ? `x ${formatNumber(M3_PER_MMSCF, 4)}` : ""} ={" "}
+                              {formatNumber(flaringReview.volumeM3, 4)}
+                            </div>
+                            <div>
+                              total_moles = volume_m3 x {formatNumber(MOLES_PER_M3, 6)} x{" "}
+                              {formatNumber(FLARING_TEMPERATURE_CORRECTION, 6)} ={" "}
+                              {formatNumber(flaringReview.correctedMoles, 4)}
+                            </div>
+                            <div>
+                              Sigma(gas_fraction x carbon_atoms) = {formatNumber(flaringReview.weightedCarbonSum, 6)}
+                            </div>
+                            <div>
+                              combustion_co2_moles = {formatNumber(flaringReview.combustionCo2Moles, 4)}
+                            </div>
+                            <div>
+                              existing_co2_moles = {formatNumber(flaringReview.existingCo2Moles, 4)}
+                            </div>
+                            <div>
+                              total_co2_moles = combustion + existing ={" "}
+                              {formatNumber(flaringReview.totalCo2Moles, 4)}
+                            </div>
+                            <div>
+                              CO2_kg = total_co2_moles x {CO2_MOLAR_MASS_G_PER_MOL} / 1000 ={" "}
+                              {formatNumber(flaringReview.co2Kg, 4)}
+                            </div>
+                            <div>
+                              CO2_MeT = CO2_kg / 1000 = {formatNumber(flaringReview.co2Tonnes, 4)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -2745,7 +2874,9 @@ const EmissionCalculatorIPCC = () => {
                             <div className="text-sm text-gray-700">
                               <span className="font-medium">{entry.month}</span>
                               <span className="mx-2 text-gray-400">|</span>
-                              <span>{formatNumber(entry.result?.CO2_tonnes || 0, 2)} t CO2</span>
+                              <span>
+                                {formatNumber(entry.result?.CO2_tonnes || 0, 2)} {MASS_DISPLAY_UNIT_LABEL[flaringMassDisplayUnit]} CO2
+                              </span>
                             </div>
                             <Button
                               size="sm"
@@ -2913,7 +3044,22 @@ const EmissionCalculatorIPCC = () => {
                     {Math.abs(ventingPercentageTotal - 100) > 0.001 && " (must equal 100%)"}
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="w-full max-w-[180px]">
+                      <label className="text-sm text-gray-600 mb-1 block">Result unit</label>
+                      <Select
+                        value={ventingMassDisplayUnit}
+                        onValueChange={(value: MassDisplayUnit) => setVentingMassDisplayUnit(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tonnes">tonnes</SelectItem>
+                          <SelectItem value="MeT">MeT</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       onClick={handleSaveVentingMonth}
                       disabled={ventingSaving}
@@ -2933,9 +3079,12 @@ const EmissionCalculatorIPCC = () => {
                   {ventingCalculated && (
                     <>
                       <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                        <div className="text-sm text-teal-800">Total CO2e Emissions</div>
+                        <div className="text-sm text-teal-800">
+                          Total CO2e Emissions ({MASS_DISPLAY_UNIT_LABEL[ventingMassDisplayUnit]})
+                        </div>
                         <div className="text-2xl font-extrabold text-teal-900">
-                          Scope 1 Venting Emissions: {formatNumber(ventingCalculated.totalCO2e_tonnes, 2)} tCO2e
+                          Scope 1 Venting Emissions: {formatNumber(ventingCalculated.totalCO2e_tonnes, 2)}{" "}
+                          {MASS_DISPLAY_UNIT_LABEL[ventingMassDisplayUnit]} CO2e
                         </div>
                       </div>
 
@@ -2971,6 +3120,41 @@ const EmissionCalculatorIPCC = () => {
                           Total moles processed: {formatNumber(ventingCalculated.total_moles, 2)}
                         </div>
                       </div>
+
+                      {ventingReview && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+                          <div className="text-sm font-semibold text-blue-900 mb-2">
+                            Calculation Review (Testing)
+                          </div>
+                          <div className="space-y-1 text-xs text-blue-900 font-mono">
+                            <div>
+                              volume_m3 = {formatNumber(ventingVolume || 0, 4)}{" "}
+                              {ventingUnit === "MMSCF" ? `x ${formatNumber(M3_PER_MMSCF, 4)}` : ""} ={" "}
+                              {formatNumber(ventingReview.volumeM3, 4)}
+                            </div>
+                            <div>
+                              total_moles = volume_m3 x {formatNumber(MOLES_PER_M3, 6)} ={" "}
+                              {formatNumber(ventingReview.totalMoles, 4)}
+                            </div>
+                            {ventingReview.rows.map((row) => (
+                              <div key={`review-${row.gas}`}>
+                                {row.gas}: gas_moles = {formatNumber(row.gasMoles, 4)} | CO2e_moles = gas_moles x{" "}
+                                {row.gwp} = {formatNumber(row.co2eMoles, 4)}
+                              </div>
+                            ))}
+                            <div>
+                              total_CO2e_moles = {formatNumber(ventingReview.totalCo2eMoles, 4)}
+                            </div>
+                            <div>
+                              CO2e_kg = total_CO2e_moles x 44 / 1000 ={" "}
+                              {formatNumber(ventingReview.totalCo2eKg, 4)}
+                            </div>
+                            <div>
+                              CO2e_MeT = CO2e_kg / 1000 = {formatNumber(ventingReview.totalCo2eTonnes, 4)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -2990,7 +3174,10 @@ const EmissionCalculatorIPCC = () => {
                             <div className="text-sm text-gray-700">
                               <span className="font-medium">{entry.month}</span>
                               <span className="mx-2 text-gray-400">|</span>
-                              <span>{formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)} tCO2e</span>
+                              <span>
+                                {formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)}{" "}
+                                {MASS_DISPLAY_UNIT_LABEL[ventingMassDisplayUnit]} CO2e
+                              </span>
                             </div>
                             <Button
                               size="sm"
