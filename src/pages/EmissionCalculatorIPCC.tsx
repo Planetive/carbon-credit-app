@@ -56,7 +56,9 @@ type VentingGasComponent = {
 type VentingBreakdownItem = {
   gas: VentingGas;
   gwp: number;
-  co2eMoles: number;
+  gasMoles: number;
+  molarMass: number;
+  gasMassKg: number;
   co2eKg: number;
 };
 
@@ -263,6 +265,7 @@ const CHAP2_INDUSTRIES = [
 const M3_PER_MMSCF = 28316.846592;
 const MOLES_PER_M3 = 44.615;
 const FLARING_TEMPERATURE_CORRECTION = 273.15 / 288.71;
+const VENTING_TEMPERATURE_CORRECTION = 273.15 / 288.71;
 const CO2_MOLAR_MASS_G_PER_MOL = 44.01;
 
 const VENTING_GWP: Record<VentingGas, number> = {
@@ -572,7 +575,7 @@ const calculateVentingEmissions = (
   }
 
   const volumeM3 = unit === "MMSCF" ? volume * M3_PER_MMSCF : volume;
-  const total_moles = volumeM3 * MOLES_PER_M3;
+  const total_moles = volumeM3 * MOLES_PER_M3 * VENTING_TEMPERATURE_CORRECTION;
 
   const percentageByGas = composition.reduce<Record<VentingGas, number>>(
     (acc, item) => {
@@ -589,17 +592,23 @@ const calculateVentingEmissions = (
     (gas) => percentageByGas[gas] > 0
   ).map((gas) => {
     const gasMoles = total_moles * (percentageByGas[gas] / 100);
-    const co2eMoles = gasMoles * VENTING_GWP[gas];
+    const parsed = parseChemicalFormula(gas);
+    if (!parsed) {
+      throw new Error(`Invalid vent gas formula: ${gas}`);
+    }
+    const gasMassKg = (gasMoles * parsed.molarMass) / 1000;
+    const co2eKg = gasMassKg * VENTING_GWP[gas];
     return {
       gas,
       gwp: VENTING_GWP[gas],
-      co2eMoles,
-      co2eKg: (co2eMoles * 44) / 1000,
+      gasMoles,
+      molarMass: parsed.molarMass,
+      gasMassKg,
+      co2eKg,
     };
   });
 
-  const totalCO2eMoles = breakdown.reduce((sum, item) => sum + item.co2eMoles, 0);
-  const totalCO2e_kg = (totalCO2eMoles * 44) / 1000;
+  const totalCO2e_kg = breakdown.reduce((sum, item) => sum + item.co2eKg, 0);
   const totalCO2e_tonnes = totalCO2e_kg / 1000;
 
   return {
@@ -999,7 +1008,7 @@ const EmissionCalculatorIPCC = () => {
   const ventingReview = useMemo(() => {
     if (!ventingCalculated || typeof ventingVolume !== "number" || ventingVolume <= 0) return null;
     const volumeM3 = ventingUnit === "MMSCF" ? ventingVolume * M3_PER_MMSCF : ventingVolume;
-    const totalMoles = volumeM3 * MOLES_PER_M3;
+    const totalMoles = volumeM3 * MOLES_PER_M3 * VENTING_TEMPERATURE_CORRECTION;
     const percentageByGas = ventingComponents.reduce<Record<VentingGas, number>>(
       (acc, component) => {
         const percentage = typeof component.percentage === "number" ? component.percentage : 0;
@@ -1010,16 +1019,18 @@ const EmissionCalculatorIPCC = () => {
     );
     const rows = VENTING_GAS_OPTIONS.filter((gas) => percentageByGas[gas] > 0).map((gas) => {
       const gasMoles = totalMoles * (percentageByGas[gas] / 100);
+      const parsed = parseChemicalFormula(gas);
       const gwp = VENTING_GWP[gas];
-      const co2eMoles = gasMoles * gwp;
-      return { gas, percentage: percentageByGas[gas], gasMoles, gwp, co2eMoles };
+      const molarMass = parsed?.molarMass || 0;
+      const gasMassKg = (gasMoles * molarMass) / 1000;
+      const co2eKg = gasMassKg * gwp;
+      return { gas, percentage: percentageByGas[gas], gasMoles, molarMass, gasMassKg, gwp, co2eKg };
     });
 
     return {
       volumeM3,
       totalMoles,
       rows,
-      totalCo2eMoles: rows.reduce((sum, row) => sum + row.co2eMoles, 0),
       totalCo2eKg: ventingCalculated.totalCO2e_kg,
       totalCo2eTonnes: ventingCalculated.totalCO2e_tonnes,
     };
@@ -2821,37 +2832,83 @@ const EmissionCalculatorIPCC = () => {
                           <div className="text-sm font-semibold text-blue-900 mb-2">
                             Calculation Review (Testing)
                           </div>
-                          <div className="space-y-1 text-xs text-blue-900 font-mono">
-                            <div>
-                              volume_m3 = {formatNumber(flaringVolume || 0, 4)}{" "}
-                              {flaringUnit === "MMSCF" ? `x ${formatNumber(M3_PER_MMSCF, 4)}` : ""} ={" "}
-                              {formatNumber(flaringReview.volumeM3, 4)}
-                            </div>
-                            <div>
-                              total_moles = volume_m3 x {formatNumber(MOLES_PER_M3, 6)} x{" "}
-                              {formatNumber(FLARING_TEMPERATURE_CORRECTION, 6)} ={" "}
-                              {formatNumber(flaringReview.correctedMoles, 4)}
-                            </div>
-                            <div>
-                              Sigma(gas_fraction x carbon_atoms) = {formatNumber(flaringReview.weightedCarbonSum, 6)}
-                            </div>
-                            <div>
-                              combustion_co2_moles = {formatNumber(flaringReview.combustionCo2Moles, 4)}
-                            </div>
-                            <div>
-                              existing_co2_moles = {formatNumber(flaringReview.existingCo2Moles, 4)}
-                            </div>
-                            <div>
-                              total_co2_moles = combustion + existing ={" "}
-                              {formatNumber(flaringReview.totalCo2Moles, 4)}
-                            </div>
-                            <div>
-                              CO2_kg = total_co2_moles x {CO2_MOLAR_MASS_G_PER_MOL} / 1000 ={" "}
-                              {formatNumber(flaringReview.co2Kg, 4)}
-                            </div>
-                            <div>
-                              CO2_MeT = CO2_kg / 1000 = {formatNumber(flaringReview.co2Tonnes, 4)}
-                            </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[820px] text-sm">
+                              <thead className="bg-blue-100">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-semibold text-blue-900">Step</th>
+                                  <th className="px-3 py-2 text-left font-semibold text-blue-900">Formula</th>
+                                  <th className="px-3 py-2 text-right font-semibold text-blue-900">Result</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">1. Volume to m3</td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    {flaringUnit === "MMSCF"
+                                      ? `${formatNumber(flaringVolume || 0, 4)} x ${formatNumber(M3_PER_MMSCF, 4)}`
+                                      : `${formatNumber(flaringVolume || 0, 4)}`}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.volumeM3, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">2. Total moles</td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    volume_m3 x {formatNumber(MOLES_PER_M3, 6)} x{" "}
+                                    {formatNumber(FLARING_TEMPERATURE_CORRECTION, 6)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.correctedMoles, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">3. Sigma(frac x C atoms)</td>
+                                  <td className="px-3 py-2 text-gray-700">Sum over all gases</td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.weightedCarbonSum, 6)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">4. Combustion CO2 moles</td>
+                                  <td className="px-3 py-2 text-gray-700">Hydrocarbon contribution</td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.combustionCo2Moles, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">5. Existing CO2 moles</td>
+                                  <td className="px-3 py-2 text-gray-700">CO2 already in stream</td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.existingCo2Moles, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">6. Total CO2 moles</td>
+                                  <td className="px-3 py-2 text-gray-700">Combustion + Existing</td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.totalCo2Moles, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">7. CO2 (kg)</td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    total_co2_moles x {CO2_MOLAR_MASS_G_PER_MOL} / 1000
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                    {formatNumber(flaringReview.co2Kg, 4)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-gray-800">8. CO2 (MeT)</td>
+                                  <td className="px-3 py-2 text-gray-700">CO2_kg / 1000</td>
+                                  <td className="px-3 py-2 text-right font-semibold text-blue-900">
+                                    {formatNumber(flaringReview.co2Tonnes, 4)}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       )}
@@ -3043,6 +3100,9 @@ const EmissionCalculatorIPCC = () => {
                     Gas composition total: <span className="font-semibold">{formatNumber(ventingPercentageTotal, 2)}%</span>
                     {Math.abs(ventingPercentageTotal - 100) > 0.001 && " (must equal 100%)"}
                   </div>
+                  <div className="text-xs text-gray-500">
+                    Venting temperature correction applied: (273.15 / 288.71)
+                  </div>
 
                   <div className="flex items-end justify-between gap-3">
                     <div className="w-full max-w-[180px]">
@@ -3096,7 +3156,7 @@ const EmissionCalculatorIPCC = () => {
                               <tr>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Gas</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">GWP</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">CO2e Moles</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Gas Mass (kg)</th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">CO2e (kg)</th>
                               </tr>
                             </thead>
@@ -3106,7 +3166,7 @@ const EmissionCalculatorIPCC = () => {
                                   <td className="px-3 py-2 text-sm text-gray-900">{VENTING_GAS_LABELS[item.gas]}</td>
                                   <td className="px-3 py-2 text-sm text-gray-700">{item.gwp}</td>
                                   <td className="px-3 py-2 text-sm text-gray-700">
-                                    {formatNumber(item.co2eMoles, 2)}
+                                    {formatNumber(item.gasMassKg, 2)}
                                   </td>
                                   <td className="px-3 py-2 text-sm font-medium text-gray-900">
                                     {formatNumber(item.co2eKg, 2)}
@@ -3117,7 +3177,7 @@ const EmissionCalculatorIPCC = () => {
                           </table>
                         </div>
                         <div className="mt-3 text-xs text-gray-500">
-                          Total moles processed: {formatNumber(ventingCalculated.total_moles, 2)}
+                          Total corrected moles processed: {formatNumber(ventingCalculated.total_moles, 2)}
                         </div>
                       </div>
 
@@ -3126,31 +3186,84 @@ const EmissionCalculatorIPCC = () => {
                           <div className="text-sm font-semibold text-blue-900 mb-2">
                             Calculation Review (Testing)
                           </div>
-                          <div className="space-y-1 text-xs text-blue-900 font-mono">
-                            <div>
-                              volume_m3 = {formatNumber(ventingVolume || 0, 4)}{" "}
-                              {ventingUnit === "MMSCF" ? `x ${formatNumber(M3_PER_MMSCF, 4)}` : ""} ={" "}
-                              {formatNumber(ventingReview.volumeM3, 4)}
+                          <div className="space-y-3">
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[820px] text-sm">
+                                <thead className="bg-blue-100">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-semibold text-blue-900">Step</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-blue-900">Formula</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">Result</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t border-blue-100">
+                                    <td className="px-3 py-2 text-gray-800">1. Volume to m3</td>
+                                    <td className="px-3 py-2 text-gray-700">
+                                      {ventingUnit === "MMSCF"
+                                        ? `${formatNumber(ventingVolume || 0, 4)} x ${formatNumber(M3_PER_MMSCF, 4)}`
+                                        : `${formatNumber(ventingVolume || 0, 4)}`}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                      {formatNumber(ventingReview.volumeM3, 4)}
+                                    </td>
+                                  </tr>
+                                  <tr className="border-t border-blue-100">
+                                    <td className="px-3 py-2 text-gray-800">2. Total moles</td>
+                                    <td className="px-3 py-2 text-gray-700">
+                                      volume_m3 x {formatNumber(MOLES_PER_M3, 6)} x{" "}
+                                      {formatNumber(VENTING_TEMPERATURE_CORRECTION, 6)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                      {formatNumber(ventingReview.totalMoles, 4)}
+                                    </td>
+                                  </tr>
+                                  <tr className="border-t border-blue-100">
+                                    <td className="px-3 py-2 text-gray-800">3. Total CO2e (kg)</td>
+                                    <td className="px-3 py-2 text-gray-700">Sum(CO2e_kg by gas)</td>
+                                    <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                      {formatNumber(ventingReview.totalCo2eKg, 4)}
+                                    </td>
+                                  </tr>
+                                  <tr className="border-t border-blue-100">
+                                    <td className="px-3 py-2 text-gray-800">4. Total CO2e (MeT)</td>
+                                    <td className="px-3 py-2 text-gray-700">CO2e_kg / 1000</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-blue-900">
+                                      {formatNumber(ventingReview.totalCo2eTonnes, 4)}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
                             </div>
-                            <div>
-                              total_moles = volume_m3 x {formatNumber(MOLES_PER_M3, 6)} ={" "}
-                              {formatNumber(ventingReview.totalMoles, 4)}
-                            </div>
-                            {ventingReview.rows.map((row) => (
-                              <div key={`review-${row.gas}`}>
-                                {row.gas}: gas_moles = {formatNumber(row.gasMoles, 4)} | CO2e_moles = gas_moles x{" "}
-                                {row.gwp} = {formatNumber(row.co2eMoles, 4)}
-                              </div>
-                            ))}
-                            <div>
-                              total_CO2e_moles = {formatNumber(ventingReview.totalCo2eMoles, 4)}
-                            </div>
-                            <div>
-                              CO2e_kg = total_CO2e_moles x 44 / 1000 ={" "}
-                              {formatNumber(ventingReview.totalCo2eKg, 4)}
-                            </div>
-                            <div>
-                              CO2e_MeT = CO2e_kg / 1000 = {formatNumber(ventingReview.totalCo2eTonnes, 4)}
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[900px] text-sm">
+                                <thead className="bg-blue-100">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-semibold text-blue-900">Gas</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">Fraction (%)</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">Gas Moles</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">Molar Mass</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">Gas Mass (kg)</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">GWP</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-blue-900">CO2e (kg)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {ventingReview.rows.map((row) => (
+                                    <tr key={`review-${row.gas}`} className="border-t border-blue-100">
+                                      <td className="px-3 py-2 text-gray-900">{row.gas}</td>
+                                      <td className="px-3 py-2 text-right text-gray-700">{formatNumber(row.percentage, 4)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-700">{formatNumber(row.gasMoles, 4)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-700">{formatNumber(row.molarMass, 3)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-700">{formatNumber(row.gasMassKg, 4)}</td>
+                                      <td className="px-3 py-2 text-right text-gray-700">{row.gwp}</td>
+                                      <td className="px-3 py-2 text-right font-medium text-gray-900">
+                                        {formatNumber(row.co2eKg, 4)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         </div>
