@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Factory, Globe2, ArrowLeft, ChevronDown, ChevronRight, Flame, Plus, Trash2, Truck } from "lucide-react";
+import { Factory, Globe2, ArrowLeft, ChevronDown, ChevronRight, Flame, Plus, Trash2, Truck, Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 
 const RESTRICTED_IPCC_EMAILS = ["asghar.hayat@marienergies.com.pk"];
@@ -86,6 +88,77 @@ type FlaringSavedEntry = {
   composition: FlaringGasComponent[];
   result: FlaringCalculationResult;
   updatedAt: string;
+};
+
+type VehicularSavedEntry = {
+  id: string;
+  month: string;
+  dieselLiters: number;
+  petrolLiters: number;
+  dieselFactor: number;
+  petrolFactor: number;
+  result: {
+    totalCO2e_kg: number;
+    totalCO2e_tonnes: number;
+  };
+  updatedAt: string;
+};
+
+type KitchenSavedEntry = {
+  id: string;
+  month: string;
+  lpgKg: number;
+  ngMmscf: number;
+  ghv: number;
+  lpgFactor: number;
+  naturalGasFactor: number;
+  result: {
+    totalCO2e_kg: number;
+    totalCO2e_tonnes: number;
+  };
+  updatedAt: string;
+};
+
+type PowerSavedEntry = {
+  id: string;
+  month: string;
+  dieselLiters: number;
+  ngMmscf: number;
+  ghv: number;
+  dieselFactor: number;
+  naturalGasFactor: number;
+  result: {
+    totalCO2e_kg: number;
+    totalCO2e_tonnes: number;
+  };
+  updatedAt: string;
+};
+
+type HeatingSavedEntry = {
+  id: string;
+  month: string;
+  heatingMmscf: number;
+  ghv: number;
+  naturalGasFactor: number;
+  result: {
+    totalCO2e_kg: number;
+    totalCO2e_tonnes: number;
+  };
+  updatedAt: string;
+};
+
+type Scope1KitchenFactors = {
+  lpg: number;
+  naturalGasCo2: number;
+  lpgSourceTable?: string;
+  naturalGasSourceTable?: string;
+};
+
+type Scope1PowerFactors = {
+  diesel: number;
+  naturalGasCo2: number;
+  dieselSourceTable?: string;
+  naturalGasSourceTable?: string;
 };
 
 type EnergyIndustryFactorRow = {
@@ -180,6 +253,12 @@ type AlternativeFuelCalculatorRow = {
   quantity?: number;
 };
 
+type Scope1VehicularFactors = {
+  diesel: number;
+  petrol: number;
+  sourceTable?: string;
+};
+
 const pickFirst = (row: Record<string, any>, keys: string[]) => {
   for (const key of keys) {
     if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") {
@@ -263,6 +342,7 @@ const CHAP2_INDUSTRIES = [
 
 const M3_PER_MMSCF = 28316.8466;
 const IDEAL_GAS_VOLUME_DIVISOR = 22.414;
+const LITERS_PER_GALLON = 3.78541;
 const FLARING_TEMPERATURE_CORRECTION = 273.15 / 288.71;
 // Use workbook temperature denominator exactly as provided by user formula.
 const VENTING_REFERENCE_TEMPERATURE_K = 288.71;
@@ -310,6 +390,34 @@ const VENTING_MOLAR_MASS_OVERRIDE: Record<VentingGas, number> = {
   C5H12: 72.15,
   C6H14: 86.18,
 };
+const DEFAULT_SCOPE1_VEHICULAR_FACTORS: Scope1VehicularFactors = {
+  diesel: 2.7,
+  petrol: 2.32,
+};
+const DEFAULT_SCOPE1_KITCHEN_FACTORS: Scope1KitchenFactors = {
+  lpg: 1.51,
+  naturalGasCo2: 53.06,
+};
+const DEFAULT_SCOPE1_POWER_FACTORS: Scope1PowerFactors = {
+  diesel: 2.7,
+  naturalGasCo2: 53.06,
+};
+const parseMonthValueToDate = (value: string) => {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return new Date();
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return new Date();
+  }
+  return new Date(year, monthIndex, 1);
+};
+const formatMonthValue = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+const formatMonthLabel = (value: string) =>
+  new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(
+    parseMonthValueToDate(value)
+  );
 const getVentingMolarMass = (gas: VentingGas): number => {
   return VENTING_MOLAR_MASS_OVERRIDE[gas];
 };
@@ -663,6 +771,51 @@ const EmissionCalculatorIPCC = () => {
   const [ventingSaving, setVentingSaving] = useState(false);
   const [ventingHistoryLoading, setVentingHistoryLoading] = useState(false);
   const [ventingHistory, setVentingHistory] = useState<VentingSavedEntry[]>([]);
+  const [vehicularDieselLiters, setVehicularDieselLiters] = useState<number | undefined>(undefined);
+  const [vehicularPetrolLiters, setVehicularPetrolLiters] = useState<number | undefined>(undefined);
+  const [vehicularMonth, setVehicularMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [scope1VehicularFactors, setScope1VehicularFactors] = useState<Scope1VehicularFactors>(
+    DEFAULT_SCOPE1_VEHICULAR_FACTORS
+  );
+  const [scope1VehicularLoading, setScope1VehicularLoading] = useState(false);
+  const [scope1VehicularError, setScope1VehicularError] = useState<string | null>(null);
+  const [vehicularSaveError, setVehicularSaveError] = useState<string | null>(null);
+  const [vehicularSaving, setVehicularSaving] = useState(false);
+  const [vehicularHistoryLoading, setVehicularHistoryLoading] = useState(false);
+  const [vehicularHistory, setVehicularHistory] = useState<VehicularSavedEntry[]>([]);
+  const [kitchenLpgKg, setKitchenLpgKg] = useState<number | undefined>(undefined);
+  const [kitchenNgMmscf, setKitchenNgMmscf] = useState<number | undefined>(undefined);
+  const [kitchenGhv, setKitchenGhv] = useState<number | undefined>(undefined);
+  const [kitchenMonth, setKitchenMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [scope1KitchenFactors, setScope1KitchenFactors] = useState<Scope1KitchenFactors>(
+    DEFAULT_SCOPE1_KITCHEN_FACTORS
+  );
+  const [scope1KitchenLoading, setScope1KitchenLoading] = useState(false);
+  const [scope1KitchenError, setScope1KitchenError] = useState<string | null>(null);
+  const [kitchenSaveError, setKitchenSaveError] = useState<string | null>(null);
+  const [kitchenSaving, setKitchenSaving] = useState(false);
+  const [kitchenHistoryLoading, setKitchenHistoryLoading] = useState(false);
+  const [kitchenHistory, setKitchenHistory] = useState<KitchenSavedEntry[]>([]);
+  const [powerDieselLiters, setPowerDieselLiters] = useState<number | undefined>(undefined);
+  const [powerNgMmscf, setPowerNgMmscf] = useState<number | undefined>(undefined);
+  const [powerGhv, setPowerGhv] = useState<number | undefined>(undefined);
+  const [powerMonth, setPowerMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [scope1PowerFactors, setScope1PowerFactors] = useState<Scope1PowerFactors>(
+    DEFAULT_SCOPE1_POWER_FACTORS
+  );
+  const [scope1PowerLoading, setScope1PowerLoading] = useState(false);
+  const [scope1PowerError, setScope1PowerError] = useState<string | null>(null);
+  const [powerSaveError, setPowerSaveError] = useState<string | null>(null);
+  const [powerSaving, setPowerSaving] = useState(false);
+  const [powerHistoryLoading, setPowerHistoryLoading] = useState(false);
+  const [powerHistory, setPowerHistory] = useState<PowerSavedEntry[]>([]);
+  const [heatingMmscf, setHeatingMmscf] = useState<number | undefined>(undefined);
+  const [heatingGhv, setHeatingGhv] = useState<number | undefined>(undefined);
+  const [heatingMonth, setHeatingMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [heatingSaveError, setHeatingSaveError] = useState<string | null>(null);
+  const [heatingSaving, setHeatingSaving] = useState(false);
+  const [heatingHistoryLoading, setHeatingHistoryLoading] = useState(false);
+  const [heatingHistory, setHeatingHistory] = useState<HeatingSavedEntry[]>([]);
   const [selectedIndustry, setSelectedIndustry] = useState<string>(CHAP2_INDUSTRIES[0]);
   const [loadingEnergyIndustry, setLoadingEnergyIndustry] = useState(false);
   const [energyIndustryRows, setEnergyIndustryRows] = useState<EnergyIndustryFactorRow[]>([]);
@@ -709,7 +862,7 @@ const EmissionCalculatorIPCC = () => {
     () => [
       {
         id: "scope1",
-        title: "Chapter 1 (Scope 1)",
+        title: "Scope 1",
         categories: [
           {
             id: "stationaryFuelCombustion",
@@ -729,11 +882,35 @@ const EmissionCalculatorIPCC = () => {
             description: "Scope 1 venting based on gas composition and GWP conversion.",
             icon: Flame,
           },
+          {
+            id: "vehicularCarbonFootprints",
+            title: "Vehicular Carbon Footprints",
+            description: "Scope 1 vehicle emissions from diesel and petrol consumption (litres).",
+            icon: Truck,
+          },
+          {
+            id: "kitchenFootprints",
+            title: "Kitchen Footprints",
+            description: "Scope 1 kitchen emissions from LPG and natural gas fuel consumption.",
+            icon: Flame,
+          },
+          {
+            id: "powerFuelConsumption",
+            title: "Fuel Consumption for Power",
+            description: "Scope 1 power emissions from diesel and natural gas fuel consumption.",
+            icon: Factory,
+          },
+          {
+            id: "heatingFootprints",
+            title: "Heating",
+            description: "Scope 1 heating emissions from natural gas and GHV.",
+            icon: Flame,
+          },
         ],
       },
       {
         id: "chap2",
-        title: "Chap 2",
+        title: "Scope 2",
         categories: [
           {
             id: "energyIndustries",
@@ -745,7 +922,7 @@ const EmissionCalculatorIPCC = () => {
       },
       {
         id: "chap3",
-        title: "Chap 3",
+        title: "Scope 3",
         categories: [
           {
             id: "roadTransport",
@@ -1251,6 +1428,317 @@ const EmissionCalculatorIPCC = () => {
     setVentingCalculationError(null);
   };
 
+  const loadVehicularHistory = async () => {
+    if (!user) return;
+    setVehicularHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("ipcc_scope1_vehicular_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("month_start", { ascending: false });
+      if (error) throw error;
+
+      const mapped: VehicularSavedEntry[] = (data || []).map((row: any) => ({
+        id: String(row.id),
+        month: String(row.month_start || "").slice(0, 7),
+        dieselLiters: Number(row.diesel_liters || 0),
+        petrolLiters: Number(row.petrol_liters || 0),
+        dieselFactor: Number(row.diesel_factor || DEFAULT_SCOPE1_VEHICULAR_FACTORS.diesel),
+        petrolFactor: Number(row.petrol_factor || DEFAULT_SCOPE1_VEHICULAR_FACTORS.petrol),
+        result: (row.result || {
+          totalCO2e_kg: 0,
+          totalCO2e_tonnes: 0,
+        }) as VehicularSavedEntry["result"],
+        updatedAt: String(row.updated_at || row.created_at || ""),
+      }));
+      setVehicularHistory(mapped);
+    } catch (error: any) {
+      console.error("Failed loading vehicular history:", error);
+    } finally {
+      setVehicularHistoryLoading(false);
+    }
+  };
+
+  const handleSaveVehicularMonth = async () => {
+    setVehicularSaveError(null);
+    if (!user) {
+      setVehicularSaveError("Please log in to save monthly vehicular entries.");
+      return;
+    }
+    if (!/^\d{4}-\d{2}$/.test(vehicularMonth)) {
+      setVehicularSaveError("Please select a valid month.");
+      return;
+    }
+    const dieselLiters = typeof vehicularDieselLiters === "number" ? vehicularDieselLiters : 0;
+    const petrolLiters = typeof vehicularPetrolLiters === "number" ? vehicularPetrolLiters : 0;
+    if (dieselLiters <= 0 && petrolLiters <= 0) {
+      setVehicularSaveError("Please enter diesel or petrol litres greater than 0.");
+      return;
+    }
+
+    const totalCO2e_kg =
+      dieselLiters * scope1VehicularFactors.diesel + petrolLiters * scope1VehicularFactors.petrol;
+    const resultToSave = {
+      totalCO2e_kg,
+      totalCO2e_tonnes: totalCO2e_kg / 1000,
+    };
+
+    setVehicularSaving(true);
+    try {
+      const payload = {
+        user_id: user.id,
+        month_start: `${vehicularMonth}-01`,
+        diesel_liters: dieselLiters,
+        petrol_liters: petrolLiters,
+        diesel_factor: scope1VehicularFactors.diesel,
+        petrol_factor: scope1VehicularFactors.petrol,
+        result: resultToSave,
+      };
+
+      const { error } = await (supabase as any)
+        .from("ipcc_scope1_vehicular_entries")
+        .upsert(payload, { onConflict: "user_id,month_start" });
+      if (error) throw error;
+
+      await loadVehicularHistory();
+    } catch (error: any) {
+      setVehicularSaveError(error?.message || "Failed to save monthly vehicular entry.");
+    } finally {
+      setVehicularSaving(false);
+    }
+  };
+
+  const handleLoadVehicularEntry = (entry: VehicularSavedEntry) => {
+    setVehicularMonth(entry.month);
+    setVehicularDieselLiters(entry.dieselLiters);
+    setVehicularPetrolLiters(entry.petrolLiters);
+    setScope1VehicularFactors((prev) => ({
+      ...prev,
+      diesel: entry.dieselFactor,
+      petrol: entry.petrolFactor,
+    }));
+    setVehicularSaveError(null);
+  };
+
+  const loadKitchenHistory = async () => {
+    if (!user) return;
+    setKitchenHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("ipcc_scope1_kitchen_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("month_start", { ascending: false });
+      if (error) throw error;
+      const mapped: KitchenSavedEntry[] = (data || []).map((row: any) => ({
+        id: String(row.id),
+        month: String(row.month_start || "").slice(0, 7),
+        lpgKg: Number(row.lpg_kg || 0),
+        ngMmscf: Number(row.ng_mmscf || 0),
+        ghv: Number(row.ghv || 0),
+        lpgFactor: Number(row.lpg_factor || DEFAULT_SCOPE1_KITCHEN_FACTORS.lpg),
+        naturalGasFactor: Number(row.natural_gas_factor || DEFAULT_SCOPE1_KITCHEN_FACTORS.naturalGasCo2),
+        result: row.result as KitchenSavedEntry["result"],
+        updatedAt: String(row.updated_at || row.created_at || ""),
+      }));
+      setKitchenHistory(mapped);
+    } catch (error: any) {
+      console.error("Failed loading kitchen history:", error);
+    } finally {
+      setKitchenHistoryLoading(false);
+    }
+  };
+
+  const handleSaveKitchenMonth = async () => {
+    setKitchenSaveError(null);
+    if (!user) return setKitchenSaveError("Please log in to save monthly kitchen entries.");
+    if (!/^\d{4}-\d{2}$/.test(kitchenMonth)) return setKitchenSaveError("Please select a valid month.");
+    const lpgKg = typeof kitchenLpgKg === "number" ? kitchenLpgKg : 0;
+    const ngMmscf = typeof kitchenNgMmscf === "number" ? kitchenNgMmscf : 0;
+    const ghv = typeof kitchenGhv === "number" ? kitchenGhv : 0;
+    if (lpgKg <= 0 && ngMmscf <= 0) return setKitchenSaveError("Please enter LPG or NG greater than 0.");
+    if (ngMmscf > 0 && ghv <= 0) return setKitchenSaveError("Please enter GHV value greater than 0.");
+    const totalCO2e_kg = lpgKg * scope1KitchenFactors.lpg + ngMmscf * ghv * scope1KitchenFactors.naturalGasCo2;
+    const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
+    setKitchenSaving(true);
+    try {
+      const { error } = await (supabase as any).from("ipcc_scope1_kitchen_entries").upsert(
+        {
+          user_id: user.id,
+          month_start: `${kitchenMonth}-01`,
+          lpg_kg: lpgKg,
+          ng_mmscf: ngMmscf,
+          ghv,
+          lpg_factor: scope1KitchenFactors.lpg,
+          natural_gas_factor: scope1KitchenFactors.naturalGasCo2,
+          result: resultToSave,
+        },
+        { onConflict: "user_id,month_start" }
+      );
+      if (error) throw error;
+      await loadKitchenHistory();
+    } catch (error: any) {
+      setKitchenSaveError(error?.message || "Failed to save monthly kitchen entry.");
+    } finally {
+      setKitchenSaving(false);
+    }
+  };
+
+  const handleLoadKitchenEntry = (entry: KitchenSavedEntry) => {
+    setKitchenMonth(entry.month);
+    setKitchenLpgKg(entry.lpgKg);
+    setKitchenNgMmscf(entry.ngMmscf);
+    setKitchenGhv(entry.ghv);
+    setScope1KitchenFactors((prev) => ({ ...prev, lpg: entry.lpgFactor, naturalGasCo2: entry.naturalGasFactor }));
+    setKitchenSaveError(null);
+  };
+
+  const loadPowerHistory = async () => {
+    if (!user) return;
+    setPowerHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("ipcc_scope1_power_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("month_start", { ascending: false });
+      if (error) throw error;
+      const mapped: PowerSavedEntry[] = (data || []).map((row: any) => ({
+        id: String(row.id),
+        month: String(row.month_start || "").slice(0, 7),
+        dieselLiters: Number(row.diesel_liters || 0),
+        ngMmscf: Number(row.ng_mmscf || 0),
+        ghv: Number(row.ghv || 0),
+        dieselFactor: Number(row.diesel_factor || DEFAULT_SCOPE1_POWER_FACTORS.diesel),
+        naturalGasFactor: Number(row.natural_gas_factor || DEFAULT_SCOPE1_POWER_FACTORS.naturalGasCo2),
+        result: row.result as PowerSavedEntry["result"],
+        updatedAt: String(row.updated_at || row.created_at || ""),
+      }));
+      setPowerHistory(mapped);
+    } catch (error: any) {
+      console.error("Failed loading power history:", error);
+    } finally {
+      setPowerHistoryLoading(false);
+    }
+  };
+
+  const handleSavePowerMonth = async () => {
+    setPowerSaveError(null);
+    if (!user) return setPowerSaveError("Please log in to save monthly power entries.");
+    if (!/^\d{4}-\d{2}$/.test(powerMonth)) return setPowerSaveError("Please select a valid month.");
+    const dieselLiters = typeof powerDieselLiters === "number" ? powerDieselLiters : 0;
+    const ngMmscf = typeof powerNgMmscf === "number" ? powerNgMmscf : 0;
+    const ghv = typeof powerGhv === "number" ? powerGhv : 0;
+    if (dieselLiters <= 0 && ngMmscf <= 0) return setPowerSaveError("Please enter diesel or NG greater than 0.");
+    if (ngMmscf > 0 && ghv <= 0) return setPowerSaveError("Please enter GHV value greater than 0.");
+    const totalCO2e_kg =
+      dieselLiters * scope1PowerFactors.diesel + ngMmscf * ghv * scope1PowerFactors.naturalGasCo2;
+    const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
+    setPowerSaving(true);
+    try {
+      const { error } = await (supabase as any).from("ipcc_scope1_power_entries").upsert(
+        {
+          user_id: user.id,
+          month_start: `${powerMonth}-01`,
+          diesel_liters: dieselLiters,
+          ng_mmscf: ngMmscf,
+          ghv,
+          diesel_factor: scope1PowerFactors.diesel,
+          natural_gas_factor: scope1PowerFactors.naturalGasCo2,
+          result: resultToSave,
+        },
+        { onConflict: "user_id,month_start" }
+      );
+      if (error) throw error;
+      await loadPowerHistory();
+    } catch (error: any) {
+      setPowerSaveError(error?.message || "Failed to save monthly power entry.");
+    } finally {
+      setPowerSaving(false);
+    }
+  };
+
+  const handleLoadPowerEntry = (entry: PowerSavedEntry) => {
+    setPowerMonth(entry.month);
+    setPowerDieselLiters(entry.dieselLiters);
+    setPowerNgMmscf(entry.ngMmscf);
+    setPowerGhv(entry.ghv);
+    setScope1PowerFactors((prev) => ({
+      ...prev,
+      diesel: entry.dieselFactor,
+      naturalGasCo2: entry.naturalGasFactor,
+    }));
+    setPowerSaveError(null);
+  };
+
+  const loadHeatingHistory = async () => {
+    if (!user) return;
+    setHeatingHistoryLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("ipcc_scope1_heating_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("month_start", { ascending: false });
+      if (error) throw error;
+      const mapped: HeatingSavedEntry[] = (data || []).map((row: any) => ({
+        id: String(row.id),
+        month: String(row.month_start || "").slice(0, 7),
+        heatingMmscf: Number(row.heating_mmscf || 0),
+        ghv: Number(row.ghv || 0),
+        naturalGasFactor: Number(row.natural_gas_factor || DEFAULT_SCOPE1_POWER_FACTORS.naturalGasCo2),
+        result: row.result as HeatingSavedEntry["result"],
+        updatedAt: String(row.updated_at || row.created_at || ""),
+      }));
+      setHeatingHistory(mapped);
+    } catch (error: any) {
+      console.error("Failed loading heating history:", error);
+    } finally {
+      setHeatingHistoryLoading(false);
+    }
+  };
+
+  const handleSaveHeatingMonth = async () => {
+    setHeatingSaveError(null);
+    if (!user) return setHeatingSaveError("Please log in to save monthly heating entries.");
+    if (!/^\d{4}-\d{2}$/.test(heatingMonth)) return setHeatingSaveError("Please select a valid month.");
+    const heating = typeof heatingMmscf === "number" ? heatingMmscf : 0;
+    const ghv = typeof heatingGhv === "number" ? heatingGhv : 0;
+    if (heating <= 0) return setHeatingSaveError("Please enter heating MMSCF greater than 0.");
+    if (ghv <= 0) return setHeatingSaveError("Please enter GHV value greater than 0.");
+    const totalCO2e_kg = heating * ghv * scope1PowerFactors.naturalGasCo2;
+    const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
+    setHeatingSaving(true);
+    try {
+      const { error } = await (supabase as any).from("ipcc_scope1_heating_entries").upsert(
+        {
+          user_id: user.id,
+          month_start: `${heatingMonth}-01`,
+          heating_mmscf: heating,
+          ghv,
+          natural_gas_factor: scope1PowerFactors.naturalGasCo2,
+          result: resultToSave,
+        },
+        { onConflict: "user_id,month_start" }
+      );
+      if (error) throw error;
+      await loadHeatingHistory();
+    } catch (error: any) {
+      setHeatingSaveError(error?.message || "Failed to save monthly heating entry.");
+    } finally {
+      setHeatingSaving(false);
+    }
+  };
+
+  const handleLoadHeatingEntry = (entry: HeatingSavedEntry) => {
+    setHeatingMonth(entry.month);
+    setHeatingMmscf(entry.heatingMmscf);
+    setHeatingGhv(entry.ghv);
+    setScope1PowerFactors((prev) => ({ ...prev, naturalGasCo2: entry.naturalGasFactor }));
+    setHeatingSaveError(null);
+  };
+
   const availableEnergyFuels = useMemo(
     () =>
       Array.from(
@@ -1331,6 +1819,32 @@ const EmissionCalculatorIPCC = () => {
       return sum + row.quantity * selectedFactor;
     }, 0);
   }, [energyCalculatorRows, energyIndustryRows]);
+
+  const scope1VehicularCo2eMeT = useMemo(() => {
+    const dieselLiters = typeof vehicularDieselLiters === "number" ? vehicularDieselLiters : 0;
+    const petrolLiters = typeof vehicularPetrolLiters === "number" ? vehicularPetrolLiters : 0;
+    return (dieselLiters * scope1VehicularFactors.diesel + petrolLiters * scope1VehicularFactors.petrol) / 1000;
+  }, [vehicularDieselLiters, vehicularPetrolLiters, scope1VehicularFactors]);
+
+  const scope1KitchenCo2eMeT = useMemo(() => {
+    const lpgKg = typeof kitchenLpgKg === "number" ? kitchenLpgKg : 0;
+    const ngMmscf = typeof kitchenNgMmscf === "number" ? kitchenNgMmscf : 0;
+    const ghv = typeof kitchenGhv === "number" ? kitchenGhv : 0;
+    return (lpgKg * scope1KitchenFactors.lpg + ngMmscf * ghv * scope1KitchenFactors.naturalGasCo2) / 1000;
+  }, [kitchenLpgKg, kitchenNgMmscf, kitchenGhv, scope1KitchenFactors]);
+
+  const scope1PowerCo2eMeT = useMemo(() => {
+    const dieselLiters = typeof powerDieselLiters === "number" ? powerDieselLiters : 0;
+    const ngMmscf = typeof powerNgMmscf === "number" ? powerNgMmscf : 0;
+    const ghv = typeof powerGhv === "number" ? powerGhv : 0;
+    return (dieselLiters * scope1PowerFactors.diesel + ngMmscf * ghv * scope1PowerFactors.naturalGasCo2) / 1000;
+  }, [powerDieselLiters, powerNgMmscf, powerGhv, scope1PowerFactors]);
+
+  const scope1HeatingCo2eMeT = useMemo(() => {
+    const ngMmscf = typeof heatingMmscf === "number" ? heatingMmscf : 0;
+    const ghv = typeof heatingGhv === "number" ? heatingGhv : 0;
+    return (ngMmscf * ghv * scope1PowerFactors.naturalGasCo2) / 1000;
+  }, [heatingMmscf, heatingGhv, scope1PowerFactors.naturalGasCo2]);
 
   const availableRoadFuelTypes = useMemo(
     () =>
@@ -1719,6 +2233,26 @@ const EmissionCalculatorIPCC = () => {
   }, [activeCategory, user]);
 
   useEffect(() => {
+    if (activeCategory !== "vehicularCarbonFootprints" || !user) return;
+    loadVehicularHistory();
+  }, [activeCategory, user]);
+
+  useEffect(() => {
+    if (activeCategory !== "kitchenFootprints" || !user) return;
+    loadKitchenHistory();
+  }, [activeCategory, user]);
+
+  useEffect(() => {
+    if (activeCategory !== "powerFuelConsumption" || !user) return;
+    loadPowerHistory();
+  }, [activeCategory, user]);
+
+  useEffect(() => {
+    if (activeCategory !== "heatingFootprints" || !user) return;
+    loadHeatingHistory();
+  }, [activeCategory, user]);
+
+  useEffect(() => {
     if (activeCategory !== "venting") return;
     if (typeof ventingVolume !== "number") {
       setVentingCalculated(null);
@@ -2036,6 +2570,486 @@ const EmissionCalculatorIPCC = () => {
   }, [activeCategory]);
 
   useEffect(() => {
+    const loadScope1VehicularFactors = async () => {
+      if (activeCategory !== "vehicularCarbonFootprints") return;
+      setScope1VehicularLoading(true);
+      setScope1VehicularError(null);
+      try {
+        const tableCandidates = [
+          "Mobile Combustion",
+          '"Mobile Combustion"',
+          "MOBILE COMBUSTION",
+          "mobile_combustion",
+        ] as const;
+
+        const parseOrNull = (value: any): number | null => {
+          if (typeof value === "number") return value;
+          if (value === undefined || value === null || String(value).trim() === "") return null;
+          const parsed = Number.parseFloat(String(value));
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const toFactorPerLiter = (row: Record<string, any>): number | null => {
+          const directLiterValue = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor (kg CO2/litre)",
+              "Emission Factor (kg CO2/Litre)",
+              "Emission Factor (kg CO2/liter)",
+              "kg CO2/litre",
+              "kg CO2/liter",
+              "kgCO2/litre",
+              "kgCO2/liter",
+            ])
+          );
+          if (typeof directLiterValue === "number") return directLiterValue;
+
+          const generic = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor",
+              "emission_factor",
+              "emission factor",
+              "Factor",
+              "factor",
+              "CO2 Emission Factor",
+              "co2_emission_factor",
+            ])
+          );
+          if (typeof generic !== "number") return null;
+          const unitText = String(pickFirst(row, ["Unit", "unit", "Units", "units"]) || "").toLowerCase();
+          if (unitText.includes("gallon") || unitText.includes("/gal")) return generic / LITERS_PER_GALLON;
+          return generic;
+        };
+
+        const fuelLabel = (row: Record<string, any>) =>
+          String(
+            pickFirst(row, [
+              "Fuel Type",
+              "FuelType",
+              "fuel_type",
+              "Fuel",
+              "fuel",
+              "Description",
+              "description",
+              "Category",
+              "category",
+            ]) || ""
+          ).toLowerCase();
+
+        let resolved: Scope1VehicularFactors = DEFAULT_SCOPE1_VEHICULAR_FACTORS;
+        let successfulTable: string | undefined;
+        const attemptErrors: string[] = [];
+
+        for (const tableName of tableCandidates) {
+          const { data: attemptData, error: attemptError } = await supabase
+            .from(tableName as any)
+            .select("*")
+            .limit(1000);
+
+          if (attemptError) {
+            attemptErrors.push(`${tableName}: ${attemptError.message}`);
+            continue;
+          }
+
+          const rows = (attemptData || []) as Record<string, any>[];
+          if (rows.length === 0) {
+            if (!successfulTable) successfulTable = tableName;
+            continue;
+          }
+
+          const dieselRow = rows.find((row) => fuelLabel(row).includes("diesel"));
+          const petrolRow = rows.find((row) => {
+            const label = fuelLabel(row);
+            return label.includes("motor gasoline") || label.includes("gasoline") || label.includes("petrol");
+          });
+
+          const dieselFactor = dieselRow ? toFactorPerLiter(dieselRow) : null;
+          const petrolFactor = petrolRow ? toFactorPerLiter(petrolRow) : null;
+
+          resolved = {
+            diesel: typeof dieselFactor === "number" ? dieselFactor : DEFAULT_SCOPE1_VEHICULAR_FACTORS.diesel,
+            petrol: typeof petrolFactor === "number" ? petrolFactor : DEFAULT_SCOPE1_VEHICULAR_FACTORS.petrol,
+            sourceTable: "Mobile Combustion",
+          };
+          successfulTable = tableName;
+          break;
+        }
+
+        setScope1VehicularFactors(resolved);
+
+        if (!successfulTable) {
+          setScope1VehicularError(
+            `Could not read Mobile Combustion factors from Supabase. Using defaults Diesel=${DEFAULT_SCOPE1_VEHICULAR_FACTORS.diesel}, Petrol=${DEFAULT_SCOPE1_VEHICULAR_FACTORS.petrol}. ${
+              attemptErrors.length ? `Errors: ${attemptErrors.join(" | ")}` : ""
+            }`
+          );
+        }
+      } catch (err: any) {
+        setScope1VehicularFactors(DEFAULT_SCOPE1_VEHICULAR_FACTORS);
+        setScope1VehicularError(
+          err?.message ||
+            `Failed to load Mobile Combustion factors. Using defaults Diesel=${DEFAULT_SCOPE1_VEHICULAR_FACTORS.diesel}, Petrol=${DEFAULT_SCOPE1_VEHICULAR_FACTORS.petrol}.`
+        );
+      } finally {
+        setScope1VehicularLoading(false);
+      }
+    };
+
+    loadScope1VehicularFactors();
+  }, [activeCategory]);
+
+  useEffect(() => {
+    const loadScope1KitchenFactors = async () => {
+      if (activeCategory !== "kitchenFootprints") return;
+      setScope1KitchenLoading(true);
+      setScope1KitchenError(null);
+      try {
+        const parseOrNull = (value: any): number | null => {
+          if (typeof value === "number") return value;
+          if (value === undefined || value === null || String(value).trim() === "") return null;
+          const parsed = Number.parseFloat(String(value));
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const toFactorPerLpgKg = (row: Record<string, any>): number | null => {
+          // Preferred path: explicit gallon-based column from Mobile Combustion.
+          const gallonValue = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor (kg CO2/gallon)",
+              "Emission Factor (kg CO2/Gallon)",
+              "CO2 Emission Factor (kg/gallon)",
+              "CO2 Emission Factor (kg/Gallon)",
+              "kg CO2/gallon",
+              "kgCO2/gallon",
+              "kg CO2/gal",
+              "kgCO2/gal",
+            ])
+          );
+          if (typeof gallonValue === "number") return gallonValue / LITERS_PER_GALLON;
+
+          // Accept direct litre/kg columns if present.
+          const directKgOrLiterValue = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor (kg CO2/litre)",
+              "Emission Factor (kg CO2/liter)",
+              "Emission Factor (kg CO2/kg)",
+              "kg CO2/litre",
+              "kg CO2/liter",
+              "kg CO2/kg",
+              "kgCO2/litre",
+              "kgCO2/liter",
+              "kgCO2/kg",
+            ])
+          );
+          if (typeof directKgOrLiterValue === "number") return directKgOrLiterValue;
+
+          // Fallback for generic factor ONLY when unit explicitly says gallon.
+          const generic = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor",
+              "emission_factor",
+              "emission factor",
+              "Factor",
+              "factor",
+              "CO2 Emission Factor",
+              "co2_emission_factor",
+            ])
+          );
+          if (typeof generic !== "number") return null;
+          const unitText = String(pickFirst(row, ["Unit", "unit", "Units", "units"]) || "").toLowerCase();
+          if (unitText.includes("gallon") || unitText.includes("/gal") || unitText.includes("gal")) {
+            return generic / LITERS_PER_GALLON;
+          }
+          // Do not accept non-gallon generic LPG values (prevents wrong 63-style picks).
+          return null;
+        };
+
+        const fuelLabel = (row: Record<string, any>) =>
+          String(
+            pickFirst(row, [
+              "Fuel Type",
+              "FuelType",
+              "fuel_type",
+              "Fuel",
+              "fuel",
+              "Description",
+              "description",
+              "Category",
+              "category",
+            ]) || ""
+          ).toLowerCase();
+
+        let lpgFactor = DEFAULT_SCOPE1_KITCHEN_FACTORS.lpg;
+        let ngFactor = DEFAULT_SCOPE1_KITCHEN_FACTORS.naturalGasCo2;
+        let lpgSourceTable: string | undefined;
+        let naturalGasSourceTable: string | undefined;
+
+        const mobileTableCandidates = [
+          "Mobile Combustion",
+          '"Mobile Combustion"',
+          "MOBILE COMBUSTION",
+          "mobile_combustion",
+        ] as const;
+        for (const tableName of mobileTableCandidates) {
+          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
+          if (error) continue;
+          const rows = (data || []) as Record<string, any>[];
+          const lpgRow = rows.find((row) => {
+            const label = fuelLabel(row);
+            return label.includes("lpg") || label.includes("liquefied petroleum");
+          });
+          if (lpgRow) {
+            const factor = toFactorPerLpgKg(lpgRow);
+            if (typeof factor === "number") {
+              lpgFactor = factor;
+              lpgSourceTable = "Mobile Combustion";
+              break;
+            }
+          }
+        }
+
+        const stationaryTableCandidates = [
+          "Stationary Combustion",
+          '"Stationary Combustion"',
+          "stationary_combustion",
+          "STATIONARY COMBUSTION",
+          "IPCC 1",
+          '"IPCC 1"',
+          "IPCC_1",
+          "ipcc_1",
+          "IPCC1",
+          "ipcc1",
+        ] as const;
+        for (const tableName of stationaryTableCandidates) {
+          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
+          if (error) continue;
+          const rows = (data || []) as Record<string, any>[];
+          const ngCandidates = rows
+            .map((row) => {
+              const fuelLabel = String(
+                pickFirst(row, [
+                  "Fuel type English description",
+                  "Fuel Type English Description",
+                  "fuel_type_english_description",
+                  "Fuel Type",
+                  "fuel_type",
+                ]) || ""
+              ).toLowerCase();
+              const subTypeLabel = String(
+                pickFirst(row, ["Sub Type", "SubType", "sub_type", "sub type", "Type"]) || ""
+              ).toLowerCase();
+              const combinedLabel = `${fuelLabel} ${subTypeLabel}`.trim();
+              if (!combinedLabel.includes("natural gas")) return null;
+
+              const factor = parseOrNull(
+                pickFirst(row, [
+                  "CO2 emission factor",
+                  "CO2 Emission Factor",
+                  "co2_emission_factor",
+                  "CO2 Emission Factor",
+                ])
+              );
+              const unit = String(pickFirst(row, ["Unit", "unit", "Units", "units"]) || "").toLowerCase();
+              if (typeof factor !== "number") return null;
+              return { factor, unit, combinedLabel };
+            })
+            .filter((item): item is { factor: number; unit: string; combinedLabel: string } => item !== null);
+
+          if (ngCandidates.length > 0) {
+            const mmbtuCandidates = ngCandidates.filter(
+              (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
+            );
+            // Prioritize Stationary Combustion NG CO2 factor range (~53 kg/MMBtu) when multiple rows exist.
+            const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
+            const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
+            ngFactor = selected.factor;
+            naturalGasSourceTable = "Stationary Combustion";
+            break;
+          }
+        }
+
+        setScope1KitchenFactors({
+          lpg: lpgFactor,
+          naturalGasCo2: ngFactor,
+          lpgSourceTable,
+          naturalGasSourceTable,
+        });
+      } catch (err: any) {
+        setScope1KitchenFactors(DEFAULT_SCOPE1_KITCHEN_FACTORS);
+        setScope1KitchenError(
+          err?.message ||
+            `Failed to load kitchen factors. Using defaults LPG=${DEFAULT_SCOPE1_KITCHEN_FACTORS.lpg}, NG=${DEFAULT_SCOPE1_KITCHEN_FACTORS.naturalGasCo2}.`
+        );
+      } finally {
+        setScope1KitchenLoading(false);
+      }
+    };
+
+    loadScope1KitchenFactors();
+  }, [activeCategory]);
+
+  useEffect(() => {
+    const loadScope1PowerFactors = async () => {
+      if (activeCategory !== "powerFuelConsumption" && activeCategory !== "heatingFootprints") return;
+      setScope1PowerLoading(true);
+      setScope1PowerError(null);
+      try {
+        const parseOrNull = (value: any): number | null => {
+          if (typeof value === "number") return value;
+          if (value === undefined || value === null || String(value).trim() === "") return null;
+          const parsed = Number.parseFloat(String(value));
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const toFactorPerLiter = (row: Record<string, any>): number | null => {
+          const directLiterValue = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor (kg CO2/litre)",
+              "Emission Factor (kg CO2/Litre)",
+              "Emission Factor (kg CO2/liter)",
+              "kg CO2/litre",
+              "kg CO2/liter",
+              "kgCO2/litre",
+              "kgCO2/liter",
+            ])
+          );
+          if (typeof directLiterValue === "number") return directLiterValue;
+          const generic = parseOrNull(
+            pickFirst(row, [
+              "Emission Factor",
+              "emission_factor",
+              "emission factor",
+              "Factor",
+              "factor",
+              "CO2 Emission Factor",
+              "co2_emission_factor",
+            ])
+          );
+          if (typeof generic !== "number") return null;
+          const unitText = String(pickFirst(row, ["Unit", "unit", "Units", "units"]) || "").toLowerCase();
+          if (unitText.includes("gallon") || unitText.includes("/gal")) return generic / LITERS_PER_GALLON;
+          return generic;
+        };
+
+        const fuelLabel = (row: Record<string, any>) =>
+          String(
+            pickFirst(row, [
+              "Fuel Type",
+              "FuelType",
+              "fuel_type",
+              "Fuel",
+              "fuel",
+              "Description",
+              "description",
+              "Category",
+              "category",
+            ]) || ""
+          ).toLowerCase();
+
+        let dieselFactor = DEFAULT_SCOPE1_POWER_FACTORS.diesel;
+        let ngFactor = DEFAULT_SCOPE1_POWER_FACTORS.naturalGasCo2;
+        let dieselSourceTable: string | undefined;
+        let naturalGasSourceTable: string | undefined;
+
+        const mobileTableCandidates = [
+          "Mobile Combustion",
+          '"Mobile Combustion"',
+          "MOBILE COMBUSTION",
+          "mobile_combustion",
+        ] as const;
+        for (const tableName of mobileTableCandidates) {
+          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
+          if (error) continue;
+          const rows = (data || []) as Record<string, any>[];
+          const dieselRow = rows.find((row) => fuelLabel(row).includes("diesel"));
+          if (dieselRow) {
+            const factor = toFactorPerLiter(dieselRow);
+            if (typeof factor === "number") {
+              dieselFactor = factor;
+              dieselSourceTable = "Mobile Combustion";
+              break;
+            }
+          }
+        }
+
+        const stationaryTableCandidates = [
+          "Stationary Combustion",
+          '"Stationary Combustion"',
+          "stationary_combustion",
+          "STATIONARY COMBUSTION",
+          "IPCC 1",
+          '"IPCC 1"',
+          "IPCC_1",
+          "ipcc_1",
+          "IPCC1",
+          "ipcc1",
+        ] as const;
+        for (const tableName of stationaryTableCandidates) {
+          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
+          if (error) continue;
+          const rows = (data || []) as Record<string, any>[];
+          const ngCandidates = rows
+            .map((row) => {
+              const fuelText = String(
+                pickFirst(row, [
+                  "Fuel type English description",
+                  "Fuel Type English Description",
+                  "fuel_type_english_description",
+                  "Fuel Type",
+                  "fuel_type",
+                ]) || ""
+              ).toLowerCase();
+              const subTypeText = String(
+                pickFirst(row, ["Sub Type", "SubType", "sub_type", "sub type", "Type"]) || ""
+              ).toLowerCase();
+              if (!`${fuelText} ${subTypeText}`.includes("natural gas")) return null;
+
+              const factor = parseOrNull(
+                pickFirst(row, [
+                  "CO2 emission factor",
+                  "CO2 Emission Factor",
+                  "co2_emission_factor",
+                  "CO2 Emission Factor",
+                ])
+              );
+              const unit = String(pickFirst(row, ["Unit", "unit", "Units", "units"]) || "").toLowerCase();
+              if (typeof factor !== "number") return null;
+              return { factor, unit };
+            })
+            .filter((item): item is { factor: number; unit: string } => item !== null);
+
+          if (ngCandidates.length > 0) {
+            const mmbtuCandidates = ngCandidates.filter(
+              (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
+            );
+            const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
+            const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
+            ngFactor = selected.factor;
+            naturalGasSourceTable = "Stationary Combustion";
+            break;
+          }
+        }
+
+        setScope1PowerFactors({
+          diesel: dieselFactor,
+          naturalGasCo2: ngFactor,
+          dieselSourceTable,
+          naturalGasSourceTable,
+        });
+      } catch (err: any) {
+        setScope1PowerFactors(DEFAULT_SCOPE1_POWER_FACTORS);
+        setScope1PowerError(
+          err?.message ||
+            `Failed to load power factors. Using defaults Diesel=${DEFAULT_SCOPE1_POWER_FACTORS.diesel}, NG=${DEFAULT_SCOPE1_POWER_FACTORS.naturalGasCo2}.`
+        );
+      } finally {
+        setScope1PowerLoading(false);
+      }
+    };
+
+    loadScope1PowerFactors();
+  }, [activeCategory]);
+
+  useEffect(() => {
     const loadRoadTransportVehicleData = async () => {
       if (activeCategory !== "roadTransportVehicleType") return;
       setLoadingRoadTransportVehicle(true);
@@ -2339,6 +3353,37 @@ const EmissionCalculatorIPCC = () => {
     }
   }, [activeCategory]);
 
+  useEffect(() => {
+    if (activeCategory === "vehicularCarbonFootprints") {
+      setVehicularDieselLiters(undefined);
+      setVehicularPetrolLiters(undefined);
+      setVehicularMonth(new Date().toISOString().slice(0, 7));
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory === "kitchenFootprints") {
+      setKitchenLpgKg(undefined);
+      setKitchenNgMmscf(undefined);
+      setKitchenGhv(undefined);
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory === "powerFuelConsumption") {
+      setPowerDieselLiters(undefined);
+      setPowerNgMmscf(undefined);
+      setPowerGhv(undefined);
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory === "heatingFootprints") {
+      setHeatingMmscf(undefined);
+      setHeatingGhv(undefined);
+    }
+  }, [activeCategory]);
+
   if (isRestrictedUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
@@ -2461,69 +3506,54 @@ const EmissionCalculatorIPCC = () => {
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                 {activeCategory === "stationaryFuelCombustion"
-                  ? "Chapter 1 - Stationary Fuel Combustion"
+                  ? "Scope 1 - Stationary Fuel Combustion"
                   : activeCategory === "flaring"
-                  ? "Chapter 1 - Flaring"
+                  ? "Scope 1 - Flaring"
                   : activeCategory === "venting"
-                  ? "Chapter 1 - Venting"
+                  ? "Scope 1 - Venting"
+                  : activeCategory === "vehicularCarbonFootprints"
+                  ? "Scope 1 - Vehicular Carbon Footprints"
+                  : activeCategory === "kitchenFootprints"
+                  ? "Scope 1 - Kitchen Footprints"
+                  : activeCategory === "powerFuelConsumption"
+                  ? "Scope 1 - Fuel Consumption for Power"
+                  : activeCategory === "heatingFootprints"
+                  ? "Scope 1 - Heating"
                   : activeCategory === "roadTransport"
-                  ? "Chap 3 - Road Transport"
+                  ? "Scope 3 - Road Transport"
                   : activeCategory === "roadTransportVehicleType"
-                  ? "Chap 3 - Road Transport with Vehicle Type"
+                  ? "Scope 3 - Road Transport with Vehicle Type"
                   : activeCategory === "usaGasolineDieselVehicles"
-                  ? "Chap 3 - USA Gasoline and Diesel Vehicles"
+                  ? "Scope 3 - USA Gasoline and Diesel Vehicles"
                   : activeCategory === "alternativeFuelVehicles"
-                  ? "Chap 3 - Alternative Fuel Vehicles"
-                  : "Chap 2 - Industry Emissions"}
+                  ? "Scope 3 - Alternative Fuel Vehicles"
+                  : "Scope 2 - Industry Emissions"}
               </h2>
               <p className="text-gray-600 mt-1 text-sm sm:text-base">
                 {activeCategory === "stationaryFuelCombustion" ? (
-                  <>
-                    Emission factors sourced from Supabase table <span className="font-semibold">IPCC 1</span>.
-                  </>
+                  <>Estimate Scope 1 emissions from stationary fuel use by entering fuel type, quantity, and unit.</>
                 ) : activeCategory === "flaring" ? (
-                  <>Stoichiometry-based calculator using flare gas volume and dynamic composition.</>
+                  <>Estimate Scope 1 flaring emissions from flare gas volume and gas composition.</>
                 ) : activeCategory === "venting" ? (
-                  <>Venting calculator using volume, composition, and gas-specific GWP conversion to tCO2e.</>
+                  <>Estimate Scope 1 venting emissions from gas volume, composition, and gas warming impact.</>
+                ) : activeCategory === "vehicularCarbonFootprints" ? (
+                  <>Estimate Scope 1 vehicle emissions from diesel and petrol consumption in litres.</>
+                ) : activeCategory === "kitchenFootprints" ? (
+                  <>Estimate Scope 1 kitchen emissions from LPG and natural gas consumption using your GHV input.</>
+                ) : activeCategory === "powerFuelConsumption" ? (
+                  <>Estimate Scope 1 power-generation emissions from diesel and natural gas usage.</>
+                ) : activeCategory === "heatingFootprints" ? (
+                  <>Estimate Scope 1 heating emissions from natural gas consumption and GHV.</>
                 ) : activeCategory === "roadTransport" ? (
-                  <>
-                    Emission factors sourced from Supabase table{" "}
-                    <span className="font-semibold">IPCC 3 ROAD TRANSPORT</span>.
-                  </>
+                  <>Estimate Scope 3 road-transport emissions by selecting vehicle and fuel details.</>
                 ) : activeCategory === "roadTransportVehicleType" ? (
-                  <>
-                    Emission factors sourced from Supabase table{" "}
-                    <span className="font-semibold">IPCC 3 Road Transport with Vehicle Type</span>.
-                  </>
+                  <>Estimate Scope 3 transport emissions using detailed vehicle-type and fuel combinations.</>
                 ) : activeCategory === "usaGasolineDieselVehicles" ? (
-                  <>
-                    Emission factors sourced from Supabase table{" "}
-                    <span className="font-semibold">IPCC 3 USA GASOLINE AND DIESEL VEHICLES</span>.
-                  </>
+                  <>Estimate Scope 3 emissions for gasoline and diesel vehicle activity scenarios.</>
                 ) : activeCategory === "alternativeFuelVehicles" ? (
-                  <>
-                    Emission factors sourced from Supabase table{" "}
-                    <span className="font-semibold">IPCC 3 ALTERNATIVE FUEL VEHICLES</span>.
-                  </>
+                  <>Estimate Scope 3 emissions for alternative-fuel vehicle activity scenarios.</>
                 ) : (
-                  <>
-                    Emission factors for <span className="font-semibold">{selectedIndustry}</span> sourced from{" "}
-                    <span className="font-semibold">
-                      {selectedIndustry === "MANUFACTURING INDUSTRIES AND CONSTRUCTION"
-                        ? "IPCC 2 Manufacturing"
-                        : selectedIndustry === "Commercial/Institutional"
-                        ? "IPCC 2 Commercial/Institutional"
-                        : selectedIndustry === "Residential and Agriculture/Forestry/Fishing/Fishing Farms"
-                        ? "IPCC 2 RESIDENTIAL AND AGRICULTURE/FORESTRY/FISHING/FISHING FAR"
-                      : selectedIndustry === "Utility Source"
-                      ? "IPCC 2 Utility Sources"
-                      : selectedIndustry === "Industrial Source"
-                      ? "IPCC 2 Industrial"
-                      : selectedIndustry === "Kilns, Ovens, and Dryers"
-                      ? "IPCC 2 KILNS, OVENS, AND DRYERS"
-                        : "IPCC 2 Energy"}
-                    </span>.
-                  </>
+                  <>Estimate Scope 2 industry emissions for <span className="font-semibold">{selectedIndustry}</span>.</>
                 )}
               </p>
             </div>
@@ -2548,18 +3578,11 @@ const EmissionCalculatorIPCC = () => {
                   <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">Stationary Fuel Combustion</h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Emissions = Quantity x CO emission factor
-                      </p>
                     </div>
                     <Button onClick={addCalculatorRow} className="bg-teal-600 hover:bg-teal-700 text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
                     </Button>
-                  </div>
-
-                  <div className="rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50/40 to-emerald-50/30 px-4 py-3 text-xs text-teal-900">
-                    Select fuel and quantity. For fuels without subtypes, the calculator applies the factor directly.
                   </div>
 
                   <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-sm">
@@ -2699,7 +3722,7 @@ const EmissionCalculatorIPCC = () => {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="text-sm text-gray-600 mb-1 block">Flare gas volume</label>
                       <Input
@@ -2733,11 +3756,22 @@ const EmissionCalculatorIPCC = () => {
                     </div>
                     <div>
                       <label className="text-sm text-gray-600 mb-1 block">Month</label>
-                      <Input
-                        type="month"
-                        value={flaringMonth}
-                        onChange={(event) => setFlaringMonth(event.target.value)}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(flaringMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(flaringMonth)}
+                            defaultMonth={parseMonthValueToDate(flaringMonth)}
+                            onSelect={(date) => date && setFlaringMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
@@ -2983,7 +4017,7 @@ const EmissionCalculatorIPCC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="text-sm text-gray-600 mb-1 block">Vent gas volume</label>
                       <Input
@@ -3017,11 +4051,22 @@ const EmissionCalculatorIPCC = () => {
                     </div>
                     <div>
                       <label className="text-sm text-gray-600 mb-1 block">Month</label>
-                      <Input
-                        type="month"
-                        value={ventingMonth}
-                        onChange={(event) => setVentingMonth(event.target.value)}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(ventingMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(ventingMonth)}
+                            defaultMonth={parseMonthValueToDate(ventingMonth)}
+                            onSelect={(date) => date && setVentingMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
@@ -3120,12 +4165,7 @@ const EmissionCalculatorIPCC = () => {
                     Gas composition total: <span className="font-semibold">{formatNumber(ventingPercentageTotal, 2)}%</span>
                     {Math.abs(ventingPercentageTotal - 100) > 0.001 && " (must equal 100%)"}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Venting temperature correction applied: (273.15 / {formatNumber(VENTING_REFERENCE_TEMPERATURE_K, 6)})
-                  </div>
-
                   <div className="flex items-end justify-between gap-3">
-                    <div className="text-sm text-gray-600">Result unit: <span className="font-semibold">MeT</span></div>
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={handleSaveVentingMonth}
@@ -3233,6 +4273,584 @@ const EmissionCalculatorIPCC = () => {
                               variant="outline"
                               className="border-gray-300 text-gray-700 hover:bg-gray-50"
                               onClick={() => handleLoadVentingEntry(entry)}
+                            >
+                              Load
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeCategory === "vehicularCarbonFootprints" ? (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Scope 1 Vehicular Carbon Footprints</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Enter monthly diesel and petrol consumption in litres to calculate CO2 in MeT.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Diesel consumption (litres)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={vehicularDieselLiters ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setVehicularDieselLiters(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setVehicularDieselLiters(numeric);
+                        }}
+                        placeholder="Enter diesel litres"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Petrol consumption (litres)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={vehicularPetrolLiters ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setVehicularPetrolLiters(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setVehicularPetrolLiters(numeric);
+                        }}
+                        placeholder="Enter petrol litres"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Month</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(vehicularMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(vehicularMonth)}
+                            defaultMonth={parseMonthValueToDate(vehicularMonth)}
+                            onSelect={(date) => date && setVehicularMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="text-sm text-gray-600">Result unit: <span className="font-semibold">MeT</span></div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleSaveVehicularMonth}
+                        disabled={vehicularSaving}
+                        variant="outline"
+                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                      >
+                        {vehicularSaving ? "Saving..." : "Save Monthly Entry"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
+                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1VehicularCo2eMeT, 2)}</div>
+                  </div>
+
+                  {(scope1VehicularLoading || scope1VehicularError) && (
+                    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                      {scope1VehicularLoading
+                        ? "Loading Mobile Combustion factors..."
+                        : scope1VehicularError || "Factor source unavailable."}
+                    </div>
+                  )}
+
+                  {vehicularSaveError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {vehicularSaveError}
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-3">Previous Monthly Entries</div>
+                    {vehicularHistoryLoading ? (
+                      <div className="text-sm text-gray-600">Loading saved entries...</div>
+                    ) : vehicularHistory.length === 0 ? (
+                      <div className="text-sm text-gray-500">No saved monthly vehicular entries yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {vehicularHistory.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded border border-gray-100 px-3 py-2"
+                          >
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">{entry.month}</span>
+                              <span className="mx-2 text-gray-400">|</span>
+                              <span>{formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)} MeT CO2</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              onClick={() => handleLoadVehicularEntry(entry)}
+                            >
+                              Load
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeCategory === "kitchenFootprints" ? (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Scope 1 Kitchen Footprints</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Enter LPG fuel consumption, NG consumption, and GHV to calculate CO2 in MeT.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">LPG consumption (kg)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={kitchenLpgKg ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setKitchenLpgKg(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setKitchenLpgKg(numeric);
+                        }}
+                        placeholder="Enter LPG kg"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">NG consumption (MMSCF)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={kitchenNgMmscf ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setKitchenNgMmscf(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setKitchenNgMmscf(numeric);
+                        }}
+                        placeholder="Enter NG MMSCF"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">GHV value</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={kitchenGhv ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setKitchenGhv(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setKitchenGhv(numeric);
+                        }}
+                        placeholder="Enter GHV"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Month</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(kitchenMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(kitchenMonth)}
+                            defaultMonth={parseMonthValueToDate(kitchenMonth)}
+                            onSelect={(date) => date && setKitchenMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="text-sm text-gray-600">Result unit: <span className="font-semibold">MeT</span></div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleSaveKitchenMonth}
+                        disabled={kitchenSaving}
+                        variant="outline"
+                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                      >
+                        {kitchenSaving ? "Saving..." : "Save Monthly Entry"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
+                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1KitchenCo2eMeT, 2)}</div>
+                  </div>
+
+                  {(scope1KitchenLoading || scope1KitchenError) && (
+                    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                      {scope1KitchenLoading
+                        ? "Loading factor sources..."
+                        : scope1KitchenError || "Factor source unavailable."}
+                    </div>
+                  )}
+
+                  {kitchenSaveError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {kitchenSaveError}
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-3">Previous Monthly Entries</div>
+                    {kitchenHistoryLoading ? (
+                      <div className="text-sm text-gray-600">Loading saved entries...</div>
+                    ) : kitchenHistory.length === 0 ? (
+                      <div className="text-sm text-gray-500">No saved monthly kitchen entries yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {kitchenHistory.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded border border-gray-100 px-3 py-2"
+                          >
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">{entry.month}</span>
+                              <span className="mx-2 text-gray-400">|</span>
+                              <span>{formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)} MeT CO2</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              onClick={() => handleLoadKitchenEntry(entry)}
+                            >
+                              Load
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeCategory === "powerFuelConsumption" ? (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Fuel Consumption for Power</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Enter diesel litres, NG in MMSCF, and GHV to calculate CO2 in MeT.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">NG consumption (MMSCF)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={powerNgMmscf ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setPowerNgMmscf(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setPowerNgMmscf(numeric);
+                        }}
+                        placeholder="Enter NG MMSCF"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Diesel consumption (litres)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={powerDieselLiters ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setPowerDieselLiters(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setPowerDieselLiters(numeric);
+                        }}
+                        placeholder="Enter diesel litres"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">GHV value</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={powerGhv ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setPowerGhv(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setPowerGhv(numeric);
+                        }}
+                        placeholder="Enter GHV"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Month</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(powerMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(powerMonth)}
+                            defaultMonth={parseMonthValueToDate(powerMonth)}
+                            onSelect={(date) => date && setPowerMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="text-sm text-gray-600">Result unit: <span className="font-semibold">MeT</span></div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleSavePowerMonth}
+                        disabled={powerSaving}
+                        variant="outline"
+                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                      >
+                        {powerSaving ? "Saving..." : "Save Monthly Entry"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
+                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1PowerCo2eMeT, 2)}</div>
+                  </div>
+
+                  {(scope1PowerLoading || scope1PowerError) && (
+                    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                      {scope1PowerLoading ? "Loading factor sources..." : scope1PowerError || "Factor source unavailable."}
+                    </div>
+                  )}
+
+                  {powerSaveError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {powerSaveError}
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-3">Previous Monthly Entries</div>
+                    {powerHistoryLoading ? (
+                      <div className="text-sm text-gray-600">Loading saved entries...</div>
+                    ) : powerHistory.length === 0 ? (
+                      <div className="text-sm text-gray-500">No saved monthly power entries yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {powerHistory.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded border border-gray-100 px-3 py-2"
+                          >
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">{entry.month}</span>
+                              <span className="mx-2 text-gray-400">|</span>
+                              <span>{formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)} MeT CO2</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              onClick={() => handleLoadPowerEntry(entry)}
+                            >
+                              Load
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : activeCategory === "heatingFootprints" ? (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Heating</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Enter heating gas in MMSCF and GHV to calculate CO2 in MeT.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Heating consumption (MMSCF)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={heatingMmscf ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setHeatingMmscf(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setHeatingMmscf(numeric);
+                        }}
+                        placeholder="Enter MMSCF"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">GHV (BTU/SCF)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={heatingGhv ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          if (raw === "") {
+                            setHeatingGhv(undefined);
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          if (!Number.isNaN(numeric) && numeric >= 0) setHeatingGhv(numeric);
+                        }}
+                        placeholder="Enter GHV"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 mb-1 block">Month</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formatMonthLabel(heatingMonth)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseMonthValueToDate(heatingMonth)}
+                            defaultMonth={parseMonthValueToDate(heatingMonth)}
+                            onSelect={(date) => date && setHeatingMonth(formatMonthValue(date))}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="text-sm text-gray-600">Result unit: <span className="font-semibold">MeT</span></div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleSaveHeatingMonth}
+                        disabled={heatingSaving}
+                        variant="outline"
+                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                      >
+                        {heatingSaving ? "Saving..." : "Save Monthly Entry"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
+                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1HeatingCo2eMeT, 2)}</div>
+                  </div>
+
+                  {(scope1PowerLoading || scope1PowerError) && (
+                    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                      {scope1PowerLoading ? "Loading NG factor..." : scope1PowerError || "Factor source unavailable."}
+                    </div>
+                  )}
+
+                  {heatingSaveError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {heatingSaveError}
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-3">Previous Monthly Entries</div>
+                    {heatingHistoryLoading ? (
+                      <div className="text-sm text-gray-600">Loading saved entries...</div>
+                    ) : heatingHistory.length === 0 ? (
+                      <div className="text-sm text-gray-500">No saved monthly heating entries yet.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {heatingHistory.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded border border-gray-100 px-3 py-2"
+                          >
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">{entry.month}</span>
+                              <span className="mx-2 text-gray-400">|</span>
+                              <span>{formatNumber(entry.result?.totalCO2e_tonnes || 0, 2)} MeT CO2</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              onClick={() => handleLoadHeatingEntry(entry)}
                             >
                               Load
                             </Button>
