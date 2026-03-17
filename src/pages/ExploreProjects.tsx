@@ -91,6 +91,13 @@ const ExploreProjects = () => {
   const navigate = useNavigate();
   const [navigating, setNavigating] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    type: "country" | "region" | "status";
+    value: string;
+  } | null>(null);
+  const [categoryProjects, setCategoryProjects] = useState<any[]>([]);
+  const [categoryProjectsLoading, setCategoryProjectsLoading] = useState(false);
+  const [categoryProjectsError, setCategoryProjectsError] = useState<string | null>(null);
   // Filter state
   const [regions, setRegions] = useState<string[]>([]);
   const [voluntaryStatuses, setVoluntaryStatuses] = useState<string[]>([]);
@@ -262,7 +269,7 @@ const ExploreProjects = () => {
       if (filters.voluntaryStatuses && filters.voluntaryStatuses.length > 0) query = query.in("Voluntary Status", filters.voluntaryStatuses);
       if (filters.voluntaryRegistries && filters.voluntaryRegistries.length > 0) query = query.in("Voluntary Registry", filters.voluntaryRegistries);
       if (filters.countries && filters.countries.length > 0) query = query.in("Country", filters.countries);
-      if (filters.areasOfInterest && filters.areasOfInterest.length > 0) query = query.in("Area of Interest", filters.areasOfInterest);
+      if (filters.areasOfInterest && filters.areasOfInterest.length > 0) query = query.in("Area of interest", filters.areasOfInterest);
 
       const { data, error, count }: { data: any[]; error: any; count: number | null } = await query;
       
@@ -326,7 +333,7 @@ const ExploreProjects = () => {
       if (filters.voluntaryStatuses && filters.voluntaryStatuses.length > 0) query = query.in("Voluntary Status", filters.voluntaryStatuses);
       if (filters.voluntaryRegistries && filters.voluntaryRegistries.length > 0) query = query.in("Voluntary Registry", filters.voluntaryRegistries);
       if (filters.countries && filters.countries.length > 0) query = query.in("Country", filters.countries);
-      if (filters.areasOfInterest && filters.areasOfInterest.length > 0) query = query.in("Area of Interest", filters.areasOfInterest);
+      if (filters.areasOfInterest && filters.areasOfInterest.length > 0) query = query.in("Area of interest", filters.areasOfInterest);
 
       const { data, error, count }: { data: any[]; error: any; count: number | null } = await query;
       
@@ -617,6 +624,136 @@ const ExploreProjects = () => {
   const activeProjects = stats.activeProjects;
   
   const loading = projectsLoading || chartsLoading || isLoadingFilters;
+
+  const renderSelectedProjectsCard = () => {
+    if (!selectedCategory) return null;
+    return (
+      <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl mb-8">
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-teal-800">Projects for Selected Category</CardTitle>
+            <CardDescription>
+              Showing projects for{" "}
+              <span className="font-semibold text-gray-800">
+                {selectedCategory.type === "country"
+                  ? "Country"
+                  : selectedCategory.type === "region"
+                  ? "Region"
+                  : "Voluntary Status"}
+              </span>
+              :{" "}
+              <span className="font-semibold text-teal-700">{selectedCategory.value}</span>
+            </CardDescription>
+          </div>
+          <Button variant="outline" onClick={() => setSelectedCategory(null)}>
+            Clear
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {categoryProjectsLoading ? (
+            <div className="text-sm text-gray-600">Loading matching projects...</div>
+          ) : categoryProjectsError ? (
+            <div className="text-sm text-red-600">{categoryProjectsError}</div>
+          ) : categoryProjects.length === 0 ? (
+            <div className="text-sm text-gray-600">No projects found for this category with current filters.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {categoryProjects.map((project, idx) => (
+                <Card key={`${project["Project Name"] || "project"}-${idx}`} className="border-teal-100 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base leading-tight text-gray-900">
+                      {project["Project Name"] || "Unnamed Project"}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {(project["Country"] || "-") + " | " + (project["Region"] || "-")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Status</span>
+                      <Badge className="bg-teal-100 text-teal-700 border-teal-200">
+                        {project["Voluntary Status"] || "N/A"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Registry</span>
+                      <span className="text-gray-800 text-right">{project["Voluntary Registry"] || "-"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Area</span>
+                      <span className="text-gray-800 text-right">
+                        {project["Area of interest"] || project["Area of Interest"] || project["area_of_interest"] || "-"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Credits</span>
+                      <span className="text-gray-800 text-right">
+                        {project["Total Credits Issued"] ? String(project["Total Credits Issued"]) : "-"}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const handleCategoryClick = (type: "country" | "region" | "status", value: string) => {
+    if (!value) return;
+    setSelectedCategory((prev) =>
+      prev && prev.type === type && prev.value === value ? null : { type, value }
+    );
+  };
+
+  useEffect(() => {
+    if (!selectedCategory) {
+      setCategoryProjects([]);
+      setCategoryProjectsError(null);
+      return;
+    }
+
+    const loadCategoryProjects = async () => {
+      setCategoryProjectsLoading(true);
+      setCategoryProjectsError(null);
+      try {
+        let query: any = supabase
+          .from("global_projects_2025" as any)
+          .select('*')
+          .limit(24);
+
+        if (selectedRegions.length > 0) query = query.in("Region", selectedRegions);
+        if (selectedVoluntaryStatuses.length > 0) query = query.in("Voluntary Status", selectedVoluntaryStatuses);
+        if (selectedVoluntaryRegistries.length > 0) query = query.in("Voluntary Registry", selectedVoluntaryRegistries);
+        if (selectedCountries.length > 0) query = query.in("Country", selectedCountries);
+        if (selectedAreasOfInterest.length > 0) query = query.in("Area of interest", selectedAreasOfInterest);
+
+        if (selectedCategory.type === "country") query = query.eq("Country", selectedCategory.value);
+        if (selectedCategory.type === "region") query = query.eq("Region", selectedCategory.value);
+        if (selectedCategory.type === "status") query = query.eq("Voluntary Status", selectedCategory.value);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setCategoryProjects(data || []);
+      } catch (err: any) {
+        setCategoryProjects([]);
+        setCategoryProjectsError(err?.message || "Failed to load projects for selected category.");
+      } finally {
+        setCategoryProjectsLoading(false);
+      }
+    };
+
+    loadCategoryProjects();
+  }, [
+    selectedCategory,
+    selectedRegions,
+    selectedVoluntaryStatuses,
+    selectedVoluntaryRegistries,
+    selectedCountries,
+    selectedAreasOfInterest,
+  ]);
 
   // Show mesmerizing loading screen while data is loading
   if (loading) {
@@ -909,6 +1046,8 @@ const ExploreProjects = () => {
                             animationBegin={0}
                             animationDuration={800}
                             animationEasing="ease-out"
+                            onClick={(entry: any) => handleCategoryClick("country", entry?.country)}
+                            cursor="pointer"
                           />
                 </BarChart>
               </ResponsiveContainer>
@@ -1009,6 +1148,8 @@ const ExploreProjects = () => {
                             animationBegin={100}
                             animationDuration={800}
                             animationEasing="ease-out"
+                            onClick={(entry: any) => handleCategoryClick("region", entry?.region)}
+                            cursor="pointer"
                           />
                 </BarChart>
               </ResponsiveContainer>
@@ -1017,6 +1158,9 @@ const ExploreProjects = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {(selectedCategory?.type === "country" || selectedCategory?.type === "region") &&
+              renderSelectedProjectsCard()}
 
             {/* Second Row: Status Pie Chart - same chart config */}
             <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl transition-all duration-300 hover:shadow-2xl">
@@ -1073,6 +1217,10 @@ const ExploreProjects = () => {
                             animationBegin={0}
                             animationDuration={1000}
                             animationEasing="ease-out"
+                            onClick={(_, index) => {
+                              const item = displayedStatusData[index];
+                              if (item?.status) handleCategoryClick("status", item.status);
+                            }}
                   >
                             {displayedStatusData.map((entry, idx) => (
                               <Cell 
@@ -1112,8 +1260,13 @@ const ExploreProjects = () => {
                         {displayedStatusData.map((entry, idx) => (
                           <div 
                             key={entry.status} 
-                            className="flex items-start gap-3 p-2 rounded-lg hover:bg-teal-50 transition-colors animate-in fade-in"
+                            className={`flex items-start gap-3 p-2 rounded-lg transition-colors animate-in fade-in cursor-pointer ${
+                              selectedCategory?.type === "status" && selectedCategory?.value === entry.status
+                                ? "bg-teal-100 ring-1 ring-teal-300"
+                                : "hover:bg-teal-50"
+                            }`}
                             style={{ animationDelay: `${idx * 50}ms` }}
+                            onClick={() => handleCategoryClick("status", entry.status)}
                           >
                             <div 
                               className="w-5 h-5 rounded flex-shrink-0 mt-0.5" 
@@ -1132,10 +1285,12 @@ const ExploreProjects = () => {
               </div>
             </div>
           </div>
+
                 )}
               </CardContent>
             </Card>
           </div>
+          {selectedCategory?.type === "status" && renderSelectedProjectsCard()}
           {/* View Details Button - same functionality */}
           <div className="flex justify-center gap-4 mb-8">
             <Button

@@ -124,6 +124,10 @@ const ExploreCCUSProjects = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    type: "type" | "status" | "sector";
+    value: string;
+  } | null>(null);
 
   // Chart data
   const [typeData, setTypeData] = useState<{ type: string; count: number }[]>([]);
@@ -254,6 +258,27 @@ const ExploreCCUSProjects = () => {
     });
   }, [projects, searchQuery]);
 
+  const handleCategoryClick = (type: "type" | "status" | "sector", value?: string) => {
+    if (!value) return;
+    setSelectedCategory((prev) =>
+      prev && prev.type === type && prev.value === value ? null : { type, value }
+    );
+  };
+
+  const selectedCategoryProjects = useMemo(() => {
+    if (!selectedCategory) return [];
+    const key =
+      selectedCategory.type === "type"
+        ? "Project type"
+        : selectedCategory.type === "status"
+        ? "Project Status"
+        : "Sector";
+
+    return filteredProjects
+      .filter((project) => String(project?.[key] || "").trim() === selectedCategory.value)
+      .slice(0, 24);
+  }, [filteredProjects, selectedCategory]);
+
   // Aggregate chart data whenever filtered projects change
   useEffect(() => {
     const typeMap = new Map<string, number>();
@@ -329,6 +354,73 @@ const ExploreCCUSProjects = () => {
     });
     return map;
   }, [filteredProjects]);
+
+  const renderSelectedProjectsCard = () => {
+    if (!selectedCategory) return null;
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg lg:col-span-2">
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg text-teal-700">Projects for Selected Category</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Showing projects for{" "}
+              <span className="font-semibold text-gray-800">
+                {selectedCategory.type === "type"
+                  ? "Project type"
+                  : selectedCategory.type === "status"
+                  ? "Project status"
+                  : "Sector"}
+              </span>
+              : <span className="font-semibold text-teal-700">{selectedCategory.value}</span>
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setSelectedCategory(null)}>
+            Clear
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {selectedCategoryProjects.length === 0 ? (
+            <div className="text-sm text-gray-600">No projects found for this category with current filters.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {selectedCategoryProjects.map((project, idx) => (
+                <Card key={`${project["Project ID"] || project["Project name"] || "project"}-${idx}`} className="border-teal-100 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base leading-tight text-gray-900">
+                      {project["Project name"] || "Unnamed Project"}
+                    </CardTitle>
+                    <p className="text-xs text-gray-500">
+                      {(project["Country or economy"] || "-") + " | " + (project["Sector"] || "-")}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Status</span>
+                      <Badge className="bg-teal-100 text-teal-700 border-teal-200">
+                        {project["Project Status"] || "N/A"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Type</span>
+                      <span className="text-gray-800 text-right">{project["Project type"] || "-"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Fate of carbon</span>
+                      <span className="text-gray-800 text-right">{project["Fate of carbon"] || "-"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Methodology</span>
+                      <span className="text-gray-800 text-right">{project["Methodology"] || "-"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (loading || filtersLoading) {
     return <LoadingScreen message="Loading CCUS Database" subMessage="Fetching project data and analytics..." />;
@@ -598,7 +690,15 @@ const ExploreCCUSProjects = () => {
                     interval={0}
                   />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#14b8a6" animationBegin={0} animationDuration={800} animationEasing="ease-out" />
+                  <Bar
+                    dataKey="count"
+                    fill="#14b8a6"
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                    cursor="pointer"
+                    onClick={(entry: any) => handleCategoryClick("type", entry?.type)}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -623,6 +723,10 @@ const ExploreCCUSProjects = () => {
                     animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
+                    onClick={(_, index) => {
+                      const item = statusData[index];
+                      if (item?.status) handleCategoryClick("status", item.status);
+                    }}
                   >
                     {statusData.map((entry, idx) => (
                       <Cell
@@ -637,6 +741,9 @@ const ExploreCCUSProjects = () => {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          {(selectedCategory?.type === "type" || selectedCategory?.type === "status") &&
+            renderSelectedProjectsCard()}
 
           {/* Projects by Sector - Full Width */}
           <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500 lg:col-span-2" style={{ animationDelay: '0.6s' }}>
@@ -679,11 +786,15 @@ const ExploreCCUSProjects = () => {
                     animationBegin={0}
                     animationDuration={800}
                     animationEasing="ease-out"
+                    cursor="pointer"
+                    onClick={(entry: any) => handleCategoryClick("sector", entry?.sector)}
                   />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          {selectedCategory?.type === "sector" && renderSelectedProjectsCard()}
         </div>
 
 
