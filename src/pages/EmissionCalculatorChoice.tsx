@@ -1,11 +1,15 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
 import { Factory, Leaf, Building2, Globe2, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 
 const EmissionCalculatorChoice = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const from = searchParams.get("from");
   const mode = searchParams.get("mode");
   const counterpartyId = searchParams.get("counterpartyId");
@@ -16,6 +20,12 @@ const EmissionCalculatorChoice = () => {
   const goToEPA = () => navigate(`/emission-calculator-epa${query}`);
   const goToUK = () => navigate(`/emission-calculator-uk${query}`);
   const goToIPCC = () => navigate(`/emission-calculator-ipcc${query}`);
+
+  useEffect(() => {
+    if (isMariEnergiesUserEmail(user?.email)) {
+      navigate(`/emission-calculator-epa${query}`, { replace: true });
+    }
+  }, [navigate, query, user?.email]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">

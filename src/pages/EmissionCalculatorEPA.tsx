@@ -41,14 +41,26 @@ import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmi
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/components/emissions/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
+import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
+import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
 
 const EmissionCalculatorEPA = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMariUser = isMariEnergiesUserEmail(user?.email);
+  const defaultManualCategory = "fuel";
+  const mariScope1CategoryIds = [
+    "flaring",
+    "venting",
+    "vehicularCarbonFootprints",
+    "kitchenFootprints",
+    "powerFuelConsumption",
+    "heatingFootprints",
+  ];
 
   const [activeScope, setActiveScope] = useState("scope1");
-  const [activeCategory, setActiveCategory] = useState("fuel");
+  const [activeCategory, setActiveCategory] = useState(defaultManualCategory);
   const [resetKey, setResetKey] = useState(0);
   const [hasWizardContext, setHasWizardContext] = useState(false);
   const [wizardMode, setWizardMode] = useState<"finance" | "facilitated">("finance");
@@ -85,6 +97,7 @@ const EmissionCalculatorEPA = () => {
   const [onRoadDieselAltFuelRows, setOnRoadDieselAltFuelRows] = useState<Array<{ emissions?: number }>>([]);
   const [nonRoadVehicleRows, setNonRoadVehicleRows] = useState<Array<{ emissions?: number }>>([]);
   const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
+  const [mariIpccScope1Totals, setMariIpccScope1Totals] = useState<Record<string, number>>({});
   // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
     scope1:
@@ -95,7 +108,8 @@ const EmissionCalculatorEPA = () => {
           onRoadGasolineRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           onRoadDieselAltFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           nonRoadVehicleRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0),
+          scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
+          (isMariUser ? Object.values(mariIpccScope1Totals).reduce((sum, v) => sum + (v || 0), 0) : 0),
     scope2:
       calculationMode === "lca"
         ? emissionData.scope3.find((r) => r.category === "lca_scope2")?.emissions || 0
@@ -344,8 +358,9 @@ const EmissionCalculatorEPA = () => {
     };
 
     setEmissionData(blankEmissionData);
+    setMariIpccScope1Totals({});
     setActiveScope("scope1");
-    setActiveCategory("fuel");
+    setActiveCategory(defaultManualCategory);
     setResetKey((prev) => prev + 1);
 
     toast({
@@ -354,21 +369,55 @@ const EmissionCalculatorEPA = () => {
     });
   };
 
+  const handleMariScope1TotalChange = (categoryId: string, totalMeT: number) => {
+    setMariIpccScope1Totals((prev) => {
+      if (prev[categoryId] === totalMeT) return prev;
+      return { ...prev, [categoryId]: totalMeT };
+    });
+  };
+
   // Sidebar – EPA version: Scope 1 Fuel only, Scope 2 Electricity + Heat & Steam, Scope 3 unchanged
+  const baseScope1Categories = [
+    { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)" },
+    { id: "scope1HeatSteam", title: "Heat and Steam", icon: Thermometer, description: "Heat and steam (Scope 1, same form as Fuel)" },
+    { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table" },
+    { id: "onRoadGasoline", title: "On-Road Gasoline", icon: Truck, description: "On-road gasoline using On-Road Gasoline table" },
+    { id: "onRoadDieselAltFuel", title: "On-Road Diesel & Alt Fuel", icon: Truck, description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table" },
+    { id: "nonRoadVehicle", title: "Non-Road Vehicle", icon: Truck, description: "Non-road vehicle fuel using Non-Road Vehicle table" },
+  ];
+
+  const mariIpccScope1Categories = [
+    { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator" },
+    { id: "venting", title: "Venting", icon: Flame, description: "Scope 1 venting calculator" },
+    {
+      id: "vehicularCarbonFootprints",
+      title: "Vehicular Carbon Footprints",
+      icon: Truck,
+      description: "Scope 1 vehicular emissions calculator",
+    },
+    { id: "kitchenFootprints", title: "Kitchen Footprints", icon: Flame, description: "Scope 1 kitchen emissions calculator" },
+    {
+      id: "powerFuelConsumption",
+      title: "Fuel Consumption for Power",
+      icon: Factory,
+      description: "Scope 1 power fuel emissions calculator",
+    },
+    { id: "heatingFootprints", title: "Heating", icon: Thermometer, description: "Scope 1 heating emissions calculator" },
+  ];
+
+  const scope1Categories = isMariUser
+    ? [...baseScope1Categories, ...mariIpccScope1Categories]
+    : baseScope1Categories;
+
   const sidebarItems = [
     {
       id: "scope1",
-      title: "Scope 1 (EPA Fuel)",
+      title: isMariUser ? "Scope 1" : "Scope 1 (EPA Fuel)",
       icon: Factory,
-      description: "Direct emissions from fuel combustion (EPA factors)",
-      categories: [
-        { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)" },
-        { id: "scope1HeatSteam", title: "Heat and Steam", icon: Thermometer, description: "Heat and steam (Scope 1, same form as Fuel)" },
-        { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table" },
-        { id: "onRoadGasoline", title: "On-Road Gasoline", icon: Truck, description: "On-road gasoline using On-Road Gasoline table" },
-        { id: "onRoadDieselAltFuel", title: "On-Road Diesel & Alt Fuel", icon: Truck, description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table" },
-        { id: "nonRoadVehicle", title: "Non-Road Vehicle", icon: Truck, description: "Non-road vehicle fuel using Non-Road Vehicle table" },
-      ],
+      description: isMariUser
+        ? "Scope 1 calculators available for your account"
+        : "Direct emissions from fuel combustion (EPA factors)",
+      categories: scope1Categories,
     },
     {
       id: "scope2",
@@ -487,42 +536,6 @@ const EmissionCalculatorEPA = () => {
     );
   }
 
-  const restrictedEmissionEmails = ["asghar.hayat@marienergies.com.pk"];
-  const isEmissionRestrictedUser = user.email
-    ? restrictedEmissionEmails.includes(user.email.toLowerCase())
-    : false;
-
-  if (isEmissionRestrictedUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
-        <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 mb-2">
-                <Factory className="h-8 w-8 text-red-500" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Emission calculator access restricted
-              </h2>
-              <p className="text-sm text-red-700 max-w-md">
-                You do not currently have access to the emission calculator modules (UK, EPA, or IPCC) in this account.
-              </p>
-              <p className="text-sm text-gray-600 max-w-md">
-                Please contact your administrator if you believe you should have access to this part of the platform.
-              </p>
-              <Button
-                className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
-                onClick={() => navigate("/dashboard")}
-              >
-                Back to Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (loadingPreferences) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -549,7 +562,7 @@ const EmissionCalculatorEPA = () => {
                   setInitialQuestionnaireCompleted(true);
                   setCalculationMode("manual");
                   setActiveScope("scope1");
-                  setActiveCategory("fuel");
+                  setActiveCategory(defaultManualCategory);
                   saveLCAPreferences(false, "manual");
                 }}
                 onInitialAnswer={(hasLCA) => {
@@ -558,7 +571,7 @@ const EmissionCalculatorEPA = () => {
                   setCalculationMode(mode);
                   if (!hasLCA) {
                     setActiveScope("scope1");
-                    setActiveCategory("fuel");
+                    setActiveCategory(defaultManualCategory);
                   }
                   saveLCAPreferences(hasLCA, mode);
                 }}
@@ -576,7 +589,7 @@ const EmissionCalculatorEPA = () => {
   const handleSwitchToManual = () => {
     setCalculationMode("manual");
     setActiveScope("scope1");
-    setActiveCategory("fuel");
+    setActiveCategory(defaultManualCategory);
     saveLCAPreferences(false, "manual");
   };
 
@@ -626,7 +639,7 @@ const EmissionCalculatorEPA = () => {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                  EPA Emission Calculator
+                  Emission Calculator
                 </h1>
               </div>
             </div>
@@ -1019,6 +1032,16 @@ const EmissionCalculatorEPA = () => {
 
           {calculationMode === "manual" && (
             <>
+              {isMariUser && activeScope === "scope1" && mariScope1CategoryIds.includes(activeCategory) && (
+                <div className="w-full" key={`mari-ipcc-embedded-${activeCategory}-${resetKey}`}>
+                  <EmissionCalculatorIPCC
+                    embedded
+                    forcedCategory={activeCategory}
+                    onScope1CategoryTotalChange={handleMariScope1TotalChange}
+                  />
+                </div>
+              )}
+
               {/* Scope 1 – Fuel only (EPA factors handled inside FuelEmissions) */}
               {activeScope === "scope1" && activeCategory === "fuel" && (
                 <div className="w-full" key={`fuel-${resetKey}`}>

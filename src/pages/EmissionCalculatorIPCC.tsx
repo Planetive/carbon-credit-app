@@ -10,8 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 
-const RESTRICTED_IPCC_EMAILS = ["asghar.hayat@marienergies.com.pk"];
-
 type StationaryFuelRow = {
   id: string;
   fuelTypeDescription: string;
@@ -78,6 +76,12 @@ type VentingSavedEntry = {
   composition: VentingGasComponent[];
   result: VentingCalculationResult;
   updatedAt: string;
+};
+
+type EmissionCalculatorIPCCProps = {
+  embedded?: boolean;
+  forcedCategory?: string;
+  onScope1CategoryTotalChange?: (categoryId: string, totalMeT: number) => void;
 };
 
 type FlaringSavedEntry = {
@@ -738,12 +742,16 @@ const calculateVentingEmissions = (
   };
 };
 
-const EmissionCalculatorIPCC = () => {
+const EmissionCalculatorIPCC = ({
+  embedded = false,
+  forcedCategory,
+  onScope1CategoryTotalChange,
+}: EmissionCalculatorIPCCProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [activeScope, setActiveScope] = useState("scope1");
-  const [activeCategory, setActiveCategory] = useState("stationaryFuelCombustion");
+  const [activeCategory, setActiveCategory] = useState(forcedCategory || "stationaryFuelCombustion");
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({ scope1: true });
   const [loadingStationary, setLoadingStationary] = useState(false);
   const [stationaryRows, setStationaryRows] = useState<StationaryFuelRow[]>([]);
@@ -848,12 +856,10 @@ const EmissionCalculatorIPCC = () => {
     AlternativeFuelCalculatorRow[]
   >([newAlternativeFuelCalculatorRow()]);
 
-  const email = user?.email?.toLowerCase() || "";
-  const isRestrictedUser = RESTRICTED_IPCC_EMAILS.includes(email);
-
   const from = searchParams.get("from");
   const mode = searchParams.get("mode");
   const counterpartyId = searchParams.get("counterpartyId");
+  const requestedCategory = forcedCategory || searchParams.get("category");
   const query = [from, mode, counterpartyId].filter(Boolean).length
     ? `?${searchParams.toString()}`
     : "";
@@ -953,6 +959,17 @@ const EmissionCalculatorIPCC = () => {
     ],
     []
   );
+
+  useEffect(() => {
+    if (!requestedCategory) return;
+    const matchedScope = sidebarItems.find((scope) =>
+      scope.categories.some((category) => category.id === requestedCategory)
+    );
+    if (!matchedScope) return;
+    setActiveScope(matchedScope.id);
+    setActiveCategory(requestedCategory);
+    setExpandedScopes((prev) => ({ ...prev, [matchedScope.id]: true }));
+  }, [requestedCategory, sidebarItems]);
 
   const availableFuelTypes = useMemo(
     () =>
@@ -1845,6 +1862,35 @@ const EmissionCalculatorIPCC = () => {
     const ghv = typeof heatingGhv === "number" ? heatingGhv : 0;
     return (ngMmscf * ghv * scope1PowerFactors.naturalGasCo2) / 1000;
   }, [heatingMmscf, heatingGhv, scope1PowerFactors.naturalGasCo2]);
+
+  useEffect(() => {
+    if (!embedded || !onScope1CategoryTotalChange) return;
+    let totalMeT = 0;
+    if (activeCategory === "flaring") {
+      totalMeT = flaringCalculated?.CO2_tonnes || 0;
+    } else if (activeCategory === "venting") {
+      totalMeT = ventingCalculated?.totalCO2e_tonnes || 0;
+    } else if (activeCategory === "vehicularCarbonFootprints") {
+      totalMeT = scope1VehicularCo2eMeT;
+    } else if (activeCategory === "kitchenFootprints") {
+      totalMeT = scope1KitchenCo2eMeT;
+    } else if (activeCategory === "powerFuelConsumption") {
+      totalMeT = scope1PowerCo2eMeT;
+    } else if (activeCategory === "heatingFootprints") {
+      totalMeT = scope1HeatingCo2eMeT;
+    }
+    onScope1CategoryTotalChange(activeCategory, totalMeT);
+  }, [
+    activeCategory,
+    embedded,
+    flaringCalculated,
+    onScope1CategoryTotalChange,
+    scope1HeatingCo2eMeT,
+    scope1KitchenCo2eMeT,
+    scope1PowerCo2eMeT,
+    scope1VehicularCo2eMeT,
+    ventingCalculated,
+  ]);
 
   const availableRoadFuelTypes = useMemo(
     () =>
@@ -3384,40 +3430,12 @@ const EmissionCalculatorIPCC = () => {
     }
   }, [activeCategory]);
 
-  if (isRestrictedUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
-        <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100 mb-2">
-                <Factory className="h-8 w-8 text-red-500" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Emission calculator access restricted
-              </h2>
-              <p className="text-sm text-red-700 max-w-md">
-                You do not currently have access to the emission calculator modules (UK, EPA, or IPCC) in this account.
-              </p>
-              <p className="text-sm text-gray-600 max-w-md">
-                Please contact your administrator if you believe you should have access to this part of the platform.
-              </p>
-              <Button
-                className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
-                onClick={() => navigate("/dashboard")}
-              >
-                Back to Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row">
-      <div className="w-full lg:w-80 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
+    <div
+      className={`${embedded ? "" : "min-h-screen "}bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row`}
+    >
+      {!embedded && (
+        <div className="w-full lg:w-80 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
         <div className="px-6 py-6 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
           <div className="flex items-center justify-between mb-5">
             <Button
@@ -3495,10 +3513,12 @@ const EmissionCalculatorIPCC = () => {
             ))}
           </nav>
         </div>
-      </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col">
-        <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 sm:px-8 py-4 sm:py-6 shadow-sm">
+        {!embedded && (
+          <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 sm:px-8 py-4 sm:py-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl shadow-lg">
               <Globe2 className="h-7 w-7 text-white" />
@@ -3558,9 +3578,12 @@ const EmissionCalculatorIPCC = () => {
               </p>
             </div>
           </div>
-        </header>
+          </header>
+        )}
 
-        <main className="flex-1 p-6 sm:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50">
+        <main
+          className={`flex-1 ${embedded ? "p-0 bg-transparent" : "p-6 sm:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50"}`}
+        >
           <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/60 shadow-xl rounded-2xl">
             <CardContent className="p-6 sm:p-8">
               {activeCategory === "stationaryFuelCombustion" && loadingStationary ? (
