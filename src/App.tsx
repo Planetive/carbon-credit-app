@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -70,11 +70,19 @@ import UserManagement from "./pages/UserManagement";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Settings from "./pages/Settings";
 import SupplyChainIntelligence from "./pages/SupplyChainIntelligence";
+import { isExploreOnlyUserEmail } from "@/utils/roleUtils";
 
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
   useScrollToTop();
   const { user } = useAuth();
+  const location = useLocation();
+  const isExploreOnlyUser = isExploreOnlyUserEmail(user?.email);
+  const isOnExploreRoute = location.pathname.startsWith("/explore");
+
+  if (isExploreOnlyUser && !isOnExploreRoute) {
+    return <Navigate to="/explore" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -7,9 +7,11 @@ import { User } from '@supabase/supabase-js';
  */
 const FULL_ACCESS_EMAILS = [
   'it@majeedfabrics.com',
-  'asghar.hayat@marienergies.com.pk',
 ] as const;
 const FULL_ACCESS_DOMAIN = '@planetive';
+const EXPLORE_ONLY_EMAILS = [
+  'asghar.hayat@marienergies.com.pk',
+] as const;
 
 /**
  * Check if an email has full access (allowlist: specific emails + @planetive domain).
@@ -48,5 +50,11 @@ export function getRestrictedRoutes(): string[] {
 export function isRestrictedRoute(path: string): boolean {
   const restrictedRoutes = getRestrictedRoutes();
   return restrictedRoutes.some(route => path.startsWith(route));
+}
+
+export function isExploreOnlyUserEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  const lower = email.toLowerCase();
+  return EXPLORE_ONLY_EMAILS.some((e) => e === lower);
 }
 
