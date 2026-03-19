@@ -37,6 +37,10 @@ export type EmissionSelection = "ch4_only" | "n2o_only";
 type DistanceUnit = "mile" | "km";
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
 
+// Keep conversion constants reciprocal to avoid floating drift in controlled inputs.
+const KM_TO_MILES = 0.621371;
+const MILES_TO_KM = 1 / KM_TO_MILES;
+
 interface OnRoadRow {
   id: string;
   dbId?: string;
@@ -82,6 +86,11 @@ const pickFirstKey = (row: any, patterns: RegExp[]): any => {
 const pickNumber = (row: any, patterns: RegExp[]): number | undefined => {
   const v = pickFirstKey(row, patterns);
   return parseNum(v);
+};
+
+const roundTo = (value: number, decimals = 6): number => {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 };
 
 function toEmissionSelection(value: unknown): EmissionSelection {
@@ -537,7 +546,11 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         {rows.map((r) => {
           const unit: DistanceUnit = r.distanceUnit ?? "mile";
           const distanceDisplay =
-            r.miles != null ? (unit === "mile" ? r.miles : r.miles * 1.60934) : "";
+            r.miles != null
+              ? unit === "mile"
+                ? roundTo(r.miles, 6)
+                : roundTo(r.miles * MILES_TO_KM, 6)
+              : "";
 
           return (
           <div key={r.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-3 rounded-lg bg-gray-50">
@@ -617,8 +630,8 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
                 } else {
                   const num = Number(v);
                   if (num >= 0 && num <= 999999999999.999999) {
-                    const miles = unit === "mile" ? num : num * 0.621371;
-                    updateRow(r.id, { miles });
+                    const miles = unit === "mile" ? num : num * KM_TO_MILES;
+                    updateRow(r.id, { miles: roundTo(miles, 6) });
                   }
                 }
               }}

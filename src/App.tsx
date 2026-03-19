@@ -56,6 +56,7 @@ import EmissionCalculatorChoice from "./pages/EmissionCalculatorChoice";
 import EmissionCalculatorEPA from "./pages/EmissionCalculatorEPA";
 import EmissionCalculatorIPCC from "./pages/EmissionCalculatorIPCC";
 import EmissionResults from "./pages/EmissionResults";
+import EmissionResultsEpaIpcc from "./pages/EmissionResultsEpaIpcc";
 import EmissionHistory from "./pages/EmissionHistory";
 import ESGFinancialInstitutions from "./pages/solutions/esg-financial-institutions";  
 import CorporateSolutions from "./pages/solutions/corporate";
@@ -218,6 +219,11 @@ const AppRoutes = () => {
           <Route path="/emission-results" element={
             <CompanyProtectedRoute>
               <EmissionResults />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/emission-results-epa-ipcc" element={
+            <CompanyProtectedRoute>
+              <EmissionResultsEpaIpcc />
             </CompanyProtectedRoute>
           } />
           {/* Removed /onboarding route - now using /finance-emission for both flows */}

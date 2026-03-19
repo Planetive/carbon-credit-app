@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, FolderOpen, Clock, BarChart3, Settings, LogOut, User, Globe, Sparkles, TrendingUp, FileText, ArrowRight, Search, Filter, Factory } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -618,11 +619,11 @@ const Dashboard = () => {
              {/* View Results Button - only show when there is emission data */}
              {hasAnyEmissions && (
                <div className="mt-6">
-                 <Button 
+                <Button 
                    variant="outline" 
                    size="lg" 
                    className="w-full bg-gradient-to-r from-emerald-400 to-teal-500 text-white border-white/20 hover:bg-gradient-to-r hover:from-emerald-500 hover:to-teal-600 hover:border-white/30 hover:text-white hover:scale-105 transition-all duration-300 py-6 text-lg font-semibold shadow-lg"
-                   onClick={() => navigate('/emission-results')}
+                  onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-epa-ipcc' : '/emission-results')}
                  >
                    View Emission Results
                  </Button>
