@@ -16,6 +16,8 @@ declare global {
 const ESGFinancialInstitutions = () => {
   const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Demo video buttons are temporarily hidden from end users.
+  const showDemoVideos = false;
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -98,13 +100,15 @@ const ESGFinancialInstitutions = () => {
                 transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
                 className="flex flex-col sm:flex-row items-center justify-center gap-4"
               >
-                <button
-                  onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
-                  className="group inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-base hover:bg-gray-800 transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                >
-                  See a Portfolio Demo
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                {showDemoVideos && (
+                  <button
+                    onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
+                    className="group inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-base hover:bg-gray-800 transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  >
+                    See a Portfolio Demo
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
                 <Link
                   to="/contact"
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 border-2 border-gray-900 rounded-lg font-medium text-base hover:bg-gray-50 transition-all duration-300 hover:scale-105 hover:shadow-xl"
@@ -277,30 +281,10 @@ const ESGFinancialInstitutions = () => {
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
-                    Financed & facilitated emissions measurement
+                    Financed & Facilitated Emissions
                   </h3>
-                  <p className="text-teal-100 mb-2 font-medium">Understand the carbon exposure embedded across your portfolio and capital markets activities.</p>
-                  <ul className="text-teal-50 space-y-2 mb-6 text-sm leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Financed emissions across loans, investments, and underwriting</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Facilitated emissions linked to capital markets and advisory services</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Sector, asset-class, and counterparty-level attribution</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Methodologies aligned with PCAF and global best practice</span>
-                    </li>
-                  </ul>
-                  <p className="text-white font-semibold text-sm mt-4">
-                    Outcome: Clear visibility into which sectors, clients, and assets drive portfolio emissions.
-                  </p>
+                  <p className="text-teal-100 mb-2 font-medium">Measure the climate impact of financial activities</p>
+                  <p className="text-teal-50 mb-4 text-sm leading-relaxed">Gain visibility into the emissions associated with lending, investments, and capital markets activities through standardized financed emissions measurement.</p>
                 </motion.div>
               </motion.div>
 
@@ -329,30 +313,10 @@ const ESGFinancialInstitutions = () => {
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
-                    Portfolio-level climate risk assessment
+                    Portfolio Climate Risk Assessment
                   </h3>
-                  <p className="text-teal-100 mb-4 font-medium">Identify where climate-related risks translate into financial exposure across your balance sheet.</p>
-                  <ul className="text-teal-50 space-y-2 mb-6 text-sm leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Physical and transition risk screening</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Exposure analysis by sector, geography, and asset class</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Identification of high-risk assets and concentration risks</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Alignment with TCFD and supervisory expectations</span>
-                    </li>
-                  </ul>
-                  <p className="text-white font-semibold text-sm">
-                    Outcome: A defensible view of climate risks across your portfolio.
-                  </p>
+                  <p className="text-teal-100 mb-2 font-medium">Identify climate risks embedded within portfolios</p>
+                  <p className="text-teal-50 mb-4 text-sm leading-relaxed">Understand how climate-related physical and transition risks translate into financial exposure across sectors, geographies, and asset classes.</p>
                 </motion.div>
               </motion.div>
 
@@ -381,30 +345,10 @@ const ESGFinancialInstitutions = () => {
                   className="relative z-10"
                 >
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
-                    Scenario analysis & climate stress testing
+                    Scenario Analysis & Climate Stress Testing
                   </h3>
-                  <p className="text-teal-100 mb-4 font-medium">Move beyond historical data with forward-looking climate scenarios.</p>
-                  <ul className="text-teal-50 space-y-2 mb-6 text-sm leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Multiple climate and transition pathways</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Policy, technology, and market-driven scenarios</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Portfolio resilience and emissions trajectory analysis</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Identification of hotspots under different futures</span>
-                    </li>
-                  </ul>
-                  <p className="text-white font-semibold text-sm">
-                    Outcome: Forward-looking insights to support strategy, risk governance, and disclosures.
-                  </p>
+                  <p className="text-teal-100 mb-2 font-medium">Evaluate portfolio resilience under future climate pathways</p>
+                  <p className="text-teal-50 mb-4 text-sm leading-relaxed">Assess how portfolios perform under different climate and transition scenarios to understand potential impacts on financial performance.</p>
                 </motion.div>
               </motion.div>
 
@@ -430,37 +374,13 @@ const ESGFinancialInstitutions = () => {
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: 0.1 }}
-                  className="relative z-10 grid md:grid-cols-2 gap-8"
+                  className="relative z-10"
                 >
-                  <div>
-                    <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
-                      Portfolio decarbonisation & transition planning
-                    </h3>
-                    <p className="text-teal-100 mb-2 font-medium">Turn analysis into actionable capital allocation strategies.</p>
-                  </div>
-                  <div>
-                    <ul className="text-teal-50 space-y-2 text-sm leading-relaxed">
-                      <li className="flex items-start gap-2">
-                        <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                        <span>Science-aligned portfolio reduction pathways</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                        <span>Client and sector engagement prioritisation</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                        <span>Transition finance opportunity identification</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                        <span>Medium- and long-term portfolio roadmaps</span>
-                      </li>
-                    </ul>
-                    <p className="text-white font-semibold text-sm mt-6">
-                      Outcome: A clear, credible roadmap for managing climate exposure while enabling transition.
-                    </p>
-                  </div>
+                  <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
+                    Portfolio Decarbonization & Transition Planning
+                  </h3>
+                  <p className="text-teal-100 mb-2 font-medium">Translate climate insights into actionable portfolio strategy</p>
+                  <p className="text-teal-50 mb-4 text-sm leading-relaxed">Turn emissions and risk insights into credible portfolio decarbonization pathways and transition strategies.</p>
                 </motion.div>
               </motion.div>
             </div>
@@ -663,13 +583,15 @@ const ESGFinancialInstitutions = () => {
                 transition={{ duration: 0.8, delay: 0.4 }}
                 className="flex flex-col sm:flex-row items-center justify-center gap-4"
               >
-                <button
-                  onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
-                  className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 rounded-lg font-medium text-base hover:bg-gray-100 transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                >
-                  See a Portfolio Demo
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
+                {showDemoVideos && (
+                  <button
+                    onClick={() => window.Supademo.open('cmkfamaw80niww7p29cay3tb7')}
+                    className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 rounded-lg font-medium text-base hover:bg-gray-100 transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  >
+                    See a Portfolio Demo
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
                 <Link
                   to="/contact"
                   className="group inline-flex items-center gap-2 px-6 py-3 bg-transparent text-white border-2 border-white rounded-lg font-medium text-base hover:bg-white/10 transition-all duration-300 hover:scale-105"
