@@ -13,6 +13,7 @@ import {
   Building2,
   X,
   Info,
+  Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -43,6 +44,146 @@ import Scope3Section from "@/components/emissions/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
 import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
+
+type EmissionPdfReportData = {
+  company: string;
+  period: string;
+  year: string;
+  description?: string;
+  preparedBy?: string;
+  date?: string;
+  s1: { stationary: number; mobile: number; fugitive: number; process: number };
+  s2: { electricity: number; heat: number };
+  s3: { travel: number; commute: number; supply: number; waste: number };
+  targetYear?: string;
+  targetPct?: string;
+};
+
+const escapeHtml = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const getReportCSS = (): string => `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .report { width: 800px; font-family: Arial, sans-serif; background: #ffffff; color: #1a2318; }
+  .cover { width: 800px; height: 1131px; background: #e8f0eb; position: relative; display: flex; flex-direction: column; padding: 0; page-break-after: always; overflow: hidden; }
+  .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 52px; background: #1a3d2e; }
+  .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 52px; background: #1a3d2e; }
+  .cover-border-left { position: absolute; top: 0; left: 0; width: 52px; height: 100%; background: #1a3d2e; }
+  .cover-border-right { position: absolute; top: 0; right: 0; width: 52px; height: 100%; background: #1a3d2e; }
+  .cover-header { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 14px 80px; height: 52px; }
+  .cover-logo { display: flex; align-items: center; gap: 10px; color: #e8f0eb; font-size: 15px; font-weight: 500; }
+  .cover-logo-icon { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #4ade80; display: flex; align-items: center; justify-content: center; }
+  .cover-logo-inner { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #4ade80; }
+  .cover-year { color: #e8f0eb; font-size: 16px; font-weight: 500; }
+  .cover-body { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 80px; }
+  .cover-title { font-size: 72px; font-weight: 400; color: #1a3d2e; line-height: 1.1; letter-spacing: -1px; margin-bottom: 32px; }
+  .cover-company { font-size: 22px; font-weight: 400; color: #1a3d2e; margin-bottom: 8px; }
+  .cover-period { font-size: 18px; font-weight: 300; color: #5a7260; }
+  .cover-description { font-size: 14px; font-weight: 300; color: #5a7260; margin-top: 24px; line-height: 1.7; max-width: 520px; }
+  .cover-footer { position: relative; z-index: 2; padding: 0 80px 66px; font-size: 11px; color: #5a7260; text-align: center; line-height: 1.6; }
+  .inner-page { width: 800px; min-height: 1131px; background: #ffffff; padding: 0 0 60px; page-break-after: always; }
+  .page-header { background: #1a3d2e; padding: 14px 40px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+  .page-header-logo { color: #ffffff; font-size: 13px; font-weight: 400; }
+  .page-header-meta { color: rgba(255,255,255,0.7); font-size: 11px; }
+  .page-content { padding: 0 40px; }
+  .page-title { font-size: 32px; font-weight: 400; color: #1a3d2e; margin-bottom: 6px; }
+  .page-divider { height: 1px; background: #3a7d57; margin-bottom: 28px; }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 36px; }
+  .summary-card { background: #e8f0eb; border-radius: 8px; padding: 16px 14px; text-align: center; }
+  .summary-card-label { font-size: 10px; font-weight: 500; color: #3a7d57; letter-spacing: 0.3px; margin-bottom: 8px; text-transform: uppercase; }
+  .summary-card-value { font-size: 22px; font-weight: 500; color: #1a3d2e; margin-bottom: 2px; }
+  .summary-card-unit { font-size: 10px; color: #5a7260; }
+  .summary-card.total .summary-card-label { color: #a32d2d; }
+  .summary-card.total .summary-card-value { color: #a32d2d; }
+  .scope-section { margin-bottom: 24px; }
+  .scope-header { background: #1a3d2e; padding: 8px 16px; border-radius: 4px 4px 0 0; }
+  .scope-header-text { font-size: 11px; font-weight: 500; color: #ffffff; letter-spacing: 0.8px; text-transform: uppercase; }
+  .scope-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; font-size: 12px; color: #2a4a32; border-bottom: 1px solid #e8f0eb; }
+  .scope-row.shaded { background: #f4f8f5; }
+  .scope-subtotal { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; font-size: 12px; font-weight: 500; color: #1a3d2e; border-top: 1.5px solid #3a7d57; border-bottom: 1px solid #e8f0eb; }
+  .grand-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #1a3d2e; border-radius: 4px; margin-top: 20px; }
+  .grand-total-label { font-size: 13px; font-weight: 500; color: #ffffff; letter-spacing: 0.5px; }
+  .grand-total-value { font-size: 14px; font-weight: 500; color: #ffffff; }
+  .reduction-target { background: #e8f8ec; border-radius: 6px; padding: 14px 16px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .reduction-label { font-size: 10px; font-weight: 500; color: #3a7d57; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 4px; }
+  .reduction-text { font-size: 13px; color: #1a3d2e; }
+  .page-number { text-align: center; font-size: 10px; color: #5a7260; padding: 24px 0 0; }
+  .back-cover { width: 800px; height: 1131px; background: #1a3d2e; display: flex; align-items: flex-end; justify-content: flex-end; padding: 60px 72px; }
+  .powered-by { text-align: right; }
+  .powered-by-label { font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+  .powered-by-name { font-size: 22px; color: #ffffff; }
+`;
+
+const getReportContent = (data: EmissionPdfReportData): string => {
+  const totalS1 = data.s1.stationary + data.s1.mobile + data.s1.fugitive + data.s1.process;
+  const totalS2 = data.s2.electricity + data.s2.heat;
+  const totalS3 = data.s3.travel + data.s3.commute + data.s3.supply + data.s3.waste;
+  const grandTotal = totalS1 + totalS2 + totalS3;
+  const fmt = (n: number) => n.toFixed(2);
+
+  return `
+  <div class="report">
+    <div class="cover">
+      <div class="cover-border-top"></div><div class="cover-border-bottom"></div><div class="cover-border-left"></div><div class="cover-border-right"></div>
+      <div class="cover-header">
+        <div class="cover-logo"><div class="cover-logo-icon"><div class="cover-logo-inner"></div></div>Rethink Carbon</div>
+        <div class="cover-year">${escapeHtml(data.year)}</div>
+      </div>
+      <div class="cover-body">
+        <div class="cover-title">Carbon Emissions<br>Report</div>
+        <div class="cover-company">${escapeHtml(data.company)}</div>
+        <div class="cover-period">${escapeHtml(data.period)}</div>
+        ${data.description ? `<div class="cover-description">${escapeHtml(data.description)}</div>` : ""}
+      </div>
+      <div class="cover-footer">This report contains proprietary and confidential information of ${escapeHtml(data.company)} and is intended solely for internal use and authorized stakeholders.</div>
+    </div>
+    <div class="inner-page">
+      <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(data.company)} &nbsp;|&nbsp; ${escapeHtml(data.period)}</div></div>
+      <div class="page-content">
+        <div class="page-title">Executive Summary</div><div class="page-divider"></div>
+        <div class="summary-cards">
+          <div class="summary-card"><div class="summary-card-label">Scope 1 · Direct</div><div class="summary-card-value">${fmt(totalS1)}</div><div class="summary-card-unit">tCO2e</div></div>
+          <div class="summary-card"><div class="summary-card-label">Scope 2 · Indirect</div><div class="summary-card-value">${fmt(totalS2)}</div><div class="summary-card-unit">tCO2e</div></div>
+          <div class="summary-card"><div class="summary-card-label">Scope 3 · Value Chain</div><div class="summary-card-value">${fmt(totalS3)}</div><div class="summary-card-unit">tCO2e</div></div>
+          <div class="summary-card total"><div class="summary-card-label">Total Emissions</div><div class="summary-card-value">${fmt(grandTotal)}</div><div class="summary-card-unit">tCO2e</div></div>
+        </div>
+        <div class="scope-section">
+          <div class="scope-header"><div class="scope-header-text">Scope 1 — Direct Emissions</div></div>
+          <div class="scope-row"><span>Stationary Combustion</span><span>${fmt(data.s1.stationary)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Mobile Combustion</span><span>${fmt(data.s1.mobile)} tCO2e</span></div>
+          <div class="scope-row"><span>Fugitive Emissions</span><span>${fmt(data.s1.fugitive)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Process Emissions</span><span>${fmt(data.s1.process)} tCO2e</span></div>
+          <div class="scope-subtotal"><span>Scope 1 Total</span><span>${fmt(totalS1)} tCO2e</span></div>
+        </div>
+        <div class="scope-section">
+          <div class="scope-header"><div class="scope-header-text">Scope 2 — Indirect Energy Emissions</div></div>
+          <div class="scope-row"><span>Purchased Electricity</span><span>${fmt(data.s2.electricity)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Purchased Heat / Steam</span><span>${fmt(data.s2.heat)} tCO2e</span></div>
+          <div class="scope-subtotal"><span>Scope 2 Total</span><span>${fmt(totalS2)} tCO2e</span></div>
+        </div>
+        <div class="scope-section">
+          <div class="scope-header"><div class="scope-header-text">Scope 3 — Value Chain Emissions</div></div>
+          <div class="scope-row"><span>Business Travel</span><span>${fmt(data.s3.travel)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Employee Commuting</span><span>${fmt(data.s3.commute)} tCO2e</span></div>
+          <div class="scope-row"><span>Supply Chain</span><span>${fmt(data.s3.supply)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Waste</span><span>${fmt(data.s3.waste)} tCO2e</span></div>
+          <div class="scope-subtotal"><span>Scope 3 Total</span><span>${fmt(totalS3)} tCO2e</span></div>
+        </div>
+        <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(grandTotal)} tCO2e</div></div>
+        ${data.targetYear && data.targetPct ? `<div class="reduction-target"><div><div class="reduction-label">Reduction Target</div><div class="reduction-text">Achieve ${escapeHtml(data.targetPct)}% reduction in total emissions by ${escapeHtml(data.targetYear)}</div></div></div>` : ""}
+        ${data.preparedBy || data.date ? `<div style="margin-top: 24px; font-size: 11px; color: #5a7260;">${data.preparedBy ? `Prepared by: ${escapeHtml(data.preparedBy)}` : ""}${data.preparedBy && data.date ? "&nbsp;&nbsp;·&nbsp;&nbsp;" : ""}${data.date ? `Date: ${escapeHtml(data.date)}` : ""}</div>` : ""}
+        <div class="page-number">2</div>
+      </div>
+    </div>
+    <div class="back-cover"><div class="powered-by"><div class="powered-by-label">Powered by</div><div class="powered-by-name">Rethink Carbon</div></div></div>
+  </div>
+  `;
+};
 
 const EmissionCalculatorEPA = () => {
   const navigate = useNavigate();
@@ -98,6 +239,7 @@ const EmissionCalculatorEPA = () => {
   const [nonRoadVehicleRows, setNonRoadVehicleRows] = useState<Array<{ emissions?: number }>>([]);
   const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
   const [mariIpccScope1Totals, setMariIpccScope1Totals] = useState<Record<string, number>>({});
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
     scope1:
@@ -609,6 +751,122 @@ const EmissionCalculatorEPA = () => {
     saveLCAPreferences(true, "lca");
   };
 
+  const sumScope3ByCategories = (categories: string[]) =>
+    emissionData.scope3
+      .filter((row) => categories.includes(String(row.category || "")))
+      .reduce((sum, row) => sum + (Number(row.emissions) || 0), 0);
+
+  const buildPdfReportData = (): EmissionPdfReportData => {
+    const stationary = emissionData.scope1.fuel.reduce((sum, row) => sum + (row.emissions || 0), 0);
+    const mobile =
+      mobileFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
+      onRoadGasolineRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
+      onRoadDieselAltFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
+      nonRoadVehicleRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
+      (mariIpccScope1Totals.vehicularCarbonFootprints || 0);
+    const fugitive = (mariIpccScope1Totals.flaring || 0) + (mariIpccScope1Totals.venting || 0);
+    const process =
+      scope1HeatSteamRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
+      (mariIpccScope1Totals.kitchenFootprints || 0) +
+      (mariIpccScope1Totals.powerFuelConsumption || 0) +
+      (mariIpccScope1Totals.heatingFootprints || 0);
+
+    const electricity = emissionData.scope2.find((item: any) => item.id === "electricity-total")?.emissions || 0;
+    const heat = emissionData.scope2.find((item: any) => item.id === "heat-total")?.emissions || 0;
+
+    const travel = sumScope3ByCategories(["business_travel", "businessTravel"]);
+    const commute = sumScope3ByCategories(["employee_commuting", "employeeCommuting"]);
+    const supply = sumScope3ByCategories([
+      "purchased_goods_services",
+      "capital_goods",
+      "fuel_energy_activities",
+      "upstream_transportation",
+      "upstream_leased_assets",
+      "investments",
+      "downstream_transportation",
+      "processing_use_of_sold_products",
+      "end_of_life_treatment",
+      "downstream_leased_assets",
+      "franchises",
+    ]);
+    const waste = sumScope3ByCategories(["waste_generated", "wasteGenerated"]);
+
+    return {
+      company: companyContext?.counterpartyId || "Organization",
+      period: new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      year: String(new Date().getFullYear()),
+      description: "EPA + IPCC greenhouse gas emissions summary report.",
+      preparedBy: user?.email || "Rethink Carbon User",
+      date: new Date().toLocaleDateString(),
+      s1: { stationary, mobile, fugitive, process },
+      s2: { electricity, heat },
+      s3: { travel, commute, supply, waste },
+    };
+  };
+
+  const generatePDF = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { default: jsPDF } = await import("jspdf");
+      const reportData = buildPdfReportData();
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "800px";
+      wrapper.style.position = "absolute";
+      wrapper.style.left = "-99999px";
+      wrapper.style.top = "0";
+      wrapper.style.background = "#ffffff";
+      wrapper.innerHTML = `<style>${getReportCSS()}</style>${getReportContent(reportData)}`;
+      document.body.appendChild(wrapper);
+
+      const target = wrapper.querySelector(".report") as HTMLElement;
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      document.body.removeChild(wrapper);
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 10;
+      const contentWidth = pageWidth - margin * 2;
+      const imgWidth = contentWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - margin * 2;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - margin * 2;
+      }
+
+      const fileDate = new Date().toISOString().slice(0, 10);
+      pdf.save(`EPA_IPCC_Emissions_Report_${fileDate}.pdf`);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast({
+        title: "PDF generation failed",
+        description: "Could not generate the report PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row">
       {/* Sidebar (hidden in LCA mode) */}
@@ -958,7 +1216,8 @@ const EmissionCalculatorEPA = () => {
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 bg-gray-50 rounded-full border border-gray-200/50 self-start md:self-auto">
+              <div className="flex items-center gap-2 sm:gap-3 self-start md:self-auto">
+                <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 bg-gray-50 rounded-full border border-gray-200/50">
                 <span className="text-xs sm:text-sm font-semibold text-gray-700">Manual</span>
                 <Switch
                   checked={calculationMode === "lca"}
@@ -972,6 +1231,7 @@ const EmissionCalculatorEPA = () => {
                   className="data-[state=checked]:bg-teal-600"
                 />
                 <span className="text-xs sm:text-sm font-semibold text-gray-700">LCA</span>
+                </div>
               </div>
             </div>
           </header>

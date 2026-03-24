@@ -14,6 +14,77 @@ const formatKg = (value: number) =>
 const formatTonnes = (value: number) =>
   (value / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
+const escapeHtml = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const getReportCSS = (): string => `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; color: #1f2a23; background: #fff; }
+
+  /* Cover page (styled like provided sample) */
+  .cover { width: 800px; height: 1131px; background: #d9e0e3; position: relative; overflow: hidden; page-break-after: always; }
+  .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-left { position: absolute; top: 0; left: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-border-right { position: absolute; top: 0; right: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-inner { position: absolute; top: 30px; right: 30px; bottom: 30px; left: 30px; padding: 28px 30px 34px; }
+  .cover-header { display: flex; justify-content: space-between; align-items: center; }
+  .cover-logo-wrap { display: flex; align-items: center; margin-top: 8px; }
+  .cover-logo-wrap img {
+    height: 68px;
+    width: auto;
+    max-width: 220px;
+    display: block;
+    object-fit: contain;
+  }
+  .cover-year { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; }
+  .cover-body { margin-top: 190px; padding-left: 20px; }
+  .cover-title { font-family: 'Playfair Display', serif; font-size: 62px; line-height: 1.04; letter-spacing: -0.6px; color: #0A3D2E; margin-bottom: 26px; }
+  .cover-company { font-family: 'Playfair Display', serif; font-size: 42px; color: #0A3D2E; margin-bottom: 8px; }
+  .cover-period { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; margin-bottom: 18px; }
+  .cover-description { font-size: 14px; color: #526158; line-height: 1.7; max-width: 560px; }
+  .cover-footer { position: absolute; right: 20px; bottom: 8px; left: 20px; font-size: 10px; color: #3d4b42; text-align: center; }
+
+  /* Inner summary page */
+  .inner-page { width: 800px; min-height: 1131px; background: #fff; page-break-after: always; }
+  .page-header { background: #0c4a3f; color: #fff; padding: 14px 34px; display: flex; justify-content: space-between; align-items: center; }
+  .page-header-logo { font-family: 'Playfair Display', serif; font-size: 16px; }
+  .page-header-meta { font-size: 11px; opacity: 0.85; }
+  .page-content { padding: 30px 34px 46px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; margin-bottom: 6px; }
+  .page-divider { height: 1px; background: #9cb0a6; margin-bottom: 20px; }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  .summary-card { border: 1px solid #dce6df; background: #f4f8f5; border-radius: 10px; padding: 12px; text-align: center; }
+  .summary-card-label { font-size: 10px; color: #0A3D2E; text-transform: uppercase; margin-bottom: 6px; font-weight: 700; letter-spacing: 0.4px; }
+  .summary-card-value { font-size: 20px; font-weight: 700; color: #0A3D2E; }
+  .summary-card-unit { font-size: 10px; color: #6a7a72; margin-top: 2px; }
+  .summary-card.total { background: #fff2f2; border-color: #f2c8c8; }
+  .summary-card.total .summary-card-label, .summary-card.total .summary-card-value { color: #9b2f2f; }
+  .scope-section { border: 1px solid #d9e3dd; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .scope-header { background: #0A3D2E; padding: 8px 12px; }
+  .scope-header-text { font-size: 11px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+  .scope-row, .scope-subtotal, .grand-total { display: flex; justify-content: space-between; align-items: center; }
+  .scope-row { padding: 9px 12px; font-size: 12px; border-top: 1px solid #edf3ef; color: #264435; }
+  .scope-row.shaded { background: #f8fbf9; }
+  .scope-subtotal { padding: 10px 12px; font-size: 12px; font-weight: 700; color: #0A3D2E; background: #f0f7f3; border-top: 1px solid #d7e4dc; }
+  .grand-total { margin-top: 14px; background: #15392c; color: #fff; border-radius: 8px; padding: 12px 14px; font-weight: 700; }
+  .grand-total-label { font-size: 12px; letter-spacing: 0.4px; }
+  .grand-total-value { font-size: 13px; }
+  .page-number { text-align: center; margin-top: 14px; font-size: 10px; color: #6c7e74; }
+
+  /* Back cover */
+  .back-cover { width: 800px; height: 1131px; background: #123b2f; display: flex; align-items: flex-end; justify-content: flex-end; padding: 56px 62px; }
+  .powered-by-label { color: rgba(255,255,255,0.72); font-size: 15px; text-align: right; }
+  .powered-by-name { color: #fff; font-family: 'Playfair Display', serif; font-size: 26px; text-align: right; margin-top: 2px; }
+`;
+
 const EmissionResultsEpaIpcc = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +96,7 @@ const EmissionResultsEpaIpcc = () => {
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const HIDDEN_DETAIL_COLUMNS = [
     "id",
@@ -176,6 +248,136 @@ const EmissionResultsEpaIpcc = () => {
     a.download = "emission-calculator-results.csv";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportPdf = async () => {
+    if (!results) return;
+    setIsGeneratingPdf(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { default: jsPDF } = await import("jspdf");
+
+      const mapScopeRows = (rows: EpaIpccResultsData["scope1"]) => {
+        const [a, b, c, d] = [...rows.filter((r) => r.value > 0), { value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }];
+        return {
+          first: a.value || 0,
+          second: b.value || 0,
+          third: c.value || 0,
+          fourth: d.value || 0,
+        };
+      };
+
+      const scope1 = mapScopeRows(results.scope1);
+      const scope2 = mapScopeRows(results.scope2);
+      const scope3 = mapScopeRows(results.scope3);
+      const submitted = new Date(submittedAt);
+      const company = user?.email?.split("@")[0] || "Organization";
+      const period = submitted.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const year = String(new Date().getFullYear());
+      const fmt = (n: number) => (n / 1000).toFixed(2);
+
+      const reportHtml = `
+      <div class="report">
+        <div class="cover">
+          <div class="cover-border-top"></div><div class="cover-border-bottom"></div><div class="cover-border-left"></div><div class="cover-border-right"></div>
+          <div class="cover-inner">
+            <div class="cover-header">
+              <div class="cover-logo-wrap">
+                <img src="/logoo.png" alt="Rethink Carbon logo" />
+              </div>
+              <div class="cover-year">${escapeHtml(year)}</div>
+            </div>
+            <div class="cover-body">
+              <div class="cover-title">Carbon Emissions Report</div>
+              <div class="cover-company">${escapeHtml(company)}</div>
+              <div class="cover-period">Year i.e ${escapeHtml(period)}</div>
+            </div>
+            <div class="cover-footer">This report contains proprietary and confidential information of ${escapeHtml(company)} and is intended solely for internal use and authorized stakeholders.</div>
+          </div>
+        </div>
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="page-title">Executive Summary</div><div class="page-divider"></div>
+            <div class="summary-cards">
+              <div class="summary-card"><div class="summary-card-label">Scope 1 · Direct</div><div class="summary-card-value">${fmt(results.totals.scope1)}</div><div class="summary-card-unit">tCO2e</div></div>
+              <div class="summary-card"><div class="summary-card-label">Scope 2 · Indirect</div><div class="summary-card-value">${fmt(results.totals.scope2)}</div><div class="summary-card-unit">tCO2e</div></div>
+              <div class="summary-card"><div class="summary-card-label">Scope 3 · Value Chain</div><div class="summary-card-value">${fmt(results.totals.scope3)}</div><div class="summary-card-unit">tCO2e</div></div>
+              <div class="summary-card total"><div class="summary-card-label">Total Emissions</div><div class="summary-card-value">${fmt(results.totals.grand)}</div><div class="summary-card-unit">tCO2e</div></div>
+            </div>
+            <div class="scope-section">
+              <div class="scope-header"><div class="scope-header-text">Scope 1 — Direct Emissions</div></div>
+              <div class="scope-row"><span>${escapeHtml(results.scope1[0]?.label || "Category 1")}</span><span>${fmt(scope1.first)} tCO2e</span></div>
+              <div class="scope-row shaded"><span>${escapeHtml(results.scope1[1]?.label || "Category 2")}</span><span>${fmt(scope1.second)} tCO2e</span></div>
+              <div class="scope-row"><span>${escapeHtml(results.scope1[2]?.label || "Category 3")}</span><span>${fmt(scope1.third)} tCO2e</span></div>
+              <div class="scope-row shaded"><span>${escapeHtml(results.scope1[3]?.label || "Category 4")}</span><span>${fmt(scope1.fourth)} tCO2e</span></div>
+              <div class="scope-subtotal"><span>Scope 1 Total</span><span>${fmt(results.totals.scope1)} tCO2e</span></div>
+            </div>
+            <div class="scope-section">
+              <div class="scope-header"><div class="scope-header-text">Scope 2 — Indirect Energy Emissions</div></div>
+              <div class="scope-row"><span>${escapeHtml(results.scope2[0]?.label || "Category 1")}</span><span>${fmt(scope2.first)} tCO2e</span></div>
+              <div class="scope-row shaded"><span>${escapeHtml(results.scope2[1]?.label || "Category 2")}</span><span>${fmt(scope2.second)} tCO2e</span></div>
+              <div class="scope-subtotal"><span>Scope 2 Total</span><span>${fmt(results.totals.scope2)} tCO2e</span></div>
+            </div>
+            <div class="scope-section">
+              <div class="scope-header"><div class="scope-header-text">Scope 3 — Value Chain Emissions</div></div>
+              <div class="scope-row"><span>${escapeHtml(results.scope3[0]?.label || "Category 1")}</span><span>${fmt(scope3.first)} tCO2e</span></div>
+              <div class="scope-row shaded"><span>${escapeHtml(results.scope3[1]?.label || "Category 2")}</span><span>${fmt(scope3.second)} tCO2e</span></div>
+              <div class="scope-row"><span>${escapeHtml(results.scope3[2]?.label || "Category 3")}</span><span>${fmt(scope3.third)} tCO2e</span></div>
+              <div class="scope-row shaded"><span>${escapeHtml(results.scope3[3]?.label || "Category 4")}</span><span>${fmt(scope3.fourth)} tCO2e</span></div>
+              <div class="scope-subtotal"><span>Scope 3 Total</span><span>${fmt(results.totals.scope3)} tCO2e</span></div>
+            </div>
+            <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(results.totals.grand)} tCO2e</div></div>
+            <div class="page-number">2</div>
+          </div>
+        </div>
+        <div class="back-cover"><div class="powered-by"><div class="powered-by-label">Powered by</div><div class="powered-by-name">Rethink Carbon</div></div></div>
+      </div>
+      `;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "800px";
+      wrapper.style.position = "absolute";
+      wrapper.style.left = "-99999px";
+      wrapper.style.top = "0";
+      wrapper.style.background = "#ffffff";
+      wrapper.innerHTML = `<style>${getReportCSS()}</style>${reportHtml}`;
+      document.body.appendChild(wrapper);
+
+      const target = wrapper.querySelector(".report") as HTMLElement;
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        allowTaint: true,
+      });
+      document.body.removeChild(wrapper);
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 0;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = margin;
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - margin * 2;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - margin * 2;
+      }
+
+      const fileDate = new Date().toISOString().slice(0, 10);
+      pdf.save(`EPA_IPCC_Results_Report_${fileDate}.pdf`);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const topScope1 = useMemo(() => {
@@ -517,6 +719,10 @@ const EmissionResultsEpaIpcc = () => {
                 <Button onClick={exportCsv} className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
+                </Button>
+                <Button onClick={exportPdf} disabled={isGeneratingPdf} className="bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg">
+                  <Download className="h-4 w-4 mr-2" />
+                  {isGeneratingPdf ? "Generating PDF..." : "Download PDF"}
                 </Button>
               </div>
             </div>

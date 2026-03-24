@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
+import Scope3ModeSelector, { type Scope3Mode } from "@/components/emissions/scope3/Scope3ModeSelector";
 
 type StationaryFuelRow = {
   id: string;
@@ -752,6 +753,7 @@ const EmissionCalculatorIPCC = ({
   const [searchParams] = useSearchParams();
   const [activeScope, setActiveScope] = useState("scope1");
   const [activeCategory, setActiveCategory] = useState(forcedCategory || "stationaryFuelCombustion");
+  const [scope3Mode, setScope3Mode] = useState<Scope3Mode | null>(null);
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({ scope1: true });
   const [loadingStationary, setLoadingStationary] = useState(false);
   const [stationaryRows, setStationaryRows] = useState<StationaryFuelRow[]>([]);
@@ -931,27 +933,9 @@ const EmissionCalculatorIPCC = ({
         title: "Scope 3",
         categories: [
           {
-            id: "roadTransport",
-            title: "Road Transport",
-            description: "IPCC Chapter 3 category factors.",
-            icon: Truck,
-          },
-          {
-            id: "roadTransportVehicleType",
-            title: "Road Transport with Vehicle Type",
-            description: "IPCC Chapter 3 factors by fuel and vehicle type.",
-            icon: Truck,
-          },
-          {
-            id: "usaGasolineDieselVehicles",
-            title: "USA Gasoline and Diesel Vehicles",
-            description: "IPCC Chapter 3 USA gasoline and diesel vehicle factors.",
-            icon: Truck,
-          },
-          {
-            id: "alternativeFuelVehicles",
-            title: "Alternative Fuel Vehicles",
-            description: "IPCC Chapter 3 alternative fuel vehicle factors.",
+            id: "scope3ModeSelection",
+            title: "Mode Selection",
+            description: "Choose your IPCC Tier mode to start Scope 3 estimation.",
             icon: Truck,
           },
         ],
@@ -3435,7 +3419,7 @@ const EmissionCalculatorIPCC = ({
       className={`${embedded ? "" : "min-h-screen "}bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row`}
     >
       {!embedded && (
-        <div className="w-full lg:w-80 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
+        <div className="w-full lg:w-80 lg:shrink-0 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
         <div className="px-6 py-6 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
           <div className="flex items-center justify-between mb-5">
             <Button
@@ -3516,7 +3500,7 @@ const EmissionCalculatorIPCC = ({
         </div>
       )}
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col">
         {!embedded && (
           <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 sm:px-8 py-4 sm:py-6 shadow-sm">
           <div className="flex items-center gap-4">
@@ -3527,6 +3511,8 @@ const EmissionCalculatorIPCC = ({
               <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                 {activeCategory === "stationaryFuelCombustion"
                   ? "Scope 1 - Stationary Fuel Combustion"
+                  : activeCategory === "scope3ModeSelection"
+                  ? "Scope 3 - Method Selection"
                   : activeCategory === "flaring"
                   ? "Scope 1 - Flaring"
                   : activeCategory === "venting"
@@ -3550,7 +3536,9 @@ const EmissionCalculatorIPCC = ({
                   : "Scope 2 - Industry Emissions"}
               </h2>
               <p className="text-gray-600 mt-1 text-sm sm:text-base">
-                {activeCategory === "stationaryFuelCombustion" ? (
+                {activeCategory === "scope3ModeSelection" ? (
+                  <>Select the IPCC tier approach that best matches your data depth and reporting objective.</>
+                ) : activeCategory === "stationaryFuelCombustion" ? (
                   <>Estimate Scope 1 emissions from stationary fuel use by entering fuel type, quantity, and unit.</>
                 ) : activeCategory === "flaring" ? (
                   <>Estimate Scope 1 flaring emissions from flare gas volume and gas composition.</>
@@ -3582,11 +3570,13 @@ const EmissionCalculatorIPCC = ({
         )}
 
         <main
-          className={`flex-1 ${embedded ? "p-0 bg-transparent" : "p-6 sm:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50"}`}
+          className={`flex-1 min-w-0 ${embedded ? "p-0 bg-transparent" : "p-6 sm:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50"}`}
         >
           <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/60 shadow-xl rounded-2xl">
             <CardContent className="p-6 sm:p-8">
-              {activeCategory === "stationaryFuelCombustion" && loadingStationary ? (
+              {activeCategory === "scope3ModeSelection" ? (
+                <Scope3ModeSelector selectedMode={scope3Mode} onModeSelect={setScope3Mode} />
+              ) : activeCategory === "stationaryFuelCombustion" && loadingStationary ? (
                 <div className="text-sm text-gray-600">Loading stationary fuel combustion factors...</div>
               ) : activeCategory === "stationaryFuelCombustion" && stationaryError ? (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
