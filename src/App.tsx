@@ -221,11 +221,12 @@ const AppRoutes = () => {
               <EmissionResults />
             </CompanyProtectedRoute>
           } />
-          <Route path="/emission-results-epa-ipcc" element={
+          <Route path="/emission-results-calculator" element={
             <CompanyProtectedRoute>
               <EmissionResultsEpaIpcc />
             </CompanyProtectedRoute>
           } />
+          <Route path="/emission-results-epa-ipcc" element={<Navigate to="/emission-results-calculator" replace />} />
           {/* Removed /onboarding route - now using /finance-emission for both flows */}
           <Route path="/finance-emission" element={
             <CompanyProtectedRoute>

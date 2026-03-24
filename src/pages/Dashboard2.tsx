@@ -1194,7 +1194,7 @@ const Dashboard2 = () => {
                       <motion.div className="mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                         <Button 
                           className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
-                          onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-epa-ipcc' : '/emission-results')}
+                          onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-calculator' : '/emission-results')}
                         >
                           {hasAnyEmissions ? 'View Emission Results' : 'Start Emission Calculation'}
                         </Button>

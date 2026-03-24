@@ -626,7 +626,7 @@ const EmissionCalculatorEPA = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => navigate(isMariUser ? "/emission-results-epa-ipcc" : "/emission-results?source=epa")}
+                onClick={() => navigate(isMariUser ? "/emission-results-calculator" : "/emission-results?source=epa")}
                 className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
               >
                 <span className="text-sm font-medium">Results</span>

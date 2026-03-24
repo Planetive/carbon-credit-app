@@ -623,7 +623,7 @@ const Dashboard = () => {
                    variant="outline" 
                    size="lg" 
                    className="w-full bg-gradient-to-r from-emerald-400 to-teal-500 text-white border-white/20 hover:bg-gradient-to-r hover:from-emerald-500 hover:to-teal-600 hover:border-white/30 hover:text-white hover:scale-105 transition-all duration-300 py-6 text-lg font-semibold shadow-lg"
-                  onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-epa-ipcc' : '/emission-results')}
+                  onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-calculator' : '/emission-results')}
                  >
                    View Emission Results
                  </Button>
