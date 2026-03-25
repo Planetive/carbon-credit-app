@@ -32,6 +32,7 @@ import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { loadEpaIpccResults } from "@/lib/epaIpccResults";
 import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
 import DashboardSidebar from "@/components/DashboardSidebar";
@@ -236,6 +237,14 @@ const Dashboard2 = () => {
 
       // Load emission totals for Scope 1, 2, and 3
       try {
+        // Mari users use the EPA+IPCC calculator tables, so load from the unified results loader.
+        if (isMariEnergiesUserEmail(user?.email)) {
+          const mariResults = await loadEpaIpccResults(user.id);
+          setScope1Total(mariResults.totals.scope1);
+          setScope2Total(mariResults.totals.scope2);
+          setScope3Total(mariResults.totals.scope3);
+          setHasAnyEmissions(mariResults.totals.grand > 0);
+        } else {
         // Scope 1 - Load all categories
         const [fuelRes, refRes, passRes, delRes] = await Promise.all([
           (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
@@ -342,6 +351,7 @@ const Dashboard2 = () => {
 
         // Set hasAnyEmissions based on whether any scope has data
         setHasAnyEmissions(scope1 > 0 || scope2 > 0 || scope3 > 0);
+        }
       } catch (error) {
         console.error('Error loading emission totals:', error);
         setHasAnyEmissions(false);
