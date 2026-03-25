@@ -360,6 +360,7 @@ const EmissionResultsEpaIpcc = () => {
     try {
       const html2canvas = (await import("html2canvas")).default;
       const { default: jsPDF } = await import("jspdf");
+      const isMariUser = isMariEnergiesUserEmail(user?.email);
 
       const historicalByYear: Record<number, { scope1: number; scope2: number; scope3: number; total: number }> = {};
       if (user?.id) {
@@ -378,6 +379,54 @@ const EmissionResultsEpaIpcc = () => {
           const s2 = Number(row?.scope2_emissions || 0);
           const s3 = Number(row?.scope3_emissions || 0);
           historicalByYear[year] = { scope1: s1, scope2: s2, scope3: s3, total: s1 + s2 + s3 };
+        });
+      }
+
+      const gasTotalsKg: Record<"CO2" | "CH4" | "N2O" | "CO2e", number> = { CO2: 0, CH4: 0, N2O: 0, CO2e: 0 };
+      if (isMariUser && user?.id) {
+        const [onRoadGasRows, onRoadDieselRows, nonRoadRows, roadVehicleRows, usaRows, altFuelRows, ventingRows] =
+          await Promise.all([
+            (supabase as any).from("scope1_epa_on_road_gasoline_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("scope1_epa_on_road_diesel_alt_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("scope1_epa_non_road_vehicle_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_road_transport_vehicle_type_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_usa_gasoline_diesel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_alternative_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope1_venting_entries").select("result").eq("user_id", user.id),
+          ]);
+
+        const addBySelection = (rows: any[] | null | undefined) => {
+          (rows || []).forEach((row: any) => {
+            const val = Number(row?.emissions || 0);
+            if (!Number.isFinite(val) || val <= 0) return;
+            const selection = String(row?.emission_selection || "").toLowerCase();
+            if (selection === "co2_only") gasTotalsKg.CO2 += val;
+            else if (selection === "ch4_only") gasTotalsKg.CH4 += val;
+            else if (selection === "n2o_only" || selection === "no2_only") gasTotalsKg.N2O += val;
+            else gasTotalsKg.CO2e += val;
+          });
+        };
+
+        addBySelection(onRoadGasRows?.data);
+        addBySelection(onRoadDieselRows?.data);
+        addBySelection(nonRoadRows?.data);
+        addBySelection(roadVehicleRows?.data);
+        addBySelection(usaRows?.data);
+        addBySelection(altFuelRows?.data);
+
+        // Venting includes per-gas co2e contributions in breakdown; include where available.
+        (ventingRows?.data || []).forEach((row: any) => {
+          const breakdown = row?.result?.breakdown;
+          if (!Array.isArray(breakdown)) return;
+          breakdown.forEach((b: any) => {
+            const gas = String(b?.gas || "").toUpperCase();
+            const co2eKg = Number(b?.co2eKg || 0);
+            if (!Number.isFinite(co2eKg) || co2eKg <= 0) return;
+            if (gas === "CO2") gasTotalsKg.CO2 += co2eKg;
+            else if (gas === "CH4") gasTotalsKg.CH4 += co2eKg;
+            else if (gas === "N2O" || gas === "NO2") gasTotalsKg.N2O += co2eKg;
+            else gasTotalsKg.CO2e += co2eKg;
+          });
         });
       }
 
@@ -471,6 +520,14 @@ const EmissionResultsEpaIpcc = () => {
         Boolean(historicalByYear[prevYear1]) || Boolean(historicalByYear[prevYear2]);
       const y1 = historicalByYear[prevYear2];
       const y2 = historicalByYear[prevYear1];
+      const gasRows = [
+        { gas: "CO2", value: gasTotalsKg.CO2 },
+        { gas: "CH4", value: gasTotalsKg.CH4 },
+        { gas: "N2O", value: gasTotalsKg.N2O },
+        { gas: "CO2e (other/mixed)", value: gasTotalsKg.CO2e },
+      ].filter((r) => r.value > 0);
+      const gasGrand = gasRows.reduce((sum, r) => sum + r.value, 0);
+      const hasGasBreakdown = isMariUser && gasGrand > 0;
 
       const topScope1Category = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
       const topScope2Category = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
@@ -879,6 +936,17 @@ const EmissionResultsEpaIpcc = () => {
                 <tr><td><strong>Total</strong></td><td class="num"><strong>${fmt(results.totals.grand)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
               </tbody>
             </table>
+
+            ${hasGasBreakdown ? `
+            <div class="subsection-title" style="margin-top:14px;">A.1 Gas Breakdown (Mari)</div>
+            <table class="inventory-table">
+              <thead><tr><th>Gas</th><th>Emissions (kg CO2e)</th><th>% Contribution</th></tr></thead>
+              <tbody>
+                ${gasRows.map((r) => `<tr><td>${r.gas}</td><td class="num">${(r.value).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td><td class="num">${pct(r.value, gasGrand)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${gasGrand.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            ` : ""}
 
             <div class="subsection-title" style="margin-top:16px;">B. Category Breakdown</div>
             <div class="chip-grid">
