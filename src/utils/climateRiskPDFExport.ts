@@ -65,7 +65,7 @@ const loadLogo = (): Promise<string> => {
       reject(new Error('Failed to load logo'));
     };
     
-    img.src = '/logoo.png';
+    img.src = '/new_logo.png';
   });
 };
 
@@ -74,8 +74,8 @@ const addHeader = async (pdf: jsPDF, yPos: number): Promise<number> => {
   try {
     const logoData = await loadLogo();
     // Add logo (scaled to fit) - centered
-    const logoWidth = 50;
-    const logoHeight = 18;
+    const logoWidth = 90;
+    const logoHeight = 32;
     const pageWidth = 210; // A4 width in mm
     const logoX = (pageWidth - logoWidth) / 2; // Center the logo
     pdf.addImage(logoData, 'PNG', logoX, yPos, logoWidth, logoHeight);

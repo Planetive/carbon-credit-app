@@ -97,11 +97,11 @@ const Login = () => {
               <Leaf className="h-8 w-8 text-primary" />
             </div> */}
             <div className="flex justify-center ">
-              <div className="h-10 w-10 md:h-12 md:w-12 flex items-center justify-center">
+              <div className="h-20 w-44 md:h-24 md:w-56 flex items-center justify-center mx-auto">
                 <img
-                  src="/logo3.png"
+                  src="/new_logo.png"
                   alt="ReThink Carbon Logo"
-                  className="h-full w-full object-contain"
+                  className="h-full w-auto object-contain scale-[2.6] md:scale-[2.8]"
                 />
               </div>
             </div>

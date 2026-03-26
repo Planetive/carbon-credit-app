@@ -42,11 +42,11 @@ const MainHeader = () => {
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <div className="h-10 md:h-14 flex items-center">
+          <div className="h-14 md:h-16 lg:h-20 w-28 md:w-40 lg:w-52 flex items-center justify-start ml-0 md:-ml-3 lg:-ml-12 overflow-hidden md:overflow-visible">
             <img
-              src="/logoo.png"
+              src="/new_logo.png"
               alt="ReThink Carbon Logo"
-              className="h-10 md:h-14 w-auto object-contain"
+              className="h-full w-auto object-contain origin-left scale-[2.5] -translate-x-6 md:scale-[2.9] md:-translate-x-9 lg:scale-[3.6] lg:-translate-x-16"
             />
           </div>
         </div>

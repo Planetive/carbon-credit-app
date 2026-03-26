@@ -36,13 +36,15 @@ const getReportCSS = (): string => `
   .cover-border-right { position: absolute; top: 0; right: 0; width: 30px; height: 100%; background: #0c4a3f; }
   .cover-inner { position: absolute; top: 30px; right: 30px; bottom: 30px; left: 30px; padding: 28px 30px 34px; }
   .cover-header { display: flex; justify-content: space-between; align-items: center; }
-  .cover-logo-wrap { display: flex; align-items: center; margin-top: 8px; }
+  .cover-logo-wrap { display: flex; align-items: center; margin-top: 8px; width: 360px; height: 96px; overflow: hidden; }
   .cover-logo-wrap img {
-    height: 68px;
+    height: 120px;
     width: auto;
-    max-width: 220px;
+    max-width: none;
     display: block;
     object-fit: contain;
+    transform: scale(2.6) translateX(-18px);
+    transform-origin: left center;
   }
   .cover-year { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; }
   .cover-body { margin-top: 190px; padding-left: 20px; }
@@ -143,15 +145,16 @@ const getReportCSS = (): string => `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 74px;
-    height: 28px;
-    padding: 0 12px;
+    min-width: 66px;
+    height: 24px;
+    padding: 0 10px;
     border-radius: 999px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1;
+    line-height: 24px;
     white-space: nowrap;
     box-sizing: border-box;
+    vertical-align: middle;
   }
   .badge-impact-high { color: #9b2f2f; background: #fce8e8; }
   .badge-impact-medium { color: #7a4a07; background: #fff3dc; }
@@ -590,7 +593,7 @@ const EmissionResultsEpaIpcc = () => {
           <div class="cover-inner">
             <div class="cover-header">
               <div class="cover-logo-wrap">
-                <img src="/logoo.png" alt="Rethink Carbon logo" />
+                <img src="/new_logo.png" alt="Rethink Carbon logo" />
               </div>
               <div class="cover-year">${escapeHtml(year)}</div>
             </div>

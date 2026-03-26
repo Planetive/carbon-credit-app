@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Leaf } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ const Register = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -48,6 +50,14 @@ const Register = () => {
       toast({
         title: "Password too short",
         description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!acceptedTerms) {
+      toast({
+        title: "Consent required",
+        description: "Please accept the legal terms to continue.",
         variant: "destructive",
       });
       return;
@@ -165,11 +175,11 @@ const Register = () => {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center ">
-              <div className="h-10 w-10 md:h-12 md:w-12 flex items-center justify-center">
+              <div className="h-20 w-44 md:h-24 md:w-56 flex items-center justify-center mx-auto">
                 <img
-                  src="/logo3.png"
+                  src="/new_logo.png"
                   alt="ReThink Carbon Logo"
-                  className="h-full w-full object-contain"
+                  className="h-full w-auto object-contain scale-[2.6] md:scale-[2.8]"
                 />
               </div>
             </div>
@@ -215,6 +225,29 @@ const Register = () => {
                 onChange={handleInputChange}
                 required
               />
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="accept-terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  className="mt-1"
+                />
+                <Label htmlFor="accept-terms" className="text-sm leading-5 font-normal">
+                  I agree to the{" "}
+                  <Link to="/terms-and-conditions" className="text-primary hover:underline">
+                    Terms and Conditions
+                  </Link>
+                  ,{" "}
+                  <Link to="/privacy-policy" className="text-primary hover:underline">
+                    Privacy Policy
+                  </Link>
+                  , and{" "}
+                  <Link to="/data-consent" className="text-primary hover:underline">
+                    Data Consent
+                  </Link>
+                  .
+                </Label>
+              </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Creating Account..." : "Create Account"}
               </Button>

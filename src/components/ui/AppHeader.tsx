@@ -152,11 +152,11 @@ const AppHeader = () => {
   return (
     <header className="w-full bg-white shadow-sm py-4 px-4 md:px-8 flex items-center justify-between z-50 relative">
       {/* Logo */}
-      <Link to={logoLink} className="h-10 md:h-14 flex items-center hover:opacity-80 transition-opacity">
+      <Link to={logoLink} className="h-12 md:h-14 lg:h-16 w-36 md:w-44 lg:w-56 flex items-center justify-start ml-0 hover:opacity-80 transition-opacity overflow-hidden">
         <img 
-          src="/logoo.png"
+          src="/new_logo.png"
           alt="ReThink Carbon Logo"
-          className="h-10 md:h-14 w-auto object-contain"
+          className="h-full w-auto object-contain origin-left scale-[3.0] -translate-x-5 md:scale-[3.2] md:-translate-x-6 lg:scale-[3.4] lg:-translate-x-8"
         />
       </Link>
 

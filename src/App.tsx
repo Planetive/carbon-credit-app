@@ -71,6 +71,9 @@ import UserManagement from "./pages/UserManagement";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Settings from "./pages/Settings";
 import SupplyChainIntelligence from "./pages/SupplyChainIntelligence";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import DataConsent from "./pages/DataConsent";
 
 const AppRoutes = () => {
   // Global scroll to top functionality for all routes
@@ -91,6 +94,9 @@ const AppRoutes = () => {
         <Route path="/solutions/esg-financial-institutions" element={<Navigate to="/solutions/financial-institutions" replace />} />
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/data-consent" element={<DataConsent />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/confirm-email" element={<ConfirmEmail />} />
         <Route element={<MainLayout />}>

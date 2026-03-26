@@ -13,11 +13,11 @@ const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center mb-4">
               {/* <Leaf className="h-8 w-8 text-teal-400 mr-3" /> */}
-              <div className="h-6 w-6 md:h-12 md:w-12 relative mr-3">
+              <div className="h-12 w-20 md:h-16 md:w-28 overflow-hidden relative mr-3">
                 <img
-                  src="/logo3.png"
+                  src="/new_logo.png"
                   alt="ReThink Carbon Logo"
-                  className="absolute inset-0 w-full h-full object-contain"
+                  className="absolute inset-0 w-full h-full object-contain scale-[3.0] origin-left -translate-x-7 md:-translate-x-9"
                 />
               </div>
               <h3 className="text-xl font-bold text-white">ReThink Carbon</h3>
@@ -58,13 +58,18 @@ const Footer = () => {
               </li>
               
               <li>
-                <Link to="#" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/privacy-policy" className="text-gray-300 hover:text-teal-400 transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="#" className="text-gray-300 hover:text-teal-400 transition-colors">
-                  Terms of service
+                <Link to="/terms-and-conditions" className="text-gray-300 hover:text-teal-400 transition-colors">
+                  Terms and Conditions
+                </Link>
+              </li>
+              <li>
+                <Link to="/data-consent" className="text-gray-300 hover:text-teal-400 transition-colors">
+                  Data Consent
                 </Link>
               </li>
             </ul>
@@ -101,12 +106,9 @@ const Footer = () => {
               © {currentYear} ReThink Carbon. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
-                Privacy Policy
-              </a>
-              <a href="#" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
-                Terms of Service
-              </a>
+              <Link to="/privacy-policy" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Privacy Policy</Link>
+              <Link to="/terms-and-conditions" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Terms and Conditions</Link>
+              <Link to="/data-consent" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Data Consent</Link>
               <a href="#" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
                 FAQ's
               </a>
