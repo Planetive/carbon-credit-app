@@ -1,8 +1,9 @@
 # Privacy Policy (Enterprise - GDPR Article-Referenced Version)
 
-**Rethink Carbon - Enterprise Privacy Policy**  
-**Effective Date:** [Insert Date]  
-**Last Updated:** [Insert Date]
+## Rethink Carbon - Enterprise Privacy Policy
+
+**Effective Date:** 26 March,2026
+**Last Updated:** 26 March,2026
 
 ## 1. Introduction and Legal Framework
 
@@ -292,6 +293,5 @@ In accordance with Articles 24 and 32, the Company further implements structured
 ## 14. Contact Information
 
 **Data Protection Contact:**  
-[Insert Company Address - Pakistan]  
-**Email:** [Insert Email]
-
+Ise Tower 55b, Jinnah Avenue, Fl 9 Ofc 910, Islamabad, GPO, Federal Capital & AJK, 44000, Pakistan. 
+**Email:** connect@rethinkcarbon.io

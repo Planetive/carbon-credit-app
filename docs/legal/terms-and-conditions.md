@@ -1,7 +1,8 @@
 # Enterprise Terms and Conditions
 
-**Rethink Carbon - Enterprise SaaS Agreement**  
-**Effective Date:** [Insert Date]
+## Rethink Carbon - Terms & Conditions
+
+**Effective Date:** 26 March, 2026
 
 ## 1. Definitions
 
