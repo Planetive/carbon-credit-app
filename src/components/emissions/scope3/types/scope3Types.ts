@@ -215,6 +215,7 @@ export interface FuelEnergyRow {
   extraction: string;
   distance: number | undefined;
   refining: string;
+  emissions?: number;
 }
 
 export interface OtherSourceRow {

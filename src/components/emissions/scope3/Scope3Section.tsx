@@ -1020,7 +1020,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
-          employees: entry.number_of_employees,
+          employees: entry.employees,
           emissions: entry.emissions,
         }));
 
@@ -1720,7 +1720,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             travel_type_id: r.travelTypeId,
             travel_type_name: travelType?.vehicle_type || '',
             distance: r.distance!,
-            number_of_employees: r.employees!,
+            employees: r.employees!,
             emission_factor: factorPerKm,
             emissions: r.emissions!,
           };
@@ -1743,7 +1743,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               travel_type_id: r.travelTypeId,
               travel_type_name: travelType?.vehicle_type || '',
               distance: r.distance!,
-              number_of_employees: r.employees!,
+              employees: r.employees!,
               emission_factor: factorPerKm,
               emissions: r.emissions!,
             })
@@ -1773,7 +1773,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
-          employees: entry.number_of_employees,
+          employees: entry.employees,
           emissions: entry.emissions,
         }));
         setExistingEmployeeCommuting(updatedRows);
@@ -2263,6 +2263,123 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     loadUse();
   }, [user, activeCategory, productType, companyContext, counterpartyId, toast]);
 
+  // Keep these hooks at top-level to satisfy React hook ordering rules.
+  useEmissionSync({
+    category: "processing_sold_products",
+    rows: processingRows,
+    enabled: productType === "intermediate",
+    mapRowToEntry: (r) => {
+      if (!r.processingActivity) return null;
+
+      const hasCombustion = r.processingActivity === 'Heating, melting, smelting' && 
+        r.combustionType && 
+        typeof r.quantity === "number" && r.quantity > 0 &&
+        ((r.combustionType === 'stationary' && r.stationaryCo2Factor !== undefined) ||
+         (r.combustionType === 'mobile' && r.mobileKgCo2PerUnit !== undefined));
+      
+      const hasHeatSteam = r.processingActivity === 'Drying / Curing / Kilns' &&
+        r.heatSteamType &&
+        typeof r.quantity === "number" && r.quantity > 0 &&
+        r.heatSteamKgCo2e !== undefined;
+      
+      const hasFuel =
+        !!r.type && !!r.fuel && !!r.unit && typeof r.quantity === "number" && r.quantity > 0;
+      
+      const hasElectricity = typeof r.totalKwh === "number" && r.totalKwh > 0;
+
+      if (!hasCombustion && !hasHeatSteam && !hasFuel && !hasElectricity) return null;
+
+      let unit = "entry";
+      let quantity = 1;
+      
+      if (hasCombustion) {
+        if (r.combustionType === 'stationary') {
+          unit = r.stationaryUnit || "entry";
+          quantity = r.quantity || 1;
+        } else if (r.combustionType === 'mobile') {
+          unit = r.mobileUnit || "entry";
+          quantity = r.quantity || 1;
+        }
+      } else if (hasHeatSteam) {
+        unit = r.heatSteamUnit || "kWh";
+        quantity = r.quantity || 1;
+      } else if (hasFuel) {
+        unit = r.unit || "entry";
+        quantity = r.quantity || 1;
+      } else if (hasElectricity) {
+        unit = "kWh";
+        quantity = r.totalKwh || 1;
+      }
+
+      return {
+        id: r.id,
+        category: "processing_sold_products",
+        activity: r.processingActivity,
+        unit,
+        quantity,
+        emissions: r.emissions || 0,
+      };
+    },
+    setEmissionData,
+  });
+
+  useEmissionSync({
+    category: "use_of_sold_products",
+    rows: useRows,
+    enabled: productType === "final",
+    mapRowToEntry: (r) => {
+      if (!r.processingActivity) return null;
+
+      const hasCombustion = r.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' && 
+        ((typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0 && r.stationaryCo2Factor !== undefined) ||
+         (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0 && r.mobileKgCo2PerUnit !== undefined));
+
+      const hasHybridFuel = r.processingActivity === 'Hybrid vehicles' &&
+        r.hybridFuelType && r.hybridFuel && r.hybridFuelUnit &&
+        typeof r.hybridFuelQuantity === "number" && r.hybridFuelQuantity > 0 &&
+        r.hybridFuelFactor !== undefined;
+      
+      const hasHybridElectricity = r.processingActivity === 'Hybrid vehicles' &&
+        typeof r.hybridTotalKwh === "number" && r.hybridTotalKwh > 0;
+
+      const hasOtherData = r.energyConsumption && r.energyConsumption.trim() !== '';
+
+      if (!hasCombustion && !hasHybridFuel && !hasHybridElectricity && !hasOtherData) return null;
+
+      let unit = "entry";
+      let quantity = 1;
+      
+      if (hasCombustion) {
+        if (typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0) {
+          unit = r.stationaryUnit || "entry";
+          quantity = r.stationaryQuantity || 1;
+        } else if (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0) {
+          unit = r.mobileUnit || "entry";
+          quantity = r.mobileQuantity || 1;
+        }
+      } else if (hasHybridFuel) {
+        unit = r.hybridFuelUnit || "entry";
+        quantity = r.hybridFuelQuantity || 1;
+      } else if (hasHybridElectricity) {
+        unit = "kWh";
+        quantity = r.hybridTotalKwh || 1;
+      } else {
+        unit = "entry";
+        quantity = r.quantity || 1;
+      }
+
+      return {
+        id: r.id,
+        category: "use_of_sold_products",
+        activity: r.processingActivity,
+        unit,
+        quantity,
+        emissions: r.emissions || 0,
+      };
+    },
+    setEmissionData,
+  });
+
   // Purchased Goods & Services
   if (activeCategory === 'purchasedGoods') {
     return (
@@ -2593,131 +2710,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }));
     };
 
-    // Sync rows to emissionData
-    useEmissionSync({
-      category: "processing_sold_products",
-      rows: processingRows,
-      enabled: productType === "intermediate",
-      mapRowToEntry: (r) => {
-        if (!r.processingActivity) return null;
-
-        // Check for combustion emissions (Heating, melting, smelting)
-        const hasCombustion = r.processingActivity === 'Heating, melting, smelting' && 
-          r.combustionType && 
-          typeof r.quantity === "number" && r.quantity > 0 &&
-          ((r.combustionType === 'stationary' && r.stationaryCo2Factor !== undefined) ||
-           (r.combustionType === 'mobile' && r.mobileKgCo2PerUnit !== undefined));
-        
-        // Check for heat and steam emissions (Drying / Curing / Kilns)
-        const hasHeatSteam = r.processingActivity === 'Drying / Curing / Kilns' &&
-          r.heatSteamType &&
-          typeof r.quantity === "number" && r.quantity > 0 &&
-          r.heatSteamKgCo2e !== undefined;
-        
-        // Check for regular fuel emissions
-        const hasFuel =
-          !!r.type && !!r.fuel && !!r.unit && typeof r.quantity === "number" && r.quantity > 0;
-        
-        // Check for electricity
-        const hasElectricity = typeof r.totalKwh === "number" && r.totalKwh > 0;
-
-        if (!hasCombustion && !hasHeatSteam && !hasFuel && !hasElectricity) return null;
-
-        // Determine unit and quantity based on what's available
-        let unit = "entry";
-        let quantity = 1;
-        
-        if (hasCombustion) {
-          if (r.combustionType === 'stationary') {
-            unit = r.stationaryUnit || "entry";
-            quantity = r.quantity || 1;
-          } else if (r.combustionType === 'mobile') {
-            unit = r.mobileUnit || "entry";
-            quantity = r.quantity || 1;
-          }
-        } else if (hasHeatSteam) {
-          unit = r.heatSteamUnit || "kWh";
-          quantity = r.quantity || 1;
-        } else if (hasFuel) {
-          unit = r.unit || "entry";
-          quantity = r.quantity || 1;
-        } else if (hasElectricity) {
-          unit = "kWh";
-          quantity = r.totalKwh || 1;
-        }
-
-        return {
-          id: r.id,
-          category: "processing_sold_products",
-          activity: r.processingActivity,
-          unit,
-          quantity,
-          emissions: r.emissions || 0,
-        };
-      },
-      setEmissionData,
-    });
-
-    useEmissionSync({
-      category: "use_of_sold_products",
-      rows: useRows,
-      enabled: productType === "final",
-      mapRowToEntry: (r) => {
-        if (!r.processingActivity) return null;
-
-        // Check for combustion emissions (Internal combustion engine vehicles)
-        const hasCombustion = r.processingActivity === 'Internal combustion engine vehicles (cars, trucks, bikes)' && 
-          ((typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0 && r.stationaryCo2Factor !== undefined) ||
-           (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0 && r.mobileKgCo2PerUnit !== undefined));
-
-        // Check for hybrid vehicle emissions (fuel or electricity)
-        const hasHybridFuel = r.processingActivity === 'Hybrid vehicles' &&
-          r.hybridFuelType && r.hybridFuel && r.hybridFuelUnit &&
-          typeof r.hybridFuelQuantity === "number" && r.hybridFuelQuantity > 0 &&
-          r.hybridFuelFactor !== undefined;
-        
-        const hasHybridElectricity = r.processingActivity === 'Hybrid vehicles' &&
-          typeof r.hybridTotalKwh === "number" && r.hybridTotalKwh > 0;
-
-        // For other activities, require energyConsumption
-        const hasOtherData = r.energyConsumption && r.energyConsumption.trim() !== '';
-
-        if (!hasCombustion && !hasHybridFuel && !hasHybridElectricity && !hasOtherData) return null;
-
-        // Determine unit and quantity based on what's available
-        let unit = "entry";
-        let quantity = 1;
-        
-        if (hasCombustion) {
-          if (typeof r.stationaryQuantity === "number" && r.stationaryQuantity > 0) {
-            unit = r.stationaryUnit || "entry";
-            quantity = r.stationaryQuantity || 1;
-          } else if (typeof r.mobileQuantity === "number" && r.mobileQuantity > 0) {
-            unit = r.mobileUnit || "entry";
-            quantity = r.mobileQuantity || 1;
-          }
-        } else if (hasHybridFuel) {
-          unit = r.hybridFuelUnit || "entry";
-          quantity = r.hybridFuelQuantity || 1;
-        } else if (hasHybridElectricity) {
-          unit = "kWh";
-          quantity = r.hybridTotalKwh || 1;
-        } else {
-          unit = "entry";
-          quantity = r.quantity || 1;
-        }
-
-        return {
-            id: r.id,
-              category: "use_of_sold_products",
-            activity: r.processingActivity,
-          unit,
-          quantity,
-            emissions: r.emissions || 0,
-        };
-      },
-      setEmissionData,
-    });
+    // row sync hooks are declared at top-level for stable hook ordering
 
     // Product Type Selection Screen
     if (!productType) {
@@ -2803,7 +2796,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
               mobile_fuel_type: r.mobileFuelType,
               mobile_kg_co2_per_unit: r.mobileKgCo2PerUnit,
               mobile_unit: r.mobileUnit,
-              heat_steam_standard: r.heatSteamStandard,
               heat_steam_type: r.heatSteamType,
               heat_steam_kg_co2e: r.heatSteamKgCo2e,
               heat_steam_unit: r.heatSteamUnit,

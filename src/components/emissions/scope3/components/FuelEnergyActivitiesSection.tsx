@@ -39,6 +39,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
     extraction: "",
     distance: undefined,
     refining: "",
+    emissions: undefined,
   });
 
   const addFuelEnergyRow = () =>
@@ -90,6 +91,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           extraction: entry.extraction || "",
           distance: entry.distance || undefined,
           refining: entry.refining || "",
+          emissions: entry.emissions || undefined,
         }));
 
         setExistingFuelEnergy(loadedRows);
@@ -118,14 +120,16 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
       r.extraction &&
       r.refining &&
       typeof r.distance === "number" &&
-      r.distance >= 0
+      r.distance >= 0 &&
+      typeof r.emissions === "number" &&
+      r.emissions >= 0
         ? {
             id: r.id,
             category: "fuel_energy_activities",
             activity: r.extraction,
             unit: "km",
             quantity: r.distance,
-            emissions: 0,
+            emissions: r.emissions,
           }
         : null,
     setEmissionData,
@@ -154,7 +158,8 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
       return (
         existing.extraction !== r.extraction ||
         existing.distance !== r.distance ||
-        existing.refining !== r.refining
+        existing.refining !== r.refining ||
+        existing.emissions !== r.emissions
       );
     });
 
@@ -175,6 +180,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           extraction: r.extraction,
           distance: r.distance!,
           refining: r.refining,
+          emissions: r.emissions || 0,
         }));
 
         const { error } = await supabase
@@ -191,6 +197,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
               extraction: r.extraction,
               distance: r.distance!,
               refining: r.refining,
+              emissions: r.emissions || 0,
             })
             .eq("id", r.dbId!),
         );
@@ -219,6 +226,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           extraction: entry.extraction || "",
           distance: entry.distance || undefined,
           refining: entry.refining || "",
+          emissions: entry.emissions || undefined,
         }));
         setExistingFuelEnergy(updatedRows);
         setFuelEnergyRows(updatedRows);
@@ -281,6 +289,10 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
     (sum, r) => sum + (r.distance || 0),
     0,
   );
+  const totalEmissions = fuelEnergyRows.reduce(
+    (sum, r) => sum + (r.emissions || 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -302,10 +314,11 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Extraction</Label>
         <Label className="text-gray-500 font-medium">Distance (km)</Label>
         <Label className="text-gray-500 font-medium">Refining</Label>
+        <Label className="text-gray-500 font-medium">Emissions (kg CO2e)</Label>
         <Label className="text-gray-500 font-medium">Actions</Label>
       </div>
 
@@ -313,7 +326,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
         {fuelEnergyRows.map((r) => (
           <div
             key={r.id}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
+            className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
           >
             <div className="w-full">
               <Input
@@ -356,6 +369,27 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
                 className="w-full"
               />
             </div>
+            <div className="w-full">
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={r.emissions ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    updateFuelEnergyRow(r.id, { emissions: undefined });
+                  } else {
+                    const numValue = Number(value);
+                    if (numValue >= 0) {
+                      updateFuelEnergyRow(r.id, { emissions: numValue });
+                    }
+                  }
+                }}
+                placeholder="Enter emissions"
+                className="w-full"
+              />
+            </div>
             {r.isExisting ? (
               <Button
                 variant="outline"
@@ -386,6 +420,11 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           <span className="font-semibold">
             {totalDistance.toFixed(1)} km
           </span>
+          {" "}·{" "}
+          Total Emissions:{" "}
+          <span className="font-semibold">
+            {totalEmissions.toFixed(3)} kg CO2e
+          </span>
         </div>
         {(() => {
           const pendingNew = fuelEnergyRows.filter(
@@ -400,7 +439,8 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
             return (
               existing.extraction !== r.extraction ||
               existing.distance !== r.distance ||
-              existing.refining !== r.refining
+              existing.refining !== r.refining ||
+              existing.emissions !== r.emissions
             );
           }).length;
           const totalPending = pendingNew + pendingUpdates;

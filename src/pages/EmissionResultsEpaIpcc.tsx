@@ -460,6 +460,18 @@ const EmissionResultsEpaIpcc = () => {
       const fmt = (n: number) => (n / 1000).toFixed(2);
       const pct = (value: number, total: number) => (total > 0 ? ((value / total) * 100).toFixed(1) : "0.0");
       const pctNum = (value: number, total: number) => (total > 0 ? (value / total) * 100 : 0);
+      const pctDisplay = (value: number, total: number) => {
+        if (total <= 0) return "0.0";
+        const p = (value / total) * 100;
+        if (p > 0 && p < 0.1) return "<0.1";
+        return p.toFixed(1);
+      };
+      const pctBarWidth = (value: number, total: number) => {
+        if (total <= 0) return "0";
+        const p = (value / total) * 100;
+        if (p > 0 && p < 0.5) return "0.5";
+        return p.toFixed(1);
+      };
       const dominantScope = [
         { name: "Scope 1", value: results.totals.scope1 },
         { name: "Scope 2", value: results.totals.scope2 },
@@ -829,15 +841,15 @@ const EmissionResultsEpaIpcc = () => {
         : "Scope 2 emissions are currently not significant in this reporting period.";
       const scope1Second = scope1Rows[1];
       const scope1ManagementInsight = topScope1Category
-        ? `Management focus: prioritize ${topScope1Category.label} first (${pct(topScope1Category.value, results.totals.scope1)}% of Scope 1)${scope1Second ? `, then ${scope1Second.label} (${pct(scope1Second.value, results.totals.scope1)}%)` : ""}; this sequence gives the highest near-term abatement leverage.`
-        : "Management focus: increase Scope 1 data capture cadence to identify stable reduction levers.";
+        ? `Prioritize ${topScope1Category.label} first (${pct(topScope1Category.value, results.totals.scope1)}% of Scope 1)${scope1Second ? `, then ${scope1Second.label} (${pct(scope1Second.value, results.totals.scope1)}%)` : ""}; this sequence gives the highest near-term abatement leverage.`
+        : "Increase Scope 1 data capture cadence to identify stable reduction levers.";
       const scope2Second = scope2Rows[1];
       const scope2ManagementInsight = topScope2Category
-        ? `Management focus: set procurement and efficiency targets around ${topScope2Category.label}${scope2Second ? ` while tracking ${scope2Second.label} as secondary driver` : ""}; review monthly intensity (kg CO2e per activity unit) to validate gains.`
-        : "Management focus: broaden Scope 2 source-level inputs before setting procurement targets.";
+        ? `Set procurement and efficiency targets around ${topScope2Category.label}${scope2Second ? ` while tracking ${scope2Second.label} as secondary driver` : ""}; review monthly intensity (kg CO2e per activity unit) to validate gains.`
+        : "Broaden Scope 2 source-level inputs before setting procurement targets.";
       const upstreamShare = results.totals.scope3 > 0 ? ((upstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
       const downstreamShare = results.totals.scope3 > 0 ? ((downstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
-      const scope3ManagementInsight = `Management view: Scope 3 mix is ${upstreamShare}% upstream vs ${downstreamShare}% downstream; allocate governance and supplier/customer engagement budget in this proportion for better execution alignment.`;
+      const scope3ManagementInsight = `Scope 3 mix is ${upstreamShare}% upstream vs ${downstreamShare}% downstream; allocate governance and supplier/customer engagement budget in this proportion for better execution alignment.`;
       const driversInsight = `Emissions are structurally driven by ${topDriverName}, based on current activity concentration.`;
 
       const buildActionFromLabel = (label: string): { action: string; impact: "High" | "Medium"; effort: "Low" | "Medium"; timeline: string } => {
@@ -1247,9 +1259,6 @@ const EmissionResultsEpaIpcc = () => {
           <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
           <div class="page-content">
             <div class="section-title">7. Scope 1 Analysis</div>
-            <div class="donut-wrap">
-              <div class="donut" style="--s1:${scope1PctNum.toFixed(2)}%;--s2:${scope2PctNum.toFixed(2)}%;"></div>
-            </div>
             <div class="chart-bars">
               ${scope1Rows.slice(0, 8).map((r) => `
                 <div class="chart-row">
@@ -1360,16 +1369,16 @@ const EmissionResultsEpaIpcc = () => {
             <div class="section-title">10. Emissions Drivers Analysis</div>
             <div class="chart-bars">
               <div class="chart-row">
-                <div class="chart-meta"><span>Energy</span><span>${pct(safeEnergyDriver, results.totals.grand)}%</span></div>
-                <div class="chart-track"><div class="chart-fill" style="width:${pct(safeEnergyDriver, results.totals.grand)}%;background:#0ea5a3;"></div></div>
+                <div class="chart-meta"><span>Energy</span><span>${pctDisplay(safeEnergyDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(safeEnergyDriver, results.totals.grand)}%;background:#0ea5a3;"></div></div>
               </div>
               <div class="chart-row">
-                <div class="chart-meta"><span>Supply chain</span><span>${pct(supplyChainDriver, results.totals.grand)}%</span></div>
-                <div class="chart-track"><div class="chart-fill" style="width:${pct(supplyChainDriver, results.totals.grand)}%;background:#6366f1;"></div></div>
+                <div class="chart-meta"><span>Supply chain</span><span>${pctDisplay(supplyChainDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(supplyChainDriver, results.totals.grand)}%;background:#6366f1;"></div></div>
               </div>
               <div class="chart-row">
-                <div class="chart-meta"><span>Logistics</span><span>${pct(logisticsDriver, results.totals.grand)}%</span></div>
-                <div class="chart-track"><div class="chart-fill" style="width:${pct(logisticsDriver, results.totals.grand)}%;background:#f97316;"></div></div>
+                <div class="chart-meta"><span>Logistics</span><span>${pctDisplay(logisticsDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(logisticsDriver, results.totals.grand)}%;background:#f97316;"></div></div>
               </div>
             </div>
             <div class="insight-box"><div class="insight-text">${escapeHtml(driversInsight)}</div></div>
@@ -1732,6 +1741,15 @@ const EmissionResultsEpaIpcc = () => {
     </Card>
   );
 
+  const scope3UpstreamRows = results.scope3.filter((r) =>
+    ["purchased_goods", "capital_goods", "fuel_energy", "upstream_transport", "waste", "business_travel", "employee_commuting"].includes(r.key)
+  );
+  const scope3DownstreamRows = results.scope3.filter((r) =>
+    ["investments", "downstream_transport", "end_of_life", "processing_sold", "use_of_sold"].includes(r.key)
+  );
+  const scope3UpstreamTotal = scope3UpstreamRows.reduce((sum, r) => sum + r.value, 0);
+  const scope3DownstreamTotal = scope3DownstreamRows.reduce((sum, r) => sum + r.value, 0);
+
   return (
     <>
       <style>{`
@@ -1864,7 +1882,8 @@ const EmissionResultsEpaIpcc = () => {
           <div className={`space-y-6 ${mounted ? "animate-fade-in-up" : "opacity-0"}`}>
             {renderScopeTable("Scope 1 Breakdown", results.scope1, results.totals.scope1)}
             {renderScopeTable("Scope 2 Breakdown", results.scope2, results.totals.scope2)}
-            {renderScopeTable("Scope 3 Breakdown", results.scope3, results.totals.scope3)}
+            {renderScopeTable("Scope 3 Upstream Breakdown", scope3UpstreamRows, scope3UpstreamTotal)}
+            {renderScopeTable("Scope 3 Downstream Breakdown", scope3DownstreamRows, scope3DownstreamTotal)}
           </div>
 
           <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 ${mounted ? "animate-fade-in-up" : "opacity-0"}`}>

@@ -48,7 +48,7 @@ const Dashboard2 = () => {
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
-  const [userType, setUserType] = useState<string>("financial_institution");
+  const [userType, setUserType] = useState<string>("corporate");
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
@@ -118,7 +118,7 @@ const Dashboard2 = () => {
       if (data && data.user_type) {
         setUserType(data.user_type);
       } else {
-        setUserType("financial_institution"); // Default to financial_institution
+        setUserType("corporate"); // Default to corporate for safety
       }
       setUserTypeResolved(true);
 

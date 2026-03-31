@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
@@ -227,6 +227,7 @@ const EmissionCalculatorEPA = () => {
   const [calculationMode, setCalculationMode] = useState<"lca" | "manual" | null>(null);
   const [showSwitchToLCADialog, setShowSwitchToLCADialog] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const hasHydratedSummaryRef = useRef(false);
   const [emissionData, setEmissionData] = useState<EmissionData>({
     scope1: {
       fuel: [],
@@ -312,6 +313,113 @@ const EmissionCalculatorEPA = () => {
       scope2: [...prev.scope2.filter((item: any) => item.id !== "heat-total"), { id: "heat-total", emissions: total }] as any,
     }));
   };
+
+  // Hydrate sidebar totals from saved DB entries so Scope 2/3 appear immediately.
+  useEffect(() => {
+    const hydrateSavedTotals = async () => {
+      if (!user?.id || hasHydratedSummaryRef.current) return;
+      hasHydratedSummaryRef.current = true;
+
+      try {
+        const { data: mainRow } = await (supabase as any)
+          .from("scope2_electricity_main")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let electricityTotal = 0;
+        if (mainRow) {
+          const totalKwh = Number(mainRow.total_kwh) || 0;
+          const gridPct = Number(mainRow.grid_pct) || 0;
+          const otherPct = Number(mainRow.other_pct) || 0;
+          const { data: subs } = await (supabase as any)
+            .from("scope2_electricity_subanswers")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("main_id", mainRow.id);
+          const gridRow = (subs || []).find((r: any) => r.type === "grid");
+          const gridFactor = Number(gridRow?.grid_emission_factor || 0);
+          const gridPart = totalKwh > 0 && gridPct > 0 && gridFactor > 0 ? (gridPct / 100) * totalKwh * gridFactor : 0;
+          const otherRows = (subs || []).filter((r: any) => r.type === "other");
+          const sumOtherEmissions = otherRows.reduce((s: number, r: any) => s + (Number(r.other_sources_emissions) || 0), 0);
+          const otherPart = totalKwh > 0 && otherPct > 0 ? (otherPct / 100) * totalKwh * sumOtherEmissions : 0;
+          electricityTotal = Number((gridPart + otherPart).toFixed(6));
+        }
+
+        const { data: heatRows } = await (supabase as any)
+          .from("scope2_heatsteam_entries_epa")
+          .select("emissions")
+          .eq("user_id", user.id);
+        const heatTotal = Number(
+          ((heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
+        );
+
+        const sumEmissions = (rows: any[] | null | undefined) =>
+          (rows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
+        const sumRowDataEmissions = (rows: any[] | null | undefined) =>
+          (rows || []).reduce((s: number, r: any) => s + (Number(r?.row_data?.emissions) || 0), 0);
+
+        const [
+          purchasedGoodsRes,
+          capitalGoodsRes,
+          fuelEnergyRes,
+          upstreamTransportRes,
+          wasteGeneratedRes,
+          businessTravelRes,
+          employeeCommutingRes,
+          investmentsRes,
+          downstreamTransportRes,
+          endOfLifeRes,
+          processingSoldRes,
+          useOfSoldRes,
+        ] = await Promise.all([
+          (supabase as any).from("scope3_purchased_goods_services").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_capital_goods").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_fuel_energy_activities").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_upstream_transportation").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_waste_generated").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_business_travel").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_employee_commuting").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_investments").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_downstream_transportation").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_end_of_life_treatment").select("emissions").eq("user_id", user.id),
+          (supabase as any).from("scope3_processing_sold_products").select("row_data").eq("user_id", user.id),
+          (supabase as any).from("scope3_use_of_sold_products").select("row_data").eq("user_id", user.id),
+        ]);
+
+        const hydratedScope3 = [
+          { id: "scope3-purchased-goods", category: "purchased_goods_services", emissions: sumEmissions(purchasedGoodsRes.data) },
+          { id: "scope3-capital-goods", category: "capital_goods", emissions: sumEmissions(capitalGoodsRes.data) },
+          { id: "scope3-fuel-energy", category: "fuel_energy_activities", emissions: sumEmissions(fuelEnergyRes.data) },
+          { id: "scope3-upstream-transport", category: "upstream_transportation", emissions: sumEmissions(upstreamTransportRes.data) },
+          { id: "scope3-waste-generated", category: "waste_generated", emissions: sumEmissions(wasteGeneratedRes.data) },
+          { id: "scope3-business-travel", category: "business_travel", emissions: sumEmissions(businessTravelRes.data) },
+          { id: "scope3-employee-commuting", category: "employee_commuting", emissions: sumEmissions(employeeCommutingRes.data) },
+          { id: "scope3-investments", category: "investments", emissions: sumEmissions(investmentsRes.data) },
+          { id: "scope3-downstream-transport", category: "downstream_transportation", emissions: sumEmissions(downstreamTransportRes.data) },
+          { id: "scope3-end-of-life", category: "end_of_life_treatment", emissions: sumEmissions(endOfLifeRes.data) },
+          { id: "scope3-processing-sold", category: "processing_use_of_sold_products", emissions: sumRowDataEmissions(processingSoldRes.data) },
+          { id: "scope3-use-of-sold", category: "processing_use_of_sold_products", emissions: sumRowDataEmissions(useOfSoldRes.data) },
+        ].filter((r) => (r.emissions || 0) > 0) as any[];
+
+        setEmissionData((prev) => ({
+          ...prev,
+          scope2: [
+            ...prev.scope2.filter((item: any) => item.id !== "electricity-total" && item.id !== "heat-total"),
+            { id: "electricity-total", emissions: electricityTotal },
+            { id: "heat-total", emissions: heatTotal },
+          ] as any,
+          scope3: prev.scope3.length > 0 ? prev.scope3 : hydratedScope3,
+        }));
+      } catch (e) {
+        console.warn("Failed to hydrate EPA summary totals:", e);
+      }
+    };
+
+    hydrateSavedTotals();
+  }, [user?.id]);
 
   // Save company emissions to database (same as main calculator)
   const saveCompanyEmissions = async (totals: ScopeTotals) => {

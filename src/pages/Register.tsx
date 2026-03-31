@@ -29,8 +29,8 @@ const Register = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
-  // Get user_type from query params, default to 'financial_institution'
-  const userType = searchParams.get('user_type') || 'financial_institution';
+  // Get user_type from query params, default to 'corporate'
+  const userType = searchParams.get('user_type') || 'corporate';
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
