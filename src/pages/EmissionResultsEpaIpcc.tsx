@@ -95,7 +95,8 @@ const getReportCSS = (): string => `
   .about-title { font-size: 16px; font-weight: 700; color: #0A3D2E; margin-bottom: 8px; }
   .about-text { font-size: 12px; color: #355244; line-height: 1.65; }
   .section-title { font-family: 'Playfair Display', serif; font-size: 30px; color: #0A3D2E; margin-bottom: 8px; }
-  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: 6px; margin-bottom: 10px; }
+  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: 18px; margin-bottom: 12px; }
+  .section-title + .subsection-title { margin-top: 10px; }
   .body-text { font-size: 12px; color: #2f4a3d; line-height: 1.65; margin-bottom: 10px; }
   .bullet-list {
     margin: 0 0 10px 0;
@@ -160,7 +161,7 @@ const getReportCSS = (): string => `
   .badge-impact-medium { color: #7a4a07; background: #fff3dc; }
   .badge-effort-low { color: #0f6d45; background: #e3f8ee; }
   .badge-effort-medium { color: #755b13; background: #fdf5db; }
-  .inventory-table, .trend-table, .scope3-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: 8px; }
+  .inventory-table, .trend-table, .scope3-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: 8px; margin-bottom: 12px; }
   .inventory-table th, .trend-table th, .scope3-table th { background: #0A3D2E; color: #fff; text-align: left; font-size: 11px; padding: 9px; }
   .inventory-table td, .trend-table td, .scope3-table td { border-top: 1px solid #e5ede9; font-size: 12px; color: #2f4a3d; padding: 8px 9px; }
   .inventory-table td.num, .trend-table td.num, .scope3-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -168,9 +169,9 @@ const getReportCSS = (): string => `
   .chip-card { border: 1px solid #dce8e1; border-radius: 10px; background: #f7fbf9; padding: 10px; }
   .chip-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #0A3D2E; font-weight: 700; }
   .chip-value { font-size: 18px; color: #0A3D2E; font-weight: 700; margin-top: 4px; }
-  .insight-box { border: 1px solid #d6e6de; background: #f3faf6; border-left: 4px solid #0A3D2E; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .insight-box { border: 1px solid #d6e6de; background: #f3faf6; border-left: 4px solid #0A3D2E; border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
   .insight-text { font-size: 12px; color: #274739; line-height: 1.55; }
-  .chart-bars { margin-top: 10px; }
+  .chart-bars { margin-top: 12px; margin-bottom: 14px; }
   .chart-row { margin-bottom: 9px; }
   .chart-meta { display: flex; justify-content: space-between; font-size: 11px; color: #2d4b3d; margin-bottom: 4px; }
   .chart-track { width: 100%; height: 8px; background: #e5efea; border-radius: 999px; overflow: hidden; }
@@ -449,7 +450,7 @@ const EmissionResultsEpaIpcc = () => {
       const submitted = new Date(submittedAt);
       const generatedAt = new Date();
       const company = user?.email?.split("@")[0] || "Organization";
-      const period = submitted.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const period = generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
       const year = String(generatedAt.getFullYear());
       const reportPeriodStart = `01/01/${year}`;
       const reportPeriodEnd = generatedAt.toLocaleDateString("en-GB");
@@ -501,11 +502,66 @@ const EmissionResultsEpaIpcc = () => {
         { Energy: 0, Transport: 0, Materials: 0, Waste: 0 }
       );
 
+      const scope1Rows = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const scope2Rows = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
       const scope3Sorted = [...results.scope3].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
-      const scope3TopRows = scope3Sorted.slice(0, 5);
       const topCount = Math.max(1, Math.ceil(scope3Sorted.length * 0.2));
       const topShare = scope3Sorted.slice(0, topCount).reduce((sum, r) => sum + r.value, 0);
       const topSharePct = pct(topShare, results.totals.scope3);
+      const scope3ChartRows = scope3Sorted.slice(0, 8);
+
+      const monthLabel = (dateValue: string) => {
+        const dt = new Date(dateValue);
+        if (Number.isNaN(dt.getTime())) return dateValue;
+        return dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+      };
+
+      const extractRowKg = (row: any): number => {
+        const direct = Number(row?.emissions ?? row?.total_emissions_kg ?? row?.co2e_kg ?? 0);
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        const resultObj = row?.result || {};
+        const fromResult = Number(
+          resultObj?.totalCO2e_kg ??
+          resultObj?.total_co2e_kg ??
+          resultObj?.co2e_kg ??
+          resultObj?.emissions_kg ??
+          0
+        );
+        return Number.isFinite(fromResult) && fromResult > 0 ? fromResult : 0;
+      };
+
+      const ipccMonthlySources = [
+        { label: "Vehicular", table: "ipcc_scope1_vehicular_entries" },
+        { label: "Kitchen", table: "ipcc_scope1_kitchen_entries" },
+        { label: "Power", table: "ipcc_scope1_power_entries" },
+        { label: "Heating", table: "ipcc_scope1_heating_entries" },
+      ];
+
+      const ipccMonthlyRows = user?.id
+        ? (
+            await Promise.all(
+              ipccMonthlySources.map(async (source) => {
+                const { data } = await (supabase as any)
+                  .from(source.table)
+                  .select("month_start, result")
+                  .eq("user_id", user.id)
+                  .order("month_start", { ascending: false });
+
+                const monthly = (data || [])
+                  .filter((row: any) => row?.month_start)
+                  .map((row: any) => ({
+                    monthStart: String(row.month_start),
+                    kg: extractRowKg(row),
+                  }))
+                  .filter((row: any) => row.kg > 0)
+                  .slice(0, 12)
+                  .sort((a: any, b: any) => new Date(a.monthStart).getTime() - new Date(b.monthStart).getTime());
+
+                return { label: source.label, monthly };
+              })
+            )
+          ).filter((row) => row.monthly.length > 0)
+        : [];
 
       const logisticsDriver = allRows
         .filter((r) => /transport|travel|commut|logistics|vehicle|mobile|on-road|non-road/i.test(r.label))
@@ -534,6 +590,14 @@ const EmissionResultsEpaIpcc = () => {
 
       const topScope1Category = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
       const topScope2Category = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+      const upstreamScope3Rows = [...results.scope3]
+        .filter((r) => ["purchased_goods", "capital_goods", "fuel_energy", "upstream_transport", "waste", "business_travel", "employee_commuting"].includes(r.key) && r.value > 0)
+        .sort((a, b) => b.value - a.value);
+      const downstreamScope3Rows = [...results.scope3]
+        .filter((r) => ["investments", "downstream_transport", "end_of_life", "processing_sold", "use_of_sold"].includes(r.key) && r.value > 0)
+        .sort((a, b) => b.value - a.value);
+      const topScope3UpstreamCategory = upstreamScope3Rows[0];
+      const topScope3DownstreamCategory = downstreamScope3Rows[0];
       const topDriverName = [
         { name: "energy operations", value: safeEnergyDriver },
         { name: "supply chain activities", value: supplyChainDriver },
@@ -550,12 +614,230 @@ const EmissionResultsEpaIpcc = () => {
           : "Scope 2 data is limited; increasing energy data granularity is recommended.",
       ];
 
+      const scopeKeyToTable: Record<string, string> = {
+        fuel: "scope1_fuel_entries",
+        mobile: "scope1_epa_mobile_fuel_entries",
+        onroad_gas: "scope1_epa_on_road_gasoline_entries",
+        onroad_diesel: "scope1_epa_on_road_diesel_alt_fuel_entries",
+        nonroad: "scope1_epa_non_road_vehicle_entries",
+        heatsteam: "scope2_heatsteam_entries_epa",
+        flaring: "ipcc_scope1_flaring_entries",
+        venting: "ipcc_scope1_venting_entries",
+        vehicular: "ipcc_scope1_vehicular_entries",
+        kitchen: "ipcc_scope1_kitchen_entries",
+        power: "ipcc_scope1_power_entries",
+        heating: "ipcc_scope1_heating_entries",
+        electricity: "scope2_electricity_subanswers",
+        purchased_goods: "scope3_purchased_goods_services",
+        capital_goods: "scope3_capital_goods",
+        fuel_energy: "scope3_fuel_energy_activities",
+        upstream_transport: "scope3_upstream_transportation",
+        waste: "scope3_waste_generated",
+        business_travel: "scope3_business_travel",
+        employee_commuting: "scope3_employee_commuting",
+        investments: "scope3_investments",
+        downstream_transport: "scope3_downstream_transportation",
+        end_of_life: "scope3_end_of_life_treatment",
+        processing_sold: "scope3_processing_sold_products",
+        use_of_sold: "scope3_use_of_sold_products",
+      };
+
+      const detailGroupCandidates = [
+        "fuel_type",
+        "fuel",
+        "category",
+        "sub_category",
+        "type",
+        "vehicle_type",
+        "energy_source",
+        "source",
+        "activity_type",
+        "material_type",
+        "waste_type",
+        "travel_type",
+        "transport_mode",
+        "investment_type",
+      ];
+
+      const gasLabelMap: Record<string, "CO2" | "CH4" | "N2O" | "Other"> = {
+        co2_only: "CO2",
+        ch4_only: "CH4",
+        n2o_only: "N2O",
+        no2_only: "N2O",
+      };
+
+      const extractEmissionKg = (row: any): number => {
+        const direct = Number(row?.emissions || 0);
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        const rowData = row?.row_data;
+        if (rowData && typeof rowData === "object") {
+          const rd = Number((rowData as any).emissions || (rowData as any).totalCO2e_kg || 0);
+          if (Number.isFinite(rd) && rd > 0) return rd;
+        }
+        const resultObj = row?.result;
+        if (resultObj && typeof resultObj === "object") {
+          const rr = Number((resultObj as any).totalCO2e_kg || (resultObj as any).total_co2e_kg || 0);
+          if (Number.isFinite(rr) && rr > 0) return rr;
+        }
+        return 0;
+      };
+
+      const extractGasBreakdown = (rows: any[]): Record<string, number> => {
+        const totals: Record<string, number> = { CO2: 0, CH4: 0, N2O: 0, Other: 0 };
+        (rows || []).forEach((row: any) => {
+          const emissionSelection = String(row?.emission_selection || "").toLowerCase();
+          const rowEmission = extractEmissionKg(row);
+          if (emissionSelection && rowEmission > 0) {
+            const mapped = gasLabelMap[emissionSelection] || "Other";
+            totals[mapped] += rowEmission;
+          }
+
+          const resultObj = row?.result;
+          if (resultObj && typeof resultObj === "object") {
+            const breakdown = (resultObj as any).breakdown;
+            if (Array.isArray(breakdown)) {
+              breakdown.forEach((b: any) => {
+                const gas = String(b?.gas || "").toUpperCase();
+                const kg = Number(b?.co2eKg ?? b?.co2e_kg ?? b?.kg ?? 0);
+                if (!Number.isFinite(kg) || kg <= 0) return;
+                if (gas === "CO2") totals.CO2 += kg;
+                else if (gas === "CH4") totals.CH4 += kg;
+                else if (gas === "N2O" || gas === "NO2") totals.N2O += kg;
+                else totals.Other += kg;
+              });
+            }
+
+            const co2Kg = Number((resultObj as any).co2_kg ?? (resultObj as any).co2Kg ?? 0);
+            const ch4Kg = Number((resultObj as any).ch4_kg ?? (resultObj as any).ch4Kg ?? 0);
+            const n2oKg = Number((resultObj as any).n2o_kg ?? (resultObj as any).n2oKg ?? 0);
+            if (Number.isFinite(co2Kg) && co2Kg > 0) totals.CO2 += co2Kg;
+            if (Number.isFinite(ch4Kg) && ch4Kg > 0) totals.CH4 += ch4Kg;
+            if (Number.isFinite(n2oKg) && n2oKg > 0) totals.N2O += n2oKg;
+          }
+        });
+        return totals;
+      };
+
+      const scopeTotalByName = (scopeName: string) =>
+        scopeName === "Scope 1" ? results.totals.scope1 : scopeName === "Scope 2" ? results.totals.scope2 : results.totals.scope3;
+
+      const buildCategoryDrilldown = async (
+        category: { key: string; label: string; value: number } | undefined,
+        scopeName: string
+      ) => {
+        if (!category || !user?.id || category.value <= 0) return "";
+        const table = scopeKeyToTable[category.key];
+        if (!table) return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+
+        const { data } = await (supabase as any)
+          .from(table)
+          .select("*")
+          .eq("user_id", user.id)
+          .limit(300);
+
+        const rows = data || [];
+        if (!rows.length) {
+          return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+        }
+
+        const rankedEntries = rows
+          .map((row: any) => ({ row, kg: extractEmissionKg(row) }))
+          .filter((entry) => entry.kg > 0)
+          .sort((a, b) => b.kg - a.kg);
+        const largestEntry = rankedEntries[0];
+
+        const gasFocusedKeys = new Set([
+          "vehicular",
+          "venting",
+          "flaring",
+          "mobile",
+          "onroad_gas",
+          "onroad_diesel",
+          "nonroad",
+          "fuel",
+          "kitchen",
+          "power",
+          "heating",
+        ]);
+        if (gasFocusedKeys.has(category.key)) {
+          const gasTotals = extractGasBreakdown(rows);
+          const topGas = Object.entries(gasTotals)
+            .filter(([, val]) => Number(val) > 0)
+            .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+          if (topGas) {
+            const gasPct = category.value > 0 ? ((Number(topGas[1]) / category.value) * 100).toFixed(1) : "0.0";
+            return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%); dominant gas composition is ${topGas[0]} (~${gasPct}%).`;
+          }
+        }
+
+        let groupingColumn = "";
+        for (const c of detailGroupCandidates) {
+          if (rows.some((r: any) => typeof r?.[c] === "string" && String(r[c]).trim().length > 0)) {
+            groupingColumn = c;
+            break;
+          }
+        }
+
+        if (!groupingColumn) {
+          if (largestEntry) {
+            const row = largestEntry.row;
+            const subCategoryValue =
+              detailGroupCandidates
+                .map((key) => row?.[key])
+                .find((v) => typeof v === "string" && String(v).trim().length > 0) || "";
+            const monthValue =
+              typeof row?.month_start === "string" && row.month_start
+                ? monthLabel(row.month_start)
+                : "";
+            const entryPct = category.value > 0 ? ((largestEntry.kg / category.value) * 100).toFixed(1) : "0.0";
+            if (subCategoryValue) {
+              return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest sub-category is ${String(subCategoryValue)} (~${entryPct}% of ${category.label}).`;
+            }
+            if (monthValue) {
+              return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest recorded month is ${monthValue} (${formatTonnes(largestEntry.kg)} tCO2e, ~${entryPct}% of ${category.label}).`;
+            }
+            return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest single entry is ${formatTonnes(largestEntry.kg)} tCO2e (~${entryPct}% of ${category.label}).`;
+          }
+          return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}% with ${rows.length} recorded entries.`;
+        }
+
+        const grouped = rows.reduce((acc: Record<string, number>, row: any) => {
+          const key = String(row?.[groupingColumn] || "Other").trim() || "Other";
+          acc[key] = (acc[key] || 0) + extractEmissionKg(row);
+          return acc;
+        }, {} as Record<string, number>);
+
+        const topGroup = Object.entries(grouped).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+        if (!topGroup) {
+          return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+        }
+
+        const groupPct = category.value > 0 ? ((Number(topGroup[1]) / category.value) * 100).toFixed(1) : "0.0";
+        return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%); within this category, ${topGroup[0]} is highest (~${groupPct}%).`;
+      };
+
+      const scope1ContributorInsight = await buildCategoryDrilldown(topScope1Category, "Scope 1");
+      const scope2ContributorInsight = await buildCategoryDrilldown(topScope2Category, "Scope 2");
+      const scope3UpstreamContributorInsight = await buildCategoryDrilldown(topScope3UpstreamCategory, "Scope 3 upstream");
+      const scope3DownstreamContributorInsight = await buildCategoryDrilldown(topScope3DownstreamCategory, "Scope 3 downstream");
+
       const scope1Insight = topScope1Category
         ? `${topScope1Category.label} contributes the largest share of Scope 1 (${pct(topScope1Category.value, results.totals.scope1)}%).`
         : "Scope 1 emissions are currently low or unavailable.";
       const scope2Insight = results.totals.scope2 > 0
         ? `Scope 2 is split across available electricity/heat sources; cleaner procurement can reduce ${scope2Pct}% of total emissions.`
         : "Scope 2 emissions are currently not significant in this reporting period.";
+      const scope1Second = scope1Rows[1];
+      const scope1ManagementInsight = topScope1Category
+        ? `Management focus: prioritize ${topScope1Category.label} first (${pct(topScope1Category.value, results.totals.scope1)}% of Scope 1)${scope1Second ? `, then ${scope1Second.label} (${pct(scope1Second.value, results.totals.scope1)}%)` : ""}; this sequence gives the highest near-term abatement leverage.`
+        : "Management focus: increase Scope 1 data capture cadence to identify stable reduction levers.";
+      const scope2Second = scope2Rows[1];
+      const scope2ManagementInsight = topScope2Category
+        ? `Management focus: set procurement and efficiency targets around ${topScope2Category.label}${scope2Second ? ` while tracking ${scope2Second.label} as secondary driver` : ""}; review monthly intensity (kg CO2e per activity unit) to validate gains.`
+        : "Management focus: broaden Scope 2 source-level inputs before setting procurement targets.";
+      const upstreamShare = results.totals.scope3 > 0 ? ((upstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
+      const downstreamShare = results.totals.scope3 > 0 ? ((downstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
+      const scope3ManagementInsight = `Management view: Scope 3 mix is ${upstreamShare}% upstream vs ${downstreamShare}% downstream; allocate governance and supplier/customer engagement budget in this proportion for better execution alignment.`;
       const driversInsight = `Emissions are structurally driven by ${topDriverName}, based on current activity concentration.`;
 
       const buildActionFromLabel = (label: string): { action: string; impact: "High" | "Medium"; effort: "Low" | "Medium"; timeline: string } => {
@@ -600,7 +882,7 @@ const EmissionResultsEpaIpcc = () => {
             <div class="cover-body">
               <div class="cover-title">Carbon Emissions Report</div>
               <div class="cover-company">${escapeHtml(company)}</div>
-              <div class="cover-period">Year i.e ${escapeHtml(period)}</div>
+              <div class="cover-period">${escapeHtml(period)}</div>
             </div>
             <div class="cover-footer">This report contains proprietary and confidential information of ${escapeHtml(company)} and is intended solely for internal use and authorized stakeholders.</div>
           </div>
@@ -887,7 +1169,6 @@ const EmissionResultsEpaIpcc = () => {
                 <tr><td></td><td>Rationale to include</td><td>Important for understanding the impact of financial investments.</td></tr>
                 <tr><td></td><td>GHG Protocol Reference</td><td>3.15 Investments.</td></tr>
 
-                <tr class="op-group"><td colspan="3">Excluded Activities</td></tr>
                 <tr><td class="op-subhead">Process Emissions</td><td>Description</td><td>Emissions resulting from release of greenhouse gases in production processes.</td></tr>
                 <tr><td></td><td>Rationale to Exclude</td><td>Emissions category not applicable.</td></tr>
                 <tr><td></td><td>GHG Protocol Reference</td><td>1.3 Process emissions.</td></tr>
@@ -968,21 +1249,36 @@ const EmissionResultsEpaIpcc = () => {
             <div class="section-title">7. Scope 1 Analysis</div>
             <div class="donut-wrap">
               <div class="donut" style="--s1:${scope1PctNum.toFixed(2)}%;--s2:${scope2PctNum.toFixed(2)}%;"></div>
-              <div class="legend">
-                <div class="legend-item"><span class="dot" style="background:#ef4444;"></span>Scope 1: ${scope1Pct}%</div>
-                <div class="legend-item"><span class="dot" style="background:#f59e0b;"></span>Scope 2: ${scope2Pct}%</div>
-                <div class="legend-item"><span class="dot" style="background:#2563eb;"></span>Scope 3: ${scope3Pct}%</div>
-              </div>
             </div>
             <div class="chart-bars">
-              ${results.scope1.filter((r) => r.value > 0).slice(0, 6).map((r) => `
+              ${scope1Rows.slice(0, 8).map((r) => `
                 <div class="chart-row">
                   <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${fmt(r.value)} tCO2e</span></div>
                   <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope1)}%;background:#ef4444;"></div></div>
                 </div>
               `).join("")}
             </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 1</th></tr></thead>
+              <tbody>
+                ${scope1Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope1)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope1)}</strong></td><td class="num"><strong>${fmt(results.totals.scope1)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            ${ipccMonthlyRows.length > 0 ? `
+            ${ipccMonthlyRows.map((entry) => `
+              <table class="scope3-table">
+                <thead><tr><th colspan="3">${escapeHtml(entry.label)}</th></tr></thead>
+                <thead><tr><th>Month</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+                <tbody>
+                  ${entry.monthly.map((m: any) => `<tr><td>${escapeHtml(monthLabel(m.monthStart))}</td><td class="num">${formatKg(m.kg)}</td><td class="num">${formatTonnes(m.kg)}</td></tr>`).join("")}
+                </tbody>
+              </table>
+            `).join("")}
+            ` : ""}
             <div class="insight-box"><div class="insight-text">${escapeHtml(scope1Insight)}</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope1ManagementInsight)}</div></div>
+            ${scope1ContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope1ContributorInsight)}</div></div>` : ""}
             <div class="page-number">10</div>
           </div>
         </div>
@@ -992,14 +1288,23 @@ const EmissionResultsEpaIpcc = () => {
           <div class="page-content">
             <div class="section-title">8. Scope 2 Analysis</div>
             <div class="chart-bars">
-              ${results.scope2.filter((r) => r.value > 0).map((r) => `
+              ${scope2Rows.slice(0, 8).map((r) => `
                 <div class="chart-row">
                   <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${fmt(r.value)} tCO2e</span></div>
                   <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope2)}%;background:#f59e0b;"></div></div>
                 </div>
               `).join("")}
             </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 2</th></tr></thead>
+              <tbody>
+                ${scope2Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope2)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope2)}</strong></td><td class="num"><strong>${fmt(results.totals.scope2)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
             <div class="insight-box"><div class="insight-text">${escapeHtml(scope2Insight)}</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope2ManagementInsight)}</div></div>
+            ${scope2ContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope2ContributorInsight)}</div></div>` : ""}
             <div class="page-number">11</div>
           </div>
         </div>
@@ -1008,21 +1313,43 @@ const EmissionResultsEpaIpcc = () => {
           <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
           <div class="page-content">
             <div class="section-title">9. Scope 3 Analysis</div>
-            <table class="scope3-table">
-              <thead><tr><th>Category</th><th>Emissions (tCO2e)</th><th>% of Scope 3</th></tr></thead>
-              <tbody>
-                ${scope3TopRows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
-              </tbody>
-            </table>
+            <div class="subsection-title">9.1 Upstream Breakdown</div>
             <div class="chart-bars">
-              ${scope3TopRows.map((r) => `
+              ${upstreamScope3Rows.slice(0, 6).map((r) => `
                 <div class="chart-row">
                   <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${pct(r.value, results.totals.scope3)}%</span></div>
                   <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope3)}%;background:#2563eb;"></div></div>
                 </div>
               `).join("")}
             </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 3</th></tr></thead>
+              <tbody>
+                ${upstreamScope3Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
+                <tr><td><strong>Upstream Total</strong></td><td class="num"><strong>${formatKg(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${fmt(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${pct(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0), results.totals.scope3)}%</strong></td></tr>
+              </tbody>
+            </table>
+            <div class="subsection-title" style="margin-top:12px;">9.2 Downstream Breakdown</div>
+            <div class="chart-bars">
+              ${downstreamScope3Rows.slice(0, 6).map((r) => `
+                <div class="chart-row">
+                  <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${pct(r.value, results.totals.scope3)}%</span></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope3)}%;background:#1d4ed8;"></div></div>
+                </div>
+              `).join("")}
+            </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 3</th></tr></thead>
+              <tbody>
+                ${downstreamScope3Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
+                <tr><td><strong>Downstream Total</strong></td><td class="num"><strong>${formatKg(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${fmt(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${pct(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0), results.totals.scope3)}%</strong></td></tr>
+                <tr><td><strong>Scope 3 Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope3)}</strong></td><td class="num"><strong>${fmt(results.totals.scope3)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
             <div class="insight-box"><div class="insight-text">Top 20% of categories contribute ${topSharePct}% of Scope 3 emissions.</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope3ManagementInsight)}</div></div>
+            ${scope3UpstreamContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope3UpstreamContributorInsight)}</div></div>` : ""}
+            ${scope3DownstreamContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope3DownstreamContributorInsight)}</div></div>` : ""}
             <div class="page-number">12</div>
           </div>
         </div>
@@ -1114,7 +1441,7 @@ const EmissionResultsEpaIpcc = () => {
       document.body.removeChild(wrapper);
 
       const fileDate = new Date().toISOString().slice(0, 10);
-      pdf.save(`EPA_IPCC_Results_Report_${fileDate}.pdf`);
+      pdf.save(`Emission_Results_Report_${fileDate}.pdf`);
     } finally {
       setIsGeneratingPdf(false);
     }

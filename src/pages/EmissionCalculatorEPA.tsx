@@ -54,7 +54,7 @@ type EmissionPdfReportData = {
   date?: string;
   s1: { stationary: number; mobile: number; fugitive: number; process: number };
   s2: { electricity: number; heat: number };
-  s3: { travel: number; commute: number; supply: number; waste: number };
+  s3: { upstream: number; downstream: number; travel: number; commute: number; waste: number };
   targetYear?: string;
   targetPct?: string;
 };
@@ -106,6 +106,7 @@ const getReportCSS = (): string => `
   .scope-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; font-size: 12px; color: #2a4a32; border-bottom: 1px solid #e8f0eb; }
   .scope-row.shaded { background: #f4f8f5; }
   .scope-subtotal { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; font-size: 12px; font-weight: 500; color: #1a3d2e; border-top: 1.5px solid #3a7d57; border-bottom: 1px solid #e8f0eb; }
+  .scope-subheading { font-size: 11px; font-weight: 700; color: #1a3d2e; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.4px; }
   .grand-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #1a3d2e; border-radius: 4px; margin-top: 20px; }
   .grand-total-label { font-size: 13px; font-weight: 500; color: #ffffff; letter-spacing: 0.5px; }
   .grand-total-value { font-size: 14px; font-weight: 500; color: #ffffff; }
@@ -122,7 +123,7 @@ const getReportCSS = (): string => `
 const getReportContent = (data: EmissionPdfReportData): string => {
   const totalS1 = data.s1.stationary + data.s1.mobile + data.s1.fugitive + data.s1.process;
   const totalS2 = data.s2.electricity + data.s2.heat;
-  const totalS3 = data.s3.travel + data.s3.commute + data.s3.supply + data.s3.waste;
+  const totalS3 = data.s3.upstream + data.s3.downstream + data.s3.travel + data.s3.commute + data.s3.waste;
   const grandTotal = totalS1 + totalS2 + totalS3;
   const fmt = (n: number) => n.toFixed(2);
 
@@ -168,10 +169,13 @@ const getReportContent = (data: EmissionPdfReportData): string => {
         </div>
         <div class="scope-section">
           <div class="scope-header"><div class="scope-header-text">Scope 3 — Value Chain Emissions</div></div>
-          <div class="scope-row"><span>Business Travel</span><span>${fmt(data.s3.travel)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Employee Commuting</span><span>${fmt(data.s3.commute)} tCO2e</span></div>
-          <div class="scope-row"><span>Supply Chain</span><span>${fmt(data.s3.supply)} tCO2e</span></div>
+          <div class="scope-subheading">Upstream</div>
+          <div class="scope-row"><span>Upstream Activities</span><span>${fmt(data.s3.upstream)} tCO2e</span></div>
+          <div class="scope-row shaded"><span>Business Travel</span><span>${fmt(data.s3.travel)} tCO2e</span></div>
+          <div class="scope-row"><span>Employee Commuting</span><span>${fmt(data.s3.commute)} tCO2e</span></div>
           <div class="scope-row shaded"><span>Waste</span><span>${fmt(data.s3.waste)} tCO2e</span></div>
+          <div class="scope-subheading">Downstream</div>
+          <div class="scope-row"><span>Downstream Activities</span><span>${fmt(data.s3.downstream)} tCO2e</span></div>
           <div class="scope-subtotal"><span>Scope 3 Total</span><span>${fmt(totalS3)} tCO2e</span></div>
         </div>
         <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(grandTotal)} tCO2e</div></div>
@@ -776,12 +780,14 @@ const EmissionCalculatorEPA = () => {
 
     const travel = sumScope3ByCategories(["business_travel", "businessTravel"]);
     const commute = sumScope3ByCategories(["employee_commuting", "employeeCommuting"]);
-    const supply = sumScope3ByCategories([
+    const upstream = sumScope3ByCategories([
       "purchased_goods_services",
       "capital_goods",
       "fuel_energy_activities",
       "upstream_transportation",
       "upstream_leased_assets",
+    ]);
+    const downstream = sumScope3ByCategories([
       "investments",
       "downstream_transportation",
       "processing_use_of_sold_products",
@@ -800,7 +806,7 @@ const EmissionCalculatorEPA = () => {
       date: new Date().toLocaleDateString(),
       s1: { stationary, mobile, fugitive, process },
       s2: { electricity, heat },
-      s3: { travel, commute, supply, waste },
+      s3: { upstream, downstream, travel, commute, waste },
     };
   };
 

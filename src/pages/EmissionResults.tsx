@@ -16,6 +16,140 @@ interface EmissionResultsData {
   submitted_at: string;
 }
 
+type EmissionPdfReportData = {
+  company: string;
+  period: string;
+  year: string;
+  submittedAt: string;
+  scope1: Array<{ label: string; value: number }>;
+  scope2: Array<{ label: string; value: number }>;
+  scope3Upstream: Array<{ label: string; value: number }>;
+  scope3Downstream: Array<{ label: string; value: number }>;
+};
+
+const escapeHtml = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const getReportCSS = (): string => `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .report { width: 800px; font-family: Arial, sans-serif; color: #1f2a23; background: #fff; }
+  .cover { width: 800px; height: 1131px; background: #d9e0e3; position: relative; overflow: hidden; page-break-after: always; }
+  .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-left { position: absolute; top: 0; left: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-border-right { position: absolute; top: 0; right: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-inner { position: absolute; top: 30px; right: 30px; bottom: 30px; left: 30px; padding: 28px 30px 34px; }
+  .cover-header { display: flex; justify-content: space-between; align-items: center; }
+  .cover-brand { font-size: 20px; font-weight: 700; color: #0A3D2E; }
+  .cover-year { font-size: 34px; color: #0A3D2E; }
+  .cover-body { margin-top: 220px; padding-left: 20px; }
+  .cover-title { font-size: 62px; line-height: 1.04; color: #0A3D2E; margin-bottom: 26px; }
+  .cover-company { font-size: 42px; color: #0A3D2E; margin-bottom: 8px; }
+  .cover-period { font-size: 34px; color: #0A3D2E; margin-bottom: 18px; }
+  .cover-footer { position: absolute; right: 20px; bottom: 8px; left: 20px; font-size: 10px; color: #3d4b42; text-align: center; }
+  .inner-page { width: 800px; min-height: 1131px; background: #fff; page-break-after: always; position: relative; }
+  .page-header { background: #0c4a3f; color: #fff; padding: 14px 34px; display: flex; justify-content: space-between; align-items: center; }
+  .page-content { padding: 30px 34px 66px; }
+  .section-title { font-size: 30px; color: #0A3D2E; margin-bottom: 10px; }
+  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: 16px; margin-bottom: 10px; }
+  .scope-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: 8px; margin-bottom: 12px; }
+  .scope-table th { background: #0A3D2E; color: #fff; text-align: left; font-size: 11px; padding: 9px; }
+  .scope-table td { border-top: 1px solid #e5ede9; font-size: 12px; color: #2f4a3d; padding: 8px 9px; }
+  .scope-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .page-number { position: absolute; left: 0; right: 0; bottom: 20px; text-align: center; font-size: 10px; color: #6c7e74; }
+`;
+
+const getReportContent = (data: EmissionPdfReportData): string => {
+  const toTonnes = (kg: number) => kg / 1000;
+  const fmtKg = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  const fmtT = (n: number) => toTonnes(n).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  const total = (rows: Array<{ label: string; value: number }>) => rows.reduce((s, r) => s + r.value, 0);
+  const s1Total = total(data.scope1);
+  const s2Total = total(data.scope2);
+  const s3UpTotal = total(data.scope3Upstream);
+  const s3DownTotal = total(data.scope3Downstream);
+  const s3Total = s3UpTotal + s3DownTotal;
+  const grand = s1Total + s2Total + s3Total;
+
+  return `
+  <div class="report">
+    <div class="cover">
+      <div class="cover-border-top"></div><div class="cover-border-bottom"></div><div class="cover-border-left"></div><div class="cover-border-right"></div>
+      <div class="cover-inner">
+        <div class="cover-header">
+          <div class="cover-brand">Rethink Carbon</div>
+          <div class="cover-year">${escapeHtml(data.year)}</div>
+        </div>
+        <div class="cover-body">
+          <div class="cover-title">Carbon Emissions Report</div>
+          <div class="cover-company">${escapeHtml(data.company)}</div>
+          <div class="cover-period">${escapeHtml(data.period)}</div>
+        </div>
+        <div class="cover-footer">This report contains proprietary and confidential information and is intended solely for internal use and authorized stakeholders.</div>
+      </div>
+    </div>
+    <div class="inner-page">
+      <div class="page-header"><div>Rethink Carbon</div><div>${escapeHtml(data.company)} &nbsp;|&nbsp; ${escapeHtml(data.period)}</div></div>
+      <div class="page-content">
+        <div class="section-title">Emissions Summary</div>
+        <table class="scope-table">
+          <thead><tr><th>Scope</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Total</th></tr></thead>
+          <tbody>
+            <tr><td>Scope 1</td><td class="num">${fmtKg(s1Total)}</td><td class="num">${fmtT(s1Total)}</td><td class="num">${grand > 0 ? ((s1Total / grand) * 100).toFixed(1) : "0.0"}%</td></tr>
+            <tr><td>Scope 2</td><td class="num">${fmtKg(s2Total)}</td><td class="num">${fmtT(s2Total)}</td><td class="num">${grand > 0 ? ((s2Total / grand) * 100).toFixed(1) : "0.0"}%</td></tr>
+            <tr><td>Scope 3</td><td class="num">${fmtKg(s3Total)}</td><td class="num">${fmtT(s3Total)}</td><td class="num">${grand > 0 ? ((s3Total / grand) * 100).toFixed(1) : "0.0"}%</td></tr>
+            <tr><td><strong>Grand Total</strong></td><td class="num"><strong>${fmtKg(grand)}</strong></td><td class="num"><strong>${fmtT(grand)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+          </tbody>
+        </table>
+
+        <div class="subsection-title">Scope 1 Breakdown</div>
+        <table class="scope-table">
+          <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+          <tbody>
+            ${data.scope1.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${fmtKg(r.value)}</td><td class="num">${fmtT(r.value)}</td></tr>`).join("")}
+            <tr><td><strong>Scope 1 Total</strong></td><td class="num"><strong>${fmtKg(s1Total)}</strong></td><td class="num"><strong>${fmtT(s1Total)}</strong></td></tr>
+          </tbody>
+        </table>
+
+        <div class="subsection-title">Scope 2 Breakdown</div>
+        <table class="scope-table">
+          <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+          <tbody>
+            ${data.scope2.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${fmtKg(r.value)}</td><td class="num">${fmtT(r.value)}</td></tr>`).join("")}
+            <tr><td><strong>Scope 2 Total</strong></td><td class="num"><strong>${fmtKg(s2Total)}</strong></td><td class="num"><strong>${fmtT(s2Total)}</strong></td></tr>
+          </tbody>
+        </table>
+
+        <div class="subsection-title">Scope 3 Upstream Breakdown</div>
+        <table class="scope-table">
+          <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+          <tbody>
+            ${data.scope3Upstream.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${fmtKg(r.value)}</td><td class="num">${fmtT(r.value)}</td></tr>`).join("")}
+            <tr><td><strong>Upstream Total</strong></td><td class="num"><strong>${fmtKg(s3UpTotal)}</strong></td><td class="num"><strong>${fmtT(s3UpTotal)}</strong></td></tr>
+          </tbody>
+        </table>
+
+        <div class="subsection-title">Scope 3 Downstream Breakdown</div>
+        <table class="scope-table">
+          <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+          <tbody>
+            ${data.scope3Downstream.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${fmtKg(r.value)}</td><td class="num">${fmtT(r.value)}</td></tr>`).join("")}
+            <tr><td><strong>Downstream Total</strong></td><td class="num"><strong>${fmtKg(s3DownTotal)}</strong></td><td class="num"><strong>${fmtT(s3DownTotal)}</strong></td></tr>
+            <tr><td><strong>Scope 3 Total</strong></td><td class="num"><strong>${fmtKg(s3Total)}</strong></td><td class="num"><strong>${fmtT(s3Total)}</strong></td></tr>
+          </tbody>
+        </table>
+        <div class="page-number">2</div>
+      </div>
+    </div>
+  </div>
+  `;
+};
+
 const EmissionResults = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -60,6 +194,7 @@ const EmissionResults = () => {
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const scope1Total = useMemo(() => {
     if (isEPA) {
@@ -418,6 +553,64 @@ const EmissionResults = () => {
     a.download = 'emissions-scope2.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const buildPdfReportData = (): EmissionPdfReportData => {
+    const submitted = new Date(results?.submitted_at || new Date().toISOString());
+    return {
+      company: user?.email?.split("@")[0] || "Organization",
+      period: submitted.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      year: String(new Date().getFullYear()),
+      submittedAt: submitted.toISOString(),
+      scope1: breakdown.map((b) => ({ label: b.label, value: b.value })),
+      scope2: scope2Breakdown.map((b) => ({ label: b.label, value: b.value })),
+      scope3Upstream: scope3UpstreamBreakdown.map((b) => ({ label: b.label, value: b.value })),
+      scope3Downstream: scope3DownstreamBreakdown.map((b) => ({ label: b.label, value: b.value })),
+    };
+  };
+
+  const exportPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { default: jsPDF } = await import("jspdf");
+      const reportData = buildPdfReportData();
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "800px";
+      wrapper.style.position = "absolute";
+      wrapper.style.left = "-99999px";
+      wrapper.style.top = "0";
+      wrapper.style.background = "#ffffff";
+      wrapper.innerHTML = `<style>${getReportCSS()}</style>${getReportContent(reportData)}`;
+      document.body.appendChild(wrapper);
+
+      const reportPages = Array.from(wrapper.querySelectorAll(".cover, .inner-page")) as HTMLElement[];
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 10;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+
+      for (let i = 0; i < reportPages.length; i++) {
+        const canvas = await html2canvas(reportPages[i], {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          allowTaint: true,
+        });
+        const imgData = canvas.toDataURL("image/png");
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", margin, margin, contentWidth, contentHeight);
+      }
+
+      document.body.removeChild(wrapper);
+      const fileDate = new Date().toISOString().slice(0, 10);
+      pdf.save(`Emission_Results_Report_${fileDate}.pdf`);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   useEffect(() => {
@@ -830,6 +1023,15 @@ const EmissionResults = () => {
       >
         <Download className="h-4 w-4 mr-2" />
         Export CSV
+      </Button>
+      <Button
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  size="lg"
+        onClick={exportPdf}
+        disabled={isGeneratingPdf}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
       </Button>
     </div>
   </div>
