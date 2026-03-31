@@ -224,7 +224,7 @@ const Landing = () => {
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6">
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '0.02em' }}>
-                  ReThink Carbon
+                  RETHINK CARBON
               </h1>
             </div>
             <p className="text-lg sm:text-xl md:text-2xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4 font-normal" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, letterSpacing: '0.01em' }}>
@@ -478,18 +478,10 @@ const Landing = () => {
               className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
               asChild
             >
-              <Link to="/register">
-                Start Free Trial
+              <Link to="/contact">
+                Contact Us
                 <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 border-white text-teal-400 hover:bg-white hover:text-teal-600 w-full sm:w-auto"
-              asChild
-            >
-              <Link to="/demo">Schedule Demo</Link>
             </Button>
           </div>
         </div>

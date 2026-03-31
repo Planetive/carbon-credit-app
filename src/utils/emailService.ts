@@ -9,6 +9,15 @@ interface InvitationEmailData {
   expiresAt: Date;
 }
 
+interface ContactNotificationData {
+  name: string;
+  email: string;
+  company?: string;
+  phone?: string;
+  subject: string;
+  message: string;
+}
+
 /**
  * Send organization invitation email
  * Uses Supabase's built-in email service or can be extended to use EmailJS
@@ -47,6 +56,48 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<{ 
     return { success: true };
   } catch (error) {
     console.error('Error sending invitation email:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Send contact form notification email to internal inbox.
+ * Requires EmailJS env vars:
+ * - VITE_EMAILJS_SERVICE_ID
+ * - VITE_EMAILJS_CONTACT_TEMPLATE_ID
+ * - VITE_EMAILJS_PUBLIC_KEY
+ */
+export async function sendContactNotificationEmail(
+  data: ContactNotificationData
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const templateId = import.meta.env.VITE_EMAILJS_CONTACT_TEMPLATE_ID;
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+    if (!serviceId || !templateId || !publicKey) {
+      throw new Error(
+        "EmailJS contact notification configuration missing (VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_CONTACT_TEMPLATE_ID, VITE_EMAILJS_PUBLIC_KEY)"
+      );
+    }
+
+    const emailjs = await import("@emailjs/browser");
+    const templateParams = {
+      to_email: "connect@rethinkcarbon.io",
+      from_name: data.name,
+      reply_to: data.email,
+      from_email: data.email,
+      company: data.company || "N/A",
+      phone: data.phone || "N/A",
+      subject: data.subject,
+      message: data.message,
+      submitted_at: new Date().toISOString(),
+    };
+
+    await emailjs.send(serviceId, templateId, templateParams, publicKey);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending contact notification email:", error);
     return { success: false, error };
   }
 }

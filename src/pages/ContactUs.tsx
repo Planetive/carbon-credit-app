@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { sendContactNotificationEmail } from "@/utils/emailService";
 
 const ContactUs = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -77,6 +78,19 @@ const ContactUs = () => {
         setErrorMessage(error.message || 'Failed to store submission');
         setSubmitStatus('error');
       } else {
+        const emailResult = await sendContactNotificationEmail({
+          name: formData.name,
+          email: formData.email,
+          company: formData.company || undefined,
+          phone: formData.phone || undefined,
+          subject: formData.subject,
+          message: formData.message,
+        });
+
+        if (!emailResult.success) {
+          console.warn("Contact submission saved but email notification failed:", emailResult.error);
+        }
+
         console.log('Submission successful:', data);
         setSubmitStatus('success');
         // Reset form
@@ -360,7 +374,7 @@ const ContactUs = () => {
               asChild
             >
               <Link to="/register">
-                Start Free Trial
+                Learn More
                 <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
             </Button>

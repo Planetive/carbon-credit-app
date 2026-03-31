@@ -695,18 +695,10 @@ const AboutUs = () => {
               className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-6 w-full sm:w-auto"
               asChild
             >
-              <Link to="/register">
-                Start Free Trial
+              <Link to="/contact">
+                Contact Us
                 <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-6 border-white text-white text-teal-600 w-full sm:w-auto"
-              asChild
-            >
-              <Link to="/contact">Contact Sales</Link>
             </Button>
           </div>
         </div>
