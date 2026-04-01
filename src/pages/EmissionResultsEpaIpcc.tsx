@@ -26,7 +26,7 @@ const getReportCSS = (): string => `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; color: #1f2a23; background: #fff; }
+  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; color: #1f2a23; background: #fff; --space-1: 8px; --space-2: 16px; line-height: 1.5; }
 
   /* Cover page (styled like provided sample) */
   .cover { width: 800px; height: 1131px; background: #d9e0e3; position: relative; overflow: hidden; page-break-after: always; }
@@ -35,18 +35,27 @@ const getReportCSS = (): string => `
   .cover-border-left { position: absolute; top: 0; left: 0; width: 30px; height: 100%; background: #0c4a3f; }
   .cover-border-right { position: absolute; top: 0; right: 0; width: 30px; height: 100%; background: #0c4a3f; }
   .cover-inner { position: absolute; top: 30px; right: 30px; bottom: 30px; left: 30px; padding: 28px 30px 34px; }
-  .cover-header { display: flex; justify-content: space-between; align-items: center; }
-  .cover-logo-wrap { display: flex; align-items: center; margin-top: 8px; width: 360px; height: 96px; overflow: hidden; }
+  .cover-header { display: flex; justify-content: space-between; align-items: center; min-height: 96px; }
+  .cover-logo-wrap { display: flex; align-items: center; margin-top: 0; width: 360px; height: 96px; overflow: hidden; }
   .cover-logo-wrap img {
     height: 120px;
     width: auto;
     max-width: none;
     display: block;
     object-fit: contain;
-    transform: scale(2.6) translateX(-18px);
+    transform: scale(2.6) translate(-18px, 6px);
     transform-origin: left center;
   }
-  .cover-year { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; }
+  .cover-year {
+    font-family: 'Playfair Display', serif;
+    font-size: 34px;
+    color: #0A3D2E;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    line-height: 1;
+  }
   .cover-body { margin-top: 190px; padding-left: 20px; }
   .cover-title { font-family: 'Playfair Display', serif; font-size: 62px; line-height: 1.04; letter-spacing: -0.6px; color: #0A3D2E; margin-bottom: 26px; }
   .cover-company { font-family: 'Playfair Display', serif; font-size: 42px; color: #0A3D2E; margin-bottom: 8px; }
@@ -60,16 +69,16 @@ const getReportCSS = (): string => `
   .page-header-logo { font-family: 'Playfair Display', serif; font-size: 16px; }
   .page-header-meta { font-size: 11px; opacity: 0.85; }
   .page-content { padding: 30px 34px 66px; }
-  .page-title { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; margin-bottom: 6px; }
-  .page-divider { height: 1px; background: #9cb0a6; margin-bottom: 20px; }
-  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; margin-bottom: var(--space-1); }
+  .page-divider { height: 1px; background: #9cb0a6; margin-bottom: var(--space-2); }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: var(--space-2); }
   .summary-card { border: 1px solid #dce6df; background: #f4f8f5; border-radius: 10px; padding: 12px; text-align: center; }
   .summary-card-label { font-size: 10px; color: #0A3D2E; text-transform: uppercase; margin-bottom: 6px; font-weight: 700; letter-spacing: 0.4px; }
   .summary-card-value { font-size: 20px; font-weight: 700; color: #0A3D2E; }
   .summary-card-unit { font-size: 10px; color: #6a7a72; margin-top: 2px; }
   .summary-card.total { background: #fff2f2; border-color: #f2c8c8; }
   .summary-card.total .summary-card-label, .summary-card.total .summary-card-value { color: #9b2f2f; }
-  .scope-section { border: 1px solid #d9e3dd; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .scope-section { border: 1px solid #d9e3dd; border-radius: 8px; overflow: hidden; margin-bottom: var(--space-2); }
   .scope-header { background: #0A3D2E; padding: 8px 12px; }
   .scope-header-text { font-size: 11px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
   .scope-row, .scope-subtotal, .grand-total { display: flex; justify-content: space-between; align-items: center; }
@@ -88,16 +97,16 @@ const getReportCSS = (): string => `
     font-size: 10px;
     color: #6c7e74;
   }
-  .toc-title { font-family: 'Playfair Display', serif; font-size: 30px; color: #0A3D2E; margin-bottom: 14px; }
+  .toc-title { font-family: 'Playfair Display', serif; font-size: 30px; color: #0A3D2E; margin-bottom: var(--space-2); }
   .toc-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid #d8e3dd; }
   .toc-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 2px; border-bottom: 1px solid #e8efeb; font-size: 14px; color: #274739; }
   .about-box { margin-top: 24px; border: 1px solid #d9e5df; border-radius: 10px; background: #f8fbf9; padding: 14px 16px; }
   .about-title { font-size: 16px; font-weight: 700; color: #0A3D2E; margin-bottom: 8px; }
   .about-text { font-size: 12px; color: #355244; line-height: 1.65; }
-  .section-title { font-family: 'Playfair Display', serif; font-size: 30px; color: #0A3D2E; margin-bottom: 8px; }
-  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: 18px; margin-bottom: 12px; }
-  .section-title + .subsection-title { margin-top: 10px; }
-  .body-text { font-size: 12px; color: #2f4a3d; line-height: 1.65; margin-bottom: 10px; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 30px; color: #0A3D2E; margin-bottom: var(--space-1); }
+  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: var(--space-1); margin-bottom: var(--space-1); }
+  .section-title + .subsection-title { margin-top: var(--space-1); }
+  .body-text { font-size: 12px; color: #2f4a3d; line-height: 1.65; margin-bottom: var(--space-2); }
   .bullet-list {
     margin: 0 0 10px 0;
     padding: 0;
@@ -123,7 +132,7 @@ const getReportCSS = (): string => `
   .methodology-figure { margin-top: 10px; border: 1px solid #d9e5df; border-radius: 10px; padding: 8px; background: #fff; }
   .methodology-figure img { width: 100%; max-height: 430px; object-fit: contain; display: block; }
   .figure-caption { font-size: 10px; color: #5b6f64; margin-top: 8px; text-align: center; }
-  .op-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #cfded5; }
+  .op-table { width: 100%; border-collapse: collapse; margin-top: var(--space-1); margin-bottom: var(--space-2); border: 1px solid #cfded5; }
   .op-table th { background: #0A3D2E; color: #fff; text-align: left; font-size: 10px; letter-spacing: 0.35px; text-transform: uppercase; padding: 8px; }
   .op-table td { border-top: 1px solid #dce8e1; padding: 7px 8px; font-size: 11px; color: #2f4a3d; vertical-align: top; line-height: 1.45; }
   .op-group td { background: #edf5f1; font-weight: 700; color: #0A3D2E; border-top: 1px solid #cfe0d7; }
@@ -136,32 +145,76 @@ const getReportCSS = (): string => `
   .scope-bar-top { display: flex; justify-content: space-between; font-size: 11px; color: #2b4a3c; margin-bottom: 4px; }
   .scope-bar-track { height: 7px; width: 100%; border-radius: 999px; background: #e7efea; overflow: hidden; }
   .scope-bar-fill { height: 100%; border-radius: 999px; }
-  .insights-list { margin: 0; padding-left: 16px; }
-  .insights-list li { font-size: 12px; color: #2f4a3d; line-height: 1.55; margin-bottom: 8px; }
-  .actions-table { width: 100%; border-collapse: collapse; border: 1px solid #dce5df; border-radius: 10px; overflow: hidden; }
+  .insights-list { margin: 0; padding: 0; list-style: none; }
+  .insights-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: #2f4a3d;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+  .insights-list li::before {
+    content: "•";
+    color: #274739;
+    font-weight: 700;
+    line-height: 1.55;
+    flex: 0 0 8px;
+    text-align: center;
+  }
+  .actions-table { width: 100%; border-collapse: collapse; border: 1px solid #dce5df; border-radius: 10px; overflow: hidden; table-layout: auto; }
   .actions-table th { text-align: left; font-size: 11px; color: #fff; background: #0A3D2E; padding: 9px 10px; letter-spacing: 0.4px; text-transform: uppercase; }
-  .actions-table td { font-size: 12px; color: #2f4a3d; padding: 10px; border-top: 1px solid #e6eeea; vertical-align: middle; }
-  .actions-table td:nth-child(2), .actions-table td:nth-child(3) { white-space: nowrap; }
-  .badge {
-    display: inline-flex;
+  .actions-table td { font-size: 12px; color: #2f4a3d; padding: 10px; border-top: 1px solid #edf3ef; vertical-align: middle; }
+  .actions-table th:nth-child(2), .actions-table th:nth-child(3),
+  .actions-table td:nth-child(2), .actions-table td:nth-child(3) {
+    white-space: nowrap;
+    text-align: center;
+    width: 96px;
+  }
+  .actions-table th:nth-child(4),
+  .actions-table td:nth-child(4) {
+    white-space: nowrap;
+    width: 118px;
+  }
+  .actions-table td:first-child {
+    line-height: 1.45;
+  }
+  .pill-cell {
+    padding: 8px 10px !important;
+    height: 44px;
+    vertical-align: middle;
+  }
+  .pill-wrap {
+    display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 66px;
-    height: 24px;
-    padding: 0 10px;
+    min-height: 28px;
+    width: 100%;
+  }
+  .badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    min-height: 26px;
+    padding: 5px 12px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 700;
-    line-height: 24px;
+    line-height: 1.2;
     white-space: nowrap;
     box-sizing: border-box;
     vertical-align: middle;
+    margin: 0 auto;
+    position: relative;
+    top: -1px;
   }
   .badge-impact-high { color: #9b2f2f; background: #fce8e8; }
   .badge-impact-medium { color: #7a4a07; background: #fff3dc; }
   .badge-effort-low { color: #0f6d45; background: #e3f8ee; }
   .badge-effort-medium { color: #755b13; background: #fdf5db; }
-  .inventory-table, .trend-table, .scope3-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: 8px; margin-bottom: 12px; }
+  .inventory-table, .trend-table, .scope3-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: var(--space-1); margin-bottom: var(--space-2); }
   .inventory-table th, .trend-table th, .scope3-table th { background: #0A3D2E; color: #fff; text-align: left; font-size: 11px; padding: 9px; }
   .inventory-table td, .trend-table td, .scope3-table td { border-top: 1px solid #e5ede9; font-size: 12px; color: #2f4a3d; padding: 8px 9px; }
   .inventory-table td.num, .trend-table td.num, .scope3-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -449,7 +502,28 @@ const EmissionResultsEpaIpcc = () => {
       const scope3 = mapScopeRows(results.scope3);
       const submitted = new Date(submittedAt);
       const generatedAt = new Date();
-      const company = user?.email?.split("@")[0] || "Organization";
+      let company = "Organization";
+      let headerName = user?.email?.split("@")[0] || "User";
+      if (user?.id) {
+        const { data: profileData } = await (supabase as any)
+          .from("profiles")
+          .select("display_name, organization_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const resolvedDisplayName =
+          profileData?.display_name?.trim() ||
+          user?.user_metadata?.full_name?.trim() ||
+          user?.user_metadata?.name?.trim();
+        const resolvedOrganizationName =
+          profileData?.organization_name?.trim() ||
+          user?.user_metadata?.organization_name?.trim();
+        if (resolvedOrganizationName) {
+          company = resolvedOrganizationName;
+        }
+        if (resolvedDisplayName) {
+          headerName = resolvedDisplayName;
+        }
+      }
       const period = generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
       const year = String(generatedAt.getFullYear());
       const reportPeriodStart = `01/01/${year}`;
@@ -960,7 +1034,7 @@ const EmissionResultsEpaIpcc = () => {
                 </div>
               </div>
               <div class="exec-card">
-                <div class="exec-card-title">B. Key Insights (Auto-generated)</div>
+                <div class="exec-card-title">B. Key Insights</div>
                 <ul class="insights-list">
                   ${keyInsights.map((insight) => `<li>${escapeHtml(insight)}</li>`).join("")}
                 </ul>
@@ -981,8 +1055,8 @@ const EmissionResultsEpaIpcc = () => {
                 ${prioritizedActions.map((item) => `
                   <tr>
                     <td>${escapeHtml(item.action)}</td>
-                    <td><span class="badge ${item.impact === "High" ? "badge-impact-high" : "badge-impact-medium"}">${item.impact}</span></td>
-                    <td><span class="badge ${item.effort === "Low" ? "badge-effort-low" : "badge-effort-medium"}">${item.effort}</span></td>
+                    <td class="pill-cell"><div class="pill-wrap"><span class="badge ${item.impact === "High" ? "badge-impact-high" : "badge-impact-medium"}">${item.impact}</span></div></td>
+                    <td class="pill-cell"><div class="pill-wrap"><span class="badge ${item.effort === "Low" ? "badge-effort-low" : "badge-effort-medium"}">${item.effort}</span></div></td>
                     <td>${escapeHtml(item.timeline)}</td>
                   </tr>
                 `).join("")}
@@ -1064,7 +1138,7 @@ const EmissionResultsEpaIpcc = () => {
             </p>
 
             <div class="methodology-figure">
-              <img src="/images/methadology_pdf.png" alt="Overview of GHG Protocol scopes and value chain emissions" />
+              <img src="/images/Methadology.jpeg" alt="Overview of GHG Protocol scopes and value chain emissions" />
               <div class="figure-caption">Figure 1.1: Overview of GHG Protocol scopes and emissions across the value chain</div>
             </div>
 
@@ -1422,7 +1496,11 @@ const EmissionResultsEpaIpcc = () => {
       wrapper.style.left = "-99999px";
       wrapper.style.top = "0";
       wrapper.style.background = "#ffffff";
-      wrapper.innerHTML = `<style>${getReportCSS()}</style>${reportHtml}`;
+      const reportHtmlWithHeaderName = reportHtml.replaceAll(
+        `${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}`,
+        `${escapeHtml(headerName)} &nbsp;|&nbsp; ${escapeHtml(period)}`
+      );
+      wrapper.innerHTML = `<style>${getReportCSS()}</style>${reportHtmlWithHeaderName}`;
       document.body.appendChild(wrapper);
 
       const pdf = new jsPDF("p", "mm", "a4");
@@ -1433,19 +1511,22 @@ const EmissionResultsEpaIpcc = () => {
         wrapper.querySelectorAll(".cover, .inner-page, .back-cover")
       ) as HTMLElement[];
 
+      const RENDER_SCALE = 1.2;
+      const JPEG_QUALITY = 0.62;
+
       for (let i = 0; i < pageNodes.length; i++) {
         const node = pageNodes[i];
         const canvas = await html2canvas(node, {
-          scale: 2,
+          scale: RENDER_SCALE,
           backgroundColor: "#ffffff",
           useCORS: true,
           allowTaint: true,
         });
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
         if (i > 0) {
           pdf.addPage();
         }
-        pdf.addImage(imgData, "PNG", margin, margin, pageWidth, pageHeight);
+        pdf.addImage(imgData, "JPEG", margin, margin, pageWidth, pageHeight);
       }
       document.body.removeChild(wrapper);
 
@@ -1596,7 +1677,7 @@ const EmissionResultsEpaIpcc = () => {
           <CardContent className="p-6 text-center space-y-4">
             <p className="text-gray-700">No results found yet for this emission calculator assessment.</p>
             <Button onClick={() => navigate("/emission-calculator-epa")} className="bg-teal-600 hover:bg-teal-700 text-white">
-              Back to EPA Calculator
+              Back to calculator
             </Button>
           </CardContent>
         </Card>
@@ -1799,7 +1880,7 @@ const EmissionResultsEpaIpcc = () => {
                   className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to EPA Calculator
+                  Back to calculator
                 </Button>
                 <Button onClick={exportCsv} className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg">
                   <Download className="h-4 w-4 mr-2" />
