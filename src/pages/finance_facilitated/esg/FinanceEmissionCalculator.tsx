@@ -60,7 +60,18 @@ interface FinanceEmissionCalculatorProps {
   unverifiedEmissions?: number;
   activeTab: 'finance' | 'facilitated';
   onTabChange?: (tab: 'finance' | 'facilitated') => void;
-  onResults?: (results: Array<{ type: string; label: string; attributionFactor: number; financedEmissions: number; denominatorLabel: string; denominatorValue: number }>, formData?: any) => void;
+  onResults?: (
+    results: Array<{
+      type: string;
+      label: string;
+      attributionFactor: number;
+      financedEmissions: number;
+      denominatorLabel: string;
+      denominatorValue: number;
+      dataQualityScore?: number;
+    }>,
+    formData?: any
+  ) => void;
 }
 
 export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps> = ({
@@ -367,7 +378,17 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
   }, []);
   const [result, setResult] = useState<CalculationResult | null>(null);
-  const [multiResults, setMultiResults] = useState<Array<{ type: string; label: string; attributionFactor: number; financeEmission: number; denominatorLabel: string; denominatorValue: number }>>([]);
+  const [multiResults, setMultiResults] = useState<
+    Array<{
+      type: string;
+      label: string;
+      attributionFactor: number;
+      financeEmission: number;
+      denominatorLabel: string;
+      denominatorValue: number;
+      dataQualityScore?: number;
+    }>
+  >([]);
   const [selectedFormula, setSelectedFormula] = useState<string>('');
   const [companyType, setCompanyType] = useState<'listed' | 'private'>('listed');
   const [isCalculating, setIsCalculating] = useState(false);
@@ -1177,7 +1198,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       attributionFactor: pcafResult.attributionFactor,
       financeEmission: pcafResult.financedEmissions,
       denominatorLabel,
-      denominatorValue
+      denominatorValue,
+      dataQualityScore: pcafResult.dataQualityScore
     };
   };
 
@@ -1499,7 +1521,15 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
       // Multi-loan: iterate and compute per-loan results when more than one selected
       if (expandedLoanTypes.length > 1) {
-        const results: Array<{ type: string; label: string; attributionFactor: number; financeEmission: number; denominatorLabel: string; denominatorValue: number }> = [];
+        const results: Array<{
+          type: string;
+          label: string;
+          attributionFactor: number;
+          financeEmission: number;
+          denominatorLabel: string;
+          denominatorValue: number;
+          dataQualityScore?: number;
+        }> = [];
         for (const inst of expandedLoanTypes) {
           const ltKey = inst.type;
           const saved = perLoanFormData[inst.key] || formData; // fall back to current formData
@@ -1511,7 +1541,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               attributionFactor: r.attributionFactor,
               financeEmission: r.financeEmission,
               denominatorLabel: r.denominatorLabel,
-              denominatorValue: r.denominatorValue
+              denominatorValue: r.denominatorValue,
+              dataQualityScore: r.dataQualityScore
             });
           } catch (e) {
             console.warn('Failed to calculate for loan type', ltKey, e);
@@ -1537,7 +1568,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             attributionFactor: r.attributionFactor,
             financedEmissions: r.financeEmission,
             denominatorLabel: r.denominatorLabel,
-            denominatorValue: r.denominatorValue
+            denominatorValue: r.denominatorValue,
+            dataQualityScore: r.dataQualityScore
           })), {
             outstandingLoan: formData.outstandingLoan,
             totalAssetsValue: formData.totalAssetsValue,
@@ -1579,7 +1611,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               attributionFactor: calculationResult.attributionFactor,
               financedEmissions: calculationResult.financeEmission,
               denominatorLabel: (loanType === 'mortgage' ? 'Total Property Value at Origination' : loanType === 'sovereign-debt' ? 'PP-Adjusted GDP' : loanType === 'motor-vehicle-loan' ? 'Total Value at Origination' : loanType === 'commercial-real-estate' ? 'Property Value at Origination' : corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'),
-              denominatorValue: calculationResult.evic
+              denominatorValue: calculationResult.evic,
+              dataQualityScore: calculationResult.dataQualityScore
             }
           ], {
             outstandingLoan: formData.outstandingLoan,
@@ -1598,7 +1631,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       }
     
         toast({
-          title: "PCAF Calculation Complete",
+          title: "Calculation complete",
           description: `Finance emission calculated using ${pcafResult.methodology}`,
           variant: "default"
         });
@@ -2279,13 +2312,20 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Finance Emission:</span> <span className="font-semibold">{r.financeEmission.toFixed(2)} tCO2e</span>
                       </div>
+                      {r.dataQualityScore != null && isFinite(r.dataQualityScore) && (
+                        <div className="mt-1">
+                          <Badge className={getDataQualityColor(r.dataQualityScore)}>
+                            Data quality score {r.dataQualityScore}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {result.dataQualityScore && (
+            {result.dataQualityScore != null && isFinite(result.dataQualityScore) && (
               <div className="p-4 bg-primary/5 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="text-sm font-medium text-muted-foreground">Data Quality Score</div>
@@ -2341,7 +2381,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                 attributionFactor: result.attributionFactor,
                 financedEmissions: result.facilitatedEmission,
                 denominatorLabel: denominatorLabel,
-                denominatorValue: denominatorValue
+                denominatorValue: denominatorValue,
+                dataQualityScore: result.dataQualityScore
               };
               onResults([formattedResult]);
             }

@@ -1273,6 +1273,7 @@ export interface Database {
           results: Json
           financed_emissions: number
           attribution_factor: number | null
+          data_quality_score: number | null
           evic: number | null
           total_equity_plus_debt: number | null
           status: 'draft' | 'completed' | 'failed'
@@ -1292,6 +1293,7 @@ export interface Database {
           results: Json
           financed_emissions: number
           attribution_factor?: number | null
+          data_quality_score?: number | null
           evic?: number | null
           total_equity_plus_debt?: number | null
           status: 'draft' | 'completed' | 'failed'
@@ -1311,6 +1313,7 @@ export interface Database {
           results?: Json
           financed_emissions?: number
           attribution_factor?: number | null
+          data_quality_score?: number | null
           evic?: number | null
           total_equity_plus_debt?: number | null
           status?: 'draft' | 'completed' | 'failed'
@@ -1363,6 +1366,7 @@ export interface Database {
           total_equity_plus_debt: number | null
           financed_emissions: number
           attribution_factor: number | null
+          data_quality_score: number | null
           status: 'draft' | 'completed' | 'failed'
           share_price: number | null
           outstanding_shares: number | null
@@ -1387,6 +1391,7 @@ export interface Database {
           total_equity_plus_debt?: number | null
           financed_emissions: number
           attribution_factor?: number | null
+          data_quality_score?: number | null
           status: 'draft' | 'completed' | 'failed'
           share_price?: number | null
           outstanding_shares?: number | null
@@ -1411,6 +1416,7 @@ export interface Database {
           total_equity_plus_debt?: number | null
           financed_emissions?: number
           attribution_factor?: number | null
+          data_quality_score?: number | null
           status?: 'draft' | 'completed' | 'failed'
           share_price?: number | null
           outstanding_shares?: number | null

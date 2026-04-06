@@ -61,6 +61,7 @@ export interface EmissionCalculation {
   results: any;
   financed_emissions: number;
   attribution_factor: number | null;
+  data_quality_score: number | null;
   evic: number | null;
   total_equity_plus_debt: number | null;
   status: 'draft' | 'completed' | 'failed';
@@ -734,6 +735,7 @@ export class PortfolioClient {
     formula_id: string;
     formula_name: string;
     company_type: 'listed' | 'unlisted';
+    data_quality_score?: number | null;
     [key: string]: any;
   }): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();

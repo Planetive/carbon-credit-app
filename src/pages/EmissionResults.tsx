@@ -37,7 +37,10 @@ const escapeHtml = (unsafe: string): string =>
 
 const getReportCSS = (): string => `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  .report { width: 800px; font-family: Arial, sans-serif; color: #1f2a23; background: #fff; }
+  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; color: #1f2a23; background: #fff; --space-1: 8px; --space-2: 16px; line-height: 1.5; }
+  .cover-year, .cover-title, .cover-company, .cover-period, .section-title, .page-header > div:first-child {
+    font-family: 'Playfair Display', serif;
+  }
   .cover { width: 800px; height: 1131px; background: #d9e0e3; position: relative; overflow: hidden; page-break-after: always; }
   .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
   .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
@@ -55,9 +58,9 @@ const getReportCSS = (): string => `
   .inner-page { width: 800px; min-height: 1131px; background: #fff; page-break-after: always; position: relative; }
   .page-header { background: #0c4a3f; color: #fff; padding: 14px 34px; display: flex; justify-content: space-between; align-items: center; }
   .page-content { padding: 30px 34px 66px; }
-  .section-title { font-size: 30px; color: #0A3D2E; margin-bottom: 10px; }
-  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: 16px; margin-bottom: 10px; }
-  .scope-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: 8px; margin-bottom: 12px; }
+  .section-title { font-size: 30px; color: #0A3D2E; margin-bottom: var(--space-1); }
+  .subsection-title { font-size: 18px; font-weight: 700; color: #0A3D2E; margin-top: var(--space-1); margin-bottom: var(--space-1); }
+  .scope-table { width: 100%; border-collapse: collapse; border: 1px solid #d6e3dc; margin-top: var(--space-1); margin-bottom: var(--space-2); }
   .scope-table th { background: #0A3D2E; color: #fff; text-align: left; font-size: 11px; padding: 9px; }
   .scope-table td { border-top: 1px solid #e5ede9; font-size: 12px; color: #2f4a3d; padding: 8px 9px; }
   .scope-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -593,16 +596,19 @@ const EmissionResults = () => {
       const contentWidth = pageWidth - margin * 2;
       const contentHeight = pageHeight - margin * 2;
 
+      const RENDER_SCALE = 1.2;
+      const JPEG_QUALITY = 0.62;
+
       for (let i = 0; i < reportPages.length; i++) {
         const canvas = await html2canvas(reportPages[i], {
-          scale: 2,
+          scale: RENDER_SCALE,
           backgroundColor: "#ffffff",
           useCORS: true,
           allowTaint: true,
         });
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
         if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", margin, margin, contentWidth, contentHeight);
+        pdf.addImage(imgData, "JPEG", margin, margin, contentWidth, contentHeight);
       }
 
       document.body.removeChild(wrapper);

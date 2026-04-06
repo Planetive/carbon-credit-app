@@ -45,6 +45,15 @@ interface Props {
 
 type EmissionSelection = "ch4" | "n2o";
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+const KM_TO_MILES = 0.621371192237334;
+const MILES_TO_KM = 1 / KM_TO_MILES;
+const outputUnitLabel = (unit: OutputUnit): string => (unit === "short_ton" ? "short ton" : unit);
+
+const roundTo = (value: number, decimals = 6): number => {
+  if (!isFinite(value)) return value;
+  const p = 10 ** decimals;
+  return Math.round(value * p) / p;
+};
 
 const newRow = (): EntryRow =>
   ({
@@ -372,7 +381,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
         if (typeof next.miles === "number" && factorRow) {
           const unit: DistanceUnit = next.distanceUnit ?? "mile";
-          const miles = unit === "mile" ? next.miles : next.miles * 0.621371; // convert km → miles
+          const miles = unit === "mile" ? next.miles : next.miles * KM_TO_MILES; // convert km → miles
           // Output in selected gas only (kg CH4 or kg N2O); no CO2e conversion.
           const selection: EmissionSelection = next.emissionSelection ?? "ch4";
           if (selection === "ch4") {
@@ -541,7 +550,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <h4 className="text-lg sm:text-xl font-semibold text-gray-900">
-            On-Road Diesel & Alt Fuel (Scope 1)
+            On-Road Diesel & Alt Fuel
           </h4>
           <p className="text-xs sm:text-sm text-gray-600">
             Factors loaded from <span className="font-medium">On-Road Diesel & Alt Fuel</span>.
@@ -565,7 +574,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         <Label className="md:col-span-1 text-gray-500">Emission type</Label>
         <Label className="md:col-span-1 text-gray-500">Distance unit</Label>
         <Label className="md:col-span-1 text-gray-500">Vehicle distance</Label>
-        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnit})</Label>
+        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnitLabel(outputUnit)})</Label>
       </div>
 
       <div className="space-y-3">
@@ -574,7 +583,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           const years = showYear ? modelYearsFor(r.vehicleType, r.fuelType) : [];
           const unit: DistanceUnit = r.distanceUnit ?? "mile";
           const distanceDisplay =
-            r.miles != null ? (unit === "mile" ? r.miles : r.miles * 1.60934) : "";
+            r.miles != null ? (unit === "mile" ? roundTo(r.miles) : roundTo(r.miles * MILES_TO_KM)) : "";
 
           return (
             <div
@@ -675,7 +684,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
                   } else {
                     const num = Number(v);
                     if (num >= 0 && num <= 999999999999.999999) {
-                      const miles = unit === "mile" ? num : num * 0.621371; // km → miles
+                      const miles = unit === "mile" ? roundTo(num) : roundTo(num * KM_TO_MILES); // km → miles
                       updateRow(r.id, { miles });
                     }
                   }
@@ -708,7 +717,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
         <div className="text-gray-700 font-medium">
           Total On-Road Diesel & Alt Fuel Emissions:{" "}
           <span className="font-semibold">
-            {convertEmission(totalEmissions)} {outputUnit}
+            {convertEmission(totalEmissions)} {outputUnitLabel(outputUnit)}
           </span>
         </div>
         <div className="flex items-center gap-3">

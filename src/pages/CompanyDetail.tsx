@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipPortal, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles, Plus, Minus } from 'lucide-react';
 import { PortfolioClient, EmissionCalculation } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const currencyFormat = (value: number) => (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -152,16 +152,21 @@ const CompanyDetail: React.FC = () => {
   // State for emission calculations
   const [emissionCalculations, setEmissionCalculations] = useState<EmissionCalculation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedBreakdown, setExpandedBreakdown] = useState<'finance' | 'facilitated' | null>(null);
+  const [breakdownTab, setBreakdownTab] = useState<'context' | 'inputs' | 'results'>('context');
 
-  // Load emission calculations for this counterparty
-  const loadEmissionCalculations = async () => {
+  // Load emission calculations for this counterparty.
+  // Use silent=true for refetches (tab focus, visibility) so we keep showing the last values instead of flashing "Loading..."
+  const loadEmissionCalculations = async (opts?: { silent?: boolean }) => {
     if (!counterpartyId) {
       setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (!opts?.silent) {
+        setLoading(true);
+      }
       console.log('🔍 CompanyDetail - Loading emission calculations for counterpartyId:', counterpartyId);
       const calculations = await PortfolioClient.getEmissionCalculations(counterpartyId);
       console.log('🔍 CompanyDetail - Loaded calculations:', calculations);
@@ -185,23 +190,23 @@ const CompanyDetail: React.FC = () => {
     loadEmissionCalculations();
   }, [counterpartyId]);
 
-  // Reload emission calculations when component becomes visible (e.g., when returning from wizard)
+  // Refresh in background when the tab becomes visible or the window regains focus (e.g. after Snipping Tool, Alt+Tab).
+  // Silent refetch avoids replacing visible numbers with "Loading..." on every focus/blur cycle.
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && counterpartyId) {
-        loadEmissionCalculations();
+        loadEmissionCalculations({ silent: true });
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Also reload on focus (when user navigates back to this tab)
+
     const handleFocus = () => {
       if (counterpartyId) {
-        loadEmissionCalculations();
+        loadEmissionCalculations({ silent: true });
       }
     };
-    
+
     window.addEventListener('focus', handleFocus);
 
     return () => {
@@ -257,10 +262,20 @@ const CompanyDetail: React.FC = () => {
             calculation_type: 'finance',
             company_type: '',
             formula_id: 'aggregate',
-            inputs: {},
-            results: {},
+            inputs: parsed.inputs || {},
+            results: {
+              allResults: Array.isArray(parsed.allResults) ? parsed.allResults : [],
+              dataQualityScore:
+                typeof parsed.dataQualityScore === 'number' && isFinite(parsed.dataQualityScore)
+                  ? parsed.dataQualityScore
+                  : null
+            },
             financed_emissions: parsed.financed_emissions || 0,
             attribution_factor: parsed.attribution_factor || 0,
+            data_quality_score:
+              typeof parsed.dataQualityScore === 'number' && isFinite(parsed.dataQualityScore)
+                ? parsed.dataQualityScore
+                : null,
             evic: parsed.denominator_value || 0,
             total_equity_plus_debt: parsed.denominator_value || 0,
             status: 'completed',
@@ -308,10 +323,20 @@ const CompanyDetail: React.FC = () => {
             calculation_type: 'facilitated',
             company_type: '',
             formula_id: 'aggregate',
-            inputs: {},
-            results: {},
+            inputs: parsed.inputs || {},
+            results: {
+              allResults: Array.isArray(parsed.allResults) ? parsed.allResults : [],
+              dataQualityScore:
+                typeof parsed.dataQualityScore === 'number' && isFinite(parsed.dataQualityScore)
+                  ? parsed.dataQualityScore
+                  : null
+            },
             financed_emissions: parsed.financed_emissions || 0,
             attribution_factor: parsed.attribution_factor || 0,
+            data_quality_score:
+              typeof parsed.dataQualityScore === 'number' && isFinite(parsed.dataQualityScore)
+                ? parsed.dataQualityScore
+                : null,
             evic: parsed.denominator_value || 0,
             total_equity_plus_debt: parsed.denominator_value || 0,
             status: 'completed',
@@ -329,6 +354,96 @@ const CompanyDetail: React.FC = () => {
     if (!value || !isFinite(value)) return '0';
     return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
+
+  const getDataQualityScoreBadgeClass = (score: number) => {
+    switch (Math.round(score)) {
+      case 1:
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 2:
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 3:
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 4:
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 5:
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  /** Distinct data quality scores (1–5) for display on summary cards */
+  const getDistinctDataQualityScores = (calc?: EmissionCalculation): number[] => {
+    const rows = Array.isArray(calc?.results?.allResults) ? calc!.results.allResults : [];
+    const fromRows = rows
+      .map((r: any) => r.dataQualityScore)
+      .filter((n: any) => typeof n === 'number' && isFinite(n))
+      .map((n: number) => Math.round(n));
+    if (fromRows.length > 0) {
+      return [...new Set(fromRows)].sort((a, b) => a - b);
+    }
+    const agg = (calc?.results as any)?.dataQualityScore;
+    if (typeof agg === 'number' && isFinite(agg)) {
+      return [Math.round(agg)];
+    }
+    const col = calc?.data_quality_score;
+    if (typeof col === 'number' && isFinite(col)) {
+      return [Math.round(col)];
+    }
+    return [];
+  };
+
+  const getBreakdownRows = (calc?: EmissionCalculation) => {
+    const rows = Array.isArray(calc?.results?.allResults) ? calc!.results.allResults : [];
+    return rows
+      .filter((r: any) => r && (r.label || r.type))
+      .map((r: any) => ({
+        label: String(r.label || r.type || 'Loan'),
+        attributionFactor: Number(r.attributionFactor || 0),
+        financedEmissions: Number(r.financedEmissions || 0),
+        dataQualityScore:
+          typeof r.dataQualityScore === 'number' && isFinite(r.dataQualityScore) ? r.dataQualityScore : null,
+      }));
+  };
+
+  const prettifyKey = (key: string) =>
+    key
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const getInputRows = (calc?: EmissionCalculation) => {
+    const inputs = calc?.inputs || {};
+    return Object.entries(inputs).filter(
+      ([key, value]) =>
+        value !== null &&
+        value !== undefined &&
+        value !== '' &&
+        !Array.isArray(value) &&
+        typeof value !== 'object' &&
+        !['loanTypes', 'loanLabels'].includes(key)
+    );
+  };
+
+  const getCalcContext = (calc?: EmissionCalculation) => {
+    const inputs = calc?.inputs || {};
+    const hasVerification = String(inputs.verificationStatus || '').trim().length > 0;
+    const verifierName = String(inputs.verifierName || '').trim();
+    const verificationStatus = hasVerification ? String(inputs.verificationStatus) : 'not_provided';
+    return {
+      calculatorUsed: !!calc,
+      verificationStatus,
+      verifierName: verifierName || 'N/A',
+      hasEmissions: inputs.hasEmissions === true ? 'Yes' : inputs.hasEmissions === false ? 'No' : 'N/A',
+      companyType: inputs.corporateStructure || calc?.company_type || 'N/A',
+      updatedAt: calc?.updated_at ? new Date(calc.updated_at).toLocaleString() : 'N/A',
+    };
+  };
+
+  const financeResult = getFinanceEmissionResult();
+  const facilitatedResult = getFacilitatedEmissionResult();
+  const financeBreakdown = getBreakdownRows(financeResult);
+  const facilitatedBreakdown = getBreakdownRows(facilitatedResult);
 
   return (
     <TooltipProvider>
@@ -372,9 +487,11 @@ const CompanyDetail: React.FC = () => {
                               {sector}
                             </Badge>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Sector</p>
-                          </TooltipContent>
+                          <TooltipPortal>
+                            <TooltipContent>
+                              <p className="text-xs">Sector</p>
+                            </TooltipContent>
+                          </TooltipPortal>
                         </Tooltip>
                       )}
                     </div>
@@ -533,9 +650,11 @@ const CompanyDetail: React.FC = () => {
                           <TooltipTrigger asChild>
                             <Info className="h-3.5 w-3.5 text-red-500 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>The likelihood that a borrower will default on their loan obligations within a given time period.</p>
-                          </TooltipContent>
+                          <TooltipPortal>
+                            <TooltipContent className="max-w-xs">
+                              <p>The likelihood that a borrower will default on their loan obligations within a given time period.</p>
+                            </TooltipContent>
+                          </TooltipPortal>
                         </Tooltip>
                       </div>
                     </div>
@@ -561,9 +680,11 @@ const CompanyDetail: React.FC = () => {
                           <TooltipTrigger asChild>
                             <Info className="h-3.5 w-3.5 text-orange-500 cursor-help" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>The percentage of exposure that would be lost if a default occurs, accounting for recovery value.</p>
-                          </TooltipContent>
+                          <TooltipPortal>
+                            <TooltipContent className="max-w-xs">
+                              <p>The percentage of exposure that would be lost if a default occurs, accounting for recovery value.</p>
+                            </TooltipContent>
+                          </TooltipPortal>
                         </Tooltip>
                       </div>
                     </div>
@@ -605,6 +726,17 @@ const CompanyDetail: React.FC = () => {
             className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-6 border-2 border-green-100/80 shadow-lg hover:shadow-xl hover:border-green-200 transition-all duration-300"
           >
             <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/20 rounded-full -mr-20 -mt-20"></div>
+            {financeBreakdown.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpandedBreakdown(expandedBreakdown === 'finance' ? null : 'finance')}
+                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-green-200 text-green-700 hover:bg-green-50 shadow-sm flex items-center justify-center"
+                aria-label={expandedBreakdown === 'finance' ? 'Hide finance breakdown' : 'Show finance breakdown'}
+                title={expandedBreakdown === 'finance' ? 'Hide breakdown' : 'View breakdown'}
+              >
+                {expandedBreakdown === 'finance' ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              </button>
+            )}
             <div className="relative">
               <div className="flex items-center gap-3 mb-5">
                 <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-md">
@@ -618,25 +750,56 @@ const CompanyDetail: React.FC = () => {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500 border-t-transparent mx-auto mb-3"></div>
                   <p className="text-xs text-green-500 font-medium">Loading...</p>
                 </div>
-              ) : getFinanceEmissionResult() ? (
+              ) : financeResult ? (
                 <>
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                     className="text-5xl font-bold text-green-600 mb-3"
                   >
-                    {formatEmissionValue(getFinanceEmissionResult()?.financed_emissions)}
+                    {formatEmissionValue(financeResult?.financed_emissions)}
                   </motion.div>
-                  <div className="flex items-center gap-1 mb-5">
-                    <span className="text-xs text-green-500 font-medium">tCO₂e</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-green-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
-                      </TooltipContent>
-                    </Tooltip>
+                  <div className="mb-5 space-y-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-green-500 font-medium">tCO₂e</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-green-400 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipPortal>
+                          <TooltipContent className="max-w-xs">
+                            <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
+                          </TooltipContent>
+                        </TooltipPortal>
+                      </Tooltip>
+                    </div>
+                    {getDistinctDataQualityScores(financeResult).length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-green-700/90 font-medium">Data quality score</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-green-500 cursor-help shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipPortal>
+                            <TooltipContent className="max-w-xs">
+                              <p>
+                                Data quality scores from 1 (highest certainty) to 5 (lowest), based on the
+                                methodology and inputs used for this calculation.
+                              </p>
+                            </TooltipContent>
+                          </TooltipPortal>
+                        </Tooltip>
+                        {getDistinctDataQualityScores(financeResult).map((s) => (
+                          <Badge
+                            key={s}
+                            variant="outline"
+                            className={`text-xs font-semibold border ${getDataQualityScoreBadgeClass(s)}`}
+                          >
+                            Score {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -648,7 +811,7 @@ const CompanyDetail: React.FC = () => {
               
               <Button
               onClick={() => navigate('/finance-emission', { 
-                state: getFinanceEmissionResult() ? {
+                state: financeResult ? {
                   ...cleanPortfolioData,
                   mode: 'finance', 
                   startFresh: true, 
@@ -661,7 +824,7 @@ const CompanyDetail: React.FC = () => {
                 className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
-                {getFinanceEmissionResult() ? (
+                {financeResult ? (
                   <>
                     <Edit className="h-4 w-4 mr-2" />
                     Update Calculation
@@ -685,6 +848,17 @@ const CompanyDetail: React.FC = () => {
             className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-6 border-2 border-blue-100/80 shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300"
           >
             <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+            {facilitatedBreakdown.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpandedBreakdown(expandedBreakdown === 'facilitated' ? null : 'facilitated')}
+                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-blue-200 text-blue-700 hover:bg-blue-50 shadow-sm flex items-center justify-center"
+                aria-label={expandedBreakdown === 'facilitated' ? 'Hide facilitated breakdown' : 'Show facilitated breakdown'}
+                title={expandedBreakdown === 'facilitated' ? 'Hide breakdown' : 'View breakdown'}
+              >
+                {expandedBreakdown === 'facilitated' ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              </button>
+            )}
             <div className="relative">
               <div className="flex items-center gap-3 mb-5">
                 <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
@@ -698,25 +872,56 @@ const CompanyDetail: React.FC = () => {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
                   <p className="text-xs text-blue-500 font-medium">Loading...</p>
                 </div>
-              ) : getFacilitatedEmissionResult() ? (
+              ) : facilitatedResult ? (
                 <>
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                     className="text-5xl font-bold text-blue-600 mb-3"
                   >
-                    {formatEmissionValue(getFacilitatedEmissionResult()?.financed_emissions)}
+                    {formatEmissionValue(facilitatedResult?.financed_emissions)}
                   </motion.div>
-                  <div className="flex items-center gap-1 mb-5">
-                    <span className="text-xs text-blue-500 font-medium">tCO₂e</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 text-blue-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
-                      </TooltipContent>
-                    </Tooltip>
+                  <div className="mb-5 space-y-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-blue-500 font-medium">tCO₂e</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-blue-400 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipPortal>
+                          <TooltipContent className="max-w-xs">
+                            <p>Tonnes of carbon dioxide equivalent - a standard unit for measuring carbon footprint.</p>
+                          </TooltipContent>
+                        </TooltipPortal>
+                      </Tooltip>
+                    </div>
+                    {getDistinctDataQualityScores(facilitatedResult).length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-blue-700/90 font-medium">Data quality score</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-blue-500 cursor-help shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipPortal>
+                            <TooltipContent className="max-w-xs">
+                              <p>
+                                Data quality scores from 1 (highest certainty) to 5 (lowest), based on the
+                                methodology and inputs used for this calculation.
+                              </p>
+                            </TooltipContent>
+                          </TooltipPortal>
+                        </Tooltip>
+                        {getDistinctDataQualityScores(facilitatedResult).map((s) => (
+                          <Badge
+                            key={s}
+                            variant="outline"
+                            className={`text-xs font-semibold border ${getDataQualityScoreBadgeClass(s)}`}
+                          >
+                            Score {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -728,7 +933,7 @@ const CompanyDetail: React.FC = () => {
               
               <Button
               onClick={() => navigate('/finance-emission', { 
-                state: getFacilitatedEmissionResult() ? {
+                state: facilitatedResult ? {
                   ...cleanPortfolioData,
                   mode: 'facilitated', 
                   startFresh: true, 
@@ -741,7 +946,7 @@ const CompanyDetail: React.FC = () => {
                 className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
-                {getFacilitatedEmissionResult() ? (
+                {facilitatedResult ? (
                   <>
                     <Edit className="h-4 w-4 mr-2" />
                     Update Calculation
@@ -756,6 +961,169 @@ const CompanyDetail: React.FC = () => {
             </div>
           </motion.div>
         </div>
+
+        <AnimatePresence>
+          {expandedBreakdown && (
+            <motion.div
+              initial={{ opacity: 0, y: -16, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="mb-6 overflow-hidden"
+            >
+              <Card className={`border-2 shadow-2xl rounded-2xl overflow-hidden ${expandedBreakdown === 'finance' ? 'border-green-200 bg-gradient-to-br from-green-50/80 to-emerald-50/40' : 'border-blue-200 bg-gradient-to-br from-blue-50/80 to-cyan-50/40'}`}>
+                <CardHeader className={`${expandedBreakdown === 'finance' ? 'bg-gradient-to-r from-green-100/80 to-emerald-100/40' : 'bg-gradient-to-r from-blue-100/80 to-cyan-100/40'} border-b`}>
+                  <CardTitle className={`text-xl font-bold flex items-center gap-2 ${expandedBreakdown === 'finance' ? 'text-green-800' : 'text-blue-800'}`}>
+                    <Sparkles className="h-5 w-5" />
+                    {expandedBreakdown === 'finance' ? 'Finance Emission Breakdown' : 'Facilitated Emission Breakdown'}
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Detailed questionnaire inputs and calculated loan-level results.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <div className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur px-6 py-3">
+                      <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50">
+                        <button
+                          type="button"
+                          onClick={() => setBreakdownTab('context')}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'context' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          Context
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBreakdownTab('inputs')}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'inputs' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          Inputs
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBreakdownTab('results')}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'results' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          Results
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6 p-6">
+                      {breakdownTab === 'context' && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Calculation Context</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(() => {
+                              const c = getCalcContext(expandedBreakdown === 'finance' ? financeResult : facilitatedResult);
+                              return (
+                                <>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Used calculator</div>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.calculatorUsed ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                                      {c.calculatorUsed ? 'Yes' : 'No'}
+                                    </span>
+                                  </div>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Verification status</div>
+                                    <span className="font-semibold text-gray-900">{prettifyKey(c.verificationStatus)}</span>
+                                  </div>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Verified by</div>
+                                    <span className="font-semibold text-gray-900">{c.verifierName}</span>
+                                  </div>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Company type</div>
+                                    <span className="font-semibold text-gray-900">{prettifyKey(String(c.companyType))}</span>
+                                  </div>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Counterparty has emissions</div>
+                                    <span className="font-semibold text-gray-900">{c.hasEmissions}</span>
+                                  </div>
+                                  <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Last updated</div>
+                                    <span className="font-semibold text-gray-900">{c.updatedAt}</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {breakdownTab === 'inputs' && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Questionnaire Inputs</h4>
+                          <div className="rounded-xl border bg-white/95 overflow-hidden shadow-sm">
+                            <table className="w-full text-sm">
+                              <tbody>
+                                {getInputRows(expandedBreakdown === 'finance' ? financeResult : facilitatedResult).map(([key, value], idx) => (
+                                  <tr key={`${key}-${idx}`} className={`border-t first:border-t-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
+                                    <td className="px-4 py-2.5 text-gray-600 font-medium w-1/2">{prettifyKey(key)}</td>
+                                    <td className="px-4 py-2.5 text-gray-900 text-right font-semibold">{String(value)}</td>
+                                  </tr>
+                                ))}
+                                {getInputRows(expandedBreakdown === 'finance' ? financeResult : facilitatedResult).length === 0 && (
+                                  <tr>
+                                    <td className="px-3 py-3 text-gray-500" colSpan={2}>No questionnaire input details available.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {breakdownTab === 'results' && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Result Breakdown</h4>
+                          <div className="rounded-xl border bg-white/95 overflow-hidden shadow-sm">
+                            <table className="w-full text-sm">
+                              <thead className={`${expandedBreakdown === 'finance' ? 'bg-green-50 text-green-800' : 'bg-blue-50 text-blue-800'}`}>
+                                <tr>
+                                  <th className="text-left px-4 py-2.5 font-semibold">Loan Type</th>
+                                  <th className="text-center px-4 py-2.5 font-semibold">Data quality score</th>
+                                  <th className="text-right px-4 py-2.5 font-semibold">Attribution Factor</th>
+                                  <th className="text-right px-4 py-2.5 font-semibold">Financed Emissions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(expandedBreakdown === 'finance' ? financeBreakdown : facilitatedBreakdown).map((row, idx) => (
+                                  <tr key={`detail-${idx}`} className={`border-t ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
+                                    <td className="px-4 py-2.5 text-gray-800 font-medium">{row.label}</td>
+                                    <td className="px-4 py-2.5 text-center">
+                                      {row.dataQualityScore != null && isFinite(row.dataQualityScore) ? (
+                                        <Badge
+                                          variant="outline"
+                                          className={`text-xs font-semibold border ${getDataQualityScoreBadgeClass(row.dataQualityScore)}`}
+                                        >
+                                          {Math.round(row.dataQualityScore)}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-gray-400 text-xs">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-gray-700 font-semibold">{(row.attributionFactor * 100).toFixed(2)}%</td>
+                                    <td className="px-4 py-2.5 text-right font-bold text-gray-900">{row.financedEmissions.toFixed(2)} tCO₂e</td>
+                                  </tr>
+                                ))}
+                                {(expandedBreakdown === 'finance' ? financeBreakdown : facilitatedBreakdown).length === 0 && (
+                                  <tr>
+                                    <td className="px-3 py-3 text-gray-500" colSpan={4}>No result breakdown available.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
         </div>
       </div>
     </TooltipProvider>

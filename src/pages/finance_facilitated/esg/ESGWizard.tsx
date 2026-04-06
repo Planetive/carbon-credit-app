@@ -111,23 +111,48 @@ export const ESGWizard: React.FC = () => {
               .select('formula_id, inputs')
               .eq('counterparty_id', counterpartyId)
               .eq('calculation_type', mode);
+            // #region agent log
+            fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H1',location:'ESGWizard.tsx:114',message:'Fetched finance emission calculations for loan type restore',data:{counterpartyId,mode,rowCount:Array.isArray(emissionCalculations)?emissionCalculations.length:0},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             
             // Extract loan types from emission calculations (only for finance mode)
             if (emissionCalculations) {
               const loanTypeMap = new Map<string, number>();
+              const shapeCounters = { singularLoanType: 0, arrayLoanTypes: 0, missingLoanTypeData: 0 };
               emissionCalculations.forEach(calc => {
                 if (calc.inputs && typeof calc.inputs === 'object') {
                   const inputs = calc.inputs as any;
+                  if (Array.isArray(inputs.loanTypes) && inputs.loanTypes.length > 0) {
+                    inputs.loanTypes.forEach((loanType: unknown) => {
+                      const normalizedType = typeof loanType === 'string' ? loanType : '';
+                      if (!normalizedType) return;
+                      const count = loanTypeMap.get(normalizedType) || 0;
+                      loanTypeMap.set(normalizedType, count + 1);
+                    });
+                    shapeCounters.arrayLoanTypes += 1;
+                    return;
+                  }
                   if (inputs.loanType) {
                     const count = loanTypeMap.get(inputs.loanType) || 0;
                     loanTypeMap.set(inputs.loanType, count + 1);
+                    shapeCounters.singularLoanType += 1;
+                  } else {
+                    shapeCounters.missingLoanTypeData += 1;
                   }
+                } else {
+                  shapeCounters.missingLoanTypeData += 1;
                 }
               });
+              // #region agent log
+              fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H2',location:'ESGWizard.tsx:132',message:'Detected loan type field shape in stored inputs',data:shapeCounters,timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
               
               loanTypeMap.forEach((quantity, type) => {
                 loanTypes.push({ type, quantity });
               });
+              // #region agent log
+              fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H3',location:'ESGWizard.tsx:137',message:'Loan types reconstructed for form state',data:{reconstructedCount:loanTypes.length,reconstructedLoanTypes:loanTypes.map(l=>l.type)},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
             }
           }
           // For facilitated mode, loanTypes should always be empty array
@@ -159,6 +184,9 @@ export const ESGWizard: React.FC = () => {
             verified_emissions,
             unverified_emissions
           });
+          // #region agent log
+          fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H4',location:'ESGWizard.tsx:161',message:'Form state set after loading questionnaire',data:{mode,loanTypeCount:loanTypes.length,verificationStatus:questionnaire.verification_status||null},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
 
           console.log('Loaded questionnaire data into form:', {
             corporateStructure: questionnaire.corporate_structure,
@@ -368,7 +396,17 @@ export const ESGWizard: React.FC = () => {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [results, setResults] = useState<Array<{ type: string; label: string; attributionFactor: number; financedEmissions: number; denominatorLabel: string; denominatorValue: number }>>([]);
+  const [results, setResults] = useState<
+    Array<{
+      type: string;
+      label: string;
+      attributionFactor: number;
+      financedEmissions: number;
+      denominatorLabel: string;
+      denominatorValue: number;
+      dataQualityScore?: number;
+    }>
+  >([]);
 
   // Track per-loan-type quantity inputs before adding
   const [pendingQuantities, setPendingQuantities] = useState<Record<string, number>>({});
@@ -553,7 +591,18 @@ export const ESGWizard: React.FC = () => {
   };
 
   // Clean up old finance emission calculations that are no longer needed
-  const cleanupOldFinanceEmissionCalculations = async (counterpartyId: string, currentResults: Array<{ type: string; label: string; attributionFactor: number; financedEmissions: number; denominatorLabel: string; denominatorValue: number }>) => {
+  const cleanupOldFinanceEmissionCalculations = async (
+    counterpartyId: string,
+    currentResults: Array<{
+      type: string;
+      label: string;
+      attributionFactor: number;
+      financedEmissions: number;
+      denominatorLabel: string;
+      denominatorValue: number;
+      dataQualityScore?: number;
+    }>
+  ) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -598,7 +647,18 @@ export const ESGWizard: React.FC = () => {
   };
 
   // Save emission calculations to database
-  const saveEmissionCalculations = async (calculationResults: Array<{ type: string; label: string; attributionFactor: number; financedEmissions: number; denominatorLabel: string; denominatorValue: number }>, formData?: any) => {
+  const saveEmissionCalculations = async (
+    calculationResults: Array<{
+      type: string;
+      label: string;
+      attributionFactor: number;
+      financedEmissions: number;
+      denominatorLabel: string;
+      denominatorValue: number;
+      dataQualityScore?: number;
+    }>,
+    formData?: any
+  ) => {
     console.log('🔍 ESGWizard - saveEmissionCalculations called');
     console.log('🔍 ESGWizard - counterpartyId:', counterpartyId);
     console.log('🔍 ESGWizard - calculationResults:', calculationResults);
@@ -647,6 +707,15 @@ export const ESGWizard: React.FC = () => {
         : 0;
       const firstResult = calculationResults[0]; // Use first result for denominator (usually same for all)
 
+      const resultsWithDataQualityScores = calculationResults.filter(
+        (r) => r.dataQualityScore != null && isFinite(r.dataQualityScore)
+      );
+      const averageDataQualityScore =
+        resultsWithDataQualityScores.length > 0
+          ? resultsWithDataQualityScores.reduce((sum, r) => sum + (r.dataQualityScore as number), 0) /
+            resultsWithDataQualityScores.length
+          : null;
+
       // Save individual records for each loan type (for detailed tracking)
       for (const result of calculationResults) {
         // Also save to finance_emission_calculations table for portfolio integration
@@ -662,6 +731,11 @@ export const ESGWizard: React.FC = () => {
           total_equity_plus_debt: sanitizeNumericValue(result.denominatorValue),
           financed_emissions: sanitizeNumericValue(result.financedEmissions),
           attribution_factor: sanitizeNumericValue(result.attributionFactor),
+          data_quality_score: sanitizeNumericValue(
+            result.dataQualityScore != null && isFinite(result.dataQualityScore)
+              ? result.dataQualityScore
+              : null
+          ),
           status: 'completed',
           // Additional financial data
           share_price: sanitizeNumericValue(formData?.sharePrice || 0),
@@ -714,7 +788,11 @@ export const ESGWizard: React.FC = () => {
             attributionFactor: sanitizeNumericValue(r.attributionFactor),
             financedEmissions: sanitizeNumericValue(r.financedEmissions),
             denominatorLabel: r.denominatorLabel,
-            denominatorValue: sanitizeNumericValue(r.denominatorValue)
+            denominatorValue: sanitizeNumericValue(r.denominatorValue),
+            dataQualityScore:
+              r.dataQualityScore != null && isFinite(r.dataQualityScore)
+                ? sanitizeNumericValue(r.dataQualityScore)
+                : null
           })),
           // Use first result for single values (usually same for all)
           attributionFactor: sanitizeNumericValue(averageAttributionFactor),
@@ -722,10 +800,18 @@ export const ESGWizard: React.FC = () => {
           denominatorLabel: firstResult?.denominatorLabel || '',
           denominatorValue: sanitizeNumericValue(firstResult?.denominatorValue || 0),
           loanType: calculationResults.length === 1 ? firstResult?.type : 'multiple',
-          loanLabel: calculationResults.length === 1 ? firstResult?.label : `${calculationResults.length} loan types`
+          loanLabel: calculationResults.length === 1 ? firstResult?.label : `${calculationResults.length} loan types`,
+          dataQualityScore:
+            averageDataQualityScore != null && isFinite(averageDataQualityScore)
+              ? sanitizeNumericValue(averageDataQualityScore)
+              : null
         },
         financed_emissions: sanitizeNumericValue(totalFinancedEmissions), // Sum all financed emissions
         attribution_factor: sanitizeNumericValue(averageAttributionFactor),
+        data_quality_score:
+          averageDataQualityScore != null && isFinite(averageDataQualityScore)
+            ? sanitizeNumericValue(averageDataQualityScore)
+            : null,
         evic: sanitizeNumericValue(firstResult?.denominatorValue || 0),
         total_equity_plus_debt: sanitizeNumericValue(firstResult?.denominatorValue || 0),
         status: 'completed'
@@ -736,7 +822,7 @@ export const ESGWizard: React.FC = () => {
       console.log('✅ Calculation type:', mode);
       console.log('✅ Counterparty ID:', counterpartyId);
 
-      // Cache a lightweight summary for immediate display on return
+      // Cache enough for Company Detail to show breakdown (+) and data quality scores immediately — not only after DB refetch
       try {
         const cacheKey = `latestEmissionSummary:${counterpartyId}:${mode}`;
         const summary = {
@@ -744,7 +830,41 @@ export const ESGWizard: React.FC = () => {
           attribution_factor: averageAttributionFactor,
           denominator_value: firstResult?.denominatorValue || 0,
           updated_at: new Date().toISOString(),
-          calculation_type: mode
+          calculation_type: mode,
+          allResults: calculationResults.map((r) => ({
+            type: r.type,
+            label: r.label,
+            attributionFactor: sanitizeNumericValue(r.attributionFactor),
+            financedEmissions: sanitizeNumericValue(r.financedEmissions),
+            denominatorLabel: r.denominatorLabel,
+            denominatorValue: sanitizeNumericValue(r.denominatorValue),
+            dataQualityScore:
+              r.dataQualityScore != null && isFinite(r.dataQualityScore)
+                ? sanitizeNumericValue(r.dataQualityScore)
+                : null
+          })),
+          dataQualityScore:
+            averageDataQualityScore != null && isFinite(averageDataQualityScore)
+              ? sanitizeNumericValue(averageDataQualityScore)
+              : null,
+          inputs: {
+            corporateStructure: formData?.corporateStructure,
+            hasEmissions: formData?.hasEmissions,
+            verificationStatus: formData?.verificationStatus,
+            scope1Emissions: formData?.scope1Emissions,
+            scope2Emissions: formData?.scope2Emissions,
+            scope3Emissions: formData?.scope3Emissions,
+            verifierName: formData?.verifierName,
+            outstandingLoan: formData?.outstandingLoan,
+            sharePrice: formData?.sharePrice,
+            outstandingShares: formData?.outstandingShares,
+            totalDebt: formData?.totalDebt,
+            totalEquity: formData?.totalEquity,
+            minorityInterest: formData?.minorityInterest,
+            preferredStock: formData?.preferredStock,
+            loanTypes: calculationResults.map((r) => r.type),
+            loanLabels: calculationResults.map((r) => r.label)
+          }
         };
         sessionStorage.setItem(cacheKey, JSON.stringify(summary));
         console.log('✅ Cached latest emission summary:', cacheKey, summary);
@@ -1572,12 +1692,13 @@ export const ESGWizard: React.FC = () => {
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <motion.div
+                    className="h-full"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
                   >
-                    <Card className="bg-gradient-to-br from-blue-50 via-blue-100 to-cyan-50 border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6">
+                    <Card className="h-full bg-gradient-to-br from-blue-50 via-blue-100 to-cyan-50 border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
+                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
                             <TrendingUp className="h-6 w-6 text-white" />
@@ -1594,12 +1715,13 @@ export const ESGWizard: React.FC = () => {
                   </motion.div>
 
                   <motion.div
+                    className="h-full"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <Card className="bg-gradient-to-br from-green-50 via-emerald-100 to-teal-50 border-green-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6">
+                    <Card className="h-full bg-gradient-to-br from-green-50 via-emerald-100 to-teal-50 border-green-200 shadow-lg hover:shadow-xl transition-shadow">
+                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
                             <BarChart3 className="h-6 w-6 text-white" />
@@ -1616,12 +1738,13 @@ export const ESGWizard: React.FC = () => {
                   </motion.div>
 
                   <motion.div
+                    className="h-full"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <Card className="bg-gradient-to-br from-purple-50 via-purple-100 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6">
+                    <Card className="h-full bg-gradient-to-br from-purple-50 via-purple-100 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
+                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
                             <Building className="h-6 w-6 text-white" />

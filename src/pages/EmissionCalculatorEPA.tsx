@@ -69,38 +69,38 @@ const escapeHtml = (unsafe: string): string =>
 
 const getReportCSS = (): string => `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  .report { width: 800px; font-family: Arial, sans-serif; background: #ffffff; color: #1a2318; }
+  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; background: #ffffff; color: #1a2318; --space-1: 8px; --space-2: 16px; line-height: 1.5; }
   .cover { width: 800px; height: 1131px; background: #e8f0eb; position: relative; display: flex; flex-direction: column; padding: 0; page-break-after: always; overflow: hidden; }
   .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 52px; background: #1a3d2e; }
   .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 52px; background: #1a3d2e; }
   .cover-border-left { position: absolute; top: 0; left: 0; width: 52px; height: 100%; background: #1a3d2e; }
   .cover-border-right { position: absolute; top: 0; right: 0; width: 52px; height: 100%; background: #1a3d2e; }
   .cover-header { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 14px 80px; height: 52px; }
-  .cover-logo { display: flex; align-items: center; gap: 10px; color: #e8f0eb; font-size: 15px; font-weight: 500; }
+  .cover-logo { display: flex; align-items: center; gap: 10px; color: #e8f0eb; font-size: 15px; font-weight: 500; font-family: 'Playfair Display', serif; }
   .cover-logo-icon { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #4ade80; display: flex; align-items: center; justify-content: center; }
   .cover-logo-inner { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #4ade80; }
-  .cover-year { color: #e8f0eb; font-size: 16px; font-weight: 500; }
+  .cover-year { color: #e8f0eb; font-size: 16px; font-weight: 500; font-family: 'Playfair Display', serif; }
   .cover-body { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 80px; }
-  .cover-title { font-size: 72px; font-weight: 400; color: #1a3d2e; line-height: 1.1; letter-spacing: -1px; margin-bottom: 32px; }
-  .cover-company { font-size: 22px; font-weight: 400; color: #1a3d2e; margin-bottom: 8px; }
-  .cover-period { font-size: 18px; font-weight: 300; color: #5a7260; }
+  .cover-title { font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 400; color: #1a3d2e; line-height: 1.1; letter-spacing: -1px; margin-bottom: 32px; }
+  .cover-company { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 400; color: #1a3d2e; margin-bottom: 8px; }
+  .cover-period { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 300; color: #5a7260; }
   .cover-description { font-size: 14px; font-weight: 300; color: #5a7260; margin-top: 24px; line-height: 1.7; max-width: 520px; }
   .cover-footer { position: relative; z-index: 2; padding: 0 80px 66px; font-size: 11px; color: #5a7260; text-align: center; line-height: 1.6; }
   .inner-page { width: 800px; min-height: 1131px; background: #ffffff; padding: 0 0 60px; page-break-after: always; }
-  .page-header { background: #1a3d2e; padding: 14px 40px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-  .page-header-logo { color: #ffffff; font-size: 13px; font-weight: 400; }
+  .page-header { background: #1a3d2e; padding: 14px 40px; display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+  .page-header-logo { color: #ffffff; font-size: 13px; font-weight: 400; font-family: 'Playfair Display', serif; }
   .page-header-meta { color: rgba(255,255,255,0.7); font-size: 11px; }
   .page-content { padding: 0 40px; }
-  .page-title { font-size: 32px; font-weight: 400; color: #1a3d2e; margin-bottom: 6px; }
-  .page-divider { height: 1px; background: #3a7d57; margin-bottom: 28px; }
-  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 36px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 400; color: #1a3d2e; margin-bottom: var(--space-1); }
+  .page-divider { height: 1px; background: #3a7d57; margin-bottom: var(--space-2); }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: var(--space-2); }
   .summary-card { background: #e8f0eb; border-radius: 8px; padding: 16px 14px; text-align: center; }
   .summary-card-label { font-size: 10px; font-weight: 500; color: #3a7d57; letter-spacing: 0.3px; margin-bottom: 8px; text-transform: uppercase; }
   .summary-card-value { font-size: 22px; font-weight: 500; color: #1a3d2e; margin-bottom: 2px; }
   .summary-card-unit { font-size: 10px; color: #5a7260; }
   .summary-card.total .summary-card-label { color: #a32d2d; }
   .summary-card.total .summary-card-value { color: #a32d2d; }
-  .scope-section { margin-bottom: 24px; }
+  .scope-section { margin-bottom: var(--space-2); }
   .scope-header { background: #1a3d2e; padding: 8px 16px; border-radius: 4px 4px 0 0; }
   .scope-header-text { font-size: 11px; font-weight: 500; color: #ffffff; letter-spacing: 0.8px; text-transform: uppercase; }
   .scope-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; font-size: 12px; color: #2a4a32; border-bottom: 1px solid #e8f0eb; }
@@ -117,7 +117,7 @@ const getReportCSS = (): string => `
   .back-cover { width: 800px; height: 1131px; background: #1a3d2e; display: flex; align-items: flex-end; justify-content: flex-end; padding: 60px 72px; }
   .powered-by { text-align: right; }
   .powered-by-label { font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
-  .powered-by-name { font-size: 22px; color: #ffffff; }
+  .powered-by-name { font-family: 'Playfair Display', serif; font-size: 22px; color: #ffffff; }
 `;
 
 const getReportContent = (data: EmissionPdfReportData): string => {
@@ -666,7 +666,7 @@ const EmissionCalculatorEPA = () => {
   const sidebarItems = [
     {
       id: "scope1",
-      title: isMariUser ? "Scope 1" : "Scope 1 (EPA Fuel)",
+      title: "Scope 1",
       icon: Factory,
       description: isMariUser
         ? "Scope 1 calculators available for your account"
@@ -934,9 +934,11 @@ const EmissionCalculatorEPA = () => {
       wrapper.innerHTML = `<style>${getReportCSS()}</style>${getReportContent(reportData)}`;
       document.body.appendChild(wrapper);
 
+      const RENDER_SCALE = 1.2;
+      const JPEG_QUALITY = 0.62;
       const target = wrapper.querySelector(".report") as HTMLElement;
       const canvas = await html2canvas(target, {
-        scale: 2,
+        scale: RENDER_SCALE,
         backgroundColor: "#ffffff",
         useCORS: true,
         allowTaint: true,
@@ -944,7 +946,7 @@ const EmissionCalculatorEPA = () => {
 
       document.body.removeChild(wrapper);
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pageWidth = 210;
@@ -957,13 +959,13 @@ const EmissionCalculatorEPA = () => {
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
       heightLeft -= pageHeight - margin * 2;
 
       while (heightLeft > 0) {
         position = heightLeft - imgHeight + margin;
         pdf.addPage();
-        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
         heightLeft -= pageHeight - margin * 2;
       }
 

@@ -27,6 +27,7 @@ interface FactorRow {
 type NonRoadUnit = "gallon" | "liter";
 type EmissionSelection = "ch4" | "n2o";
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+const outputUnitLabel = (unit: OutputUnit): string => (unit === "short_ton" ? "short ton" : unit);
 
 interface EntryRow {
   id: string;
@@ -517,7 +518,7 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Non-Road Vehicle (Scope 1)</h4>
+          <h4 className="text-lg font-semibold text-gray-900">Non-Road Vehicle</h4>
           <p className="text-sm text-gray-600">
             Factors loaded from <span className="font-medium">Non-Road Vehicle</span>. Enter fuel use in gallons.
           </p>
@@ -535,7 +536,7 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         <Label className="md:col-span-1 text-gray-500">Fuel amount</Label>
         <Label className="md:col-span-1 text-gray-500">Unit</Label>
         <Label className="md:col-span-1 text-gray-500">Emission type</Label>
-        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnit})</Label>
+        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnitLabel(outputUnit)})</Label>
       </div>
 
       <div className="space-y-3">
@@ -638,7 +639,7 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         <div className="text-gray-700 font-medium">
           Total Non-Road Vehicle Emissions:{" "}
           <span className="font-semibold">
-            {convertEmission(totalEmissions)} {outputUnit}
+            {convertEmission(totalEmissions)} {outputUnitLabel(outputUnit)}
           </span>
         </div>
         <div className="flex items-center gap-3">

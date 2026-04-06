@@ -917,7 +917,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
               </div>
             </div>
 
-            {result.dataQualityScore && (
+            {result.dataQualityScore != null && isFinite(result.dataQualityScore) && (
               <div className="p-4 bg-primary/5 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="text-sm font-medium text-muted-foreground">Data Quality Score</div>

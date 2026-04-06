@@ -58,10 +58,10 @@ export const PDFDownload: React.FC<PDFDownloadProps> = ({
 
   const getReportCSS = () => `
     :root { --brand: #6AA261; --text: #333; --muted: #555; --border: #e9ecef; --bg: #f5f5f5; }
-    body { margin: 0; padding: 0; background: var(--bg); font-family: Arial, sans-serif; color: var(--text); }
+    body { margin: 0; padding: 0; background: var(--bg); font-family: 'DM Sans', Arial, sans-serif; color: var(--text); line-height: 1.5; }
     .report { max-width: 800px; margin: 0 auto; background: #fff; padding: 28px; }
     .header { text-align: center; padding-bottom: 16px; border-bottom: 3px solid var(--brand); margin-bottom: 22px; }
-    .title { color: var(--brand); font-size: 26px; margin: 0; font-weight: 800; letter-spacing: 0.3px; }
+    .title { font-family: 'Playfair Display', serif; color: var(--brand); font-size: 26px; margin: 0; font-weight: 800; letter-spacing: 0.3px; }
     .details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; background: #f8f9fa; padding: 14px; border-radius: 10px; margin: 18px 0 24px; }
     .details .item { font-size: 13px; }
     .details .label { color: #666; font-weight: 600; margin-right: 6px; }
@@ -178,12 +178,14 @@ export const PDFDownload: React.FC<PDFDownloadProps> = ({
       document.body.appendChild(wrapper);
 
       const target = wrapper.querySelector('.report') as HTMLElement;
-      const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: true });
+      const RENDER_SCALE = 1.2;
+      const JPEG_QUALITY = 0.62;
+      const canvas = await html2canvas(target, { scale: RENDER_SCALE, backgroundColor: '#ffffff', useCORS: true, allowTaint: true });
 
       // Remove from DOM after render
       document.body.removeChild(wrapper);
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
       const pdf = new jsPDF('p', 'mm', 'a4');
 
       const pageWidth = 210; // A4 width in mm
@@ -196,13 +198,13 @@ export const PDFDownload: React.FC<PDFDownloadProps> = ({
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
       heightLeft -= (pageHeight - margin * 2);
 
       while (heightLeft > 0) {
         position = heightLeft - imgHeight + margin;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
         heightLeft -= (pageHeight - margin * 2);
       }
 

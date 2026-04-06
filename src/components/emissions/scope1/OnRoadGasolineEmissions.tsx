@@ -36,6 +36,7 @@ interface OnRoadFactorRow {
 export type EmissionSelection = "ch4_only" | "n2o_only";
 type DistanceUnit = "mile" | "km";
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
+const outputUnitLabel = (unit: OutputUnit): string => (unit === "short_ton" ? "short ton" : unit);
 
 // Keep conversion constants reciprocal to avoid floating drift in controlled inputs.
 const KM_TO_MILES = 0.621371;
@@ -521,7 +522,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">On-Road Gasoline (Scope 1)</h4>
+          <h4 className="text-lg font-semibold text-gray-900">On-Road Gasoline</h4>
           <p className="text-sm text-gray-600">
             Factors loaded from <span className="font-medium">On-Road Gasoline</span>.
           </p>
@@ -539,7 +540,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         <Label className="md:col-span-1 text-gray-500">Emission type</Label>
         <Label className="md:col-span-1 text-gray-500">Distance unit</Label>
         <Label className="md:col-span-1 text-gray-500">Distance</Label>
-        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnit})</Label>
+        <Label className="md:col-span-1 text-gray-500">Emissions ({outputUnitLabel(outputUnit)})</Label>
       </div>
 
       <div className="space-y-3">
@@ -652,7 +653,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         <div className="text-gray-700 font-medium">
           Total On-Road Gasoline Emissions:{" "}
           <span className="font-semibold">
-            {convertEmission(totalEmissions)} {outputUnit}
+            {convertEmission(totalEmissions)} {outputUnitLabel(outputUnit)}
           </span>
         </div>
         <div className="flex items-center gap-3">

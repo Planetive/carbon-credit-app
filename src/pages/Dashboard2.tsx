@@ -26,6 +26,7 @@ import {
   MoreVertical,
   Calendar,
   Leaf,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
@@ -36,6 +37,7 @@ import { loadEpaIpccResults } from "@/lib/epaIpccResults";
 import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
 import DashboardSidebar from "@/components/DashboardSidebar";
+import { exportPortfolioPdfReport, formatDataQualityScoresFromStoredResults } from "@/utils/portfolioPdfExport";
 // Onboarding wizard gate removed; users go straight to dashboard
 
 const Dashboard2 = () => {
@@ -48,6 +50,7 @@ const Dashboard2 = () => {
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
+  const [organizationName, setOrganizationName] = useState<string>("");
   const [userType, setUserType] = useState<string>("corporate");
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
@@ -62,6 +65,7 @@ const Dashboard2 = () => {
   const [riskAssessmentData, setRiskAssessmentData] = useState<any>(null);
   const [portfolioCompanies, setPortfolioCompanies] = useState<any[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [isGeneratingPortfolioPdf, setIsGeneratingPortfolioPdf] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [deletingCompanyId, setDeletingCompanyId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -104,6 +108,9 @@ const Dashboard2 = () => {
         // Pre-fill the form with existing data if available
         if (data.organization_name && !organizationNameIsMissing) {
           setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
+          setOrganizationName(data.organization_name);
+        } else {
+          setOrganizationName("");
         }
         if (data.display_name && !displayNameIsDefault) {
           setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
@@ -622,6 +629,71 @@ const Dashboard2 = () => {
         exposureId: company.exposureId 
       } 
     });
+  };
+
+  const handleDownloadPortfolioReport = async () => {
+    if (isGeneratingPortfolioPdf) return;
+    try {
+      setIsGeneratingPortfolioPdf(true);
+
+      const dataQualityScoresByCounterparty = new Map<string, { finance: string; facilitated: string }>();
+      if (user?.id && portfolioCompanies.length > 0) {
+        const { data: aggRows } = await (supabase as any)
+          .from("emission_calculations")
+          .select("counterparty_id, calculation_type, results, data_quality_score")
+          .eq("user_id", user.id)
+          .eq("formula_id", "aggregate")
+          .in("calculation_type", ["finance", "facilitated"]);
+
+        for (const row of aggRows || []) {
+          const cid = row.counterparty_id as string | null;
+          if (!cid) continue;
+          const prev = dataQualityScoresByCounterparty.get(cid) || { finance: "—", facilitated: "—" };
+          const formatted = formatDataQualityScoresFromStoredResults(row.results, row.data_quality_score);
+          if (row.calculation_type === "finance") {
+            dataQualityScoresByCounterparty.set(cid, { ...prev, finance: formatted });
+          } else if (row.calculation_type === "facilitated") {
+            dataQualityScoresByCounterparty.set(cid, { ...prev, facilitated: formatted });
+          }
+        }
+      }
+
+      await exportPortfolioPdfReport({
+        organizationName: organizationName || "Organization",
+        displayName: displayName || user?.email?.split("@")[0] || "User",
+        generatedAt: new Date().toISOString(),
+        financeEmissions: Number(financeEmissionData?.financed_emissions || 0),
+        facilitatedEmissions: Number(facilitatedEmissionData?.financed_emissions || 0),
+        companies: portfolioCompanies.map((company) => {
+          const dqs = dataQualityScoresByCounterparty.get(company.id);
+          return {
+            name: company.name || "N/A",
+            counterpartyType: company.counterpartyType || "N/A",
+            sector: company.sector || "N/A",
+            geography: company.geography || "N/A",
+            amount: Number(company.amount || 0),
+            probabilityOfDefault: Number(company.probabilityOfDefault || 0),
+            lossGivenDefault: Number(company.lossGivenDefault || 0),
+            tenor: Number(company.tenor || 0),
+            financeDataQualityScores: dqs?.finance ?? "—",
+            facilitatedDataQualityScores: dqs?.facilitated ?? "—",
+          };
+        }),
+      });
+      toast({
+        title: "Report ready",
+        description: "Portfolio PDF report has been downloaded.",
+      });
+    } catch (error: any) {
+      console.error("Error generating portfolio report:", error);
+      toast({
+        title: "Export failed",
+        description: error?.message || "Could not generate portfolio PDF report.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPortfolioPdf(false);
+    }
   };
 
 
@@ -1370,6 +1442,16 @@ const Dashboard2 = () => {
                     <p className="text-gray-600">View and manage your portfolio companies</p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        onClick={handleDownloadPortfolioReport}
+                        disabled={portfolioLoading || isGeneratingPortfolioPdf}
+                        className="bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-md disabled:opacity-60"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {isGeneratingPortfolioPdf ? "Generating PDF..." : "Portfolio Report"}
+                      </Button>
+                    </motion.div>
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button
                         onClick={() =>
