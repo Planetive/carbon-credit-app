@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { FACTORS, SCOPE2_FACTORS } from "../shared/EmissionFactors";
+import { formatDynamicEmission } from "../scope1/emissionFormatting";
 
 type FuelType = "Gaseous fuels" | "Liquid fuels" | "Solid fuels";
 
@@ -29,9 +30,16 @@ const getGridFactor = (country?: 'UAE' | 'Pakistan') => (country ? SCOPE2_FACTOR
 interface ElectricityEmissionsProps { 
   onTotalChange?: (total: number) => void;
   onSaveAndNext?: () => void;
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
-const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChange, onSaveAndNext }) => {
+const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
+  onTotalChange,
+  onSaveAndNext,
+  companyContext = false,
+  counterpartyId,
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -53,11 +61,24 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
   const hasRestoredDraftRef = useRef(false);
 
   const getDraftKey = () => {
+    if (companyContext && counterpartyId && userId) return `electricityDraft:company:${counterpartyId}:${userId}`;
+    if (companyContext && counterpartyId) return `electricityDraft:company:${counterpartyId}:anon`;
     if (userId) return `electricityDraft:user:${userId}`;
     return "electricityDraft:anon";
   };
 
   const factorsSafe = FACTORS || {};
+  const formatEmission = (raw: number): string => {
+    if (!isFinite(raw)) return "";
+    return formatDynamicEmission(raw);
+  };
+  const formatNumberInput = (raw?: number): string => {
+    if (raw == null || !isFinite(raw)) return "";
+    return raw.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 6,
+    });
+  };
   const fuelTypes = Object.keys(factorsSafe) as FuelType[];
   const fuelsFor = (type?: FuelType) => (type ? Object.keys(factorsSafe[type] || {}) : []);
   const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : []);
@@ -65,6 +86,18 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
   useEffect(() => {
     const load = async () => {
       if (!userId) return;
+      if (companyContext) {
+        setMainId(null);
+        setTotalKwh(undefined);
+        setGridPct(undefined);
+        setRenewablePct(undefined);
+        setOtherPct(undefined);
+        setGridCountry(undefined);
+        setGridSubId(undefined);
+        setOtherRows([]);
+        setIsInitialLoad(false);
+        return;
+      }
       try {
         // Load latest main row
         const { data: mainData, error: mainError } = await (supabase as any)
@@ -130,7 +163,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
       }
     };
     load();
-  }, [userId, toast]);
+  }, [userId, toast, companyContext]);
 
   // Restore draft after initial load when there is no saved DB data yet
   useEffect(() => {
@@ -288,6 +321,25 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
       toast({ title: "Missing total", description: "Enter total electricity consumption (kWh).", variant: "destructive" });
       return;
     }
+    if (companyContext) {
+      try {
+        const key = getDraftKey();
+        const payload = {
+          totalKwh,
+          gridPct,
+          renewablePct,
+          otherPct,
+          gridCountry,
+          otherRows,
+          ts: Date.now(),
+        };
+        sessionStorage.setItem(key, JSON.stringify(payload));
+        toast({ title: "Saved", description: "Saved for this company context." });
+      } catch (e: any) {
+        toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
+      }
+      return;
+    }
     setSaving(true);
     try {
       // Upsert main row
@@ -419,18 +471,18 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
         <div className="md:col-span-1">
           <Label>Total electricity consumption (kWh)</Label>
           <Input
-            type="number"
-            step="any"
-            min="0"
-            max="999999999999.999999"
-            value={totalKwh ?? ''}
+            type="text"
+            inputMode="decimal"
+            value={formatNumberInput(totalKwh)}
             onChange={(e) => {
-              const value = e.target.value;
+              const value = e.target.value.trim();
               if (value === '') {
                 setTotalKwh(undefined);
               } else {
-                const numValue = Number(value);
-                if (numValue >= 0 && numValue <= 999999999999.999999) {
+                const normalized = value.replace(/,/g, "");
+                if (!/^\d*\.?\d*$/.test(normalized)) return;
+                const numValue = Number(normalized);
+                if (isFinite(numValue) && numValue >= 0 && numValue <= 999999999999.999999) {
                   setTotalKwh(numValue);
                 }
               }
@@ -529,11 +581,11 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
             <Label>Grid emissions</Label>
             <Input
               readOnly
-              value={gridEmissions || ''}
+              value={gridEmissions ? formatEmission(gridEmissions) : ''}
             />
           </div>
           <div className="md:col-span-3 text-gray-700 font-medium">
-            Grid sources emissions: <span className="font-semibold">{gridEmissions.toFixed(6)} kg CO2e</span>
+            Grid sources emissions: <span className="font-semibold">{formatEmission(gridEmissions)} kg CO2e</span>
           </div>
         </div>
       )}
@@ -599,18 +651,18 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
                   </Select>
 
                   <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    max="999999999999.999999"
-                    value={r.quantity ?? ''}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatNumberInput(r.quantity)}
                     onChange={e => {
-                      const value = e.target.value;
+                      const value = e.target.value.trim();
                       if (value === '') {
                         updateOtherRow(r.id, { quantity: undefined });
                       } else {
-                        const numValue = Number(value);
-                        if (numValue >= 0 && numValue <= 999999999999.999999) {
+                        const normalized = value.replace(/,/g, "");
+                        if (!/^\d*\.?\d*$/.test(normalized)) return;
+                        const numValue = Number(normalized);
+                        if (isFinite(numValue) && numValue >= 0 && numValue <= 999999999999.999999) {
                           updateOtherRow(r.id, { quantity: numValue });
                         }
                       }
@@ -635,14 +687,14 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({ onTotalChan
           </div>
 
           <div className="text-gray-700 font-medium">
-            Other sources emissions: <span className="font-semibold">{totalOtherEmissions.toFixed(6)} kg CO2e</span>
+            Other sources emissions: <span className="font-semibold">{formatEmission(totalOtherEmissions)} kg CO2e</span>
           </div>
         </div>
       )}
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-900 font-medium">
-          Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
+          Total electricity emissions: <span className="font-semibold">{formatEmission(computedElectricityEmissions)} kg CO2e</span>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={saveAll} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">

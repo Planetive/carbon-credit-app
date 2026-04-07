@@ -776,12 +776,18 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         sessionStorage.removeItem(key);
       } catch {}
 
-      // Reload data
-      const { data: newData } = await (supabase as any)
+      // Reload only the current context to avoid mixing personal/company rows.
+      let reloadQ = (supabase as any)
         .from('scope1_fuel_entries')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      if (companyContext && counterpartyId) {
+        reloadQ = reloadQ.eq('counterparty_id', counterpartyId);
+      } else {
+        reloadQ = reloadQ.is('counterparty_id', null);
+      }
+      const { data: newData } = await reloadQ;
 
       if (newData) {
         const updatedExistingRows = newData.map(entry => ({

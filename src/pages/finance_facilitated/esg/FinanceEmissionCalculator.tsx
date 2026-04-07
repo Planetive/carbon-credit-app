@@ -447,6 +447,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   useEffect(() => {
     // Only reset when we have valid props to avoid overriding with undefined values
     if (propVerifiedEmissions !== undefined || propUnverifiedEmissions !== undefined) {
+      const returnedTotalEmissions = (propScope1 || 0) + (propScope2 || 0) + (propScope3 || 0);
       // Clear all data when switching companies - always start fresh
       setSharedCompanyData({
         sharePrice: 0,
@@ -471,7 +472,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         outstandingLoan: 0,
         verified_emissions: propVerifiedEmissions || 0,
         unverified_emissions: propUnverifiedEmissions || 0,
-        emissions: 0,
+        emissions: returnedTotalEmissions,
         energyConsumption: 0,
         emissionFactor: 0,
         totalDebt: 0,
@@ -487,7 +488,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       
       console.log('🔄 FinanceEmissionCalculator - Starting fresh for counterparty:', resolvedCounterpartyId);
     }
-  }, [resolvedCounterpartyId, propVerifiedEmissions, propUnverifiedEmissions]);
+  }, [resolvedCounterpartyId, propVerifiedEmissions, propUnverifiedEmissions, propScope1, propScope2, propScope3]);
 
   // No auto-filling - always start fresh
 

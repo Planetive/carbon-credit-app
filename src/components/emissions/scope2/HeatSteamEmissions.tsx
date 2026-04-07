@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDynamicEmission } from "../scope1/emissionFormatting";
 
 interface HeatRow {
   id?: string;
@@ -74,6 +75,14 @@ const computeEmissionsKg = (
   return Number(((quantityInBaseUnit * factorPerUnit) / 1000).toFixed(6));
 };
 
+const formatNumberInput = (raw?: number): string => {
+  if (raw == null || !isFinite(raw)) return "";
+  return raw.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
+};
+
 const getFactorForGas = (row: HeatRow, gas: "co2" | "ch4" | "n2o"): number => {
   if (gas === "co2") {
     if (typeof row.co2Factor === "number") return row.co2Factor;
@@ -118,6 +127,8 @@ interface HeatSteamEmissionsProps {
    * When "epa", data is stored in scope2_heatsteam_entries_epa so UK and EPA data are separate.
    */
   storageVariant?: "uk" | "epa";
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
 const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
@@ -125,6 +136,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   onSaveAndNext,
   forcedStandard,
   storageVariant = "uk",
+  companyContext = false,
+  counterpartyId,
 }) => {
   const heatSteamTable = storageVariant === "epa" ? HEATSTEAM_TABLE_EPA : HEATSTEAM_TABLE_UK;
   const { user } = useAuth();
@@ -163,6 +176,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   const getDraftKey = () => {
     const standardKey = heatSteamStandard || "UK";
     const storageKey = storageVariant === "epa" ? "epa" : "uk";
+    if (companyContext && counterpartyId && userId) return `heatSteamDraft:${storageKey}:${standardKey}:company:${counterpartyId}:${userId}`;
+    if (companyContext && counterpartyId) return `heatSteamDraft:${storageKey}:${standardKey}:company:${counterpartyId}:anon`;
     if (userId) return `heatSteamDraft:${storageKey}:${standardKey}:user:${userId}`;
     return `heatSteamDraft:${storageKey}:${standardKey}:anon`;
   };
@@ -388,6 +403,12 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   useEffect(() => {
     const load = async () => {
       if (!userId) return;
+      if (companyContext) {
+        setHeatRows([]);
+        setHasUserRows(false);
+        setIsInitialLoad(false);
+        return;
+      }
       try {
         // Load Heat & Steam entries (UK table or EPA table per storageVariant)
         const { data: heatData, error: heatError } = await (supabase as any)
@@ -442,7 +463,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       }
     };
     load();
-  }, [userId, toast, forcedStandard, heatSteamTable]);
+  }, [userId, toast, forcedStandard, heatSteamTable, companyContext]);
 
   // Restore draft only when there are no user rows yet
   useEffect(() => {
@@ -556,6 +577,22 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       toast({ title: "Nothing to save", description: "Enter quantities for heat & steam." }); 
       return; 
     }
+    if (companyContext) {
+      try {
+        const key = getDraftKey();
+        const payload = {
+          rows: heatRows,
+          outputUnit,
+          heatSteamStandard,
+          ts: Date.now(),
+        };
+        sessionStorage.setItem(key, JSON.stringify(payload));
+        toast({ title: "Saved", description: "Saved for this company context." });
+      } catch (e: any) {
+        toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
+      }
+      return;
+    }
     setSavingHeat(true);
     try {
       const inserts = validRows.filter(r => !r.dbId).map(r => ({
@@ -634,10 +671,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
-    return raw.toLocaleString(undefined, {
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
-    });
+    return formatDynamicEmission(raw);
   };
 
   const convertEmission = (value?: number): string => {
@@ -838,18 +872,18 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                         </SelectContent>
                       </Select>
                       <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="999999999999.999999"
-                        value={row.quantity ?? ""}
+                        type="text"
+                        inputMode="decimal"
+                        value={formatNumberInput(row.quantity)}
                         onChange={(e) => {
-                          const value = e.target.value;
+                          const value = e.target.value.trim();
                           if (value === "") {
                             updateHeatRowQty(row.entryType, undefined);
                           } else {
-                            const numValue = Number(value);
-                            if (numValue >= 0 && numValue <= 999999999999.999999) {
+                            const normalized = value.replace(/,/g, "");
+                            if (!/^\d*\.?\d*$/.test(normalized)) return;
+                            const numValue = Number(normalized);
+                            if (isFinite(numValue) && numValue >= 0 && numValue <= 999999999999.999999) {
                               updateHeatRowQty(row.entryType, numValue);
                             }
                           }
@@ -864,18 +898,18 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                   ) : (
                     <Input
                       className="mt-1"
-                      type="number"
-                      step="any"
-                      min="0"
-                      max="999999999999.999999"
-                      value={row.quantity ?? ""}
+                      type="text"
+                      inputMode="decimal"
+                      value={formatNumberInput(row.quantity)}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = e.target.value.trim();
                         if (value === "") {
                           updateHeatRowQty(row.entryType, undefined);
                         } else {
-                          const numValue = Number(value);
-                          if (numValue >= 0 && numValue <= 999999999999.999999) {
+                          const normalized = value.replace(/,/g, "");
+                          if (!/^\d*\.?\d*$/.test(normalized)) return;
+                          const numValue = Number(normalized);
+                          if (isFinite(numValue) && numValue >= 0 && numValue <= 999999999999.999999) {
                             updateHeatRowQty(row.entryType, numValue);
                           }
                         }

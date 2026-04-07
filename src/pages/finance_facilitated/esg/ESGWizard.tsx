@@ -30,7 +30,33 @@ export const ESGWizard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const mode: 'finance' | 'facilitated' = (location.state as any)?.mode || 'finance';
-  const counterpartyId: string | undefined = (location.state as any)?.counterpartyId || (location.state as any)?.counterparty || (location.state as any)?.id || new URLSearchParams(window.location.search).get('counterpartyId') || undefined;
+  const getCounterpartyIdFromSources = (): string | undefined => {
+    const stateId =
+      (location.state as any)?.counterpartyId ||
+      (location.state as any)?.counterparty ||
+      (location.state as any)?.id;
+    if (stateId) return stateId;
+
+    try {
+      const saved = sessionStorage.getItem('esgWizardState');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const sessionId = parsed?.counterpartyId || parsed?.formData?.counterpartyId;
+        if (sessionId) return sessionId;
+      }
+    } catch {}
+
+    return new URLSearchParams(window.location.search).get('counterpartyId') || undefined;
+  };
+
+  // Keep counterparty stable across rerenders/navigation state updates.
+  const [counterpartyId, setCounterpartyId] = useState<string | undefined>(() => getCounterpartyIdFromSources());
+  useEffect(() => {
+    const latest = getCounterpartyIdFromSources();
+    if (latest && latest !== counterpartyId) {
+      setCounterpartyId(latest);
+    }
+  }, [location.state, counterpartyId]);
   const startFresh: boolean = (location.state as any)?.startFresh === true;
   const returnUrl: string | undefined = (location.state as any)?.returnUrl;
   const originalState = (location.state || {}) as any;
@@ -83,18 +109,29 @@ export const ESGWizard: React.FC = () => {
       }
 
       // IMPORTANT: Check if sessionStorage has data for a different mode and clear it
+      let resumePayload: any = null;
       try {
         const saved = sessionStorage.getItem('esgWizardState');
         if (saved) {
           const parsed = JSON.parse(saved);
+          resumePayload = parsed;
           if (parsed.mode && parsed.mode !== mode) {
             console.log('ESGWizard - Clearing sessionStorage: previous mode was', parsed.mode, 'current mode is', mode);
             sessionStorage.removeItem('esgWizardState');
+            resumePayload = null;
           }
         }
       } catch (e) {
         console.warn('Error checking sessionStorage mode:', e);
       }
+
+      const shouldPreserveReturnedScopeValues =
+        !!resumePayload &&
+        resumePayload.resumeAtCalculation === true &&
+        resumePayload.mode === mode &&
+        (typeof resumePayload.scope1Emissions === 'number' ||
+          typeof resumePayload.scope2Emissions === 'number' ||
+          typeof resumePayload.scope3Emissions === 'number');
 
       try {
         console.log('Loading existing questionnaire for counterpartyId:', counterpartyId);
@@ -157,8 +194,17 @@ export const ESGWizard: React.FC = () => {
           }
           // For facilitated mode, loanTypes should always be empty array
           
+          // Prefer fresh values returned from emission calculator when resuming;
+          // otherwise use persisted questionnaire scope values.
+          const resumedScope1 = Number(resumePayload?.scope1Emissions ?? 0);
+          const resumedScope2 = Number(resumePayload?.scope2Emissions ?? 0);
+          const resumedScope3 = Number(resumePayload?.scope3Emissions ?? 0);
+          const scope1Emissions = shouldPreserveReturnedScopeValues ? resumedScope1 : (questionnaire.scope1_emissions || 0);
+          const scope2Emissions = shouldPreserveReturnedScopeValues ? resumedScope2 : (questionnaire.scope2_emissions || 0);
+          const scope3Emissions = shouldPreserveReturnedScopeValues ? resumedScope3 : (questionnaire.scope3_emissions || 0);
+
           // Auto-calculate verified/unverified emissions when scope emissions change
-          const totalEmissions = (questionnaire.scope1_emissions || 0) + (questionnaire.scope2_emissions || 0) + (questionnaire.scope3_emissions || 0);
+          const totalEmissions = scope1Emissions + scope2Emissions + scope3Emissions;
           let verified_emissions = 0;
           let unverified_emissions = 0;
           
@@ -177,9 +223,9 @@ export const ESGWizard: React.FC = () => {
             verificationStatus: questionnaire.verification_status || '',
             calculationMethod: '',
             score: 0,
-            scope1Emissions: questionnaire.scope1_emissions || 0,
-            scope2Emissions: questionnaire.scope2_emissions || 0,
-            scope3Emissions: questionnaire.scope3_emissions || 0,
+            scope1Emissions,
+            scope2Emissions,
+            scope3Emissions,
             verifierName: questionnaire.verifier_name || '',
             verified_emissions,
             unverified_emissions
@@ -314,6 +360,11 @@ export const ESGWizard: React.FC = () => {
         // IMPORTANT: Only restore if the mode matches! Don't use finance data for facilitated mode
         if (parsed.resumeAtCalculation === true && parsed.mode === mode) {
           hasRestoredRef.current = true; // Mark as restored to prevent re-runs
+          const restoredCounterpartyId =
+            parsed.counterpartyId || parsed.formData?.counterpartyId;
+          if (restoredCounterpartyId) {
+            setCounterpartyId(restoredCounterpartyId);
+          }
           
           // Restore form data from sessionStorage
           if (parsed.formData) {
@@ -1556,6 +1607,7 @@ export const ESGWizard: React.FC = () => {
                       sessionStorage.setItem('esgWizardState', JSON.stringify({ 
                         formData: { ...formData, calculationMethod: 'emission-calculator' }, 
                         resumeAtCalculation: true, 
+                        counterpartyId,
                         mode, 
                         ts: Date.now() 
                       }));

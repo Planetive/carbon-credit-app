@@ -318,6 +318,7 @@ const EmissionCalculatorEPA = () => {
   useEffect(() => {
     const hydrateSavedTotals = async () => {
       if (!user?.id || hasHydratedSummaryRef.current) return;
+      if (companyContext) return;
       hasHydratedSummaryRef.current = true;
 
       try {
@@ -419,7 +420,7 @@ const EmissionCalculatorEPA = () => {
     };
 
     hydrateSavedTotals();
-  }, [user?.id]);
+  }, [user?.id, companyContext]);
 
   // Save company emissions to database (same as main calculator)
   const saveCompanyEmissions = async (totals: ScopeTotals) => {
@@ -543,9 +544,11 @@ const EmissionCalculatorEPA = () => {
 
           resetCalculatorState();
 
-          if (counterpartyId) {
+          const resolvedCounterpartyId =
+            counterpartyId || parsed?.counterpartyId || parsed?.formData?.counterpartyId;
+          if (resolvedCounterpartyId) {
             setCompanyContext({
-              counterpartyId,
+              counterpartyId: resolvedCounterpartyId,
               returnUrl: "/finance-emission",
               timestamp: Date.now(),
             });
@@ -581,6 +584,10 @@ const EmissionCalculatorEPA = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const fromWizard = urlParams.get("from") === "wizard";
         const counterpartyId = urlParams.get("counterpartyId");
+        if (fromWizard) {
+          // Wizard flow context is handled by the wizard-context effect.
+          return;
+        }
 
         if (counterpartyId && !fromWizard) {
           setCompanyContext({
@@ -1018,43 +1025,6 @@ const EmissionCalculatorEPA = () => {
               </div>
             </div>
           </div>
-
-          {companyContext && (
-            <div className="px-6 py-5 bg-gradient-to-r from-blue-50/80 via-indigo-50/80 to-blue-50/80 backdrop-blur-sm border-b border-blue-200/50">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg flex-shrink-0">
-                      <Building2 className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-blue-900 truncate">Company-Specific Emissions</h3>
-                      <p className="text-xs text-blue-600/80 mt-0.5">EPA calculator for specific counterparty</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200 hover:shadow-md rounded-lg px-4 py-2 flex-shrink-0"
-                    onClick={() => {
-                      sessionStorage.removeItem("companyEmissionsContext");
-                      setCompanyContext(null);
-                      resetCalculatorState();
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Clear
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3 px-2">
-                  <span className="text-sm text-blue-700 font-semibold">Company ID:</span>
-                  <code className="px-3 py-1.5 bg-white/80 text-blue-800 text-sm font-mono rounded-lg border border-blue-200/50 shadow-sm flex-1 min-w-0 backdrop-blur-sm">
-                    <span className="truncate block">{companyContext.counterpartyId}</span>
-                  </code>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Summary cards */}
           <div className="p-6 border-b border-gray-200/50 bg-gradient-to-b from-white to-gray-50/30" key={`summary-${resetKey}`}>
@@ -1525,6 +1495,8 @@ const EmissionCalculatorEPA = () => {
                       <HeatSteamEPAEmissions
                         onTotalChange={handleHeatSteamTotalChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>
@@ -1539,6 +1511,8 @@ const EmissionCalculatorEPA = () => {
                       <ElectricityEmissions
                         onTotalChange={handleElectricityDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
                       />
                     </CardContent>
                   </Card>
@@ -1584,7 +1558,8 @@ const EmissionCalculatorEPA = () => {
 
                     let verified_emissions = 0;
                     let unverified_emissions = 0;
-                    const verificationStatus = parsed.formData?.verificationStatus || "";
+                    const verificationStatus =
+                      parsed.formData?.verificationStatus || parsed.verificationStatus || "";
                     if (verificationStatus === "verified") {
                       verified_emissions = totalEmissions;
                       unverified_emissions = 0;
@@ -1595,6 +1570,11 @@ const EmissionCalculatorEPA = () => {
 
                     const updatedState = {
                       ...parsed,
+                      mode: wizardMode,
+                      counterpartyId:
+                        companyContext?.counterpartyId ||
+                        parsed.counterpartyId ||
+                        parsed.formData?.counterpartyId,
                       resumeAtCalculation: true,
                       scope1Emissions: scopeTotals.scope1,
                       scope2Emissions: scopeTotals.scope2,
@@ -1602,6 +1582,14 @@ const EmissionCalculatorEPA = () => {
                       verified_emissions,
                       unverified_emissions,
                       totalEmissions,
+                      ts: Date.now(),
+                      formData: {
+                        ...(parsed.formData || {}),
+                        counterpartyId:
+                          companyContext?.counterpartyId ||
+                          parsed.counterpartyId ||
+                          parsed.formData?.counterpartyId,
+                      },
                     };
 
                     sessionStorage.setItem("esgWizardState", JSON.stringify(updatedState));

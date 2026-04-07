@@ -4,6 +4,8 @@ import HeatSteamEmissions from "@/components/emissions/scope2/HeatSteamEmissions
 interface Props {
   onTotalChange?: (total: number) => void;
   onSaveAndNext?: () => void;
+  companyContext?: boolean;
+  counterpartyId?: string;
 }
 
 /**
