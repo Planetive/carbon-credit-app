@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDynamicEmission } from "./emissionFormatting";
 
 const TABLE_NAME = "scope1_epa_on_road_gasoline_entries";
 
@@ -144,10 +145,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
-    return raw.toLocaleString(undefined, {
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
-    });
+    return formatDynamicEmission(raw);
   };
 
   const convertEmission = (value?: number): string => {
@@ -523,9 +521,6 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-lg font-semibold text-gray-900">On-Road Gasoline</h4>
-          <p className="text-sm text-gray-600">
-            Factors loaded from <span className="font-medium">On-Road Gasoline</span>.
-          </p>
         </div>
         <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={loading}>
           <Plus className="h-4 w-4 mr-2" /> Add Row

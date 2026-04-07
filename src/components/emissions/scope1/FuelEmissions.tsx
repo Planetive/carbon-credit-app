@@ -16,6 +16,7 @@ import {
   newFuelRow,
   fuelRowChanged
 } from "../shared/utils";
+import { formatDynamicEmission } from "./emissionFormatting";
 
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
 
@@ -86,10 +87,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
-    return raw.toLocaleString(undefined, {
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
-    });
+    return formatDynamicEmission(raw);
   };
 
   const convertEmission = (value?: number): string => {

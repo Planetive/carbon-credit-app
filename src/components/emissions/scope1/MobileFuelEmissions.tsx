@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDynamicEmission } from "./emissionFormatting";
 
 interface MobileFuelRow {
   id: string;
@@ -359,9 +360,14 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
+    return formatDynamicEmission(raw);
+  };
+
+  const formatQuantityInput = (raw?: number): string => {
+    if (raw == null || !isFinite(raw)) return "";
     return raw.toLocaleString(undefined, {
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 6,
     });
   };
 
@@ -510,7 +516,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-lg font-semibold text-gray-900">
-            Mobile Fuel (Scope 1 - EPA)
+            Mobile Fuel
           </h4>
           <p className="text-sm text-gray-600">
             Use mobile combustion emission factors from the{" "}
@@ -597,18 +603,18 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
 
               {/* Quantity input (interpreted in chosen inputUnit when base is gallon) */}
               <Input
-                type="number"
-                step="any"
-                min="0"
-                max="999999999999.999999"
-                value={r.quantity ?? ""}
+                type="text"
+                inputMode="decimal"
+                value={formatQuantityInput(r.quantity)}
                 onChange={(e) => {
-                  const value = e.target.value;
+                  const value = e.target.value.trim();
                   if (value === "") {
                     updateRow(r.id, { quantity: undefined });
                   } else {
-                    const numValue = Number(value);
-                    if (numValue >= 0 && numValue <= 999999999999.999999) {
+                    const normalized = value.replace(/,/g, "");
+                    if (!/^\d*\.?\d*$/.test(normalized)) return;
+                    const numValue = Number(normalized);
+                    if (isFinite(numValue) && numValue >= 0 && numValue <= 999999999999.999999) {
                       updateRow(r.id, { quantity: numValue });
                     }
                   }
@@ -622,7 +628,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
 
               {/* Emissions + delete */}
               <div className="flex items-center gap-2">
-                <Input value={r.emissions ?? ""} readOnly placeholder="Auto" />
+                <Input value={convertEmission(r.emissions)} readOnly placeholder="Auto" />
                 <Button
                   variant="ghost"
                   className="text-red-600"

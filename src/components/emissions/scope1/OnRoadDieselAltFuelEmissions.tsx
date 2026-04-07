@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDynamicEmission } from "./emissionFormatting";
 
 const TABLE_NAME = "scope1_epa_on_road_diesel_alt_fuel_entries";
 
@@ -404,10 +405,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
 
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
-    return raw.toLocaleString(undefined, {
-      minimumFractionDigits: 3,
-      maximumFractionDigits: 3,
-    });
+    return formatDynamicEmission(raw);
   };
 
   const convertEmission = (value?: number): string => {
