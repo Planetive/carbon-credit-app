@@ -45,7 +45,9 @@ interface Props {
 
 type EmissionSelection = "ch4" | "n2o";
 type OutputUnit = "kg" | "tonnes" | "g" | "short_ton";
-const KM_TO_MILES = 0.621371192237334;
+// Keep reciprocal constants aligned with the gasoline calculator to reduce
+// controlled-input drift while switching/editing km values.
+const KM_TO_MILES = 0.621371;
 const MILES_TO_KM = 1 / KM_TO_MILES;
 const outputUnitLabel = (unit: OutputUnit): string => (unit === "short_ton" ? "short ton" : unit);
 
@@ -583,7 +585,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           const years = showYear ? modelYearsFor(r.vehicleType, r.fuelType) : [];
           const unit: DistanceUnit = r.distanceUnit ?? "mile";
           const distanceDisplay =
-            r.miles != null ? (unit === "mile" ? roundTo(r.miles) : roundTo(r.miles * MILES_TO_KM)) : "";
+            r.miles != null ? (unit === "mile" ? roundTo(r.miles, 6) : roundTo(r.miles * MILES_TO_KM, 6)) : "";
 
           return (
             <div
@@ -684,7 +686,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
                   } else {
                     const num = Number(v);
                     if (num >= 0 && num <= 999999999999.999999) {
-                      const miles = unit === "mile" ? roundTo(num) : roundTo(num * KM_TO_MILES); // km → miles
+                      const miles = unit === "mile" ? roundTo(num, 6) : roundTo(num * KM_TO_MILES, 6); // km → miles
                       updateRow(r.id, { miles });
                     }
                   }
