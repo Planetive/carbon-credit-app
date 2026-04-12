@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, TrendingUp, Database, ArrowRight, Sparkles, CheckCircle2, Battery } from "lucide-react";
+import { Globe, TrendingUp, Database, ArrowRight, Sparkles, CheckCircle2, Battery, Earth } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,17 @@ const ExploreHub: React.FC = () => {
       gradient: 'from-teal-500 via-emerald-500 to-teal-600',
       bgGradient: 'from-teal-50/50 via-emerald-50/30 to-teal-50/50',
       iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600'
+    },
+    {
+      id: 'country-emissions',
+      title: 'Country Emissions',
+      description: 'Explore country-level emissions data with filters and ranked results tailored to your workspace.',
+      icon: Earth,
+      stats: 'Country-level dataset',
+      features: ['Country ranking', 'Sector and region filters', 'CO2e insights'],
+      gradient: 'from-cyan-500 via-teal-500 to-emerald-600',
+      bgGradient: 'from-cyan-50/50 via-teal-50/30 to-emerald-50/50',
+      iconBg: 'bg-gradient-to-br from-cyan-500 to-teal-600'
     }
   ];
 

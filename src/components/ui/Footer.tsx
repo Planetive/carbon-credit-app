@@ -36,7 +36,12 @@ const Footer = () => {
               <a href="#" className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors">
                 <Twitter className="h-5 w-5 text-gray-900" />
               </a>
-              <a href="#" className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors">
+              <a
+                href="https://www.linkedin.com/company/rethink-carbon-io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:bg-teal-400 transition-colors"
+              >
                 <Linkedin className="h-5 w-5 text-gray-900" />
               </a>
             </div>

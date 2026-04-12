@@ -41,6 +41,7 @@ import ExploreCCUSProjects from "./pages/ExploreCCUSProjects";
 import CCUSProjectDetails from "./pages/CCUSProjectDetails";
 import ExploreCCUSPolicies from "./pages/ExploreCCUSPolicies";
 import ExploreBESS from "./pages/ExploreBESS";
+import CountryEmissions from "./pages/CountryEmissions";
 import CCUSManagementStrategy from "./pages/CCUSManagementStrategy";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
@@ -195,6 +196,11 @@ const AppRoutes = () => {
           <Route path="/explore/bess-projects" element={
             <ProtectedRoute>
               <ExploreBESS />
+            </ProtectedRoute>
+          } />
+          <Route path="/explore/country-emissions" element={
+            <ProtectedRoute>
+              <CountryEmissions />
             </ProtectedRoute>
           } />
           <Route path="/emission-calculator" element={
