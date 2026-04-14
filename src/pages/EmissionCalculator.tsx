@@ -1146,7 +1146,13 @@ const EmissionCalculator = () => {
             <div className="w-full" key={`fuel-${resetKey}`}>
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300">
                 <CardContent className="p-8">
-                  <FuelEmissions onDataChange={handleFuelDataChange} companyContext={!!companyContext} counterpartyId={companyContext?.counterpartyId} onSaveAndNext={navigateToNextCategory} />
+                  <FuelEmissions
+                    onDataChange={handleFuelDataChange}
+                    companyContext={!!companyContext}
+                    counterpartyId={companyContext?.counterpartyId}
+                    onSaveAndNext={navigateToNextCategory}
+                    factorMode="uk_supabase"
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -1156,7 +1162,11 @@ const EmissionCalculator = () => {
             <div className="w-full" key={`refrigerant-${resetKey}`}>
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300">
                 <CardContent className="p-8">
-                  <RefrigerantEmissions onDataChange={handleRefrigerantDataChange} companyContext={!!companyContext} onSaveAndNext={navigateToNextCategory} />
+                  <RefrigerantEmissions
+                    onDataChange={handleRefrigerantDataChange}
+                    companyContext={!!companyContext}
+                    onSaveAndNext={navigateToNextCategory}
+                  />
                 </CardContent>
               </Card>
             </div>

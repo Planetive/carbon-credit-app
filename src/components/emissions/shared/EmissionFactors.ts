@@ -216,13 +216,3 @@ export const SCOPE2_FACTORS: Record<string, Record<string, number>> = {
   },
 };
 
-export const SCOPE3_FACTORS: Record<string, Record<string, number>> = {
-  "Business Travel": {
-    "km": 0.14, // Average car
-    "miles": 0.23,
-  },
-  "Waste": {
-    "tonnes": 0.5, // General waste
-    "kg": 0.0005,
-  },
-};

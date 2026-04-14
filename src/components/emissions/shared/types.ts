@@ -24,6 +24,9 @@ export type FuelType =
   | "Biomass Fuels - Liquid"
   | "Biomass Fuels - Kraft Pulping Liquor, by Wood Furnish";
 
+/** UK `UK_Fuel_Factors` table: which per-unit factor column drives the calculation */
+export type UkFactorBasis = "total" | "co2" | "ch4" | "n2o";
+
 export interface FuelRow {
   id: string;
   type?: FuelType;
@@ -32,13 +35,24 @@ export interface FuelRow {
   quantity?: number;
   factor?: number;
   emissions?: number;
+  /** UK calculator: basis for factor (defaults to total kg CO2e) */
+  ukFactorBasis?: UkFactorBasis;
   isExisting?: boolean;
   dbId?: string;
 }
 
+/** UK `UK_refrigerant_factors`: which kg CO2e column applies (per activity unit). */
+export type UkRefrigerantBasis = "kyoto" | "non_kyoto" | "total";
+
 export interface RefrigerantRow {
   id: string;
+  /** UK: Activity column from UK_refrigerant_factors */
+  activity?: string;
   refrigerantType?: string;
+  /** UK: Unit column (e.g. kg) — quantity is in this unit */
+  quantityUnit?: string;
+  /** UK: Kyoto / non-Kyoto / total factor column */
+  ukRefrigerantBasis?: UkRefrigerantBasis;
   quantity?: number;
   factor?: number;
   emissions?: number;

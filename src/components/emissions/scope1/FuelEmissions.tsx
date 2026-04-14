@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { Plus, Trash2, Save, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,9 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   FuelRow, 
-  FuelType 
+  FuelType,
+  UkFactorBasis,
 } from "../shared/types";
-import { FACTORS } from "../shared/EmissionFactors";
 import { 
   newFuelRow,
   fuelRowChanged
@@ -31,6 +31,40 @@ interface FuelEmissionsProps {
   sectionDescription?: string;
   /** When "scope1HeatSteam", same form as Fuel but no DB persist; uses draft only */
   variant?: "fuel" | "scope1HeatSteam";
+  /** Select where factor options come from for this screen */
+  factorMode?: "epa" | "uk_supabase";
+}
+
+type UkFactorCell = { total?: number; co2?: number; ch4?: number; n2o?: number };
+type UkFactorsMap = Record<string, Record<string, Record<string, UkFactorCell>>>;
+/** Nested fuel map from EPA Supabase tables (Fuel EPA 1/2/3). */
+type EpaFuelFactorsMap = Record<string, Record<string, Record<string, number>>>;
+
+/** Order matches UK conversion tables: total, then CO2 / CH4 / N2O components (all per activity unit). */
+const UK_BASIS_ORDER: UkFactorBasis[] = ["total", "co2", "ch4", "n2o"];
+
+const UK_BASIS_LABEL: Record<UkFactorBasis, string> = {
+  total: "kg CO2e",
+  co2: "kg CO2e of CO2 per unit",
+  ch4: "kg CO2e of CH4 per unit",
+  n2o: "kg CO2e of N2O per unit",
+};
+
+function ukBasisValue(cell: UkFactorCell | undefined, basis: UkFactorBasis): number | undefined {
+  if (!cell) return undefined;
+  const v = basis === "total" ? cell.total : basis === "co2" ? cell.co2 : basis === "ch4" ? cell.ch4 : cell.n2o;
+  return typeof v === "number" && isFinite(v) ? v : undefined;
+}
+
+/** Only bases that exist in the reference row (so the dropdown matches your sheet). */
+function availableUkBasises(cell: UkFactorCell | undefined): UkFactorBasis[] {
+  if (!cell) return [];
+  return UK_BASIS_ORDER.filter((b) => ukBasisValue(cell, b) !== undefined);
+}
+
+function ukFactorBasisFromDb(raw: unknown): UkFactorBasis | undefined {
+  if (raw === "total" || raw === "co2" || raw === "ch4" || raw === "n2o") return raw;
+  return undefined;
 }
 
 const FuelEmissions: React.FC<FuelEmissionsProps> = ({
@@ -39,8 +73,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   counterpartyId,
   onSaveAndNext,
   sectionTitle = "Fuel Entries",
-  sectionDescription = "Add your organization's fuel consumption data",
+  sectionDescription = "",
   variant = "fuel",
+  factorMode = "epa",
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -51,7 +86,10 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [fuelFactors, setFuelFactors] = useState<typeof FACTORS | null>(null);
+  const [fuelFactors, setFuelFactors] = useState<EpaFuelFactorsMap | null>(null);
+  const [ukFactorsMap, setUkFactorsMap] = useState<UkFactorsMap>({});
+  /** UK mode only: false until Supabase UK reference fetch finishes (success or error). */
+  const [ukReferenceReady, setUkReferenceReady] = useState(factorMode !== "uk_supabase");
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
   const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
   const hasRestoredDraftRef = useRef(false);
@@ -67,15 +105,69 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     return `fuelEmissionsDraft:${suffix}:anon`;
   };
 
-  // Use Supabase EPA fuel tables for dynamic fuel factors when available,
-  // but keep the hardcoded FACTORS as a safe fallback. Guard against null/undefined for different envs.
-  const effectiveFactors = (fuelFactors || FACTORS || {}) as Record<string, Record<string, Record<string, number>>>;
+  const effectiveFactors: EpaFuelFactorsMap = fuelFactors ?? {};
 
-  // Computed values – never call Object.keys on null/undefined (fixes "Cannot convert undefined or null to object")
-  const types = Object.keys(effectiveFactors) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(effectiveFactors[type] || {}) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) =>
-    type && fuel ? Object.keys((effectiveFactors[type] || {})[fuel] || {}) : [];
+  const isUkActive = factorMode === "uk_supabase" && Object.keys(ukFactorsMap).length > 0;
+  const fuelFramework: "uk" | "epa" = factorMode === "uk_supabase" ? "uk" : "epa";
+
+  const applyFuelFrameworkFilter = (query: any) => {
+    if (fuelFramework === "uk") return query.eq("emission_framework", "uk");
+    // Legacy rows before framework tagging are treated as EPA.
+    return query.or("emission_framework.eq.epa,emission_framework.is.null");
+  };
+
+  const types = useMemo(() => {
+    if (isUkActive) return Object.keys(ukFactorsMap).sort((a, b) => a.localeCompare(b));
+    return Object.keys(effectiveFactors) as FuelType[];
+  }, [isUkActive, ukFactorsMap, effectiveFactors]);
+
+  const fuelsFor = (type?: FuelType) => {
+    if (!type) return [];
+    if (isUkActive) return Object.keys(ukFactorsMap[type] || {}).sort((a, b) => a.localeCompare(b));
+    return Object.keys(effectiveFactors[type] || {});
+  };
+
+  const unitsFor = (type?: FuelType, fuel?: string) => {
+    if (!type || !fuel) return [];
+    if (isUkActive) return Object.keys(ukFactorsMap[type]?.[fuel] || {}).sort((a, b) => a.localeCompare(b));
+    return Object.keys((effectiveFactors[type] || {})[fuel] || {});
+  };
+
+  /** When Activity/Fuel/Unit or the UK map changes, align saved basis with columns that exist for that row. */
+  const ukRowIdentityKey = useMemo(
+    () =>
+      rows
+        .map((r) => `${r.id}|${r.type ?? ""}|${r.fuel ?? ""}|${r.unit ?? ""}|${r.ukFactorBasis ?? ""}`)
+        .join(";"),
+    [rows]
+  );
+
+  useLayoutEffect(() => {
+    if (!isUkActive) return;
+    setRows((prev) => {
+      let changed = false;
+      const next = prev.map((r) => {
+        if (!r.type || !r.fuel || !r.unit) return r;
+        const cell = ukFactorsMap[r.type]?.[r.fuel]?.[r.unit];
+        if (!cell) return r;
+        const avail = availableUkBasises(cell);
+        if (avail.length === 0) return r;
+        const preferred = r.ukFactorBasis || "total";
+        const basis = avail.includes(preferred) ? preferred : avail[0];
+        if (basis !== (r.ukFactorBasis || "total")) {
+          changed = true;
+          const factor = ukBasisValue(cell, basis);
+          const emissions =
+            typeof r.quantity === "number" && factor !== undefined
+              ? Number((r.quantity * factor).toFixed(6))
+              : undefined;
+          return { ...r, ukFactorBasis: basis, factor, emissions };
+        }
+        return r;
+      });
+      return changed ? next : prev;
+    });
+  }, [isUkActive, ukFactorsMap, ukRowIdentityKey]);
 
   const parseNumber = (value: any): number | undefined => {
     if (typeof value === "number") return isFinite(value) ? value : undefined;
@@ -134,24 +226,103 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     return Number(converted.toFixed(6));
   };
 
-  // Load fuel factor reference data from Supabase EPA tables:
-  //   - "Fuel EPA 1"
-  //   - "Fuel EPA 2"
-  //   - "Fuel EPA 3"
-  //
-  // Each table has (case-insensitive) columns similar to:
-  //   - "Category"
-  //   - "Fuel Type"
-  //   - "Heat Content (HHV)", "HHV Unit"
-  //   - "CO2 Factor", "CO2 Unit"
-  //   - "CH4 Factor", "CH4 Unit"
-  //   - "N2O Factor", "N2O Unit"
-  //
-  // We expose one selectable "unit" per gas and unit, e.g.:
-  //   - "CO2 (kg CO2 / mmBtu)"
-  //   - "CH4 (g CH4 / mmBtu)"
-  //   - "N2O (g N2O / mmBtu)"
+  // Load fuel factor reference data:
+  // - uk_supabase: public.UK_Fuel_Factors (Activity, Fuel, Unit, kg CO2e columns)
+  // - epa: "Fuel EPA 1" / "Fuel EPA 2" / "Fuel EPA 3"
   useEffect(() => {
+    if (factorMode === "uk_supabase") {
+      setFuelFactors(null);
+      setUkReferenceReady(false);
+      const loadUk = async () => {
+        try {
+          let data: any[] | null = null;
+          let error: any = null;
+          const primary = await (supabase as any).from("UK_Fuel_Factors").select("*");
+          if (!primary.error && primary.data?.length) {
+            data = primary.data;
+          } else {
+            const fallback = await (supabase as any).from("uk_fuel_factors").select("*");
+            if (!fallback.error && fallback.data?.length) {
+              data = fallback.data;
+            } else {
+              error = primary.error || fallback.error;
+            }
+          }
+          if (error) {
+            console.error("Error loading UK_Fuel_Factors:", error);
+            toast({
+              title: "UK fuel factors",
+              description: error.message || "Could not load UK_Fuel_Factors.",
+              variant: "destructive",
+            });
+            setUkFactorsMap({});
+            return;
+          }
+          const tableRows = data ?? [];
+          if (tableRows.length === 0) {
+            console.warn("UK_Fuel_Factors returned no rows");
+            setUkFactorsMap({});
+            return;
+          }
+
+          const map: UkFactorsMap = {};
+          for (const row of tableRows as any[]) {
+            const activity = String(row.Activity ?? row.activity ?? "").trim();
+            const fuel = String(row.Fuel ?? row.fuel ?? "").trim();
+            const unit = String(row.Unit ?? row.unit ?? "").trim();
+            if (!activity || !fuel || !unit) continue;
+
+            const total = parseNumber(
+              row["kg CO2e"] ?? row.kg_co2e ?? row.kgCO2e ?? row["Kg CO2e"]
+            );
+            const co2 = parseNumber(
+              row["kg CO2e of CO2 per unit"] ??
+                row.kg_co2e_of_co2_per_unit ??
+                row["kg_co2e_of_co2_per_unit"]
+            );
+            const ch4 = parseNumber(
+              row["kg CO2e of CH4 per unit"] ??
+                row.kg_co2e_of_ch4_per_unit ??
+                row["kg_co2e_of_ch4_per_unit"]
+            );
+            const n2o = parseNumber(
+              row["kg CO2e of N2O per unit"] ??
+                row.kg_co2e_of_n2o_per_unit ??
+                row["kg_co2e_of_n2o_per_unit"]
+            );
+
+            if (!map[activity]) map[activity] = {};
+            if (!map[activity][fuel]) map[activity][fuel] = {};
+            const prev = map[activity][fuel][unit] || {};
+            map[activity][fuel][unit] = {
+              ...prev,
+              ...(total !== undefined ? { total } : {}),
+              ...(co2 !== undefined ? { co2 } : {}),
+              ...(ch4 !== undefined ? { ch4 } : {}),
+              ...(n2o !== undefined ? { n2o } : {}),
+            };
+          }
+
+          if (Object.keys(map).length === 0) {
+            console.warn("UK_Fuel_Factors had no parseable rows");
+            setUkFactorsMap({});
+            return;
+          }
+
+          setUkFactorsMap(map);
+        } catch (err) {
+          console.error("Unexpected error loading UK_Fuel_Factors:", err);
+          setUkFactorsMap({});
+        } finally {
+          setUkReferenceReady(true);
+        }
+      };
+      void loadUk();
+      return;
+    }
+
+    setUkFactorsMap({});
+    setUkReferenceReady(true);
     const loadFuelFactors = async () => {
       try {
         const tableNames = ["Fuel EPA 1", "Fuel EPA 2", "Fuel EPA 3"];
@@ -169,11 +340,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         }
 
         if (allRows.length === 0) {
-          console.warn("Fuel EPA 1/2/3 tables returned no rows; falling back to hardcoded FACTORS");
+          console.warn("Fuel EPA 1/2/3 tables returned no rows");
           return;
         }
 
-        const map: Record<string, Record<string, Record<string, number>>> = {};
+        const map: EpaFuelFactorsMap = {};
 
         allRows.forEach((row: any) => {
           const category: string | undefined =
@@ -274,15 +445,40 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
         if (Object.keys(map).length > 0) {
           console.log("Loaded Fuel EPA 1/2/3 factors from Supabase:", map);
-          setFuelFactors(map as typeof FACTORS);
+          setFuelFactors(map);
         }
       } catch (err) {
         console.error("Unexpected error loading Fuel EPA factors:", err);
       }
     };
 
-    loadFuelFactors();
-  }, []);
+    void loadFuelFactors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per factorMode; toast stable enough
+  }, [factorMode]);
+
+  // When UK reference data loads, refresh factors/emissions on all rows
+  useEffect(() => {
+    if (!isUkActive) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (!r.type || !r.fuel || !r.unit) return r;
+        const cell = ukFactorsMap[r.type]?.[r.fuel]?.[r.unit];
+        if (!cell) return { ...r, factor: undefined, emissions: undefined };
+        const avail = availableUkBasises(cell);
+        let basis: UkFactorBasis = r.ukFactorBasis || "total";
+        if (avail.length > 0 && !avail.includes(basis)) {
+          basis = avail[0];
+        }
+        const factor = ukBasisValue(cell, basis);
+        let emissions: number | undefined;
+        if (typeof r.quantity === "number" && factor !== undefined) {
+          emissions = Number((r.quantity * factor).toFixed(6));
+        }
+        return { ...r, ukFactorBasis: basis, factor, emissions };
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ukFactorsMap, isUkActive]);
 
   // Load existing entries
   useEffect(() => {
@@ -336,16 +532,19 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         
         try {
           // Load company-specific fuel entries (supabase cast to avoid TS "excessively deep" inference on schema)
-          const { data: fuelData, error: fuelError } = await (supabase as any)
-            .from('scope1_fuel_entries')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('counterparty_id', counterpartyId)
-            .order('created_at', { ascending: false });
+          const fuelQuery = applyFuelFrameworkFilter(
+            (supabase as any)
+              .from('scope1_fuel_entries')
+              .select('*')
+              .eq('user_id', userId)
+              .eq('counterparty_id', counterpartyId)
+          ).order('created_at', { ascending: false });
+
+          const { data: fuelData, error: fuelError } = await fuelQuery;
 
           if (fuelError) throw fuelError;
 
-          const companyFuelRows = (fuelData || []).map(entry => ({
+          const companyFuelRows = (fuelData || []).map((entry: any) => ({
             id: crypto.randomUUID(),
             dbId: entry.id,
             type: entry.fuel_type_group as FuelType,
@@ -354,6 +553,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             quantity: entry.quantity,
             factor: entry.factor,
             emissions: entry.emissions,
+            ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
             isExisting: true,
           }));
 
@@ -394,16 +594,19 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       // Load personal data for individual use
       try {
-        const { data: fuelData, error: fuelError } = await (supabase as any)
-          .from('scope1_fuel_entries')
-          .select('*')
-          .eq('user_id', userId)
-          .is('counterparty_id', null) // Only personal entries (no counterparty_id)
-          .order('created_at', { ascending: false });
+        const fuelQuery = applyFuelFrameworkFilter(
+          (supabase as any)
+            .from('scope1_fuel_entries')
+            .select('*')
+            .eq('user_id', userId)
+            .is('counterparty_id', null) // Only personal entries (no counterparty_id)
+        ).order('created_at', { ascending: false });
+
+        const { data: fuelData, error: fuelError } = await fuelQuery;
 
         if (fuelError) throw fuelError;
 
-        const existingFuelRows = (fuelData || []).map(entry => ({
+        const existingFuelRows = (fuelData || []).map((entry: any) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           type: entry.fuel_type_group as FuelType,
@@ -412,6 +615,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           quantity: entry.quantity,
           factor: entry.factor,
           emissions: entry.emissions,
+          ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
           isExisting: true,
         }));
 
@@ -439,7 +643,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     };
 
     loadExistingEntries();
-  }, [userId, toast, companyContext, counterpartyId, variant]);
+  }, [userId, toast, companyContext, counterpartyId, variant, factorMode]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -522,22 +726,40 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   const addRow = () => setRows(prev => [...prev, newFuelRow()]);
   const removeRow = (id: string) => setRows(prev => prev.filter(r => r.id !== id));
 
-  // Update functions
+   // Update functions
   const updateRow = (id: string, patch: Partial<FuelRow>) => {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next: FuelRow = { ...r, ...patch };
-      if (next.type && next.fuel && next.unit) {
-        const factor = effectiveFactors[next.type]?.[next.fuel]?.[next.unit];
-        next.factor = typeof factor === 'number' ? factor : undefined;
+      let factor: number | undefined;
+
+      if (isUkActive && next.type && next.fuel && next.unit) {
+        const cell = ukFactorsMap[next.type]?.[next.fuel]?.[next.unit];
+        if (cell) {
+          const avail = availableUkBasises(cell);
+          let basis: UkFactorBasis = next.ukFactorBasis || "total";
+          if (avail.length > 0 && !avail.includes(basis)) {
+            basis = avail[0];
+            next.ukFactorBasis = basis;
+          }
+          factor = ukBasisValue(cell, basis);
+        }
+      } else if (next.type && next.fuel && next.unit) {
+        const f = effectiveFactors[next.type]?.[next.fuel]?.[next.unit];
+        factor = typeof f === "number" ? f : undefined;
       } else {
-        next.factor = undefined;
+        factor = undefined;
       }
-      // Emission = quantity × factor. Output is in the selected gas only (no CO2e conversion).
-      // CO2 units use factor in kg/unit → result in kg CO2. CH4/N2O use factor in g/unit → convert to kg of that gas.
+
+      next.factor = factor;
+
+      // UK factors are already kg CO2e (or kg CO2e per component) per activity unit; EPA CH4/N2O use g/unit → kg of that gas.
       if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
         const raw = next.quantity * next.factor;
-        const isGPerUnit = typeof next.unit === 'string' && (next.unit.startsWith('CH4') || next.unit.startsWith('N2O'));
+        const isGPerUnit =
+          !isUkActive &&
+          typeof next.unit === 'string' &&
+          (next.unit.startsWith('CH4') || next.unit.startsWith('N2O'));
         next.emissions = Number((isGPerUnit ? raw / 1000 : raw).toFixed(6));
       } else {
         next.emissions = undefined;
@@ -719,9 +941,10 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
     setSaving(true);
     try {
-      const payload = newEntries.map(v => ({
+      const payload = newEntries.map((v) => ({
         user_id: user.id,
         counterparty_id: companyContext ? counterpartyId : null, // Add counterparty_id for company entries
+        emission_framework: fuelFramework,
         fuel_type_group: v.type!,
         fuel: v.fuel!,
         unit: v.unit!,
@@ -730,6 +953,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         emissions: v.emissions!,
         emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
         emissions_output_unit: outputUnit,
+        ...(factorMode === "uk_supabase"
+          ? { uk_factor_basis: v.ukFactorBasis || "total" }
+          : {}),
       }));
 
       if (payload.length > 0) {
@@ -747,6 +973,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           (supabase as any)
             .from('scope1_fuel_entries')
             .update({
+              emission_framework: fuelFramework,
               fuel_type_group: v.type!,
               fuel: v.fuel!,
               unit: v.unit!,
@@ -755,6 +982,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               emissions: v.emissions!,
               emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
               emissions_output_unit: outputUnit,
+              ...(factorMode === "uk_supabase"
+                ? { uk_factor_basis: v.ukFactorBasis || "total" }
+                : {}),
             })
             .eq('id', v.dbId!)
         ));
@@ -787,10 +1017,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
       } else {
         reloadQ = reloadQ.is('counterparty_id', null);
       }
+      reloadQ = applyFuelFrameworkFilter(reloadQ);
       const { data: newData } = await reloadQ;
 
       if (newData) {
-        const updatedExistingRows = newData.map(entry => ({
+        const updatedExistingRows = newData.map((entry: any) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           type: entry.fuel_type_group as FuelType,
@@ -799,6 +1030,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           quantity: entry.quantity,
           factor: entry.factor,
           emissions: entry.emissions,
+          ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
           isExisting: true,
         }));
         setExistingEntries(updatedExistingRows);
@@ -821,23 +1053,37 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   // Calculate totals
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  const gridCols = isUkActive ? "md:grid-cols-5" : "md:grid-cols-4";
+  const ukInputsLocked = factorMode === "uk_supabase" && !ukReferenceReady;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
-          <p className="text-sm text-gray-600">{sectionDescription}</p>
+          {sectionDescription ? (
+            <p className="text-sm text-gray-600">{sectionDescription}</p>
+          ) : null}
+          {ukInputsLocked && (
+            <p className="text-sm text-teal-700 mt-1">Loading UK fuel factors…</p>
+          )}
         </div>
-        <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button
+          onClick={addRow}
+          className="bg-teal-600 hover:bg-teal-700 text-white"
+          disabled={ukInputsLocked}
+        >
           <Plus className="h-4 w-4 mr-2" />Add New Entry
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Label className="md:col-span-1 text-gray-500">Type</Label>
+      <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
+        <Label className="md:col-span-1 text-gray-500">{isUkActive ? "Activity" : "Type"}</Label>
         <Label className="md:col-span-1 text-gray-500">Fuel</Label>
         <Label className="md:col-span-1 text-gray-500">Unit</Label>
+        {isUkActive && (
+          <Label className="md:col-span-1 text-gray-500">Emission factor</Label>
+        )}
         <Label className="md:col-span-1 text-gray-500">Quantity</Label>
       </div>
 
@@ -846,14 +1092,16 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           const isDeleting = deletingRows.has(r.id);
           
           return (
-            <div key={r.id} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50`}>
+            <div key={r.id} className={`grid grid-cols-1 ${gridCols} gap-4 items-center p-3 rounded-lg bg-gray-50`}>
               <Select 
                 value={r.type} 
-                onValueChange={(v) => updateRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined })}
-                disabled={false}
+                onValueChange={(v) =>
+                  updateRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined, ukFactorBasis: undefined })
+                }
+                disabled={ukInputsLocked}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={isUkActive ? "Select activity" : "Select type"} />
                 </SelectTrigger>
                 <SelectContent>
                   {types.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -862,8 +1110,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
               <Select 
                 value={r.fuel} 
-                onValueChange={(v) => updateRow(r.id, { fuel: v, unit: undefined })} 
-                disabled={!r.type ? true : false}
+                onValueChange={(v) => updateRow(r.id, { fuel: v, unit: undefined, ukFactorBasis: undefined })} 
+                disabled={ukInputsLocked || !r.type}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select fuel" />
@@ -876,7 +1124,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               <Select 
                 value={r.unit} 
                 onValueChange={(v) => updateRow(r.id, { unit: v })} 
-                disabled={!r.type || !r.fuel}
+                disabled={ukInputsLocked || !r.type || !r.fuel}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select unit" />
@@ -885,6 +1133,49 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
                   {unitsFor(r.type, r.fuel).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
+
+              {isUkActive &&
+                (() => {
+                  const cell =
+                    r.type && r.fuel && r.unit
+                      ? ukFactorsMap[r.type]?.[r.fuel]?.[r.unit]
+                      : undefined;
+                  const avail = availableUkBasises(cell);
+                  if (!r.type || !r.fuel || !r.unit) {
+                    return (
+                      <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />
+                    );
+                  }
+                  if (avail.length === 0) {
+                    return (
+                      <p className="text-xs text-amber-700 leading-tight px-1">
+                        No matching factor row (check Activity, Fuel, Unit against UK_Fuel_Factors).
+                      </p>
+                    );
+                  }
+                  const selectValue = avail.includes(r.ukFactorBasis || "total")
+                    ? (r.ukFactorBasis || "total")
+                    : avail[0];
+
+                  return (
+                    <Select
+                      value={selectValue}
+                      onValueChange={(v) => updateRow(r.id, { ukFactorBasis: v as UkFactorBasis })}
+                      disabled={ukInputsLocked}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select factor column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {avail.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {UK_BASIS_LABEL[b]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
 
               <div className="flex items-center gap-2">
                 <Input 
@@ -924,7 +1215,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          Total Fuel Emissions:{" "}
+          {isUkActive
+            ? "Total (sum using each row's emission factor): "
+            : "Total Fuel Emissions: "}
           <span className="font-semibold">
             {convertEmission(totalEmissions)} {outputUnit}
           </span>

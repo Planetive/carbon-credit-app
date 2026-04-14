@@ -19,6 +19,7 @@ export const fuelRowChanged = (row: FuelRow, existingEntries: FuelRow[]) => {
     original.type !== row.type ||
     original.fuel !== row.fuel ||
     original.unit !== row.unit ||
+    (original.ukFactorBasis || "total") !== (row.ukFactorBasis || "total") ||
     original.quantity !== row.quantity ||
     original.factor !== row.factor ||
     original.emissions !== row.emissions
@@ -29,6 +30,9 @@ export const refrigerantRowChanged = (row: RefrigerantRow, existingEntries: Refr
   const original = existingEntries.find(e => e.id === row.id);
   if (!original) return false;
   return (
+    (original.activity || "") !== (row.activity || "") ||
+    (original.quantityUnit || "") !== (row.quantityUnit || "") ||
+    (original.ukRefrigerantBasis || "total") !== (row.ukRefrigerantBasis || "total") ||
     original.refrigerantType !== row.refrigerantType ||
     original.quantity !== row.quantity ||
     original.factor !== row.factor ||

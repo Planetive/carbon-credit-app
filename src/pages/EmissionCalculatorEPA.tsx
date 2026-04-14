@@ -1398,6 +1398,7 @@ const EmissionCalculatorEPA = () => {
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
                         onSaveAndNext={navigateToNextCategory}
+                        sectionDescription="Add your organization's fuel consumption data"
                       />
                     </CardContent>
                   </Card>

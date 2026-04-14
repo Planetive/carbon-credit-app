@@ -815,11 +815,16 @@ const EmissionResultsEpaIpcc = () => {
         const table = scopeKeyToTable[category.key];
         if (!table) return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
 
-        const { data } = await (supabase as any)
+        let detailQuery = (supabase as any)
           .from(table)
           .select("*")
           .eq("user_id", user.id)
           .limit(300);
+        if (category.key === "fuel") {
+          detailQuery = detailQuery.or("emission_framework.eq.epa,emission_framework.is.null");
+        }
+
+        const { data } = await detailQuery;
 
         const rows = data || [];
         if (!rows.length) {
@@ -1561,7 +1566,11 @@ const EmissionResultsEpaIpcc = () => {
       switch (key) {
         // Scope 1
         case "fuel":
-          query = (supabase as any).from("scope1_fuel_entries").select("*").eq("user_id", user.id);
+          query = (supabase as any)
+            .from("scope1_fuel_entries")
+            .select("*")
+            .eq("user_id", user.id)
+            .or("emission_framework.eq.epa,emission_framework.is.null");
           break;
         case "mobile":
           query = (supabase as any).from("scope1_epa_mobile_fuel_entries").select("*").eq("user_id", user.id);

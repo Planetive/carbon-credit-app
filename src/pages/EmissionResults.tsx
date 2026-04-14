@@ -247,6 +247,16 @@ const EmissionResults = () => {
     "standard",
   ];
 
+  const applyFuelFrameworkFilter = (query: any) => {
+    if (isEPA) return query.or("emission_framework.eq.epa,emission_framework.is.null");
+    return query.eq("emission_framework", "uk");
+  };
+
+  const applyRefrigerantFrameworkFilter = (query: any) => {
+    if (isEPA) return query.or("emission_framework.eq.epa,emission_framework.is.null");
+    return query.eq("emission_framework", "uk");
+  };
+
   const prettifyColumnLabel = (col: string) => {
     return col
       .replace(/_/g, " ")
@@ -270,10 +280,14 @@ const EmissionResults = () => {
       switch (key) {
         // Scope 1
         case 'fuel':
-          query = (supabase as any).from('scope1_fuel_entries').select('*').eq('user_id', user.id);
+          query = applyFuelFrameworkFilter(
+            (supabase as any).from('scope1_fuel_entries').select('*').eq('user_id', user.id)
+          );
           break;
         case 'refrigerant':
-          query = (supabase as any).from('scope1_refrigerant_entries').select('*').eq('user_id', user.id);
+          query = applyRefrigerantFrameworkFilter(
+            (supabase as any).from('scope1_refrigerant_entries').select('*').eq('user_id', user.id)
+          );
           break;
         case 'passenger':
           query = (supabase as any).from('scope1_passenger_vehicle_entries').select('*').eq('user_id', user.id);
@@ -636,8 +650,12 @@ const EmissionResults = () => {
           onRoadDieselRes,
           nonRoadEpaRes,
         ] = await Promise.all([
-          supabase.from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
-          supabase.from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id),
+          applyFuelFrameworkFilter(
+            (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id)
+          ),
+          applyRefrigerantFrameworkFilter(
+            (supabase as any).from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id)
+          ),
           supabase.from('scope1_passenger_vehicle_entries').select('emissions').eq('user_id', user.id),
           supabase.from('scope1_delivery_vehicle_entries').select('emissions').eq('user_id', user.id),
           // EPA Scope 1 tables (new calculators)
