@@ -905,14 +905,6 @@ const EmissionCalculator = () => {
               </CardContent>
             </Card>
           </div>
-          <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-teal-50/30 rounded-xl border border-gray-200/50">
-            <div className="text-center">
-              <div className="text-sm text-gray-500 mb-1">Total Emissions</div>
-              <div className="text-lg font-bold bg-gradient-to-r from-gray-800 to-teal-700 bg-clip-text text-transparent">
-                {(scopeTotals.total / 1000).toFixed(2)} <span className="text-sm font-normal text-gray-600">tonnes CO₂e</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Sidebar Navigation - Modern Design */}

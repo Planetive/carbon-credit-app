@@ -1,11 +1,28 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { FACTORS, SCOPE2_FACTORS, VEHICLE_FACTORS, DELIVERY_VEHICLE_FACTORS, REFRIGERANT_FACTORS } from "../shared/EmissionFactors";
+import { FACTORS, SCOPE2_FACTORS, REFRIGERANT_FACTORS } from "../shared/EmissionFactors";
+import type { UkFactorBasis } from "../shared/types";
+import {
+  availableUkPassengerBasises,
+  fetchUkPassengerFactorsMap,
+  getUkPassengerFactorCell,
+  ukPassengerBasisValue,
+  UK_PASSENGER_BASIS_LABEL,
+  type UkPassengerFactorsMap,
+} from "../shared/ukPassengerFactors";
+import {
+  availableUkDeliveryBasises,
+  fetchUkDeliveryFactorsMap,
+  getUkDeliveryFactorCell,
+  ukDeliveryBasisValue,
+  type UkDeliveryFactorsMap,
+} from "../shared/ukDeliveryFactors";
+import { formatEmissions } from "../shared/utils";
 
 interface LeasedAssetsSectionProps {
   type: 'upstream' | 'downstream';
@@ -29,6 +46,10 @@ interface TransportRow {
   activity?: string;
   vehicleTypeName?: string;
   unit?: string;
+  fuelType?: string;
+  /** UK delivery factors: laden_lev key */
+  ladenLevel?: string;
+  ukFactorBasis?: UkFactorBasis;
   distance?: number;
   factor?: number;
   emissions?: number;
@@ -59,6 +80,25 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   
   // Transport & Logistics state
   const [transportRows, setTransportRows] = useState<TransportRow[]>([]);
+  const [ukPassengerMap, setUkPassengerMap] = useState<UkPassengerFactorsMap>({});
+  const [ukDeliveryMap, setUkDeliveryMap] = useState<UkDeliveryFactorsMap>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [passengerRes, deliveryRes] = await Promise.all([
+        fetchUkPassengerFactorsMap(),
+        fetchUkDeliveryFactorsMap(),
+      ]);
+      if (!cancelled) {
+        setUkPassengerMap(passengerRes.map);
+        setUkDeliveryMap(deliveryRes.map);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   
   // Equipment & Machinery state
   const [equipmentTotalKwh, setEquipmentTotalKwh] = useState<number | undefined>();
@@ -85,35 +125,69 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const fuelsFor = (type?: FuelType) => (type ? Object.keys(FACTORS[type]) : []);
   const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys(FACTORS[type][fuel]) : []);
   
-  const vehicleActivities = Object.keys(VEHICLE_FACTORS);
-  const deliveryActivities = Object.keys(DELIVERY_VEHICLE_FACTORS);
-  // Combine all activities into one list
-  const allActivities = [...vehicleActivities, ...deliveryActivities];
-  
-  // Helper to determine if activity is passenger or delivery
-  const isPassengerActivity = (activity?: string) => activity ? vehicleActivities.includes(activity) : false;
-  const isDeliveryActivity = (activity?: string) => activity ? deliveryActivities.includes(activity) : false;
+  const vehicleActivities = useMemo(
+    () => Object.keys(ukPassengerMap).sort((a, b) => a.localeCompare(b)),
+    [ukPassengerMap]
+  );
+  const deliveryActivities = useMemo(
+    () => Object.keys(ukDeliveryMap).sort((a, b) => a.localeCompare(b)),
+    [ukDeliveryMap]
+  );
+  const allActivities = useMemo(
+    () => [...vehicleActivities, ...deliveryActivities].sort((a, b) => a.localeCompare(b)),
+    [vehicleActivities, deliveryActivities]
+  );
+
+  const isPassengerActivity = (activity?: string) =>
+    activity ? Object.prototype.hasOwnProperty.call(ukPassengerMap, activity) : false;
+  const isDeliveryActivity = (activity?: string) =>
+    activity ? Object.prototype.hasOwnProperty.call(ukDeliveryMap, activity) : false;
   
   // Get vehicle types based on activity (auto-detect passenger or delivery)
   const vehicleTypesFor = (activity?: string) => {
     if (!activity) return [];
     if (isPassengerActivity(activity)) {
-      return Object.keys(VEHICLE_FACTORS[activity] || {});
+      return Object.keys(ukPassengerMap[activity] || {}).sort((a, b) => a.localeCompare(b));
     } else if (isDeliveryActivity(activity)) {
-      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity] || {});
+      return Object.keys(ukDeliveryMap[activity] || {}).sort((a, b) => a.localeCompare(b));
     }
     return [];
   };
-  
-  // Get units based on activity and vehicle type (auto-detect passenger or delivery)
+
   const vehicleUnitsFor = (activity?: string, vehicleType?: string) => {
     if (!activity || !vehicleType) return [];
     if (isPassengerActivity(activity)) {
-      return Object.keys(VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+      return Object.keys(ukPassengerMap[activity]?.[vehicleType] || {}).sort((a, b) => a.localeCompare(b));
     } else if (isDeliveryActivity(activity)) {
-      return Object.keys(DELIVERY_VEHICLE_FACTORS[activity]?.[vehicleType] || {});
+      return Object.keys(ukDeliveryMap[activity]?.[vehicleType] || {}).sort((a, b) => a.localeCompare(b));
     }
     return [];
+  };
+
+  const vehicleFuelsFor = (activity?: string, vehicleType?: string, unit?: string) => {
+    if (!activity || !vehicleType || !unit || !isPassengerActivity(activity)) return [];
+    return Object.keys(ukPassengerMap[activity]?.[vehicleType]?.[unit] || {}).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  };
+
+  const deliveryFuelsFor = (activity?: string, vehicleType?: string, unit?: string) => {
+    if (!activity || !vehicleType || !unit || !isDeliveryActivity(activity)) return [];
+    return Object.keys(ukDeliveryMap[activity]?.[vehicleType]?.[unit] || {}).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  };
+
+  const deliveryLadenFor = (
+    activity?: string,
+    vehicleType?: string,
+    unit?: string,
+    fuelType?: string
+  ) => {
+    if (!activity || !vehicleType || !unit || !fuelType || !isDeliveryActivity(activity)) return [];
+    return Object.keys(ukDeliveryMap[activity]?.[vehicleType]?.[unit]?.[fuelType] || {}).sort((a, b) =>
+      a.localeCompare(b)
+    );
   };
   
   // Buildings & Facilities calculations
@@ -234,20 +308,71 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
     setTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
-      
-      // Calculate emissions - auto-detect which factor table to use based on activity
-      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+
+      if (
+        updated.activity &&
+        updated.vehicleTypeName &&
+        updated.unit &&
+        typeof updated.distance === "number"
+      ) {
         let factor: number | undefined;
-        
+
         if (isPassengerActivity(updated.activity)) {
-          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+          if (updated.fuelType) {
+            const cell = getUkPassengerFactorCell(
+              ukPassengerMap,
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType
+            );
+            if (cell) {
+              const avail = availableUkPassengerBasises(cell);
+              let basis: UkFactorBasis = updated.ukFactorBasis || "total";
+              if (avail.length > 0 && !avail.includes(basis)) {
+                basis = avail[0];
+                updated.ukFactorBasis = basis;
+              }
+              factor =
+                avail.length > 0 ? ukPassengerBasisValue(cell, basis) : undefined;
+            }
+          }
         } else if (isDeliveryActivity(updated.activity)) {
-          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+          if (updated.fuelType) {
+            const ladenOpts = deliveryLadenFor(
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType
+            );
+            let laden = updated.ladenLevel;
+            if (ladenOpts.length > 0 && (laden === undefined || !ladenOpts.includes(laden))) {
+              laden = ladenOpts[0];
+              updated.ladenLevel = laden;
+            }
+            const cell = getUkDeliveryFactorCell(
+              ukDeliveryMap,
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType,
+              laden
+            );
+            if (cell) {
+              const avail = availableUkDeliveryBasises(cell);
+              let basis: UkFactorBasis = updated.ukFactorBasis || "total";
+              if (avail.length > 0 && !avail.includes(basis)) {
+                basis = avail[0];
+                updated.ukFactorBasis = basis;
+              }
+              factor = avail.length > 0 ? ukDeliveryBasisValue(cell, basis) : undefined;
+            }
+          }
         }
-        
-        if (factor) {
+
+        if (typeof factor === "number" && Number.isFinite(factor)) {
           updated.factor = factor;
-          updated.emissions = updated.distance * factor;
+          updated.emissions = Number((updated.distance * factor).toFixed(6));
         } else {
           updated.factor = undefined;
           updated.emissions = undefined;
@@ -256,7 +381,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
         updated.factor = undefined;
         updated.emissions = undefined;
       }
-      
+
       return updated;
     }));
   };
@@ -308,19 +433,70 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
       if (r.id !== id) return r;
       const updated = { ...r, ...updates };
       
-      // Calculate emissions - auto-detect which factor table to use based on activity
-      if (updated.activity && updated.vehicleTypeName && updated.unit && typeof updated.distance === 'number') {
+      if (
+        updated.activity &&
+        updated.vehicleTypeName &&
+        updated.unit &&
+        typeof updated.distance === "number"
+      ) {
         let factor: number | undefined;
-        
+
         if (isPassengerActivity(updated.activity)) {
-          factor = VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+          if (updated.fuelType) {
+            const cell = getUkPassengerFactorCell(
+              ukPassengerMap,
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType
+            );
+            if (cell) {
+              const avail = availableUkPassengerBasises(cell);
+              let basis: UkFactorBasis = updated.ukFactorBasis || "total";
+              if (avail.length > 0 && !avail.includes(basis)) {
+                basis = avail[0];
+                updated.ukFactorBasis = basis;
+              }
+              factor =
+                avail.length > 0 ? ukPassengerBasisValue(cell, basis) : undefined;
+            }
+          }
         } else if (isDeliveryActivity(updated.activity)) {
-          factor = DELIVERY_VEHICLE_FACTORS[updated.activity]?.[updated.vehicleTypeName]?.[updated.unit];
+          if (updated.fuelType) {
+            const ladenOpts = deliveryLadenFor(
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType
+            );
+            let laden = updated.ladenLevel;
+            if (ladenOpts.length > 0 && (laden === undefined || !ladenOpts.includes(laden))) {
+              laden = ladenOpts[0];
+              updated.ladenLevel = laden;
+            }
+            const cell = getUkDeliveryFactorCell(
+              ukDeliveryMap,
+              updated.activity,
+              updated.vehicleTypeName,
+              updated.unit,
+              updated.fuelType,
+              laden
+            );
+            if (cell) {
+              const avail = availableUkDeliveryBasises(cell);
+              let basis: UkFactorBasis = updated.ukFactorBasis || "total";
+              if (avail.length > 0 && !avail.includes(basis)) {
+                basis = avail[0];
+                updated.ukFactorBasis = basis;
+              }
+              factor = avail.length > 0 ? ukDeliveryBasisValue(cell, basis) : undefined;
+            }
+          }
         }
-        
-        if (factor) {
+
+        if (typeof factor === "number" && Number.isFinite(factor)) {
           updated.factor = factor;
-          updated.emissions = updated.distance * factor;
+          updated.emissions = Number((updated.distance * factor).toFixed(6));
         } else {
           updated.factor = undefined;
           updated.emissions = undefined;
@@ -329,7 +505,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
         updated.factor = undefined;
         updated.emissions = undefined;
       }
-      
+
       return updated;
     }));
   };
@@ -693,18 +869,30 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           {/* Combined Vehicles List */}
           {transportRows.length > 0 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-4">
                 <Label className="text-gray-500 font-medium">Activity</Label>
                 <Label className="text-gray-500 font-medium">Type</Label>
                 <Label className="text-gray-500 font-medium">Unit</Label>
+                <Label className="text-gray-500 font-medium">Fuel</Label>
+                <Label className="text-gray-500 font-medium">Laden</Label>
+                <Label className="text-gray-500 font-medium">Factor</Label>
                 <Label className="text-gray-500 font-medium">Distance</Label>
               </div>
               <div className="space-y-3">
                 {transportRows.map((r) => (
-                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <div key={r.id} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
                     <Select 
                       value={r.activity} 
-                      onValueChange={(v) => updateTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
+                      onValueChange={(v) =>
+                        updateTransportRow(r.id, {
+                          activity: v,
+                          vehicleTypeName: undefined,
+                          unit: undefined,
+                          fuelType: undefined,
+                          ladenLevel: undefined,
+                          ukFactorBasis: undefined,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select activity" />
@@ -718,7 +906,15 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
                     <Select 
                       value={r.vehicleTypeName} 
-                      onValueChange={(v) => updateTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
+                      onValueChange={(v) =>
+                        updateTransportRow(r.id, {
+                          vehicleTypeName: v,
+                          unit: undefined,
+                          fuelType: undefined,
+                          ladenLevel: undefined,
+                          ukFactorBasis: undefined,
+                        })
+                      } 
                       disabled={!r.activity}
                     >
                       <SelectTrigger>
@@ -731,7 +927,14 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
                     <Select 
                       value={r.unit} 
-                      onValueChange={(v) => updateTransportRow(r.id, { unit: v })} 
+                      onValueChange={(v) =>
+                        updateTransportRow(r.id, {
+                          unit: v,
+                          fuelType: undefined,
+                          ladenLevel: undefined,
+                          ukFactorBasis: undefined,
+                        })
+                      }
                       disabled={!r.activity || !r.vehicleTypeName}
                     >
                       <SelectTrigger>
@@ -741,6 +944,182 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                         {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                       </SelectContent>
                     </Select>
+
+                    <Select
+                      value={r.fuelType}
+                      onValueChange={(v) =>
+                        updateTransportRow(r.id, {
+                          fuelType: v,
+                          ladenLevel: undefined,
+                          ukFactorBasis: undefined,
+                        })
+                      }
+                      disabled={
+                        !r.activity ||
+                        !r.vehicleTypeName ||
+                        !r.unit ||
+                        (!isPassengerActivity(r.activity) && !isDeliveryActivity(r.activity))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select fuel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isPassengerActivity(r.activity)
+                          ? vehicleFuelsFor(r.activity, r.vehicleTypeName, r.unit).map((fuel) => (
+                              <SelectItem key={fuel} value={fuel}>
+                                {fuel}
+                              </SelectItem>
+                            ))
+                          : isDeliveryActivity(r.activity)
+                            ? deliveryFuelsFor(r.activity, r.vehicleTypeName, r.unit).map((fuel) => (
+                                <SelectItem key={fuel} value={fuel}>
+                                  {fuel}
+                                </SelectItem>
+                              ))
+                            : null}
+                      </SelectContent>
+                    </Select>
+
+                    {isPassengerActivity(r.activity) ? (
+                      <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/60 flex items-center px-2 text-xs text-gray-500">
+                        N/A
+                      </div>
+                    ) : isDeliveryActivity(r.activity) ? (
+                      <Select
+                        value={
+                          r.ladenLevel === undefined
+                            ? undefined
+                            : r.ladenLevel === ""
+                              ? "__empty_laden__"
+                              : r.ladenLevel
+                        }
+                        onValueChange={(v) =>
+                          updateTransportRow(r.id, {
+                            ladenLevel: v === "__empty_laden__" ? "" : v,
+                            ukFactorBasis: undefined,
+                          })
+                        }
+                        disabled={
+                          !r.activity ||
+                          !r.vehicleTypeName ||
+                          !r.unit ||
+                          !r.fuelType ||
+                          deliveryLadenFor(r.activity, r.vehicleTypeName, r.unit, r.fuelType).length === 0
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Laden" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deliveryLadenFor(r.activity, r.vehicleTypeName, r.unit, r.fuelType).map((lv) => (
+                            <SelectItem
+                              key={lv || "__lk__"}
+                              value={lv === "" ? "__empty_laden__" : lv}
+                            >
+                              {lv === "" ? "(none)" : lv}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />
+                    )}
+
+                    {(() => {
+                      if (!r.activity) {
+                        return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                      }
+                      if (isPassengerActivity(r.activity)) {
+                        const cell = getUkPassengerFactorCell(
+                          ukPassengerMap,
+                          r.activity,
+                          r.vehicleTypeName,
+                          r.unit,
+                          r.fuelType
+                        );
+                        const avail = availableUkPassengerBasises(cell);
+                        if (!r.vehicleTypeName || !r.unit || !r.fuelType) {
+                          return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                        }
+                        if (avail.length === 0) {
+                          return (
+                            <p className="text-xs text-amber-700 leading-tight px-1">No factors</p>
+                          );
+                        }
+                        const selectValue = avail.includes(r.ukFactorBasis || "total")
+                          ? (r.ukFactorBasis || "total")
+                          : avail[0];
+                        return (
+                          <Select
+                            value={selectValue}
+                            onValueChange={(v) =>
+                              updateTransportRow(r.id, { ukFactorBasis: v as UkFactorBasis })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Factor column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {avail.map((b) => (
+                                <SelectItem key={b} value={b}>
+                                  {UK_PASSENGER_BASIS_LABEL[b]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      }
+                      if (isDeliveryActivity(r.activity)) {
+                        const cell = getUkDeliveryFactorCell(
+                          ukDeliveryMap,
+                          r.activity,
+                          r.vehicleTypeName,
+                          r.unit,
+                          r.fuelType,
+                          r.ladenLevel
+                        );
+                        const avail = availableUkDeliveryBasises(cell);
+                        if (!r.vehicleTypeName || !r.unit || !r.fuelType) {
+                          return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                        }
+                        if (r.ladenLevel === undefined) {
+                          return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                        }
+                        if (avail.length === 0) {
+                          return (
+                            <p className="text-xs text-amber-700 leading-tight px-1">No factors</p>
+                          );
+                        }
+                        const selectValue = avail.includes(r.ukFactorBasis || "total")
+                          ? (r.ukFactorBasis || "total")
+                          : avail[0];
+                        return (
+                          <Select
+                            value={selectValue}
+                            onValueChange={(v) =>
+                              updateTransportRow(r.id, { ukFactorBasis: v as UkFactorBasis })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Factor column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {avail.map((b) => (
+                                <SelectItem key={b} value={b}>
+                                  {UK_PASSENGER_BASIS_LABEL[b]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      }
+                      return (
+                        <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/60 flex items-center px-2 text-xs text-gray-500">
+                          N/A
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-2">
                       <Input 
@@ -775,7 +1154,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="text-gray-900 font-medium">
-              Total transport emissions: <span className="font-semibold">{totalTransportEmissions.toFixed(6)} kg CO2e</span>
+              Total transport emissions: <span className="font-semibold">{formatEmissions(totalTransportEmissions)} kg CO2e</span>
             </div>
             <Button onClick={() => toast({ title: 'Saved', description: 'Transport & Logistics data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
               <Save className="h-4 w-4 mr-2" /> Save
@@ -1040,18 +1419,30 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             {/* Combined Vehicles List */}
             {equipmentTransportRows.length > 0 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center mb-4">
                   <Label className="text-gray-500 font-medium">Activity</Label>
                   <Label className="text-gray-500 font-medium">Type</Label>
                   <Label className="text-gray-500 font-medium">Unit</Label>
+                  <Label className="text-gray-500 font-medium">Fuel</Label>
+                  <Label className="text-gray-500 font-medium">Laden</Label>
+                  <Label className="text-gray-500 font-medium">Factor</Label>
                   <Label className="text-gray-500 font-medium">Distance</Label>
                 </div>
                 <div className="space-y-3">
                   {equipmentTransportRows.map((r) => (
-                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <div key={r.id} className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center p-3 rounded-lg bg-gray-50 border border-gray-200">
                       <Select 
                         value={r.activity} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { activity: v, vehicleTypeName: undefined, unit: undefined })}
+                        onValueChange={(v) =>
+                          updateEquipmentTransportRow(r.id, {
+                            activity: v,
+                            vehicleTypeName: undefined,
+                            unit: undefined,
+                            fuelType: undefined,
+                            ladenLevel: undefined,
+                            ukFactorBasis: undefined,
+                          })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select activity" />
@@ -1065,7 +1456,15 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
                       <Select 
                         value={r.vehicleTypeName} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { vehicleTypeName: v, unit: undefined })} 
+                        onValueChange={(v) =>
+                          updateEquipmentTransportRow(r.id, {
+                            vehicleTypeName: v,
+                            unit: undefined,
+                            fuelType: undefined,
+                            ladenLevel: undefined,
+                            ukFactorBasis: undefined,
+                          })
+                        } 
                         disabled={!r.activity}
                       >
                         <SelectTrigger>
@@ -1078,7 +1477,14 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
                       <Select 
                         value={r.unit} 
-                        onValueChange={(v) => updateEquipmentTransportRow(r.id, { unit: v })} 
+                        onValueChange={(v) =>
+                          updateEquipmentTransportRow(r.id, {
+                            unit: v,
+                            fuelType: undefined,
+                            ladenLevel: undefined,
+                            ukFactorBasis: undefined,
+                          })
+                        } 
                         disabled={!r.activity || !r.vehicleTypeName}
                       >
                         <SelectTrigger>
@@ -1088,6 +1494,182 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                           {vehicleUnitsFor(r.activity, r.vehicleTypeName).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                         </SelectContent>
                       </Select>
+
+                      <Select
+                        value={r.fuelType}
+                        onValueChange={(v) =>
+                          updateEquipmentTransportRow(r.id, {
+                            fuelType: v,
+                            ladenLevel: undefined,
+                            ukFactorBasis: undefined,
+                          })
+                        }
+                        disabled={
+                          !r.activity ||
+                          !r.vehicleTypeName ||
+                          !r.unit ||
+                          (!isPassengerActivity(r.activity) && !isDeliveryActivity(r.activity))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select fuel" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isPassengerActivity(r.activity)
+                            ? vehicleFuelsFor(r.activity, r.vehicleTypeName, r.unit).map((fuel) => (
+                                <SelectItem key={fuel} value={fuel}>
+                                  {fuel}
+                                </SelectItem>
+                              ))
+                            : isDeliveryActivity(r.activity)
+                              ? deliveryFuelsFor(r.activity, r.vehicleTypeName, r.unit).map((fuel) => (
+                                  <SelectItem key={fuel} value={fuel}>
+                                    {fuel}
+                                  </SelectItem>
+                                ))
+                              : null}
+                        </SelectContent>
+                      </Select>
+
+                      {isPassengerActivity(r.activity) ? (
+                        <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/60 flex items-center px-2 text-xs text-gray-500">
+                          N/A
+                        </div>
+                      ) : isDeliveryActivity(r.activity) ? (
+                        <Select
+                          value={
+                            r.ladenLevel === undefined
+                              ? undefined
+                              : r.ladenLevel === ""
+                                ? "__empty_laden__"
+                                : r.ladenLevel
+                          }
+                          onValueChange={(v) =>
+                            updateEquipmentTransportRow(r.id, {
+                              ladenLevel: v === "__empty_laden__" ? "" : v,
+                              ukFactorBasis: undefined,
+                            })
+                          }
+                          disabled={
+                            !r.activity ||
+                            !r.vehicleTypeName ||
+                            !r.unit ||
+                            !r.fuelType ||
+                            deliveryLadenFor(r.activity, r.vehicleTypeName, r.unit, r.fuelType).length === 0
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Laden" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {deliveryLadenFor(r.activity, r.vehicleTypeName, r.unit, r.fuelType).map((lv) => (
+                              <SelectItem
+                                key={lv || "__lk__"}
+                                value={lv === "" ? "__empty_laden__" : lv}
+                              >
+                                {lv === "" ? "(none)" : lv}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />
+                      )}
+
+                      {(() => {
+                        if (!r.activity) {
+                          return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                        }
+                        if (isPassengerActivity(r.activity)) {
+                          const cell = getUkPassengerFactorCell(
+                            ukPassengerMap,
+                            r.activity,
+                            r.vehicleTypeName,
+                            r.unit,
+                            r.fuelType
+                          );
+                          const avail = availableUkPassengerBasises(cell);
+                          if (!r.vehicleTypeName || !r.unit || !r.fuelType) {
+                            return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                          }
+                          if (avail.length === 0) {
+                            return (
+                              <p className="text-xs text-amber-700 leading-tight px-1">No factors</p>
+                            );
+                          }
+                          const selectValue = avail.includes(r.ukFactorBasis || "total")
+                            ? (r.ukFactorBasis || "total")
+                            : avail[0];
+                          return (
+                            <Select
+                              value={selectValue}
+                              onValueChange={(v) =>
+                                updateEquipmentTransportRow(r.id, { ukFactorBasis: v as UkFactorBasis })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Factor column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {avail.map((b) => (
+                                  <SelectItem key={b} value={b}>
+                                    {UK_PASSENGER_BASIS_LABEL[b]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }
+                        if (isDeliveryActivity(r.activity)) {
+                          const cell = getUkDeliveryFactorCell(
+                            ukDeliveryMap,
+                            r.activity,
+                            r.vehicleTypeName,
+                            r.unit,
+                            r.fuelType,
+                            r.ladenLevel
+                          );
+                          const avail = availableUkDeliveryBasises(cell);
+                          if (!r.vehicleTypeName || !r.unit || !r.fuelType) {
+                            return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                          }
+                          if (r.ladenLevel === undefined) {
+                            return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                          }
+                          if (avail.length === 0) {
+                            return (
+                              <p className="text-xs text-amber-700 leading-tight px-1">No factors</p>
+                            );
+                          }
+                          const selectValue = avail.includes(r.ukFactorBasis || "total")
+                            ? (r.ukFactorBasis || "total")
+                            : avail[0];
+                          return (
+                            <Select
+                              value={selectValue}
+                              onValueChange={(v) =>
+                                updateEquipmentTransportRow(r.id, { ukFactorBasis: v as UkFactorBasis })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Factor column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {avail.map((b) => (
+                                  <SelectItem key={b} value={b}>
+                                    {UK_PASSENGER_BASIS_LABEL[b]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        }
+                        return (
+                          <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/60 flex items-center px-2 text-xs text-gray-500">
+                            N/A
+                          </div>
+                        );
+                      })()}
 
                       <div className="flex items-center gap-2">
                         <Input 
@@ -1122,7 +1704,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="text-gray-900 font-medium">
-                Total transport emissions: <span className="font-semibold">{equipmentTotalTransportEmissions.toFixed(6)} kg CO2e</span>
+                Total transport emissions: <span className="font-semibold">{formatEmissions(equipmentTotalTransportEmissions)} kg CO2e</span>
               </div>
             </div>
           </div>

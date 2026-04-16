@@ -1215,9 +1215,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          {isUkActive
-            ? "Total (sum using each row's emission factor): "
-            : "Total Fuel Emissions: "}
+          Total Fuel Emissions:{" "}
           <span className="font-semibold">
             {convertEmission(totalEmissions)} {outputUnit}
           </span>

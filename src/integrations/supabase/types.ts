@@ -993,6 +993,8 @@ export interface Database {
           activity: string
           vehicle_type: string
           unit: string
+          fuel_type: string | null
+          uk_factor_basis: string | null
           distance: number
           emission_factor: number
           emissions: number
@@ -1005,6 +1007,8 @@ export interface Database {
           activity: string
           vehicle_type: string
           unit: string
+          fuel_type?: string | null
+          uk_factor_basis?: string | null
           distance: number
           emission_factor: number
           emissions: number
@@ -1017,6 +1021,8 @@ export interface Database {
           activity?: string
           vehicle_type?: string
           unit?: string
+          fuel_type?: string | null
+          uk_factor_basis?: string | null
           distance?: number
           emission_factor?: number
           emissions?: number
@@ -1040,6 +1046,9 @@ export interface Database {
           activity: string
           vehicle_type: string
           unit: string
+          fuel_type?: string | null
+          laden_level?: string | null
+          uk_factor_basis?: string | null
           distance: number
           emission_factor: number
           emissions: number
@@ -1052,6 +1061,9 @@ export interface Database {
           activity: string
           vehicle_type: string
           unit: string
+          fuel_type?: string | null
+          laden_level?: string | null
+          uk_factor_basis?: string | null
           distance: number
           emission_factor: number
           emissions: number
@@ -1064,6 +1076,9 @@ export interface Database {
           activity?: string
           vehicle_type?: string
           unit?: string
+          fuel_type?: string | null
+          laden_level?: string | null
+          uk_factor_basis?: string | null
           distance?: number
           emission_factor?: number
           emissions?: number

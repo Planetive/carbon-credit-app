@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { WasteMaterial, getAvailableDisposalMethods, getEmissionFactor, DisposalMethod, getAllWasteMaterials } from "./wasteTypes";
 import { getAllBusinessTravelTypes, BusinessTravelType } from "./businessTravelTypes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FACTORS, SCOPE2_FACTORS, VEHICLE_FACTORS, DELIVERY_VEHICLE_FACTORS, REFRIGERANT_FACTORS } from "../shared/EmissionFactors";
+import { FACTORS, SCOPE2_FACTORS, REFRIGERANT_FACTORS } from "../shared/EmissionFactors";
 import { useAuth } from "@/contexts/AuthContext";
 import LeasedAssetsSection from "./LeasedAssetsSection";
 import { FuelType } from "../shared/types";

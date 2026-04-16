@@ -47,6 +47,8 @@ export const vehicleRowChanged = (row: VehicleRow, existingEntries: VehicleRow[]
     original.activity !== row.activity ||
     original.vehicleType !== row.vehicleType ||
     original.unit !== row.unit ||
+    (original.fuelType || "") !== (row.fuelType || "") ||
+    (original.ukFactorBasis || "total") !== (row.ukFactorBasis || "total") ||
     original.distance !== row.distance ||
     original.factor !== row.factor ||
     original.emissions !== row.emissions
@@ -60,6 +62,9 @@ export const deliveryVehicleRowChanged = (row: DeliveryVehicleRow, existingEntri
     original.activity !== row.activity ||
     original.vehicleType !== row.vehicleType ||
     original.unit !== row.unit ||
+    (original.fuelType || "") !== (row.fuelType || "") ||
+    (original.ladenLevel || "") !== (row.ladenLevel || "") ||
+    (original.ukFactorBasis || "total") !== (row.ukFactorBasis || "total") ||
     original.distance !== row.distance ||
     original.factor !== row.factor ||
     original.emissions !== row.emissions
@@ -97,13 +102,17 @@ export const calculateEmissions = (quantity: number, factor: number): number => 
   return Number((quantity * factor).toFixed(6));
 };
 
-// Format helpers
-export const formatEmissions = (value: number): string => {
-  return value.toFixed(6);
+// Format helpers (display only — thousands separators + fixed decimals)
+export const formatEmissions = (value: number, fractionDigits = 6): string => {
+  if (!Number.isFinite(value)) return '';
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
 };
 
-export const formatEmissionsWithUnit = (value: number): string => {
-  return `${value.toFixed(6)} kg CO2e`;
+export const formatEmissionsWithUnit = (value: number, fractionDigits = 6): string => {
+  return `${formatEmissions(value, fractionDigits)} kg CO2e`;
 };
 
 // Scope 2 helpers

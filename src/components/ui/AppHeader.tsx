@@ -500,27 +500,32 @@ const AppHeader = () => {
 
                     return (
                       <div key={to} className="space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigate("/dashboard");
-                            setIsMobileMenuOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                        <div
+                          className={`w-full flex items-stretch rounded-lg overflow-hidden transition-colors ${
                             isInDashboardGroup
                               ? "bg-primary text-white"
-                              : "text-gray-600 hover:bg-gray-100"
+                              : "bg-transparent text-gray-600"
                           }`}
                         >
-                          <Icon className="h-5 w-5" />
-                          <span>{label}</span>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsMobileDashboardOpen((open) => !open);
+                            onClick={() => {
+                              navigate("/dashboard");
+                              setIsMobileMenuOpen(false);
                             }}
-                            className="ml-auto text-inherit"
+                            className={`flex flex-1 items-center gap-3 p-3 min-w-0 text-left transition-colors ${
+                              isInDashboardGroup ? "" : "hover:bg-gray-100 rounded-l-lg"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span className="truncate">{label}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsMobileDashboardOpen((open) => !open)}
+                            className={`flex items-center justify-center px-3 flex-shrink-0 transition-colors ${
+                              isInDashboardGroup ? "" : "hover:bg-gray-100 rounded-r-lg"
+                            }`}
                             aria-label="Toggle dashboard sections"
                           >
                             <ChevronDown
@@ -529,7 +534,7 @@ const AppHeader = () => {
                               }`}
                             />
                           </button>
-                        </button>
+                        </div>
 
                         {isMobileDashboardOpen && (
                           <div className="ml-8 space-y-1">

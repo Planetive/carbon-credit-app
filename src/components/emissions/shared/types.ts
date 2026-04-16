@@ -65,6 +65,10 @@ export interface VehicleRow {
   activity?: string;
   vehicleType?: string;
   unit?: string;
+  /** Petrol / Diesel / … from UK_Passenger_factors */
+  fuelType?: string;
+  /** Which UK_Passenger_factors numeric column drives the factor (default total kg CO2e). */
+  ukFactorBasis?: UkFactorBasis;
   distance?: number;
   factor?: number;
   emissions?: number;
@@ -77,6 +81,12 @@ export interface DeliveryVehicleRow {
   activity?: string;
   vehicleType?: string;
   unit?: string;
+  /** From UK delivery factors (e.g. Diesel). */
+  fuelType?: string;
+  /** Laden level label matching reference `laden_lev`. */
+  ladenLevel?: string;
+  /** Which UK delivery numeric column drives the factor (default total kg CO2e). */
+  ukFactorBasis?: UkFactorBasis;
   distance?: number;
   factor?: number;
   emissions?: number;

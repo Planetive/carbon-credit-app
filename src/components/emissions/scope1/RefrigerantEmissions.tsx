@@ -676,7 +676,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          Total (sum using each row&apos;s emission factor):{" "}
+          Total Refrigerant Emissions:{" "}
           <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
         </div>
         {(() => {

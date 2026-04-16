@@ -145,60 +145,9 @@ export const REFRIGERANT_FACTORS: Record<string, number> = {
   "Nitrogen trifluoride": 16100.00000,
 };
 
-export const VEHICLE_FACTORS: Record<string, Record<string, Record<string, number>>> = {
-  "Cars (by market segment)": {
-    "Mini": { km: 0.10828, miles: 0.17425 },
-    "Supermini": { km: 0.13284, miles: 0.21378 },
-    "Lower medium": { km: 0.14349, miles: 0.23092 },
-    "Upper medium": { km: 0.16026, miles: 0.25792 },
-    "Executive": { km: 0.16920, miles: 0.27230 },
-    "Luxury": { km: 0.20464, miles: 0.32934 },
-    "Sports": { km: 0.17155, miles: 0.27608 },
-    "Dual purpose 4X4": { km: 0.19805, miles: 0.31874 },
-    "MPV": { km: 0.17904, miles: 0.28814 },
-  },
-  "Cars (by size)": {
-    "Small car": { km: 0.14172, miles: 0.22807 },
-    "Medium car": { km: 0.17006, miles: 0.27368 },
-    "Large car": { km: 0.20839, miles: 0.33537 },
-    "Average car": { km: 0.17136, miles: 0.27578 },
-  },
-  "Motorbike": {
-    "Small": { km: 0.08094, miles: 0.13027 },
-    "Medium": { km: 0.09826, miles: 0.15813 },
-    "Large": { km: 0.13072, miles: 0.21037 },
-    "Average": { km: 0.11138, miles: 0.17925 },
-  },
-};
+/** Scope 1 passenger car factors: load from Supabase `UK_Passenger_factors` (see `ukPassengerFactors.ts`). */
 
-export const DELIVERY_VEHICLE_FACTORS: Record<string, Record<string, Record<string, number>>> = {
-  "Vans": {
-    "Class I (up to 1.305 tonnes)": { km: 0.15572, miles: 0.25061 },
-    "Class II (1.305 to 1.74 tonnes)": { km: 0.19094, miles: 0.30728 },
-    "Class III (1.74 to 3.5 tonnes)": { km: 0.27712, miles: 0.44598 },
-    "Average (up to 3.5 tonnes)": { km: 0.25395, miles: 0.40870 },
-  },
-  "HGV (all diesel)": {
-    "Rigid (>3.5 - 7.5 tonnes)": { km: 0.49005, miles: 0.78865 },
-    "Rigid (>7.5 tonnes-17 tonnes)": { km: 0.59839, miles: 0.96301 },
-    "Rigid (>17 tonnes)": { km: 0.98074, miles: 1.57834 },
-    "All rigids": { km: 0.82844, miles: 1.33324 },
-    "Articulated (>3.5 - 33t)": { km: 0.77250, miles: 1.24322 },
-    "Articulated (>33t)": { km: 0.91969, miles: 1.48010 },
-    "All artics": { km: 0.91411, miles: 1.47111 },
-    "All HGVs": { km: 0.87910, miles: 1.41477 },
-  },
-  "HGVs refrigerated (all diesel)": {
-    "Rigid (>3.5 - 7.5 tonnes)": { km: 0.58462, miles: 0.94086 },
-    "Rigid (>7.5 tonnes-17 tonnes)": { km: 0.71387, miles: 1.14886 },
-    "Rigid (>17 tonnes)": { km: 1.17001, miles: 1.88295 },
-    "All rigids": { km: 0.98832, miles: 1.59054 },
-    "Articulated (>3.5 - 33t)": { km: 0.89538, miles: 1.44098 },
-    "Articulated (>33t)": { km: 1.06599, miles: 1.71554 },
-    "All artics": { km: 1.05952, miles: 1.70513 },
-    "All HGVs": { km: 1.03112, miles: 1.65943 },
-  },
-};
+/** Scope 1 delivery / freight: load from Supabase `UK_delivery-factors` (see `ukDeliveryFactors.ts`). */
 
 // Placeholder factors for Scope 2 and 3 (to be populated later)
 export const SCOPE2_FACTORS: Record<string, Record<string, number>> = {

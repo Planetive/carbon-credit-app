@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Info } from 'lucide-react';
 import { FormulaConfig } from '../types/formula';
 import { FieldTooltip } from '../components/FieldTooltip';
+import { passengerTypeTooltipText } from '@/components/emissions/shared/ukPassengerFactors';
 
 interface MotorVehicleLoanFormProps {
   selectedFormula: FormulaConfig | null;
@@ -21,7 +22,7 @@ interface VehicleEntry {
   vehicleType: string;
   unit: string;
   distance: number;
-  factor: number; // Emission factor (auto-calculated from VEHICLE_FACTORS)
+  factor: number; // Emission factor (example; UK passenger factors live in UK_Passenger_factors)
   emissions: number;
   totalValueAtOrigination: number; // Total value at origination for this vehicle (PKR)
 }
@@ -51,27 +52,6 @@ const VEHICLE_ACTIVITIES = {
     "Large": { km: 0.13072, miles: 0.21037 },
     "Average": { km: 0.11138, miles: 0.17925 },
   },
-};
-
-// Vehicle type descriptions (exact same as emission calculator)
-const vehicleTypeDescriptions: Record<string, string> = {
-  "Mini": "This is the smallest category of car sometimes referred to as a city car. Examples include: Citroën C1, Fiat/Alfa Romeo 500 and Panda, Peugeot 107, Volkswagen up!, Renault TWINGO, Toyota AYGO, smart fortwo and Hyundai i 10.",
-  "Supermini": "This is a car that is larger than a city car, but smaller than a small family car. Examples include: Ford Fiesta, Renault CLIO, Volkswagen Polo, Citroën C2 and C3, Opel Corsa, Peugeot 208, and Toyota Yaris.",
-  "Lower medium": "This is a small, compact family car. Examples include: Volkswagen Golf, Ford Focus, Opel Astra, Audi A3, BMW 1 Series, Renault Mégane and Toyota Auris.",
-  "Upper medium": "This is classed as a large family car. Examples include: BMW 3 Series, ŠKODA Octavia, Volkswagen Passat, Audi A4, Mercedes Benz C Class and Peugeot 508.",
-  "Executive": "These are large cars. Examples include: BMW 5 Series, Audi A5 and A6, Mercedes Benz E Class and Skoda Superb.",
-  "Luxury": "This is a luxury car which is niche in the European market. Examples include: Jaguar XF, Mercedes-Benz S-Class, .BMW 7 series, Audi A8, Porsche Panamera and Lexus LS.",
-  "Sports": "Sport cars are a small, usually two seater with two doors and designed for speed, high acceleration, and manoeuvrability. Examples include: Mercedes-Benz SLK, Audi TT, Porsche 911 and Boxster, and Peugeot RCZ.",
-  "Dual purpose 4X4": "These are sport utility vehicles (SUVs) which have off-road capabilities and four-wheel drive. Examples include: Suzuki Jimny, Land Rover Discovery and Defender, Toyota Land Cruiser, and Nissan Pathfinder.",
-  "MPV": "These are multipurpose cars. Examples include: Ford C-Max, Renault Scenic, Volkswagen Touran, Opel Zafira, Ford B-Max, and Citroën C3 Picasso and C4 Picasso.",
-  "Small car":"Petrol/LPG/CNG - up to a 1.4-litre engine, Diesel - up to a 1.7-litre engine, Others - vehicles models of a similar size (i.e. market segment A or B)",
-  "Medium car":"Petrol/LPG/CNG - from 1.4-litre to 2.0-litre engine, Diesel - from 1.7-litre to 2.0-litre engine, Others - vehicles models of a similar size (i.e. generally market segment C)",
-  "Large car":"Petrol/LPG/CNG - 2.0-litre engine + Diesel - 2.0-litre engine + Others - vehicles models of a similar size (i.e. generally market segment D and above)",
-  "Average car":"Unknown engine size",
-  "Small":"Mopeds/scooters up to 125cc.",
-  "Medium":"Mopeds/scooters 125cc to 500cc.",
-  "Large":"Mopeds/scooters 500cc +.",
-  "Average":"Unknown engine size"
 };
 
 const EMISSION_FACTORS = {
@@ -129,7 +109,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       vehicleType: 'Mini',
       unit: 'km',
       distance: 0,
-      factor: 0.10828, // Mini car factor from VEHICLE_FACTORS
+      factor: 0.10828, // Illustrative factor only
       emissions: 0,
       totalValueAtOrigination: 0
     };
@@ -253,7 +233,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                         <Info 
                           className="h-4 w-4 text-muted-foreground cursor-help"
                           onMouseEnter={(e) => {
-                            const description = vehicleTypeDescriptions[entry.vehicleType] || 'No description available';
+                            const description = passengerTypeTooltipText({}, entry.activity, entry.vehicleType);
                             setHoveredInfo({
                               value: entry.vehicleType,
                               description,
@@ -282,7 +262,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 setHoveredInfo({
                                   value: type,
-                                  description: vehicleTypeDescriptions[type] || "Vehicle type information",
+                                  description: passengerTypeTooltipText({}, entry.activity, type),
                                   position: { x: rect.right + 10, y: rect.top }
                                 });
                               }}

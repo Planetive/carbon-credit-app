@@ -8,15 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  VehicleRow
-} from "../shared/types";
-import { 
-  VEHICLE_FACTORS
-} from "../shared/EmissionFactors";
+import { VehicleRow, UkFactorBasis } from "../shared/types";
+import {
+  availableUkPassengerBasises,
+  fetchUkPassengerFactorsMap,
+  getUkPassengerFactorCell,
+  passengerTypeTooltipText,
+  passengerUkFactorBasisFromDb,
+  ukPassengerBasisValue,
+  UK_PASSENGER_BASIS_LABEL,
+  type UkPassengerFactorsMap,
+  type UkPassengerTypeDescriptions,
+} from "../shared/ukPassengerFactors";
 import { 
   newVehicleRow,
-  vehicleRowChanged
+  vehicleRowChanged,
+  formatEmissions,
 } from "../shared/utils";
 
 interface PassengerVehicleEmissionsProps {
@@ -44,31 +51,43 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
     return "passengerVehicleDraft:anon";
   };
 
-  // Computed values
-  const vehicleActivities = Object.keys(VEHICLE_FACTORS);
-  const vehicleTypesFor = (activity?: string) => (activity ? Object.keys(VEHICLE_FACTORS[activity]) : []);
-  const vehicleUnitsFor = (activity?: string, vehicleType?: string) => (activity && vehicleType ? Object.keys(VEHICLE_FACTORS[activity][vehicleType]) : []);
+  const [ukPassengerMap, setUkPassengerMap] = useState<UkPassengerFactorsMap>({});
+  const [ukTypeDescriptions, setUkTypeDescriptions] = useState<UkPassengerTypeDescriptions>({});
+  const [ukReferenceReady, setUkReferenceReady] = useState(false);
 
-  // Vehicle type descriptions
-  const vehicleTypeDescriptions: Record<string, string> = {
-    "Mini": "This is the smallest category of car sometimes referred to as a city car. Examples include: Citroën C1, Fiat/Alfa Romeo 500 and Panda, Peugeot 107, Volkswagen up!, Renault TWINGO, Toyota AYGO, smart fortwo and Hyundai i 10.",
-    "Supermini": "This is a car that is larger than a city car, but smaller than a small family car. Examples include: Ford Fiesta, Renault CLIO, Volkswagen Polo, Citroën C2 and C3, Opel Corsa, Peugeot 208, and Toyota Yaris.",
-    "Lower medium": "This is a small, compact family car. Examples include: Volkswagen Golf, Ford Focus, Opel Astra, Audi A3, BMW 1 Series, Renault Mégane and Toyota Auris.",
-    "Upper medium": "This is classed as a large family car. Examples include: BMW 3 Series, ŠKODA Octavia, Volkswagen Passat, Audi A4, Mercedes Benz C Class and Peugeot 508.",
-    "Executive": "These are large cars. Examples include: BMW 5 Series, Audi A5 and A6, Mercedes Benz E Class and Skoda Superb.",
-    "Luxury": "This is a luxury car which is niche in the European market. Examples include: Jaguar XF, Mercedes-Benz S-Class, .BMW 7 series, Audi A8, Porsche Panamera and Lexus LS.",
-    "Sports": "Sport cars are a small, usually two seater with two doors and designed for speed, high acceleration, and manoeuvrability. Examples include: Mercedes-Benz SLK, Audi TT, Porsche 911 and Boxster, and Peugeot RCZ.",
-    "Dual purpose 4X4": "These are sport utility vehicles (SUVs) which have off-road capabilities and four-wheel drive. Examples include: Suzuki Jimny, Land Rover Discovery and Defender, Toyota Land Cruiser, and Nissan Pathfinder.",
-    "MPV": "These are multipurpose cars. Examples include: Ford C-Max, Renault Scenic, Volkswagen Touran, Opel Zafira, Ford B-Max, and Citroën C3 Picasso and C4 Picasso.",
-    "Small car":"Petrol/LPG/CNG - up to a 1.4-litre engine, Diesel - up to a 1.7-litre engine, Others - vehicles models of a similar size (i.e. market segment A or B)",
-    "Medium car":"Petrol/LPG/CNG - from 1.4-litre to 2.0-litre engine, Diesel - from 1.7-litre to 2.0-litre engine, Others - vehicles models of a similar size (i.e. generally market segment C)",
-    "Large car":"Petrol/LPG/CNG - 2.0-litre engine + Diesel - 2.0-litre engine + Others - vehicles models of a similar size (i.e. generally market segment D and above)",
-    "Average car":"Unknown engine size",
-    "Small":"Mopeds/scooters up to 125cc.",
-    "Medium":"Mopeds/scooters 125cc to 500cc.",
-    "Large":"Mopeds/scooters 500cc +.",
-    "Average":"Unknown engine size"
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { map, typeDescriptions, error } = await fetchUkPassengerFactorsMap();
+      if (cancelled) return;
+      if (error) {
+        console.error("UK_Passenger_factors:", error);
+        toast({
+          title: "Could not load passenger factors",
+          description: error,
+          variant: "destructive",
+        });
+      }
+      setUkPassengerMap(map);
+      setUkTypeDescriptions(typeDescriptions);
+      setUkReferenceReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [toast]);
+
+  const vehicleActivities = Object.keys(ukPassengerMap).sort((a, b) => a.localeCompare(b));
+  const vehicleTypesFor = (activity?: string) =>
+    activity ? Object.keys(ukPassengerMap[activity] || {}).sort((a, b) => a.localeCompare(b)) : [];
+  const vehicleUnitsFor = (activity?: string, vehicleType?: string) =>
+    activity && vehicleType
+      ? Object.keys(ukPassengerMap[activity]?.[vehicleType] || {}).sort((a, b) => a.localeCompare(b))
+      : [];
+  const vehicleFuelsFor = (activity?: string, vehicleType?: string, unit?: string) =>
+    activity && vehicleType && unit
+      ? Object.keys(ukPassengerMap[activity]?.[vehicleType]?.[unit] || {}).sort((a, b) => a.localeCompare(b))
+      : [];
 
   // Clear hover info when clicking outside or pressing escape
   useEffect(() => {
@@ -116,6 +135,10 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
           activity: entry.activity,
           vehicleType: entry.vehicle_type,
           unit: entry.unit,
+          fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
+          ukFactorBasis:
+            passengerUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
+            "total",
           distance: entry.distance,
           factor: entry.emission_factor,
           emissions: entry.emissions,
@@ -219,9 +242,27 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next: VehicleRow = { ...r, ...patch };
-      if (next.activity && next.vehicleType && next.unit) {
-        const factor = VEHICLE_FACTORS[next.activity]?.[next.vehicleType]?.[next.unit];
-        next.factor = typeof factor === 'number' ? factor : undefined;
+      if (next.activity && next.vehicleType && next.unit && next.fuelType) {
+        const cell = getUkPassengerFactorCell(
+          ukPassengerMap,
+          next.activity,
+          next.vehicleType,
+          next.unit,
+          next.fuelType
+        );
+        if (cell) {
+          const avail = availableUkPassengerBasises(cell);
+          let basis: UkFactorBasis = next.ukFactorBasis || "total";
+          if (avail.length > 0 && !avail.includes(basis)) {
+            basis = avail[0];
+            next.ukFactorBasis = basis;
+          }
+          const factor =
+            avail.length > 0 ? ukPassengerBasisValue(cell, basis) : undefined;
+          next.factor = typeof factor === "number" ? factor : undefined;
+        } else {
+          next.factor = undefined;
+        }
       } else {
         next.factor = undefined;
       }
@@ -275,13 +316,21 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
     }
 
     const newEntries = rows.filter(r => 
-      r.activity && r.vehicleType && r.unit && 
+      r.activity && r.vehicleType && r.unit && r.fuelType &&
       typeof r.distance === 'number' && 
       typeof r.factor === 'number' && 
       !r.isExisting
     );
 
-    const changedExisting = rows.filter(r => r.isExisting && r.dbId && vehicleRowChanged(r, existingEntries));
+    const changedExisting = rows.filter(
+      (r) =>
+        r.isExisting &&
+        r.dbId &&
+        vehicleRowChanged(r, existingEntries) &&
+        r.fuelType &&
+        typeof r.distance === "number" &&
+        typeof r.factor === "number"
+    );
 
     if (newEntries.length === 0 && changedExisting.length === 0) {
       toast({ title: "Nothing to save", description: "No new or changed passenger vehicle entries." });
@@ -295,6 +344,8 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
         activity: v.activity!,
         vehicle_type: v.vehicleType!,
         unit: v.unit!,
+        fuel_type: v.fuelType!,
+        uk_factor_basis: v.ukFactorBasis || "total",
         distance: v.distance!,
         emission_factor: v.factor!,
         emissions: v.emissions!,
@@ -313,6 +364,8 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
               activity: v.activity!,
               vehicle_type: v.vehicleType!,
               unit: v.unit!,
+              fuel_type: v.fuelType!,
+              uk_factor_basis: v.ukFactorBasis || "total",
               distance: v.distance!,
               emission_factor: v.factor!,
               emissions: v.emissions!,
@@ -343,6 +396,10 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
           activity: entry.activity,
           vehicleType: entry.vehicle_type,
           unit: entry.unit,
+          fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
+          ukFactorBasis:
+            passengerUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
+            "total",
           distance: entry.distance,
           factor: entry.emission_factor,
           emissions: entry.emissions,
@@ -365,6 +422,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
 
   // Calculate totals
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
+  const ukInputsLocked = !ukReferenceReady || Object.keys(ukPassengerMap).length === 0;
 
   return (
     <div className="space-y-6">
@@ -373,15 +431,23 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
           <h4 className="text-lg font-semibold text-gray-900">Passenger Vehicle Entries</h4>
           <p className="text-sm text-gray-600">Add your organization's passenger vehicle usage data</p>
         </div>
-        <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={addRow} disabled={ukInputsLocked} className="bg-teal-600 hover:bg-teal-700 text-white">
           <Plus className="h-4 w-4 mr-2" />Add New Entry
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {ukReferenceReady && Object.keys(ukPassengerMap).length === 0 && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          No rows found in UK_Passenger_factors. Add data to that table (activity, type, unit, fuel_type, kg_co2e), then refresh.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Label className="md:col-span-1 text-gray-500">Activity</Label>
         <Label className="md:col-span-1 text-gray-500">Type</Label>
         <Label className="md:col-span-1 text-gray-500">Unit</Label>
+        <Label className="md:col-span-1 text-gray-500">Fuel</Label>
+        <Label className="md:col-span-1 text-gray-500">Factor</Label>
         <Label className="md:col-span-1 text-gray-500">Distance</Label>
       </div>
 
@@ -390,11 +456,19 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
           const isDeleting = deletingRows.has(r.id);
           
           return (
-            <div key={r.id} className={`grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-3 rounded-lg bg-gray-50`}>
+            <div key={r.id} className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-3 rounded-lg bg-gray-50`}>
               <Select 
                 value={r.activity} 
-                onValueChange={(v) => updateRow(r.id, { activity: v, vehicleType: undefined, unit: undefined })}
-                disabled={false}
+                onValueChange={(v) =>
+                  updateRow(r.id, {
+                    activity: v,
+                    vehicleType: undefined,
+                    unit: undefined,
+                    fuelType: undefined,
+                    ukFactorBasis: undefined,
+                  })
+                }
+                disabled={ukInputsLocked}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select activity" />
@@ -408,9 +482,14 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
                 value={r.vehicleType} 
                 onValueChange={(v) => {
                   setHoveredInfo(null); // Clear popup when option is selected
-                  updateRow(r.id, { vehicleType: v, unit: undefined });
+                  updateRow(r.id, {
+                    vehicleType: v,
+                    unit: undefined,
+                    fuelType: undefined,
+                    ukFactorBasis: undefined,
+                  });
                 }} 
-                disabled={!r.activity}
+                disabled={ukInputsLocked || !r.activity}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -448,7 +527,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
                         
                         setHoveredInfo({
                           value: type,
-                          description: vehicleTypeDescriptions[type] || "Vehicle type information",
+                          description: passengerTypeTooltipText(ukTypeDescriptions, r.activity, type),
                           position: { x, y: rect.top },
                           side
                         });
@@ -466,8 +545,10 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
 
               <Select 
                 value={r.unit} 
-                onValueChange={(v) => updateRow(r.id, { unit: v })} 
-                disabled={!r.activity || !r.vehicleType}
+                onValueChange={(v) =>
+                  updateRow(r.id, { unit: v, fuelType: undefined, ukFactorBasis: undefined })
+                } 
+                disabled={ukInputsLocked || !r.activity || !r.vehicleType}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select unit" />
@@ -476,6 +557,65 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
                   {vehicleUnitsFor(r.activity, r.vehicleType).map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                 </SelectContent>
               </Select>
+
+              <Select
+                value={r.fuelType}
+                onValueChange={(v) => updateRow(r.id, { fuelType: v, ukFactorBasis: undefined })}
+                disabled={ukInputsLocked || !r.activity || !r.vehicleType || !r.unit}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select fuel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicleFuelsFor(r.activity, r.vehicleType, r.unit).map((fuel) => (
+                    <SelectItem key={fuel} value={fuel}>
+                      {fuel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(() => {
+                const cell = getUkPassengerFactorCell(
+                  ukPassengerMap,
+                  r.activity,
+                  r.vehicleType,
+                  r.unit,
+                  r.fuelType
+                );
+                const avail = availableUkPassengerBasises(cell);
+                if (!r.activity || !r.vehicleType || !r.unit || !r.fuelType) {
+                  return <div className="h-10 rounded-md border border-dashed border-gray-200 bg-white/50" />;
+                }
+                if (avail.length === 0) {
+                  return (
+                    <p className="text-xs text-amber-700 leading-tight px-1">
+                      No factor columns for this row in UK_Passenger_factors.
+                    </p>
+                  );
+                }
+                const selectValue = avail.includes(r.ukFactorBasis || "total")
+                  ? (r.ukFactorBasis || "total")
+                  : avail[0];
+                return (
+                  <Select
+                    value={selectValue}
+                    onValueChange={(v) => updateRow(r.id, { ukFactorBasis: v as UkFactorBasis })}
+                    disabled={ukInputsLocked}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select factor column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {avail.map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {UK_PASSENGER_BASIS_LABEL[b]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
 
               <div className="flex items-center gap-2">
                 <Input 
@@ -552,7 +692,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          Total Vehicle Emissions: <span className="font-semibold">{totalEmissions.toFixed(6)} kg CO2e</span>
+          Total Vehicle Emissions: <span className="font-semibold">{formatEmissions(totalEmissions)} kg CO2e</span>
         </div>
         {(() => {
           const pendingNew = rows.filter(r => !r.isExisting).length;
@@ -562,7 +702,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
             <div className="flex items-center gap-2">
               <Button
                 onClick={saveVehicleEntries}
-                disabled={saving || totalPending === 0}
+                disabled={saving || totalPending === 0 || ukInputsLocked}
                 className="bg-teal-600 hover:bg-teal-700 text-white"
               >
                 <Save className="h-4 w-4 mr-2" />
