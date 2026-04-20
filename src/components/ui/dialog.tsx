@@ -34,28 +34,35 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
+    {/* 
+      Center with flex on a full-screen layer so the panel stays true viewport center.
+      Avoid transform-based enter animations on the same node as translate(-50%,-50%),
+      which was overriding centering and shifting the modal (e.g. import dialogs).
+    */}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-[10000] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-6 shadow-2xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl",
-        className
+        "fixed inset-0 z-[10000] outline-none pointer-events-none",
       )}
-      style={{ 
-        position: 'fixed',
-        left: '50%',
-        top: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 10000,
-        maxHeight: '90vh',
-        overflowY: 'auto'
-      }}
       {...props}
     >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {/*
+        Outer shell: full viewport, pointer-events-none so clicks pass through to the overlay (dismiss).
+        Panel: its own fixed + translate centers in the viewport regardless of flex/grid quirks from Radix/Tailwind.
+      */}
+      <div
+        className={cn(
+          "pointer-events-auto fixed left-1/2 top-1/2 z-[10001] grid w-[min(calc(100vw-2rem),32rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-6 shadow-2xl sm:rounded-xl",
+          "max-h-[min(90vh,calc(100dvh-2rem))] overflow-y-auto",
+          className,
+        )}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </div>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))

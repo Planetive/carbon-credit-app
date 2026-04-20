@@ -22,6 +22,7 @@ import { FuelType } from "../shared/types";
 import { getVehicleTypeNote, getVehicleTypeSuperscript, cleanVehicleTypeName } from "./utils/vehicleTypeHelpers";
 import { useEmissionSync } from "./hooks/useEmissionSync";
 import { InvestmentsSection } from "./components/InvestmentsSection";
+import { FacilitatedEmissionsSection } from "./components/FacilitatedEmissionsSection";
 import { FranchisesSection } from "./components/FranchisesSection";
 import { FuelEnergyActivitiesSection } from "./components/FuelEnergyActivitiesSection";
 import { PurchasedGoodsSection } from "./components/PurchasedGoodsSection";
@@ -2543,9 +2544,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
   // Investments
   if (activeCategory === 'investments') {
+    if (!user) return null;
     return (
       <InvestmentsSection
-        user={user}
+        user={{ id: user.id }}
+        companyContext={companyContext}
+        counterpartyId={counterpartyId}
+        setEmissionData={setEmissionData}
+        onSaveAndNext={onSaveAndNext}
+      />
+    );
+  }
+
+  if (activeCategory === "facilitatedEmissions") {
+    if (!user) return null;
+    return (
+      <FacilitatedEmissionsSection
+        user={{ id: user.id }}
         companyContext={companyContext}
         counterpartyId={counterpartyId}
         setEmissionData={setEmissionData}

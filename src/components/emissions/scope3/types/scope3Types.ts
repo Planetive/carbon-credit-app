@@ -186,6 +186,8 @@ export interface EmployeeCommutingRow {
   emissions: number | undefined;
 }
 
+export type InvestmentLineType = "equity" | "financed";
+
 export interface InvestmentRow {
   id: string;
   dbId?: string;
@@ -194,6 +196,9 @@ export interface InvestmentRow {
   emissions: number | undefined;
   percentage: number | undefined;
   calculatedEmissions: number | undefined;
+  lineType?: InvestmentLineType;
+  linkedEmissionCalculationId?: string | null;
+  linkedFinanceEmissionCalculationId?: string | null;
 }
 
 export interface EndOfLifeRow {

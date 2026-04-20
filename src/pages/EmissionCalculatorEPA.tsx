@@ -11,6 +11,7 @@ import {
   Flame,
   Truck,
   Building2,
+  HandCoins,
   X,
   Info,
   Download,
@@ -361,6 +362,16 @@ const EmissionCalculatorEPA = () => {
           (rows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
         const sumRowDataEmissions = (rows: any[] | null | undefined) =>
           (rows || []).reduce((s: number, r: any) => s + (Number(r?.row_data?.emissions) || 0), 0);
+        const sumInvestmentAttributed = (rows: any[] | null | undefined) =>
+          (rows || []).reduce((s: number, r: any) => {
+            const c = Number(r?.calculated_emissions);
+            if (Number.isFinite(c)) return s + c;
+            const inv = Number(r?.emissions) || 0;
+            const pct = Number(r?.ownership_percentage) || 0;
+            return s + (inv * pct) / 100;
+          }, 0);
+        const sumFacilitated = (rows: any[] | null | undefined) =>
+          (rows || []).reduce((s: number, r: any) => s + (Number(r?.emissions) || 0), 0);
 
         const [
           purchasedGoodsRes,
@@ -371,6 +382,7 @@ const EmissionCalculatorEPA = () => {
           businessTravelRes,
           employeeCommutingRes,
           investmentsRes,
+          facilitatedRes,
           downstreamTransportRes,
           endOfLifeRes,
           processingSoldRes,
@@ -383,7 +395,11 @@ const EmissionCalculatorEPA = () => {
           (supabase as any).from("scope3_waste_generated").select("emissions").eq("user_id", user.id),
           (supabase as any).from("scope3_business_travel").select("emissions").eq("user_id", user.id),
           (supabase as any).from("scope3_employee_commuting").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_investments").select("emissions").eq("user_id", user.id),
+          (supabase as any)
+            .from("scope3_investments")
+            .select("calculated_emissions, emissions, ownership_percentage")
+            .eq("user_id", user.id),
+          (supabase as any).from("scope3_facilitated_emissions").select("emissions").eq("user_id", user.id),
           (supabase as any).from("scope3_downstream_transportation").select("emissions").eq("user_id", user.id),
           (supabase as any).from("scope3_end_of_life_treatment").select("emissions").eq("user_id", user.id),
           (supabase as any).from("scope3_processing_sold_products").select("row_data").eq("user_id", user.id),
@@ -398,7 +414,8 @@ const EmissionCalculatorEPA = () => {
           { id: "scope3-waste-generated", category: "waste_generated", emissions: sumEmissions(wasteGeneratedRes.data) },
           { id: "scope3-business-travel", category: "business_travel", emissions: sumEmissions(businessTravelRes.data) },
           { id: "scope3-employee-commuting", category: "employee_commuting", emissions: sumEmissions(employeeCommutingRes.data) },
-          { id: "scope3-investments", category: "investments", emissions: sumEmissions(investmentsRes.data) },
+          { id: "scope3-investments", category: "investments", emissions: sumInvestmentAttributed(investmentsRes.data) },
+          { id: "scope3-facilitated", category: "facilitated_emissions", emissions: sumFacilitated(facilitatedRes.data) },
           { id: "scope3-downstream-transport", category: "downstream_transportation", emissions: sumEmissions(downstreamTransportRes.data) },
           { id: "scope3-end-of-life", category: "end_of_life_treatment", emissions: sumEmissions(endOfLifeRes.data) },
           { id: "scope3-processing-sold", category: "processing_use_of_sold_products", emissions: sumRowDataEmissions(processingSoldRes.data) },
@@ -704,7 +721,7 @@ const EmissionCalculatorEPA = () => {
         { id: "businessTravel", title: "Business Travel", icon: Truck, description: "Employee business travel", group: "upstream" },
         { id: "employeeCommuting", title: "Employee Commuting", icon: Truck, description: "Daily commute to workplace", group: "upstream" },
         { id: "upstreamLeasedAssets", title: "Upstream Leased Assets", icon: Building2, description: "Leased assets upstream of operations", group: "upstream" },
-        { id: "investments", title: "Investments", icon: Building2, description: "Financed emissions from investments", group: "downstream" },
+        { id: "investments", title: "Investments", icon: Building2, description: "Category 15: equity stakes and financed emissions", group: "downstream" },
         { id: "downstreamTransportation", title: "Downstream Transportation", icon: Truck, description: "Distribution of sold products", group: "downstream" },
         {
           id: "processingUseOfSoldProducts",
@@ -716,6 +733,13 @@ const EmissionCalculatorEPA = () => {
         { id: "endOfLifeTreatment", title: "End-of-Life Treatment", icon: Factory, description: "End-of-life processing and disposal", group: "downstream" },
         { id: "downstreamLeasedAssets", title: "Downstream Leased Assets", icon: Building2, description: "Leased assets downstream (tenants)", group: "downstream" },
         { id: "franchises", title: "Franchises", icon: Building2, description: "Franchise operations", group: "downstream" },
+        {
+          id: "facilitatedEmissions",
+          title: "Category 16: Facilitated emissions",
+          icon: HandCoins,
+          description: "Underwriting, advisory, or other facilitated emissions",
+          group: "downstream",
+        },
       ],
     },
   ];

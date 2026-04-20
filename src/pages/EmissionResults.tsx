@@ -187,6 +187,7 @@ const EmissionResults = () => {
   const [scope3BusinessTravel, setScope3BusinessTravel] = useState<number>(0);
   const [scope3EmployeeCommuting, setScope3EmployeeCommuting] = useState<number>(0);
   const [scope3Investments, setScope3Investments] = useState<number>(0);
+  const [scope3Facilitated, setScope3Facilitated] = useState<number>(0);
   const [scope3DownstreamTransport, setScope3DownstreamTransport] = useState<number>(0);
   const [scope3EndOfLife, setScope3EndOfLife] = useState<number>(0);
   const [scope3ProcessingSold, setScope3ProcessingSold] = useState<number>(0);
@@ -358,6 +359,9 @@ const EmissionResults = () => {
         case 'scope3_investments':
           query = (supabase as any).from('scope3_investments').select('*').eq('user_id', user.id);
           break;
+        case 'scope3_facilitated':
+          query = (supabase as any).from('scope3_facilitated_emissions').select('*').eq('user_id', user.id);
+          break;
         default:
           query = null;
       }
@@ -436,10 +440,10 @@ const EmissionResults = () => {
   const scope3Total = useMemo(() => {
     return scope3PurchasedGoods + scope3CapitalGoods + scope3FuelEnergy + 
            scope3UpstreamTransport + scope3WasteGenerated + scope3BusinessTravel + 
-           scope3EmployeeCommuting + scope3Investments + scope3DownstreamTransport + 
+           scope3EmployeeCommuting + scope3Investments + scope3Facilitated + scope3DownstreamTransport + 
            scope3EndOfLife + scope3ProcessingSold + scope3UseOfSold;
   }, [scope3PurchasedGoods, scope3CapitalGoods, scope3FuelEnergy, scope3UpstreamTransport, 
-      scope3WasteGenerated, scope3BusinessTravel, scope3EmployeeCommuting, scope3Investments, 
+      scope3WasteGenerated, scope3BusinessTravel, scope3EmployeeCommuting, scope3Investments, scope3Facilitated,
       scope3DownstreamTransport, scope3EndOfLife, scope3ProcessingSold, scope3UseOfSold]);
 
   // Scope 3 Upstream Emissions (Categories 1-8)
@@ -453,9 +457,9 @@ const EmissionResults = () => {
   // Scope 3 Downstream Emissions (Categories 9-15)
   const scope3DownstreamTotal = useMemo(() => {
     return scope3DownstreamTransport + scope3ProcessingSold + scope3UseOfSold + 
-           scope3EndOfLife + scope3Investments;
+           scope3EndOfLife + scope3Investments + scope3Facilitated;
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
-      scope3EndOfLife, scope3Investments]);
+      scope3EndOfLife, scope3Investments, scope3Facilitated]);
 
   const scope3UpstreamBreakdown = useMemo(() => {
     const data = [
@@ -477,11 +481,12 @@ const EmissionResults = () => {
       { key: 'scope3_processing_sold', label: 'Processing of Sold Products', value: scope3ProcessingSold, color: 'bg-orange-500', category: 'downstream' },
       { key: 'scope3_use_of_sold', label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
       { key: 'scope3_end_of_life', label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
-      { key: 'scope3_investments', label: 'Investments', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
+      { key: 'scope3_investments', label: 'Category 15 — Investments & finance', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
+      { key: 'scope3_facilitated', label: 'Category 16 — Facilitated emissions', value: scope3Facilitated, color: 'bg-teal-600', category: 'downstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
-      scope3EndOfLife, scope3Investments, scope3DownstreamTotal]);
+      scope3EndOfLife, scope3Investments, scope3Facilitated, scope3DownstreamTotal]);
 
   // Combined breakdown for CSV export
   const scope3Breakdown = useMemo(() => {
@@ -753,6 +758,7 @@ const EmissionResults = () => {
           businessTravelRes,
           employeeCommutingRes,
           investmentsRes,
+          facilitatedRes,
           downstreamTransportRes,
           endOfLifeRes,
           processingSoldRes,
@@ -766,7 +772,11 @@ const EmissionResults = () => {
           (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_investments').select('emissions').eq('user_id', user.id),
+          (supabase as any)
+            .from('scope3_investments')
+            .select('calculated_emissions, emissions, ownership_percentage')
+            .eq('user_id', user.id),
+          (supabase as any).from('scope3_facilitated_emissions').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
@@ -775,6 +785,14 @@ const EmissionResults = () => {
         ]);
 
         const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+        const sumInvestmentAttributed = (arr: any[] | null | undefined) =>
+          (arr || []).reduce((s, r) => {
+            const c = Number(r?.calculated_emissions);
+            if (Number.isFinite(c)) return s + c;
+            const inv = Number(r?.emissions) || 0;
+            const pct = Number(r?.ownership_percentage) || 0;
+            return s + (inv * pct) / 100;
+          }, 0);
 
         setScope3PurchasedGoods(sumScope3(purchasedGoodsRes.data));
         setScope3CapitalGoods(sumScope3(capitalGoodsRes.data));
@@ -783,7 +801,8 @@ const EmissionResults = () => {
         setScope3WasteGenerated(sumScope3(wasteGeneratedRes.data));
         setScope3BusinessTravel(sumScope3(businessTravelRes.data));
         setScope3EmployeeCommuting(sumScope3(employeeCommutingRes.data));
-        setScope3Investments(sumScope3(investmentsRes.data));
+        setScope3Investments(sumInvestmentAttributed(investmentsRes.data));
+        setScope3Facilitated(sumScope3(facilitatedRes.data));
         setScope3DownstreamTransport(sumScope3(downstreamTransportRes.data));
         setScope3EndOfLife(sumScope3(endOfLifeRes.data));
 
@@ -815,7 +834,8 @@ const EmissionResults = () => {
         // Keep minimal meta so existing UI sections render (excluding LCA entries)
         const scope3TotalCalc = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
           sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
-          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumScope3(investmentsRes.data) + 
+          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumInvestmentAttributed(investmentsRes.data) + 
+          sumScope3(facilitatedRes.data) +
           sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
 
         setResults({

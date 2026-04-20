@@ -18,6 +18,7 @@ import {
   Settings,
   Info,
   Building2,
+  HandCoins,
   X,
   CheckCircle2
 } from "lucide-react";
@@ -585,7 +586,7 @@ const EmissionCalculator = () => {
         { id: 'employeeCommuting', title: 'Employee Commuting', icon: Car, description: 'Daily commute to workplace', group: 'upstream' },
         { id: 'upstreamLeasedAssets', title: 'Upstream Leased Assets', icon: Building2, description: 'Leased assets upstream of operations', group: 'upstream' },
         // Downstream emissions (9-15)
-        { id: 'investments', title: 'Investments', icon: Building2, description: 'Financed emissions from investments', group: 'downstream' },
+        { id: 'investments', title: 'Investments', icon: Building2, description: 'Category 15: equity stakes and financed emissions', group: 'downstream' },
         { id: 'downstreamTransportation', title: 'Downstream Transportation', icon: Truck, description: 'Distribution of sold products', group: 'downstream' },
         {
           id: 'processingUseOfSoldProducts',
@@ -596,7 +597,14 @@ const EmissionCalculator = () => {
         },
         { id: 'endOfLifeTreatment', title: 'End-of-Life Treatment', icon: Factory, description: 'End-of-life processing and disposal', group: 'downstream' },
         { id: 'downstreamLeasedAssets', title: 'Downstream Leased Assets', icon: Building2, description: 'Leased assets downstream (tenants)', group: 'downstream' },
-        { id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations', group: 'downstream' }
+        { id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations', group: 'downstream' },
+        {
+          id: 'facilitatedEmissions',
+          title: 'Category 16: Facilitated emissions',
+          icon: HandCoins,
+          description: 'Underwriting, advisory, or other facilitated emissions',
+          group: 'downstream',
+        },
       ]
     }
   ];
@@ -1356,6 +1364,17 @@ const EmissionCalculator = () => {
                           activeCategory={activeCategory} 
                           emissionData={emissionData} 
                           setEmissionData={setEmissionData} 
+                          onSaveAndNext={navigateToNextCategory}
+                          companyContext={!!companyContext}
+                          counterpartyId={companyContext?.counterpartyId}
+                        />
+                      )}
+
+                      {activeCategory === "facilitatedEmissions" && (
+                        <Scope3Section
+                          activeCategory={activeCategory}
+                          emissionData={emissionData}
+                          setEmissionData={setEmissionData}
                           onSaveAndNext={navigateToNextCategory}
                           companyContext={!!companyContext}
                           counterpartyId={companyContext?.counterpartyId}

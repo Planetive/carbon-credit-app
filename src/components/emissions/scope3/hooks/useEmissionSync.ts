@@ -10,6 +10,7 @@ type Scope3Category =
   | "business_travel"
   | "employee_commuting"
   | "investments"
+  | "facilitated_emissions"
   | "end_of_life_treatment"
   | "fuel_energy_activities"
   | "processing_sold_products"

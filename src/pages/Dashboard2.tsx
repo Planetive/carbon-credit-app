@@ -315,6 +315,7 @@ const Dashboard2 = () => {
           businessTravelRes,
           employeeCommutingRes,
           investmentsRes,
+          facilitatedRes,
           downstreamTransportRes,
           endOfLifeRes,
           processingSoldRes,
@@ -327,7 +328,11 @@ const Dashboard2 = () => {
           (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_investments').select('emissions').eq('user_id', user.id),
+          (supabase as any)
+            .from('scope3_investments')
+            .select('calculated_emissions, emissions, ownership_percentage')
+            .eq('user_id', user.id),
+          (supabase as any).from('scope3_facilitated_emissions').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
           (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
@@ -335,6 +340,14 @@ const Dashboard2 = () => {
         ]);
 
         const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+        const sumInvestmentAttributed = (arr: any[] | null | undefined) =>
+          (arr || []).reduce((s, r) => {
+            const c = Number(r?.calculated_emissions);
+            if (Number.isFinite(c)) return s + c;
+            const inv = Number(r?.emissions) || 0;
+            const pct = Number(r?.ownership_percentage) || 0;
+            return s + (inv * pct) / 100;
+          }, 0);
         const processingTotal = (processingSoldRes.data || []).reduce((s: number, r: any) => {
           const rowData = r.row_data;
           if (rowData && typeof rowData.emissions === 'number') {
@@ -352,7 +365,8 @@ const Dashboard2 = () => {
 
         const scope3 = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
           sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
-          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumScope3(investmentsRes.data) + 
+          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumInvestmentAttributed(investmentsRes.data) + 
+          sumScope3(facilitatedRes.data) +
           sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
         setScope3Total(scope3);
 
