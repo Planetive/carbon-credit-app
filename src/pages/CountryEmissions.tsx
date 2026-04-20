@@ -162,7 +162,6 @@ const CountryEmissions: React.FC = () => {
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [sectorPickerOpen, setSectorPickerOpen] = useState(false);
   const [sectorMenuSector, setSectorMenuSector] = useState("");
-  const [trendGranularity, setTrendGranularity] = useState<"annual" | "monthly">("annual");
   const [activeTrendSectors, setActiveTrendSectors] = useState<string[]>([]);
   const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{
     x: number;
@@ -496,9 +495,8 @@ const CountryEmissions: React.FC = () => {
       if (period.year > 2025) continue;
       const sectorName = getRowSector(row) || "Unknown";
       const emissions = toNumber(pickValue(row, [/^emissions?$/i, /total.*emissions?/i, /co2e/i, /^value$/i]));
-      const sortKey = trendGranularity === "annual" ? period.year : yearMonthToNumber(period.year, period.month);
-      const label =
-        trendGranularity === "annual" ? String(period.year) : `${period.year}-${String(period.month).padStart(2, "0")}`;
+      const sortKey = period.year;
+      const label = String(period.year);
 
       periodMap.set(sortKey, label);
       const sectorMap = bySectorPeriod.get(sectorName) || new Map<number, number>();
@@ -516,7 +514,7 @@ const CountryEmissions: React.FC = () => {
     }));
 
     return { keys, labels, series };
-  }, [filtered, trendGranularity, aggregatedBySector]);
+  }, [filtered, aggregatedBySector]);
 
   const visibleTrendSeries = useMemo(
     () => trendData.series.filter((s) => activeTrendSectors.includes(s.name)),
@@ -991,29 +989,7 @@ const CountryEmissions: React.FC = () => {
                     })}
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-600">Select to turn sector on/off</p>
-                    <div className="inline-flex rounded-md border border-gray-300 overflow-hidden bg-white">
-                      <button
-                        type="button"
-                        onClick={() => setTrendGranularity("annual")}
-                        className={`px-4 py-1.5 text-sm font-medium border-r ${
-                          trendGranularity === "annual" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        Annual
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTrendGranularity("monthly")}
-                        className={`px-4 py-1.5 text-sm font-medium ${
-                          trendGranularity === "monthly" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        Monthly
-                      </button>
-                    </div>
-                  </div>
+                  <p className="text-sm text-gray-600">Select to turn sector on/off (yearly trend view)</p>
 
                   <div className="overflow-x-auto">
                     <svg
@@ -1127,7 +1103,7 @@ const CountryEmissions: React.FC = () => {
 
                       {trendData.labels.map((label, idx) => {
                         const x = trendChart.xMin + (idx / Math.max(1, trendData.labels.length - 1)) * (trendChart.xMax - trendChart.xMin);
-                        const every = trendGranularity === "monthly" ? Math.ceil(trendData.labels.length / 10) : 1;
+                        const every = 1;
                         if (idx % every !== 0 && idx !== trendData.labels.length - 1) return null;
                         return (
                           <text key={`x-${label}-${idx}`} x={x} y={trendChart.xLabelY} textAnchor="middle" fontSize="11" fill="#6b7280">
