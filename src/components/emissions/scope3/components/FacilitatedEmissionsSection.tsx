@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { fetchPortfolioCalculationsForScope3 } from "@/lib/portfolioCalculationsForScope3";
+import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
+import { confirmAction } from "@/lib/confirmAction";
 
 export interface FacilitatedEmissionRow {
   id: string;
@@ -34,6 +35,36 @@ interface FacilitatedEmissionsSectionProps {
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
 }
+
+type EmissionCalculationDetails = {
+  id: string;
+  calculation_type?: unknown;
+  company_type?: unknown;
+  formula_id?: unknown;
+  financed_emissions?: unknown;
+  attribution_factor?: unknown;
+  data_quality_score?: unknown;
+  status?: unknown;
+  created_at?: string | null;
+  inputs?: Record<string, unknown> | null;
+};
+
+type FinanceCalculationDetails = {
+  id: string;
+  calculation_type?: unknown;
+  formula_name?: unknown;
+  formula_id?: unknown;
+  company_type?: unknown;
+  outstanding_amount?: unknown;
+  financed_emissions?: unknown;
+  attribution_factor?: unknown;
+  data_quality_score?: unknown;
+  total_assets?: unknown;
+  evic?: unknown;
+  total_equity_plus_debt?: unknown;
+  status?: unknown;
+  created_at?: string | null;
+};
 
 function newRow(): FacilitatedEmissionRow {
   return {
@@ -419,7 +450,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       removeLocal(id);
       return;
     }
-    if (!confirm("Delete this facilitated emissions line?")) return;
+    if (!confirmAction({ title: "Delete this facilitated emissions line?" })) return;
     setDeleting((prev) => new Set(prev).add(id));
     try {
       const { error } = await supabase.from("scope3_facilitated_emissions").delete().eq("id", r.dbId);
@@ -438,6 +469,18 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
   };
 
   const total = rows.reduce((s, r) => s + (typeof r.emissions === "number" ? r.emissions : 0), 0);
+  const rowDetailsKey = useMemo(
+    () =>
+      rows
+        .map((r) => `${r.id}:${r.linkedEmissionCalculationId || ""}:${r.linkedFinanceEmissionCalculationId || ""}`)
+        .sort()
+        .join("|"),
+    [rows],
+  );
+  const linkedRowsForDetails = useMemo(
+    () => rows.filter((r) => r.linkedEmissionCalculationId || r.linkedFinanceEmissionCalculationId),
+    [rowDetailsKey],
+  );
   const toggleDetails = (id: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev);
@@ -449,7 +492,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
 
   useEffect(() => {
     const loadRowDetails = async () => {
-      const linkedRows = rows.filter((r) => r.linkedEmissionCalculationId || r.linkedFinanceEmissionCalculationId);
+      const linkedRows = linkedRowsForDetails;
       if (linkedRows.length === 0) {
         setDetailsByRowId({});
         return;
@@ -477,8 +520,10 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
           : Promise.resolve({ data: [] }),
       ]);
 
-      const ecMap = new Map<string, any>((ecRes.data || []).map((x: any) => [x.id, x]));
-      const fecMap = new Map<string, any>((fecRes.data || []).map((x: any) => [x.id, x]));
+      const ecRows = (ecRes.data || []) as EmissionCalculationDetails[];
+      const fecRows = (fecRes.data || []) as FinanceCalculationDetails[];
+      const ecMap = new Map<string, EmissionCalculationDetails>(ecRows.map((x) => [x.id, x]));
+      const fecMap = new Map<string, FinanceCalculationDetails>(fecRows.map((x) => [x.id, x]));
       const next: Record<string, Array<{ label: string; value: string }>> = {};
 
       linkedRows.forEach((row) => {
@@ -531,7 +576,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     loadRowDetails().catch(() => {
       setDetailsByRowId({});
     });
-  }, [rows]);
+  }, [rowDetailsKey, linkedRowsForDetails]);
 
   return (
     <div className="space-y-6">

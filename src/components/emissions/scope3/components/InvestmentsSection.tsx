@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmissionSync } from "../hooks/useEmissionSync";
 import type { InvestmentRow, InvestmentLineType } from "../types/scope3Types";
 import type { EmissionData } from "@/components/emissions/shared/types";
-import { fetchPortfolioCalculationsForScope3 } from "@/lib/portfolioCalculationsForScope3";
+import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
+import { confirmAction } from "@/lib/confirmAction";
 
 interface InvestmentsSectionProps {
   user: { id: string };
@@ -26,6 +27,44 @@ interface InvestmentsSectionProps {
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
 }
+
+type EmissionCalculationDetails = {
+  id: string;
+  calculation_type?: unknown;
+  company_type?: unknown;
+  formula_id?: unknown;
+  financed_emissions?: unknown;
+  attribution_factor?: unknown;
+  data_quality_score?: unknown;
+  evic?: unknown;
+  total_equity_plus_debt?: unknown;
+  status?: unknown;
+  created_at?: string | null;
+  inputs?: Record<string, unknown> | null;
+};
+
+type FinanceCalculationDetails = {
+  id: string;
+  calculation_type?: unknown;
+  formula_name?: unknown;
+  formula_id?: unknown;
+  company_type?: unknown;
+  outstanding_amount?: unknown;
+  financed_emissions?: unknown;
+  attribution_factor?: unknown;
+  data_quality_score?: unknown;
+  total_assets?: unknown;
+  evic?: unknown;
+  total_equity_plus_debt?: unknown;
+  share_price?: unknown;
+  outstanding_shares?: unknown;
+  total_debt?: unknown;
+  total_equity?: unknown;
+  minority_interest?: unknown;
+  preferred_stock?: unknown;
+  status?: unknown;
+  created_at?: string | null;
+};
 
 function investeeTotalFromDb(entry: Record<string, unknown>): number {
   const v = entry.emissions ?? entry.total_emissions;
@@ -505,7 +544,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       removeInvestmentRow(id);
       return;
     }
-    if (!confirm("Delete this entry?")) return;
+    if (!confirmAction({ title: "Delete this entry?" })) return;
     setDeletingInvestments((prev) => new Set(prev).add(id));
     try {
       const { error } = await (supabase as any).from("scope3_investments").delete().eq("id", row.dbId);
@@ -552,8 +591,20 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     }
   };
 
-  const equityRows = investmentRows.filter((r) => r.lineType !== "financed");
-  const financedRows = investmentRows.filter((r) => r.lineType === "financed");
+  const equityRows = useMemo(() => investmentRows.filter((r) => r.lineType !== "financed"), [investmentRows]);
+  const financedRows = useMemo(() => investmentRows.filter((r) => r.lineType === "financed"), [investmentRows]);
+  const financedDetailsKey = useMemo(
+    () =>
+      financedRows
+        .map((r) => `${r.id}:${r.linkedEmissionCalculationId || ""}:${r.linkedFinanceEmissionCalculationId || ""}`)
+        .sort()
+        .join("|"),
+    [financedRows],
+  );
+  const linkedFinancedRows = useMemo(
+    () => financedRows.filter((r) => r.linkedEmissionCalculationId || r.linkedFinanceEmissionCalculationId),
+    [financedDetailsKey],
+  );
   const totalEmissions = investmentRows.reduce((sum, r) => sum + (r.calculatedEmissions || 0), 0);
   const toggleFinancedDetails = (id: string) => {
     setExpandedFinancedRows((prev) => {
@@ -566,7 +617,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
 
   useEffect(() => {
     const loadFinancedDetails = async () => {
-      const linkedRows = financedRows.filter((r) => r.linkedEmissionCalculationId || r.linkedFinanceEmissionCalculationId);
+      const linkedRows = linkedFinancedRows;
       if (linkedRows.length === 0) {
         setFinancedDetailsByRowId({});
         return;
@@ -594,8 +645,10 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           : Promise.resolve({ data: [] }),
       ]);
 
-      const ecMap = new Map<string, any>((ecRes.data || []).map((x: any) => [x.id, x]));
-      const fecMap = new Map<string, any>((fecRes.data || []).map((x: any) => [x.id, x]));
+      const ecRows = (ecRes.data || []) as EmissionCalculationDetails[];
+      const fecRows = (fecRes.data || []) as FinanceCalculationDetails[];
+      const ecMap = new Map<string, EmissionCalculationDetails>(ecRows.map((x) => [x.id, x]));
+      const fecMap = new Map<string, FinanceCalculationDetails>(fecRows.map((x) => [x.id, x]));
       const next: Record<string, Array<{ label: string; value: string }>> = {};
 
       linkedRows.forEach((row) => {
@@ -657,7 +710,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       // details are supplemental, keep UI usable even if load fails
       setFinancedDetailsByRowId({});
     });
-  }, [financedRows]);
+  }, [financedDetailsKey, linkedFinancedRows]);
 
   const pendingEquityNew = investmentRows.filter(
     (r) =>
