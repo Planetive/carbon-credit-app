@@ -18,7 +18,7 @@ import { useEmissionSync } from "../hooks/useEmissionSync";
 import type { InvestmentRow, InvestmentLineType } from "../types/scope3Types";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
-import { confirmAction } from "@/lib/confirmAction";
+import { confirmAction } from "@/utils/confirmAction";
 
 interface InvestmentsSectionProps {
   user: { id: string };

@@ -16,7 +16,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
-import { confirmAction } from "@/lib/confirmAction";
+import { confirmAction } from "@/utils/confirmAction";
 
 export interface FacilitatedEmissionRow {
   id: string;

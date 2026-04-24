@@ -10,7 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Root-only: avoid ignoring frontend src/lib (Python setuptools often uses top-level lib/)
+/lib/
 lib64/
 parts/
 sdist/
