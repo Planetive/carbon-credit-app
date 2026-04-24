@@ -19,10 +19,12 @@ import {
 } from 'lucide-react';
 import { type ScenarioResult } from './scenario-building/types';
 import { exportClimateRiskReport, exportTCFDReport } from '@/utils/climateRiskPDFExport';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ClimateRiskResults: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [openModal, setOpenModal] = useState<'topExposures' | 'sector' | 'assetClass' | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -82,7 +84,11 @@ const ClimateRiskResults: React.FC = () => {
     
     setIsExportingTCFD(true);
     try {
-      await exportTCFDReport(results, portfolioEntries, selectedScenario);
+      const coverOrganizationName =
+        (user?.user_metadata?.organization_name as string | undefined)?.trim() ||
+        user?.email?.split('@')[0] ||
+        undefined;
+      await exportTCFDReport(results, portfolioEntries, selectedScenario, coverOrganizationName);
       toast({
         title: 'TCFD Report Generated',
         description: 'TCFD Climate Risk Disclosure Report has been downloaded successfully.',

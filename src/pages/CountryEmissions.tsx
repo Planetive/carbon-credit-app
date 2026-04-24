@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -9,19 +8,13 @@ import { useNavigate } from "react-router-dom";
 import ReactCountryFlag from "react-country-flag";
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import { fetchAllCountryEmissions } from "@/features/country-emissions/api";
+import type { CountryAggregateRow, CountryEmissionRecord } from "@/features/country-emissions/types";
+import { DEFAULT_TREND_CHART, pickNearestHoverPoint, type TrendHoverPoint } from "@/features/country-emissions/trendHover";
 
 countries.registerLocale(enLocale);
 
-type CountryEmissionRow = Record<string, any>;
-type CountryAggregateRow = {
-  key: string;
-  name: string;
-  alpha2?: string;
-  emissions: number;
-  percentageChangeAvg?: number;
-};
-
-const pickValue = (row: CountryEmissionRow, patterns: RegExp[]): any => {
+const pickValue = (row: CountryEmissionRecord, patterns: RegExp[]): unknown => {
   const keys = Object.keys(row || {});
   for (const p of patterns) {
     const key = keys.find((k) => p.test(k));
@@ -30,7 +23,7 @@ const pickValue = (row: CountryEmissionRow, patterns: RegExp[]): any => {
   return undefined;
 };
 
-const toNumber = (value: any): number => {
+const toNumber = (value: unknown): number => {
   if (typeof value === "number") return isFinite(value) ? value : 0;
   if (value == null) return 0;
   const s = String(value).trim().replace(/,/g, "");
@@ -64,7 +57,7 @@ const formatEmissionWithUnit = (n: number): { value: string; unit: string } => {
   return { value: formatCompact(n), unit: "t of CO₂" };
 };
 
-const getRowYearMonth = (row: CountryEmissionRow): { year: number; month: number } | undefined => {
+const getRowYearMonth = (row: CountryEmissionRecord): { year: number; month: number } | undefined => {
   const yearRaw = pickValue(row, [/^year$/i, /report.*year/i, /inventory.*year/i, /year/i]);
   const monthRaw = pickValue(row, [/^month$/i, /report.*month/i, /inventory.*month/i, /month/i]);
   const dateRaw = pickValue(row, [/^date$/i, /period/i, /timestamp/i, /created_at/i, /updated_at/i]);
@@ -86,10 +79,10 @@ const getRowYearMonth = (row: CountryEmissionRow): { year: number; month: number
   return { year, month };
 };
 
-const getRowSector = (row: CountryEmissionRow): string =>
+const getRowSector = (row: CountryEmissionRecord): string =>
   String(pickValue(row, [/^sector$/i, /sector/i]) ?? "").trim();
 
-const getRowSubSector = (row: CountryEmissionRow): string =>
+const getRowSubSector = (row: CountryEmissionRecord): string =>
   String(
     pickValue(row, [/^sub[_\s-]?sector$/i, /sub.*sector/i, /^sub[_\s-]?category$/i, /sub.*category/i]) ?? "",
   ).trim();
@@ -113,7 +106,7 @@ const parseMonthValue = (value: string): { year: number; month: number } | undef
 };
 const toMonthValue = (year: number, month: number): string => `${year}-${String(month).padStart(2, "0")}`;
 
-const getCountryDisplay = (row: CountryEmissionRow): { name: string; alpha2?: string } => {
+const getCountryDisplay = (row: CountryEmissionRecord): { name: string; alpha2?: string } => {
   const raw = String(
     pickValue(row, [
       /^country$/i,
@@ -151,7 +144,7 @@ const getCountryDisplay = (row: CountryEmissionRow): { name: string; alpha2?: st
 
 const CountryEmissions: React.FC = () => {
   const navigate = useNavigate();
-  const [rows, setRows] = useState<CountryEmissionRow[]>([]);
+  const [rows, setRows] = useState<CountryEmissionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [sectorFilter, setSectorFilter] = useState("all");
@@ -163,42 +156,21 @@ const CountryEmissions: React.FC = () => {
   const [sectorPickerOpen, setSectorPickerOpen] = useState(false);
   const [sectorMenuSector, setSectorMenuSector] = useState("");
   const [activeTrendSectors, setActiveTrendSectors] = useState<string[]>([]);
-  const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{
-    x: number;
-    y: number;
-    sector: string;
-    value: number;
-    label: string;
-    color: string;
-  } | null>(null);
+  const [hoveredTrendPoint, setHoveredTrendPoint] = useState<TrendHoverPoint | null>(null);
   const [exploreMode, setExploreMode] = useState<"rank" | "sector" | "trends">("rank");
+  const hoverRafRef = useRef<number | null>(null);
+  const latestHoverPointRef = useRef<TrendHoverPoint | null>(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const pageSize = 1000;
-      let from = 0;
-      const all: CountryEmissionRow[] = [];
-
-      while (true) {
-        const { data, error } = await supabase
-          .from("country_emissions" as any)
-          .select("*")
-          .range(from, from + pageSize - 1);
-
-        if (error) {
-          console.error("Failed loading country_emissions page:", error);
-          break;
-        }
-
-        const chunk = data || [];
-        all.push(...chunk);
-
-        if (chunk.length < pageSize) break;
-        from += pageSize;
+      try {
+        const allRows = await fetchAllCountryEmissions();
+        setRows(allRows);
+      } catch (error) {
+        console.error("Failed loading country_emissions page:", error);
+        setRows([]);
       }
-
-      setRows(all);
       setLoading(false);
     };
     load();
@@ -307,6 +279,14 @@ const CountryEmissions: React.FC = () => {
 
   const selectedStart = useMemo(() => parseMonthValue(timeStart), [timeStart]);
   const selectedEnd = useMemo(() => parseMonthValue(timeEnd), [timeEnd]);
+  const startPeriod = useMemo(
+    () => (selectedStart ? yearMonthToNumber(selectedStart.year, selectedStart.month) : undefined),
+    [selectedStart],
+  );
+  const endPeriod = useMemo(
+    () => (selectedEnd ? yearMonthToNumber(selectedEnd.year, selectedEnd.month) : undefined),
+    [selectedEnd],
+  );
 
   const selectMonth = (part: "start" | "end", year: number, month: number) => {
     const next = toMonthValue(year, month);
@@ -334,12 +314,6 @@ const CountryEmissions: React.FC = () => {
       const rowGas = String(pickValue(r, [/^gas$/i, /ghg/i, /co2e/i]) ?? "").trim();
       const period = getRowYearMonth(r);
       const rowPeriod = period ? yearMonthToNumber(period.year, period.month) : undefined;
-      const startPeriod = /^\d{4}-\d{2}$/.test(timeStart)
-        ? yearMonthToNumber(Number(timeStart.slice(0, 4)), Number(timeStart.slice(5, 7)))
-        : undefined;
-      const endPeriod = /^\d{4}-\d{2}$/.test(timeEnd)
-        ? yearMonthToNumber(Number(timeEnd.slice(0, 4)), Number(timeEnd.slice(5, 7)))
-        : undefined;
       const timeRangeMatch =
         rowPeriod == null
           ? true
@@ -366,7 +340,7 @@ const CountryEmissions: React.FC = () => {
         timeRangeMatch
       );
     });
-  }, [rows, sectorFilter, region, gas, timeStart, timeEnd]);
+  }, [rows, sectorFilter, region, gas, startPeriod, endPeriod]);
 
   const totalEmissions = useMemo(
     () =>
@@ -526,15 +500,7 @@ const CountryEmissions: React.FC = () => {
     return max > 0 ? max : 1;
   }, [visibleTrendSeries]);
 
-  const trendChart = {
-    viewWidth: 980,
-    viewHeight: 360,
-    xMin: 52,
-    xMax: 960,
-    yMin: 28,
-    yMax: 300,
-    xLabelY: 332,
-  } as const;
+  const trendChart = DEFAULT_TREND_CHART;
 
   const trendHoverTargets = useMemo(() => {
     const maxIndex = Math.max(1, trendData.labels.length - 1);
@@ -564,26 +530,24 @@ const CountryEmissions: React.FC = () => {
     const sx = ((e.clientX - rect.left) / rect.width) * trendChart.viewWidth;
     const sy = ((e.clientY - rect.top) / rect.height) * trendChart.viewHeight;
 
-    let nearest = trendHoverTargets[0];
-    let minDistSq = Number.POSITIVE_INFINITY;
-    for (const p of trendHoverTargets) {
-      const dx = p.x - sx;
-      const dy = p.y - sy;
-      const distSq = dx * dx + dy * dy;
-      if (distSq < minDistSq) {
-        minDistSq = distSq;
-        nearest = p;
-      }
-    }
-
-    // Keep hover active in surrounding area, not only exact point.
     const hoverRadius = 26;
-    if (minDistSq <= hoverRadius * hoverRadius) {
-      setHoveredTrendPoint(nearest);
-    } else {
-      setHoveredTrendPoint(null);
-    }
+    latestHoverPointRef.current = pickNearestHoverPoint(trendHoverTargets, sx, sy, hoverRadius);
+    if (hoverRafRef.current != null) return;
+    hoverRafRef.current = window.requestAnimationFrame(() => {
+      hoverRafRef.current = null;
+      setHoveredTrendPoint(latestHoverPointRef.current);
+    });
   };
+
+  useEffect(
+    () => () => {
+      if (hoverRafRef.current != null) {
+        window.cancelAnimationFrame(hoverRafRef.current);
+        hoverRafRef.current = null;
+      }
+    },
+    [],
+  );
 
   if (loading && rows.length === 0) {
     return (
@@ -996,7 +960,14 @@ const CountryEmissions: React.FC = () => {
                       viewBox="0 0 980 360"
                       className="w-full min-w-[860px] h-[360px]"
                       onMouseMove={handleTrendMouseMove}
-                      onMouseLeave={() => setHoveredTrendPoint(null)}
+                      onMouseLeave={() => {
+                        latestHoverPointRef.current = null;
+                        if (hoverRafRef.current != null) {
+                          window.cancelAnimationFrame(hoverRafRef.current);
+                          hoverRafRef.current = null;
+                        }
+                        setHoveredTrendPoint(null);
+                      }}
                     >
                       {Array.from({ length: 6 }).map((_, i) => {
                         const y = trendChart.yMin + (i / 5) * (trendChart.yMax - trendChart.yMin);

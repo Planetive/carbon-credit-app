@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Save, Trash2, Info, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
-import { FieldTooltip } from "@/pages/finance_facilitated/components/FieldTooltip";
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import { SupplierAutocomplete } from "./SupplierAutocomplete";
 import { Supplier } from "./types";
 import { getAllVehicleTypes, VehicleType } from "./vehicleTypes";
@@ -49,6 +49,16 @@ import type {
   TransportRow,
   RefrigerantRow,
 } from "./types/scope3Types";
+import {
+  createBusinessTravelRow,
+  createDownstreamTransportRow,
+  createEmployeeCommutingRow,
+  createEndOfLifeRow,
+  createProcessingRow,
+  createUpstreamTransportRow,
+  createUseRow,
+  createWasteGeneratedRow,
+} from "./scope3RowFactories";
 
 type Props = {
   activeCategory: string;
@@ -79,79 +89,8 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [savingUse, setSavingUse] = useState(false);
   const [isInitialLoadUse, setIsInitialLoadUse] = useState(true);
 
-  const newProcessingRow = (): ProcessingSoldProductsRow => ({
-    id: `psp-${Date.now()}-${Math.random()}`,
-    processingActivity: '',
-    factorType: undefined,
-    combustionType: undefined,
-    stationaryMainFuelType: undefined,
-    stationarySubFuelType: undefined,
-    stationaryCo2Factor: undefined,
-    stationaryUnit: undefined,
-    mobileFuelType: undefined,
-    mobileKgCo2PerUnit: undefined,
-    mobileUnit: undefined,
-    heatSteamStandard: undefined,
-    heatSteamType: undefined,
-    heatSteamKgCo2e: undefined,
-    heatSteamUnit: undefined,
-    type: undefined,
-    fuel: undefined,
-    unit: undefined,
-    quantity: undefined,
-    factor: undefined,
-    emissions: undefined,
-    totalKwh: undefined,
-    gridPct: undefined,
-    renewablePct: undefined,
-    otherPct: undefined,
-    gridCountry: undefined,
-    otherSources: [],
-  });
-
-  const newUseRow = (): UseOfSoldProductsRow => ({
-    id: `usp-${Date.now()}-${Math.random()}`,
-    processingActivity: '',
-    energyConsumption: '',
-    quantity: undefined,
-    emissions: undefined,
-    combustionType: undefined,
-    stationaryMainFuelType: undefined,
-    stationarySubFuelType: undefined,
-    stationaryCo2Factor: undefined,
-    stationaryUnit: undefined,
-    mobileFuelType: undefined,
-    mobileKgCo2PerUnit: undefined,
-    mobileUnit: undefined,
-    stationaryQuantity: undefined,
-    mobileQuantity: undefined,
-    hybridFuelType: undefined,
-    hybridFuel: undefined,
-    hybridFuelUnit: undefined,
-    hybridFuelQuantity: undefined,
-    hybridFuelFactor: undefined,
-    hybridFuelEmissions: undefined,
-    hybridTotalKwh: undefined,
-    hybridGridPct: undefined,
-    hybridRenewablePct: undefined,
-    hybridOtherPct: undefined,
-    hybridGridCountry: undefined,
-    hybridOtherSources: [],
-    electricityTotalKwh: undefined,
-    electricityGridPct: undefined,
-    electricityRenewablePct: undefined,
-    electricityOtherPct: undefined,
-    electricityGridCountry: undefined,
-    electricityOtherSources: [],
-    refrigerantType: undefined,
-    refrigerantFactor: undefined,
-    coolingRefrigerantQuantity: undefined,
-    gasMachineryFuelType: undefined,
-    gasMachineryFuel: undefined,
-    gasMachineryUnit: undefined,
-    gasMachineryQuantity: undefined,
-    gasMachineryFactor: undefined,
-  });
+  const newProcessingRow = createProcessingRow;
+  const newUseRow = createUseRow;
 
   // Reset state when switching away from downstream products
   useEffect(() => {
@@ -530,13 +469,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingUpstreamTransport, setDeletingUpstreamTransport] = useState<Set<string>>(new Set());
   const [isInitialLoadUpstreamTransport, setIsInitialLoadUpstreamTransport] = useState(true);
   
-  const newUpstreamTransportRow = (): UpstreamTransportRow => ({
-    id: `ut-${Date.now()}-${Math.random()}`,
-    vehicleTypeId: '',
-    distance: undefined,
-    weight: undefined,
-    emissions: undefined,
-  });
+  const newUpstreamTransportRow = createUpstreamTransportRow;
   
   const addUpstreamTransportRow = () => setUpstreamTransportRows(prev => [...prev, newUpstreamTransportRow()]);
   const removeUpstreamTransportRow = (id: string) => setUpstreamTransportRows(prev => prev.filter(r => r.id !== id));
@@ -636,13 +569,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingDownstreamTransport, setDeletingDownstreamTransport] = useState<Set<string>>(new Set());
   const [isInitialLoadDownstreamTransport, setIsInitialLoadDownstreamTransport] = useState(true);
   
-  const newDownstreamTransportRow = (): DownstreamTransportRow => ({
-    id: `dt-${Date.now()}-${Math.random()}`,
-    vehicleTypeId: '',
-    distance: undefined,
-    weight: undefined,
-    emissions: undefined,
-  });
+  const newDownstreamTransportRow = createDownstreamTransportRow;
   
   const addDownstreamTransportRow = () => setDownstreamTransportRows(prev => [...prev, newDownstreamTransportRow()]);
   const removeDownstreamTransportRow = (id: string) => setDownstreamTransportRows(prev => prev.filter(r => r.id !== id));
@@ -742,13 +669,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingWasteGenerated, setDeletingWasteGenerated] = useState<Set<string>>(new Set());
   const [isInitialLoadWasteGenerated, setIsInitialLoadWasteGenerated] = useState(true);
   
-  const newWasteGeneratedRow = (): WasteGeneratedRow => ({
-    id: `wg-${Date.now()}-${Math.random()}`,
-    materialId: '',
-    volume: undefined,
-    disposalMethod: '',
-    emissions: undefined,
-  });
+  const newWasteGeneratedRow = createWasteGeneratedRow;
   
   const addWasteGeneratedRow = () => setWasteGeneratedRows(prev => [...prev, newWasteGeneratedRow()]);
   const removeWasteGeneratedRow = (id: string) => setWasteGeneratedRows(prev => prev.filter(r => r.id !== id));
@@ -849,12 +770,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingBusinessTravel, setDeletingBusinessTravel] = useState<Set<string>>(new Set());
   const [isInitialLoadBusinessTravel, setIsInitialLoadBusinessTravel] = useState(true);
   
-  const newBusinessTravelRow = (): BusinessTravelRow => ({
-    id: `bt-${Date.now()}-${Math.random()}`,
-    travelTypeId: '',
-    distance: undefined,
-    emissions: undefined,
-  });
+  const newBusinessTravelRow = createBusinessTravelRow;
   
   const addBusinessTravelRow = () => setBusinessTravelRows(prev => [...prev, newBusinessTravelRow()]);
   const removeBusinessTravelRow = (id: string) => setBusinessTravelRows(prev => prev.filter(r => r.id !== id));
@@ -957,13 +873,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingEmployeeCommuting, setDeletingEmployeeCommuting] = useState<Set<string>>(new Set());
   const [isInitialLoadEmployeeCommuting, setIsInitialLoadEmployeeCommuting] = useState(true);
   
-  const newEmployeeCommutingRow = (): EmployeeCommutingRow => ({
-    id: `ec-${Date.now()}-${Math.random()}`,
-    travelTypeId: '',
-    distance: undefined,
-    employees: undefined,
-    emissions: undefined,
-  });
+  const newEmployeeCommutingRow = createEmployeeCommutingRow;
   
   const addEmployeeCommutingRow = () => setEmployeeCommutingRows(prev => [...prev, newEmployeeCommutingRow()]);
   const removeEmployeeCommutingRow = (id: string) => setEmployeeCommutingRows(prev => prev.filter(r => r.id !== id));
@@ -1068,15 +978,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const [deletingEndOfLife, setDeletingEndOfLife] = useState<Set<string>>(new Set());
   const [isInitialLoadEndOfLife, setIsInitialLoadEndOfLife] = useState(true);
   
-  const newEndOfLifeRow = (): EndOfLifeRow => ({
-    id: `eol-${Date.now()}-${Math.random()}`,
-    materialId: '',
-    volume: undefined,
-    disposalMethod: '',
-    recycle: undefined,
-    composition: '',
-    emissions: undefined,
-  });
+  const newEndOfLifeRow = createEndOfLifeRow;
   
   const addEndOfLifeRow = () => setEndOfLifeRows(prev => [...prev, newEndOfLifeRow()]);
   const removeEndOfLifeRow = (id: string) => setEndOfLifeRows(prev => prev.filter(r => r.id !== id));

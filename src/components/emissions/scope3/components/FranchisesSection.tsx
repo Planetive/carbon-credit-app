@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { EmissionData } from "@/components/emissions/shared/types";
-import { FieldTooltip } from "@/pages/finance_facilitated/components/FieldTooltip";
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 
 interface FranchisesSectionProps {
   emissionData: EmissionData;

@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import Scope3ModeSelector, { type Scope3Mode } from "@/components/emissions/scope3/Scope3ModeSelector";
+import { getIPCCCategoryDescription, getIPCCCategoryTitle } from "@/features/emissions/ipcc/categoryMeta";
 
 type StationaryFuelRow = {
   id: string;
@@ -3509,60 +3510,10 @@ const EmissionCalculatorIPCC = ({
             </div>
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                {activeCategory === "stationaryFuelCombustion"
-                  ? "Scope 1 - Stationary Fuel Combustion"
-                  : activeCategory === "scope3ModeSelection"
-                  ? "Scope 3 - Method Selection"
-                  : activeCategory === "flaring"
-                  ? "Scope 1 - Flaring"
-                  : activeCategory === "venting"
-                  ? "Scope 1 - Venting"
-                  : activeCategory === "vehicularCarbonFootprints"
-                  ? "Scope 1 - Vehicular Carbon Footprints"
-                  : activeCategory === "kitchenFootprints"
-                  ? "Scope 1 - Kitchen Footprints"
-                  : activeCategory === "powerFuelConsumption"
-                  ? "Scope 1 - Fuel Consumption for Power"
-                  : activeCategory === "heatingFootprints"
-                  ? "Scope 1 - Heating"
-                  : activeCategory === "roadTransport"
-                  ? "Scope 3 - Road Transport"
-                  : activeCategory === "roadTransportVehicleType"
-                  ? "Scope 3 - Road Transport with Vehicle Type"
-                  : activeCategory === "usaGasolineDieselVehicles"
-                  ? "Scope 3 - USA Gasoline and Diesel Vehicles"
-                  : activeCategory === "alternativeFuelVehicles"
-                  ? "Scope 3 - Alternative Fuel Vehicles"
-                  : "Scope 2 - Industry Emissions"}
+                {getIPCCCategoryTitle(activeCategory)}
               </h2>
               <p className="text-gray-600 mt-1 text-sm sm:text-base">
-                {activeCategory === "scope3ModeSelection" ? (
-                  <>Select the IPCC tier approach that best matches your data depth and reporting objective.</>
-                ) : activeCategory === "stationaryFuelCombustion" ? (
-                  <>Estimate Scope 1 emissions from stationary fuel use by entering fuel type, quantity, and unit.</>
-                ) : activeCategory === "flaring" ? (
-                  <>Estimate Scope 1 flaring emissions from flare gas volume and gas composition.</>
-                ) : activeCategory === "venting" ? (
-                  <>Estimate Scope 1 venting emissions from gas volume, composition, and gas warming impact.</>
-                ) : activeCategory === "vehicularCarbonFootprints" ? (
-                  <>Estimate Scope 1 vehicle emissions from diesel and petrol consumption in litres.</>
-                ) : activeCategory === "kitchenFootprints" ? (
-                  <>Estimate Scope 1 kitchen emissions from LPG and natural gas consumption using your GHV input.</>
-                ) : activeCategory === "powerFuelConsumption" ? (
-                  <>Estimate Scope 1 power-generation emissions from diesel and natural gas usage.</>
-                ) : activeCategory === "heatingFootprints" ? (
-                  <>Estimate Scope 1 heating emissions from natural gas consumption and GHV.</>
-                ) : activeCategory === "roadTransport" ? (
-                  <>Estimate Scope 3 road-transport emissions by selecting vehicle and fuel details.</>
-                ) : activeCategory === "roadTransportVehicleType" ? (
-                  <>Estimate Scope 3 transport emissions using detailed vehicle-type and fuel combinations.</>
-                ) : activeCategory === "usaGasolineDieselVehicles" ? (
-                  <>Estimate Scope 3 emissions for gasoline and diesel vehicle activity scenarios.</>
-                ) : activeCategory === "alternativeFuelVehicles" ? (
-                  <>Estimate Scope 3 emissions for alternative-fuel vehicle activity scenarios.</>
-                ) : (
-                  <>Estimate Scope 2 industry emissions for <span className="font-semibold">{selectedIndustry}</span>.</>
-                )}
+                {getIPCCCategoryDescription(activeCategory, selectedIndustry)}
               </p>
             </div>
           </div>

@@ -1,0 +1,1134 @@
+      const html2canvas = (await import("html2canvas")).default;
+      const { default: jsPDF } = await import("jspdf");
+      const isMariUser = opts.isMariUser;
+      const fuelFramework = opts.fuelFramework;
+      const submittedAtString = opts.submittedAt ?? new Date().toISOString();
+      const downloadFileName = opts.fileName;
+
+      const historicalByYear: Record<number, { scope1: number; scope2: number; scope3: number; total: number }> = {};
+      if (user?.id) {
+        const { data: historyRows } = await (supabase as any)
+          .from("emission_history_assessments")
+          .select("created_at, scope1_emissions, scope2_emissions, scope3_emissions")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        (historyRows || []).forEach((row: any) => {
+          const dt = row?.created_at ? new Date(row.created_at) : null;
+          if (!dt || Number.isNaN(dt.getTime())) return;
+          const year = dt.getFullYear();
+          if (historicalByYear[year]) return; // keep latest record per year due to desc order
+          const s1 = Number(row?.scope1_emissions || 0);
+          const s2 = Number(row?.scope2_emissions || 0);
+          const s3 = Number(row?.scope3_emissions || 0);
+          historicalByYear[year] = { scope1: s1, scope2: s2, scope3: s3, total: s1 + s2 + s3 };
+        });
+      }
+
+      const gasTotalsKg: Record<"CO2" | "CH4" | "N2O" | "CO2e", number> = { CO2: 0, CH4: 0, N2O: 0, CO2e: 0 };
+      if (isMariUser && user?.id) {
+        const [onRoadGasRows, onRoadDieselRows, nonRoadRows, roadVehicleRows, usaRows, altFuelRows, ventingRows] =
+          await Promise.all([
+            (supabase as any).from("scope1_epa_on_road_gasoline_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("scope1_epa_on_road_diesel_alt_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("scope1_epa_non_road_vehicle_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_road_transport_vehicle_type_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_usa_gasoline_diesel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope3_alternative_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
+            (supabase as any).from("ipcc_scope1_venting_entries").select("result").eq("user_id", user.id),
+          ]);
+
+        const addBySelection = (rows: any[] | null | undefined) => {
+          (rows || []).forEach((row: any) => {
+            const val = Number(row?.emissions || 0);
+            if (!Number.isFinite(val) || val <= 0) return;
+            const selection = String(row?.emission_selection || "").toLowerCase();
+            if (selection === "co2_only") gasTotalsKg.CO2 += val;
+            else if (selection === "ch4_only") gasTotalsKg.CH4 += val;
+            else if (selection === "n2o_only" || selection === "no2_only") gasTotalsKg.N2O += val;
+            else gasTotalsKg.CO2e += val;
+          });
+        };
+
+        addBySelection(onRoadGasRows?.data);
+        addBySelection(onRoadDieselRows?.data);
+        addBySelection(nonRoadRows?.data);
+        addBySelection(roadVehicleRows?.data);
+        addBySelection(usaRows?.data);
+        addBySelection(altFuelRows?.data);
+
+        // Venting includes per-gas co2e contributions in breakdown; include where available.
+        (ventingRows?.data || []).forEach((row: any) => {
+          const breakdown = row?.result?.breakdown;
+          if (!Array.isArray(breakdown)) return;
+          breakdown.forEach((b: any) => {
+            const gas = String(b?.gas || "").toUpperCase();
+            const co2eKg = Number(b?.co2eKg || 0);
+            if (!Number.isFinite(co2eKg) || co2eKg <= 0) return;
+            if (gas === "CO2") gasTotalsKg.CO2 += co2eKg;
+            else if (gas === "CH4") gasTotalsKg.CH4 += co2eKg;
+            else if (gas === "N2O" || gas === "NO2") gasTotalsKg.N2O += co2eKg;
+            else gasTotalsKg.CO2e += co2eKg;
+          });
+        });
+      }
+
+      const mapScopeRows = (rows: EpaIpccResultsData["scope1"]) => {
+        const [a, b, c, d] = [...rows.filter((r) => r.value > 0), { value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }];
+        return {
+          first: a.value || 0,
+          second: b.value || 0,
+          third: c.value || 0,
+          fourth: d.value || 0,
+        };
+      };
+
+      const scope1 = mapScopeRows(results.scope1);
+      const scope2 = mapScopeRows(results.scope2);
+      const scope3 = mapScopeRows(results.scope3);
+      const submitted = new Date(submittedAtString);
+      const generatedAt = new Date();
+      let company = "Organization";
+      let headerName = user?.email?.split("@")[0] || "User";
+      if (user?.id) {
+        const { data: profileData } = await (supabase as any)
+          .from("profiles")
+          .select("display_name, organization_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const resolvedDisplayName =
+          profileData?.display_name?.trim() ||
+          user?.user_metadata?.full_name?.trim() ||
+          user?.user_metadata?.name?.trim();
+        const resolvedOrganizationName =
+          profileData?.organization_name?.trim() ||
+          user?.user_metadata?.organization_name?.trim();
+        if (resolvedOrganizationName) {
+          company = resolvedOrganizationName;
+        }
+        if (resolvedDisplayName) {
+          headerName = resolvedDisplayName;
+        }
+      }
+      const period = generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const year = String(generatedAt.getFullYear());
+      const reportPeriodStart = `01/01/${year}`;
+      const reportPeriodEnd = generatedAt.toLocaleDateString("en-GB");
+      const nextIterationStart = new Date(generatedAt);
+      nextIterationStart.setDate(nextIterationStart.getDate() + 1);
+      const nextIterationStartText = nextIterationStart.toLocaleDateString("en-GB");
+      const fmt = (n: number) => (n / 1000).toFixed(2);
+      const pct = (value: number, total: number) => (total > 0 ? ((value / total) * 100).toFixed(1) : "0.0");
+      const pctNum = (value: number, total: number) => (total > 0 ? (value / total) * 100 : 0);
+      const pctDisplay = (value: number, total: number) => {
+        if (total <= 0) return "0.0";
+        const p = (value / total) * 100;
+        if (p > 0 && p < 0.1) return "<0.1";
+        return p.toFixed(1);
+      };
+      const pctBarWidth = (value: number, total: number) => {
+        if (total <= 0) return "0";
+        const p = (value / total) * 100;
+        if (p > 0 && p < 0.5) return "0.5";
+        return p.toFixed(1);
+      };
+      const dominantScope = [
+        { name: "Scope 1", value: results.totals.scope1 },
+        { name: "Scope 2", value: results.totals.scope2 },
+        { name: "Scope 3", value: results.totals.scope3 },
+      ].sort((a, b) => b.value - a.value)[0];
+      const topScope3Drivers = [...results.scope3]
+        .filter((r) => r.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 2)
+        .map((r) => r.label)
+        .join(" and ");
+      const scope1Pct = pct(results.totals.scope1, results.totals.grand);
+      const scope2Pct = pct(results.totals.scope2, results.totals.grand);
+      const scope3Pct = pct(results.totals.scope3, results.totals.grand);
+      const scope1PctNum = pctNum(results.totals.scope1, results.totals.grand);
+      const scope2PctNum = pctNum(results.totals.scope2, results.totals.grand);
+      const scope3PctNum = pctNum(results.totals.scope3, results.totals.grand);
+
+      const allRows = [
+        ...results.scope1.map((r) => ({ scope: "Scope 1", label: r.label, value: r.value })),
+        ...results.scope2.map((r) => ({ scope: "Scope 2", label: r.label, value: r.value })),
+        ...results.scope3.map((r) => ({ scope: "Scope 3", label: r.label, value: r.value })),
+      ].filter((r) => r.value > 0);
+
+      const classifyBucket = (label: string, scope: string) => {
+        const v = label.toLowerCase();
+        if (/waste|end.?of.?life/.test(v)) return "Waste";
+        if (/transport|travel|commut|vehicle|mobile|logistics|on-road|non-road/.test(v)) return "Transport";
+        if (/purchased goods|capital|materials|services|processing|use of sold|investments/.test(v)) return "Materials";
+        if (scope === "Scope 2" || /electricity|fuel|heat|steam|power|energy/.test(v)) return "Energy";
+        return "Energy";
+      };
+
+      const bucketTotals = allRows.reduce(
+        (acc, row) => {
+          const key = classifyBucket(row.label, row.scope);
+          acc[key] += row.value;
+          return acc;
+        },
+        { Energy: 0, Transport: 0, Materials: 0, Waste: 0 }
+      );
+
+      const scope1Rows = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const scope2Rows = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const scope3Sorted = [...results.scope3].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const topCount = Math.max(1, Math.ceil(scope3Sorted.length * 0.2));
+      const topShare = scope3Sorted.slice(0, topCount).reduce((sum, r) => sum + r.value, 0);
+      const topSharePct = pct(topShare, results.totals.scope3);
+      const scope3ChartRows = scope3Sorted.slice(0, 8);
+
+      const monthLabel = (dateValue: string) => {
+        const dt = new Date(dateValue);
+        if (Number.isNaN(dt.getTime())) return dateValue;
+        return dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+      };
+
+      const extractRowKg = (row: any): number => {
+        const direct = Number(row?.emissions ?? row?.total_emissions_kg ?? row?.co2e_kg ?? 0);
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        const resultObj = row?.result || {};
+        const fromResult = Number(
+          resultObj?.totalCO2e_kg ??
+          resultObj?.total_co2e_kg ??
+          resultObj?.co2e_kg ??
+          resultObj?.emissions_kg ??
+          0
+        );
+        return Number.isFinite(fromResult) && fromResult > 0 ? fromResult : 0;
+      };
+
+      const ipccMonthlySources = [
+        { label: "Vehicular", table: "ipcc_scope1_vehicular_entries" },
+        { label: "Kitchen", table: "ipcc_scope1_kitchen_entries" },
+        { label: "Power", table: "ipcc_scope1_power_entries" },
+        { label: "Heating", table: "ipcc_scope1_heating_entries" },
+      ];
+
+      const ipccMonthlyRows = user?.id
+        ? (
+            await Promise.all(
+              ipccMonthlySources.map(async (source) => {
+                const { data } = await (supabase as any)
+                  .from(source.table)
+                  .select("month_start, result")
+                  .eq("user_id", user.id)
+                  .order("month_start", { ascending: false });
+
+                const monthly = (data || [])
+                  .filter((row: any) => row?.month_start)
+                  .map((row: any) => ({
+                    monthStart: String(row.month_start),
+                    kg: extractRowKg(row),
+                  }))
+                  .filter((row: any) => row.kg > 0)
+                  .slice(0, 12)
+                  .sort((a: any, b: any) => new Date(a.monthStart).getTime() - new Date(b.monthStart).getTime());
+
+                return { label: source.label, monthly };
+              })
+            )
+          ).filter((row) => row.monthly.length > 0)
+        : [];
+
+      const logisticsDriver = allRows
+        .filter((r) => /transport|travel|commut|logistics|vehicle|mobile|on-road|non-road/i.test(r.label))
+        .reduce((sum, r) => sum + r.value, 0);
+      const supplyChainDriver = allRows
+        .filter((r) => /purchased goods|capital|services|processing|use of sold|investments/i.test(r.label))
+        .reduce((sum, r) => sum + r.value, 0);
+      const energyDriver = results.totals.scope1 + results.totals.scope2 - logisticsDriver;
+      const safeEnergyDriver = Math.max(0, energyDriver);
+
+      const currentYearNum = generatedAt.getFullYear();
+      const prevYear1 = currentYearNum - 1;
+      const prevYear2 = currentYearNum - 2;
+      const hasPreviousYearValues =
+        Boolean(historicalByYear[prevYear1]) || Boolean(historicalByYear[prevYear2]);
+      const y1 = historicalByYear[prevYear2];
+      const y2 = historicalByYear[prevYear1];
+      const gasRows = [
+        { gas: "CO2", value: gasTotalsKg.CO2 },
+        { gas: "CH4", value: gasTotalsKg.CH4 },
+        { gas: "N2O", value: gasTotalsKg.N2O },
+        { gas: "CO2e (other/mixed)", value: gasTotalsKg.CO2e },
+      ].filter((r) => r.value > 0);
+      const gasGrand = gasRows.reduce((sum, r) => sum + r.value, 0);
+      const hasGasBreakdown = isMariUser && gasGrand > 0;
+
+      const topScope1Category = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+      const topScope2Category = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+      const upstreamScope3Rows = [...results.scope3]
+        .filter((r) => ["purchased_goods", "capital_goods", "fuel_energy", "upstream_transport", "waste", "business_travel", "employee_commuting"].includes(r.key) && r.value > 0)
+        .sort((a, b) => b.value - a.value);
+      const downstreamScope3Rows = [...results.scope3]
+        .filter((r) => ["investments", "downstream_transport", "end_of_life", "processing_sold", "use_of_sold", "facilitated"].includes(r.key) && r.value > 0)
+        .sort((a, b) => b.value - a.value);
+      const topScope3UpstreamCategory = upstreamScope3Rows[0];
+      const topScope3DownstreamCategory = downstreamScope3Rows[0];
+      const topDriverName = [
+        { name: "energy operations", value: safeEnergyDriver },
+        { name: "supply chain activities", value: supplyChainDriver },
+        { name: "logistics and mobility", value: logisticsDriver },
+      ].sort((a, b) => b.value - a.value)[0].name;
+
+      const keyInsights = [
+        `${dominantScope.name} emissions dominate (${pct(dominantScope.value, results.totals.grand)}%) and are currently the main decarbonization lever.`,
+        topScope3Drivers
+          ? `Scope 3 concentration is highest in ${topScope3Drivers}, indicating value-chain hotspots.`
+          : "Scope 3 activity is currently limited; data coverage expansion can improve hotspot precision.",
+        topScope2Category
+          ? `${topScope2Category.label} is the largest controllable energy-related source in Scope 2.`
+          : "Scope 2 data is limited; increasing energy data granularity is recommended.",
+      ];
+
+      const scopeKeyToTable: Record<string, string> = {
+        fuel: "scope1_fuel_entries",
+        mobile: "scope1_epa_mobile_fuel_entries",
+        onroad_gas: "scope1_epa_on_road_gasoline_entries",
+        onroad_diesel: "scope1_epa_on_road_diesel_alt_fuel_entries",
+        nonroad: "scope1_epa_non_road_vehicle_entries",
+        heatsteam: "scope2_heatsteam_entries_epa",
+        flaring: "ipcc_scope1_flaring_entries",
+        venting: "ipcc_scope1_venting_entries",
+        vehicular: "ipcc_scope1_vehicular_entries",
+        kitchen: "ipcc_scope1_kitchen_entries",
+        power: "ipcc_scope1_power_entries",
+        heating: "ipcc_scope1_heating_entries",
+        electricity: "scope2_electricity_subanswers",
+        purchased_goods: "scope3_purchased_goods_services",
+        capital_goods: "scope3_capital_goods",
+        fuel_energy: "scope3_fuel_energy_activities",
+        upstream_transport: "scope3_upstream_transportation",
+        waste: "scope3_waste_generated",
+        business_travel: "scope3_business_travel",
+        employee_commuting: "scope3_employee_commuting",
+        investments: "scope3_investments",
+        downstream_transport: "scope3_downstream_transportation",
+        end_of_life: "scope3_end_of_life_treatment",
+        processing_sold: "scope3_processing_sold_products",
+        use_of_sold: "scope3_use_of_sold_products",
+        refrigerant: "scope1_refrigerant_entries",
+        passenger: "scope1_passenger_vehicle_entries",
+        delivery: "scope1_delivery_vehicle_entries",
+        epa_scope1_heat_steam: "scope1_heatsteam_entries_epa",
+        facilitated: "scope3_facilitated_emissions",
+      };
+
+      const detailGroupCandidates = [
+        "fuel_type",
+        "fuel",
+        "category",
+        "sub_category",
+        "type",
+        "vehicle_type",
+        "energy_source",
+        "source",
+        "activity_type",
+        "material_type",
+        "waste_type",
+        "travel_type",
+        "transport_mode",
+        "investment_type",
+      ];
+
+      const gasLabelMap: Record<string, "CO2" | "CH4" | "N2O" | "Other"> = {
+        co2_only: "CO2",
+        ch4_only: "CH4",
+        n2o_only: "N2O",
+        no2_only: "N2O",
+      };
+
+      const extractEmissionKg = (row: any): number => {
+        const direct = Number(row?.emissions || 0);
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        const rowData = row?.row_data;
+        if (rowData && typeof rowData === "object") {
+          const rd = Number((rowData as any).emissions || (rowData as any).totalCO2e_kg || 0);
+          if (Number.isFinite(rd) && rd > 0) return rd;
+        }
+        const resultObj = row?.result;
+        if (resultObj && typeof resultObj === "object") {
+          const rr = Number((resultObj as any).totalCO2e_kg || (resultObj as any).total_co2e_kg || 0);
+          if (Number.isFinite(rr) && rr > 0) return rr;
+        }
+        return 0;
+      };
+
+      const extractGasBreakdown = (rows: any[]): Record<string, number> => {
+        const totals: Record<string, number> = { CO2: 0, CH4: 0, N2O: 0, Other: 0 };
+        (rows || []).forEach((row: any) => {
+          const emissionSelection = String(row?.emission_selection || "").toLowerCase();
+          const rowEmission = extractEmissionKg(row);
+          if (emissionSelection && rowEmission > 0) {
+            const mapped = gasLabelMap[emissionSelection] || "Other";
+            totals[mapped] += rowEmission;
+          }
+
+          const resultObj = row?.result;
+          if (resultObj && typeof resultObj === "object") {
+            const breakdown = (resultObj as any).breakdown;
+            if (Array.isArray(breakdown)) {
+              breakdown.forEach((b: any) => {
+                const gas = String(b?.gas || "").toUpperCase();
+                const kg = Number(b?.co2eKg ?? b?.co2e_kg ?? b?.kg ?? 0);
+                if (!Number.isFinite(kg) || kg <= 0) return;
+                if (gas === "CO2") totals.CO2 += kg;
+                else if (gas === "CH4") totals.CH4 += kg;
+                else if (gas === "N2O" || gas === "NO2") totals.N2O += kg;
+                else totals.Other += kg;
+              });
+            }
+
+            const co2Kg = Number((resultObj as any).co2_kg ?? (resultObj as any).co2Kg ?? 0);
+            const ch4Kg = Number((resultObj as any).ch4_kg ?? (resultObj as any).ch4Kg ?? 0);
+            const n2oKg = Number((resultObj as any).n2o_kg ?? (resultObj as any).n2oKg ?? 0);
+            if (Number.isFinite(co2Kg) && co2Kg > 0) totals.CO2 += co2Kg;
+            if (Number.isFinite(ch4Kg) && ch4Kg > 0) totals.CH4 += ch4Kg;
+            if (Number.isFinite(n2oKg) && n2oKg > 0) totals.N2O += n2oKg;
+          }
+        });
+        return totals;
+      };
+
+      const scopeTotalByName = (scopeName: string) =>
+        scopeName === "Scope 1" ? results.totals.scope1 : scopeName === "Scope 2" ? results.totals.scope2 : results.totals.scope3;
+
+      const buildCategoryDrilldown = async (
+        category: { key: string; label: string; value: number } | undefined,
+        scopeName: string
+      ) => {
+        if (!category || !user?.id || category.value <= 0) return "";
+        const table = scopeKeyToTable[category.key];
+        if (!table) return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+
+        let detailQuery = (supabase as any)
+          .from(table)
+          .select("*")
+          .eq("user_id", user.id)
+          .limit(300);
+        if (category.key === "fuel") {
+          if (fuelFramework === "uk") {
+            detailQuery = detailQuery.eq("emission_framework", "uk");
+          } else {
+            detailQuery = detailQuery.or("emission_framework.eq.epa,emission_framework.is.null");
+          }
+        }
+
+        const { data } = await detailQuery;
+
+        const rows = data || [];
+        if (!rows.length) {
+          return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+        }
+
+        const rankedEntries = rows
+          .map((row: any) => ({ row, kg: extractEmissionKg(row) }))
+          .filter((entry) => entry.kg > 0)
+          .sort((a, b) => b.kg - a.kg);
+        const largestEntry = rankedEntries[0];
+
+        const gasFocusedKeys = new Set([
+          "vehicular",
+          "venting",
+          "flaring",
+          "mobile",
+          "onroad_gas",
+          "onroad_diesel",
+          "nonroad",
+          "fuel",
+          "kitchen",
+          "power",
+          "heating",
+        ]);
+        if (gasFocusedKeys.has(category.key)) {
+          const gasTotals = extractGasBreakdown(rows);
+          const topGas = Object.entries(gasTotals)
+            .filter(([, val]) => Number(val) > 0)
+            .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+          if (topGas) {
+            const gasPct = category.value > 0 ? ((Number(topGas[1]) / category.value) * 100).toFixed(1) : "0.0";
+            return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%); dominant gas composition is ${topGas[0]} (~${gasPct}%).`;
+          }
+        }
+
+        let groupingColumn = "";
+        for (const c of detailGroupCandidates) {
+          if (rows.some((r: any) => typeof r?.[c] === "string" && String(r[c]).trim().length > 0)) {
+            groupingColumn = c;
+            break;
+          }
+        }
+
+        if (!groupingColumn) {
+          if (largestEntry) {
+            const row = largestEntry.row;
+            const subCategoryValue =
+              detailGroupCandidates
+                .map((key) => row?.[key])
+                .find((v) => typeof v === "string" && String(v).trim().length > 0) || "";
+            const monthValue =
+              typeof row?.month_start === "string" && row.month_start
+                ? monthLabel(row.month_start)
+                : "";
+            const entryPct = category.value > 0 ? ((largestEntry.kg / category.value) * 100).toFixed(1) : "0.0";
+            if (subCategoryValue) {
+              return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest sub-category is ${String(subCategoryValue)} (~${entryPct}% of ${category.label}).`;
+            }
+            if (monthValue) {
+              return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest recorded month is ${monthValue} (${formatTonnes(largestEntry.kg)} tCO2e, ~${entryPct}% of ${category.label}).`;
+            }
+            return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}%; largest single entry is ${formatTonnes(largestEntry.kg)} tCO2e (~${entryPct}% of ${category.label}).`;
+          }
+          return `${scopeName} drilldown: ${category.label} leads at ${pct(category.value, scopeTotalByName(scopeName))}% with ${rows.length} recorded entries.`;
+        }
+
+        const grouped = rows.reduce((acc: Record<string, number>, row: any) => {
+          const key = String(row?.[groupingColumn] || "Other").trim() || "Other";
+          acc[key] = (acc[key] || 0) + extractEmissionKg(row);
+          return acc;
+        }, {} as Record<string, number>);
+
+        const topGroup = Object.entries(grouped).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+        if (!topGroup) {
+          return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
+        }
+
+        const groupPct = category.value > 0 ? ((Number(topGroup[1]) / category.value) * 100).toFixed(1) : "0.0";
+        return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%); within this category, ${topGroup[0]} is highest (~${groupPct}%).`;
+      };
+
+      const scope1ContributorInsight = await buildCategoryDrilldown(topScope1Category, "Scope 1");
+      const scope2ContributorInsight = await buildCategoryDrilldown(topScope2Category, "Scope 2");
+      const scope3UpstreamContributorInsight = await buildCategoryDrilldown(topScope3UpstreamCategory, "Scope 3 upstream");
+      const scope3DownstreamContributorInsight = await buildCategoryDrilldown(topScope3DownstreamCategory, "Scope 3 downstream");
+
+      const scope1Insight = topScope1Category
+        ? `${topScope1Category.label} contributes the largest share of Scope 1 (${pct(topScope1Category.value, results.totals.scope1)}%).`
+        : "Scope 1 emissions are currently low or unavailable.";
+      const scope2Insight = results.totals.scope2 > 0
+        ? `Scope 2 is split across available electricity/heat sources; cleaner procurement can reduce ${scope2Pct}% of total emissions.`
+        : "Scope 2 emissions are currently not significant in this reporting period.";
+      const scope1Second = scope1Rows[1];
+      const scope1ManagementInsight = topScope1Category
+        ? `Prioritize ${topScope1Category.label} first (${pct(topScope1Category.value, results.totals.scope1)}% of Scope 1)${scope1Second ? `, then ${scope1Second.label} (${pct(scope1Second.value, results.totals.scope1)}%)` : ""}; this sequence gives the highest near-term abatement leverage.`
+        : "Increase Scope 1 data capture cadence to identify stable reduction levers.";
+      const scope2Second = scope2Rows[1];
+      const scope2ManagementInsight = topScope2Category
+        ? `Set procurement and efficiency targets around ${topScope2Category.label}${scope2Second ? ` while tracking ${scope2Second.label} as secondary driver` : ""}; review monthly intensity (kg CO2e per activity unit) to validate gains.`
+        : "Broaden Scope 2 source-level inputs before setting procurement targets.";
+      const upstreamShare = results.totals.scope3 > 0 ? ((upstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
+      const downstreamShare = results.totals.scope3 > 0 ? ((downstreamScope3Rows.reduce((s, r) => s + r.value, 0) / results.totals.scope3) * 100).toFixed(1) : "0.0";
+      const scope3ManagementInsight = `Scope 3 mix is ${upstreamShare}% upstream vs ${downstreamShare}% downstream; allocate governance and supplier/customer engagement budget in this proportion for better execution alignment.`;
+      const driversInsight = `Emissions are structurally driven by ${topDriverName}, based on current activity concentration.`;
+
+      const buildActionFromLabel = (label: string): { action: string; impact: "High" | "Medium"; effort: "Low" | "Medium"; timeline: string } => {
+        const v = label.toLowerCase();
+        if (v.includes("purchased") || v.includes("capital") || v.includes("services")) {
+          return { action: "Engage suppliers on low-carbon purchasing criteria and material substitutions.", impact: "High", effort: "Medium", timeline: "6-12 months" };
+        }
+        if (v.includes("transport") || v.includes("travel") || v.includes("commuting") || v.includes("vehicle") || v.includes("mobile")) {
+          return { action: "Optimize mobility and logistics routes; shift to lower-emission transport modes.", impact: "High", effort: "Medium", timeline: "3-9 months" };
+        }
+        if (v.includes("electricity") || v.includes("heat") || v.includes("steam") || v.includes("power")) {
+          return { action: "Improve energy efficiency and increase renewable electricity procurement.", impact: "High", effort: "Medium", timeline: "6-18 months" };
+        }
+        if (v.includes("waste") || v.includes("end of life")) {
+          return { action: "Reduce waste intensity and improve recycling/diversion controls.", impact: "Medium", effort: "Low", timeline: "1-6 months" };
+        }
+        if (v.includes("investments")) {
+          return { action: "Introduce climate criteria into portfolio screening and engagement.", impact: "Medium", effort: "Low", timeline: "3-6 months" };
+        }
+        return { action: "Establish monthly emissions governance and performance tracking routines.", impact: "Medium", effort: "Low", timeline: "1-3 months" };
+      };
+
+      const prioritizedActions = [...allRows]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5)
+        .map((r) => buildActionFromLabel(r.label));
+      while (prioritizedActions.length < 5) {
+        prioritizedActions.push({ action: "Strengthen emissions data quality and category-level verification practices.", impact: "Medium", effort: "Low", timeline: "1-3 months" });
+      }
+
+      const reportHtml = `
+      <div class="report">
+        <div class="cover">
+          <div class="cover-border-top"></div><div class="cover-border-bottom"></div><div class="cover-border-left"></div><div class="cover-border-right"></div>
+          <div class="cover-inner">
+            <div class="cover-header">
+              <div class="cover-logo-wrap">
+                <img src="/new_logo.png" alt="Rethink Carbon logo" />
+              </div>
+              <div class="cover-year">${escapeHtml(year)}</div>
+            </div>
+            <div class="cover-body">
+              <div class="cover-title">Carbon Emissions Report</div>
+              <div class="cover-company">${escapeHtml(company)}</div>
+              <div class="cover-period">${escapeHtml(period)}</div>
+            </div>
+            <div class="cover-footer">This report contains proprietary and confidential information of ${escapeHtml(company)} and is intended solely for internal use and authorized stakeholders.</div>
+          </div>
+        </div>
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="toc-title">Table of Contents</div>
+            <ul class="toc-list">
+              <li class="toc-item"><span>1. About Rethink Carbon</span><span>03</span></li>
+              <li class="toc-item"><span>2. Executive Summary</span><span>04</span></li>
+              <li class="toc-item"><span>3. Introduction</span><span>05</span></li>
+              <li class="toc-item"><span>4. Methodology Overview</span><span>06</span></li>
+              <li class="toc-item"><span>5. Operational Boundaries</span><span>07</span></li>
+              <li class="toc-item"><span>6. Emissions Inventory</span><span>09</span></li>
+              <li class="toc-item"><span>7. Scope 1 / Scope 2 / Scope 3 Analysis</span><span>10-12</span></li>
+              <li class="toc-item"><span>8. Emissions Drivers Analysis</span><span>13</span></li>
+              ${hasPreviousYearValues ? `<li class="toc-item"><span>9. Full Detail & Trend Analysis</span><span>14</span></li>` : ""}
+            </ul>
+            <div class="page-number">2</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">About Rethink Carbon</div>
+            <div class="about-box">
+              <div class="about-text" style="margin-bottom:0;">
+                Rethink Carbon is an AI-powered climate intelligence platform designed to help organizations measure,
+                understand, and reduce their greenhouse gas (GHG) emissions. The platform enables companies to move
+                beyond basic carbon accounting by providing actionable insights, scenario analysis, and data-driven
+                decarbonization strategies.
+                <br /><br />
+                By combining robust emissions calculation methodologies with advanced analytics, Rethink Carbon supports
+                organizations in transitioning from compliance-focused reporting to performance-driven sustainability.
+              </div>
+            </div>
+            <div class="page-number">3</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="page-title">Executive Summary</div><div class="page-divider"></div>
+            <div class="exec-grid">
+              <div class="exec-card">
+                <div class="exec-card-title">A. Emissions Snapshot</div>
+                <div class="exec-kpi">${fmt(results.totals.grand)} tCO2e</div>
+
+                <div class="scope-bar">
+                  <div class="scope-bar-top"><span>Scope 1</span><span>${scope1Pct}%</span></div>
+                  <div class="scope-bar-track"><div class="scope-bar-fill" style="width:${scope1Pct}%;background:#e11d48;"></div></div>
+                </div>
+                <div class="scope-bar">
+                  <div class="scope-bar-top"><span>Scope 2</span><span>${scope2Pct}%</span></div>
+                  <div class="scope-bar-track"><div class="scope-bar-fill" style="width:${scope2Pct}%;background:#f59e0b;"></div></div>
+                </div>
+                <div class="scope-bar">
+                  <div class="scope-bar-top"><span>Scope 3</span><span>${scope3Pct}%</span></div>
+                  <div class="scope-bar-track"><div class="scope-bar-fill" style="width:${scope3Pct}%;background:#2563eb;"></div></div>
+                </div>
+              </div>
+              <div class="exec-card">
+                <div class="exec-card-title">B. Key Insights</div>
+                <ul class="insights-list">
+                  ${keyInsights.map((insight) => `<li>${escapeHtml(insight)}</li>`).join("")}
+                </ul>
+              </div>
+            </div>
+
+            <div class="exec-card-title" style="margin-bottom:8px;">Top 5 Actions (Prioritized)</div>
+            <table class="actions-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Impact</th>
+                  <th>Effort</th>
+                  <th>Timeline</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${prioritizedActions.map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.action)}</td>
+                    <td class="pill-cell"><div class="pill-wrap"><span class="badge ${item.impact === "High" ? "badge-impact-high" : "badge-impact-medium"}">${item.impact}</span></div></td>
+                    <td class="pill-cell"><div class="pill-wrap"><span class="badge ${item.effort === "Low" ? "badge-effort-low" : "badge-effort-medium"}">${item.effort}</span></div></td>
+                    <td>${escapeHtml(item.timeline)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(results.totals.grand)} tCO2e</div></div>
+            <div class="page-number">4</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">1. Introduction</div>
+            <div class="subsection-title">1.1. About This Report</div>
+
+            <p class="body-text">
+              This report contains the carbon footprint of the organization — ${escapeHtml(company)} for the reporting period Y-${escapeHtml(year)}: ${escapeHtml(reportPeriodStart)} to ${escapeHtml(reportPeriodEnd)}.
+              The purpose of this report is to disseminate the inventory of greenhouse gas (GHG) emissions with great attention to the accounting principles of
+              relevance, accuracy, consistency, completeness and transparency.
+            </p>
+
+            <p class="body-text">
+              This report is intended for all stakeholders interested in the GHG emissions inventory and the associated reporting structure and explanations.
+            </p>
+
+            <p class="body-text">This report:</p>
+            <ul class="bullet-list">
+              <li>Covers the footprint of the entire organization: ${escapeHtml(company)}.</li>
+              <li>Has been prepared in accordance with the requirements of the Greenhouse Gas Protocol reporting standards (Corporate Accounting and Reporting Standard, 2004; Corporate Value Chain Accounting and Reporting Standard, 2011).</li>
+            </ul>
+
+            <p class="body-text">
+              The reporting period covered in this document is ${escapeHtml(reportPeriodStart)} to ${escapeHtml(reportPeriodEnd)}. The period of the next iteration of this footprint is expected to be of the same length,
+              starting from the first day following this reporting period (${escapeHtml(nextIterationStartText)}). Any deviation from this will be mentioned in communication at the time of publication.
+            </p>
+
+            <p class="body-text">The objective of this report is to:</p>
+            <ul class="bullet-list">
+              <li>Quantify emissions across Scope 1, Scope 2, and relevant Scope 3 categories.</li>
+              <li>Identify key emissions drivers and operational hotspots.</li>
+              <li>Provide benchmarking and performance insights.</li>
+              <li>Highlight actionable opportunities for emissions reduction.</li>
+              <li>Support internal decision-making and external reporting requirements.</li>
+            </ul>
+
+            <p class="body-text">
+              This document is intended for use by management, sustainability teams, investors, and other stakeholders involved in climate-related decision-making.
+            </p>
+
+            <div class="page-number">5</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">Methodology Overview</div>
+
+            <p class="body-text">
+              This assessment of GHG emissions is compliant with the Greenhouse Gas Protocol, a globally recognized standard jointly developed by the World Resources Institute and the World Business Council for Sustainable Development.
+              The Greenhouse Gas Protocol provides comprehensive, standardized frameworks for quantifying and managing GHG emissions across private and public sector operations, value chains, and mitigation efforts.
+            </p>
+
+            <p class="body-text">Five key accounting principles are central to the Greenhouse Gas Protocol methodology:</p>
+            <ul class="bullet-list">
+              <li><strong>Relevance:</strong> Ensure that the GHG data collection accurately records and presents all relevant emissions from the organization.</li>
+              <li><strong>Completeness:</strong> The calculation captures all emitted GHGs. If any emission sources are omitted, clear and detailed justifications are given.</li>
+              <li><strong>Consistency:</strong> The calculations are based on uniform methods. Any changes in data sources, calculation boundaries, or emission factors are always reported.</li>
+              <li><strong>Transparency:</strong> All collected data is clearly and coherently reported, preferably through an accurate audit scheme. All assumptions on methods, approximations and emission factors are well documented.</li>
+              <li><strong>Accuracy:</strong> The quantification of GHG emissions is without systematic overestimation or underestimation, and uncertainties are minimized wherever possible.</li>
+            </ul>
+
+            <p class="body-text">
+              The Greenhouse Gas Protocol classifies emissions into 3 scopes and 21 categories:
+              Scope 1 direct emissions from owned/controlled sources, Scope 2 indirect energy emissions, and Scope 3 other indirect value chain emissions (upstream and downstream).
+              These scopes are further subdivided into distinct activity categories.
+            </p>
+
+            <div class="methodology-figure">
+              <img src="/images/Methadology.jpeg" alt="Overview of GHG Protocol scopes and value chain emissions" />
+              <div class="figure-caption">Figure 1.1: Overview of GHG Protocol scopes and emissions across the value chain</div>
+            </div>
+
+            <p class="body-text" style="margin-top:10px;">
+              To assess the global warming impact of emissions, the GHGs are evaluated using the Global Warming Potential (GWP) over a 100-year timeframe.
+              In subsequent sections, activity categories may be customized in naming, order, and subdivision to improve transparency and comparability,
+              while remaining linked to standard Greenhouse Gas Protocol category types.
+            </p>
+
+            <div class="page-number">6</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">5. Operational Boundaries</div>
+            <p class="body-text">
+              Details on the description of the activity categories, as well as their rationale to include and their
+              respective Greenhouse Gas Protocol references, can be found in the table below.
+            </p>
+
+            <table class="op-table">
+              <thead>
+                <tr>
+                  <th style="width:24%;">Category</th>
+                  <th style="width:20%;">Field</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="op-group"><td colspan="3">Direct</td></tr>
+
+                <tr><td class="op-subhead">Stationary Combustion</td><td>Description</td><td>Emissions resulting from combustion of fuels in stationary sources.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Directly related to the organization's operations.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>1.1 Stationary combustion.</td></tr>
+
+                <tr><td class="op-subhead">Gas turbines</td><td>Description</td><td>Emissions resulting from combustion of fuels in stationary sources.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Directly related to the organization's operations.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>1.1 Stationary combustion.</td></tr>
+
+                <tr><td class="op-subhead">Mobile Combustion</td><td>Description</td><td>Emissions resulting from combustion of fuels in company-owned/controlled mobile combustion sources.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Directly related to the organization's operations.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>1.2 Mobile combustion.</td></tr>
+
+                <tr><td class="op-subhead">Fugitive Emissions</td><td>Description</td><td>Emissions resulting from leakage of refrigerants or direct release of greenhouse gases.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important indicator for potential leaks or losses in the system.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>1.4 Fugitive emissions.</td></tr>
+
+                <tr class="op-group"><td colspan="3">Electricity</td></tr>
+                <tr><td class="op-subhead">Electricity</td><td>Description</td><td>Emissions resulting from generation of electricity purchased by the company.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Major source of indirect emissions.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>2.1 Purchased electricity.</td></tr>
+
+                <tr class="op-group"><td colspan="3">Upstream</td></tr>
+                <tr><td class="op-subhead">Goods</td><td>Description</td><td>Embedded emissions in purchased goods and services.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important overview of major indirect emission sources in the supply chain.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.1 Purchased goods and services.</td></tr>
+
+                <tr><td class="op-subhead">Services</td><td>Description</td><td>Embedded emissions in purchased goods and services.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important overview of major indirect emission sources in the supply chain.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.1 Purchased goods and services.</td></tr>
+
+                <tr><td class="op-subhead">Energy Supply</td><td>Description</td><td>Embedded emissions in the purchase of fuels and energy in other activity categories.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Reflects important upstream emissions coupled with the organization's fuel and energy use.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.3 Fuel and energy-related activities.</td></tr>
+
+                <tr><td class="op-subhead">Transport Upstream</td><td>Description</td><td>Emissions related to transport of goods upstream of production process or any transport purchased by the company.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Reflects the indirect carbon footprint of logistics in the value chain.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.4 Upstream transportation and distribution.</td></tr>
+
+                <tr><td class="op-subhead">Waste</td><td>Description</td><td>Emissions related to disposal and processing of waste generated in operations.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important indicator for impact of waste streams.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.5 Waste generated in operations.</td></tr>
+
+                <tr><td class="op-subhead">Business Travel</td><td>Description</td><td>Emissions related to transportation of employees for business-related activities.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important for understanding and managing travel-related emissions.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.6 Business travel.</td></tr>
+
+                <tr><td class="op-subhead">Commuting</td><td>Description</td><td>Emissions related to commutes of employees in vehicles not under control of the company.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important for understanding and managing employee commuting emissions.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.7 Employee commuting.</td></tr>
+
+              </tbody>
+            </table>
+
+            <div class="page-number">7</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">5. Operational Boundaries (Continued)</div>
+            <table class="op-table">
+              <thead>
+                <tr>
+                  <th style="width:24%;">Category</th>
+                  <th style="width:20%;">Field</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="op-group"><td colspan="3">Downstream</td></tr>
+                <tr><td class="op-subhead">Transport Downstream</td><td>Description</td><td>Emissions related to transport of goods downstream of the production process not paid for by the company.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Reflects the indirect carbon footprint of logistics happening downstream in the value chain.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.9 Downstream transportation and distribution.</td></tr>
+
+                <tr><td class="op-subhead">Use of Product</td><td>Description</td><td>Emissions related to energy use of the product during its planned lifetime.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important for understanding the full lifecycle impact of products.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.11 Use of sold products.</td></tr>
+
+                <tr><td class="op-subhead">Investments</td><td>Description</td><td>Emissions related to operation of investments.</td></tr>
+                <tr><td></td><td>Rationale to include</td><td>Important for understanding the impact of financial investments.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.15 Investments.</td></tr>
+
+                <tr><td class="op-subhead">Process Emissions</td><td>Description</td><td>Emissions resulting from release of greenhouse gases in production processes.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Emissions category not applicable.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>1.3 Process emissions.</td></tr>
+
+                <tr><td class="op-subhead">Steam, Heat, Cooling</td><td>Description</td><td>Emissions resulting from generation of steam, heating, or cooling purchased by the company.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Emissions category not applicable.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>2.2 Purchased steam, heat, cooling.</td></tr>
+
+                <tr><td class="op-subhead">Capital Goods</td><td>Description</td><td>Embedded emissions in capital goods like buildings, cars, ICT and machinery.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Emissions are estimated to be insignificant and available data is of poor quality.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.2 Capital goods.</td></tr>
+
+                <tr><td class="op-subhead">Leased Assets as Lessee</td><td>Description</td><td>Emissions related to operation of assets leased by the reporting company.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Not relevant for the applied consolidation approach.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.8 Upstream leased assets (as lessee).</td></tr>
+
+                <tr><td class="op-subhead">End-of-life of Product</td><td>Description</td><td>Emissions related to disposal of sold product at end of its planned lifetime.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>The organization's influence on emission source is too limited.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.12 End-of-life treatment of sold products.</td></tr>
+
+                <tr><td class="op-subhead">Processing of Product</td><td>Description</td><td>Emissions related to further processing of sold products.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>The organization's influence on emission source is too limited.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.10 Processing of sold products.</td></tr>
+
+                <tr><td class="op-subhead">Leased Assets as Lessor</td><td>Description</td><td>Emissions related to operation of assets owned by the reporting company.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Emissions category not applicable.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.13 Downstream leased assets (as lessor).</td></tr>
+
+                <tr><td class="op-subhead">Franchises</td><td>Description</td><td>Emissions related to operation of franchises.</td></tr>
+                <tr><td></td><td>Rationale to Exclude</td><td>Emissions category not applicable.</td></tr>
+                <tr><td></td><td>GHG Protocol Reference</td><td>3.14 Franchises.</td></tr>
+              </tbody>
+            </table>
+            <div class="page-number">8</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">6. Emissions Inventory</div>
+            <div class="subsection-title">A. Total Emissions Table with Gas Breakdown</div>
+            <table class="inventory-table">
+              <thead><tr><th>Scope</th><th>Emissions (tCO2e)</th><th>% Contribution</th></tr></thead>
+              <tbody>
+                <tr><td>Scope 1</td><td class="num">${fmt(results.totals.scope1)}</td><td class="num">${scope1Pct}%</td></tr>
+                <tr><td>Scope 2</td><td class="num">${fmt(results.totals.scope2)}</td><td class="num">${scope2Pct}%</td></tr>
+                <tr><td>Scope 3</td><td class="num">${fmt(results.totals.scope3)}</td><td class="num">${scope3Pct}%</td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${fmt(results.totals.grand)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+
+            ${hasGasBreakdown ? `
+            <div class="subsection-title" style="margin-top:14px;">A.1 Gas Breakdown (Mari)</div>
+            <table class="inventory-table">
+              <thead><tr><th>Gas</th><th>Emissions (kg CO2e)</th><th>% Contribution</th></tr></thead>
+              <tbody>
+                ${gasRows.map((r) => `<tr><td>${r.gas}</td><td class="num">${(r.value).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td><td class="num">${pct(r.value, gasGrand)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${gasGrand.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            ` : ""}
+
+            <div class="subsection-title" style="margin-top:16px;">B. Category Breakdown</div>
+            <div class="chip-grid">
+              <div class="chip-card"><div class="chip-label">Energy</div><div class="chip-value">${fmt(bucketTotals.Energy)}</div></div>
+              <div class="chip-card"><div class="chip-label">Transport</div><div class="chip-value">${fmt(bucketTotals.Transport)}</div></div>
+              <div class="chip-card"><div class="chip-label">Materials</div><div class="chip-value">${fmt(bucketTotals.Materials)}</div></div>
+              <div class="chip-card"><div class="chip-label">Waste</div><div class="chip-value">${fmt(bucketTotals.Waste)}</div></div>
+            </div>
+            <div class="page-number">9</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">7. Scope 1 Analysis</div>
+            <div class="chart-bars">
+              ${scope1Rows.slice(0, 8).map((r) => `
+                <div class="chart-row">
+                  <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${fmt(r.value)} tCO2e</span></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope1)}%;background:#ef4444;"></div></div>
+                </div>
+              `).join("")}
+            </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 1</th></tr></thead>
+              <tbody>
+                ${scope1Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope1)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope1)}</strong></td><td class="num"><strong>${fmt(results.totals.scope1)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            ${ipccMonthlyRows.length > 0 ? `
+            ${ipccMonthlyRows.map((entry) => `
+              <table class="scope3-table">
+                <thead><tr><th colspan="3">${escapeHtml(entry.label)}</th></tr></thead>
+                <thead><tr><th>Month</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th></tr></thead>
+                <tbody>
+                  ${entry.monthly.map((m: any) => `<tr><td>${escapeHtml(monthLabel(m.monthStart))}</td><td class="num">${formatKg(m.kg)}</td><td class="num">${formatTonnes(m.kg)}</td></tr>`).join("")}
+                </tbody>
+              </table>
+            `).join("")}
+            ` : ""}
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope1Insight)}</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope1ManagementInsight)}</div></div>
+            ${scope1ContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope1ContributorInsight)}</div></div>` : ""}
+            <div class="page-number">10</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">8. Scope 2 Analysis</div>
+            <div class="chart-bars">
+              ${scope2Rows.slice(0, 8).map((r) => `
+                <div class="chart-row">
+                  <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${fmt(r.value)} tCO2e</span></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope2)}%;background:#f59e0b;"></div></div>
+                </div>
+              `).join("")}
+            </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 2</th></tr></thead>
+              <tbody>
+                ${scope2Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope2)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope2)}</strong></td><td class="num"><strong>${fmt(results.totals.scope2)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope2Insight)}</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope2ManagementInsight)}</div></div>
+            ${scope2ContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope2ContributorInsight)}</div></div>` : ""}
+            <div class="page-number">11</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">9. Scope 3 Analysis</div>
+            <div class="subsection-title">9.1 Upstream Breakdown</div>
+            <div class="chart-bars">
+              ${upstreamScope3Rows.slice(0, 6).map((r) => `
+                <div class="chart-row">
+                  <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${pct(r.value, results.totals.scope3)}%</span></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope3)}%;background:#2563eb;"></div></div>
+                </div>
+              `).join("")}
+            </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 3</th></tr></thead>
+              <tbody>
+                ${upstreamScope3Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
+                <tr><td><strong>Upstream Total</strong></td><td class="num"><strong>${formatKg(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${fmt(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${pct(upstreamScope3Rows.reduce((sum, r) => sum + r.value, 0), results.totals.scope3)}%</strong></td></tr>
+              </tbody>
+            </table>
+            <div class="subsection-title" style="margin-top:12px;">9.2 Downstream Breakdown</div>
+            <div class="chart-bars">
+              ${downstreamScope3Rows.slice(0, 6).map((r) => `
+                <div class="chart-row">
+                  <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${pct(r.value, results.totals.scope3)}%</span></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope3)}%;background:#1d4ed8;"></div></div>
+                </div>
+              `).join("")}
+            </div>
+            <table class="scope3-table">
+              <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 3</th></tr></thead>
+              <tbody>
+                ${downstreamScope3Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
+                <tr><td><strong>Downstream Total</strong></td><td class="num"><strong>${formatKg(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${fmt(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${pct(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0), results.totals.scope3)}%</strong></td></tr>
+                <tr><td><strong>Scope 3 Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope3)}</strong></td><td class="num"><strong>${fmt(results.totals.scope3)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+              </tbody>
+            </table>
+            <div class="insight-box"><div class="insight-text">Top 20% of categories contribute ${topSharePct}% of Scope 3 emissions.</div></div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(scope3ManagementInsight)}</div></div>
+            ${scope3UpstreamContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope3UpstreamContributorInsight)}</div></div>` : ""}
+            ${scope3DownstreamContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope3DownstreamContributorInsight)}</div></div>` : ""}
+            <div class="page-number">12</div>
+          </div>
+        </div>
+
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">10. Emissions Drivers Analysis</div>
+            <div class="chart-bars">
+              <div class="chart-row">
+                <div class="chart-meta"><span>Energy</span><span>${pctDisplay(safeEnergyDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(safeEnergyDriver, results.totals.grand)}%;background:#0ea5a3;"></div></div>
+              </div>
+              <div class="chart-row">
+                <div class="chart-meta"><span>Supply chain</span><span>${pctDisplay(supplyChainDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(supplyChainDriver, results.totals.grand)}%;background:#6366f1;"></div></div>
+              </div>
+              <div class="chart-row">
+                <div class="chart-meta"><span>Logistics</span><span>${pctDisplay(logisticsDriver, results.totals.grand)}%</span></div>
+                <div class="chart-track"><div class="chart-fill" style="width:${pctBarWidth(logisticsDriver, results.totals.grand)}%;background:#f97316;"></div></div>
+              </div>
+            </div>
+            <div class="insight-box"><div class="insight-text">${escapeHtml(driversInsight)}</div></div>
+            <div class="page-number">13</div>
+          </div>
+        </div>
+
+        ${hasPreviousYearValues ? `
+        <div class="inner-page">
+          <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
+          <div class="page-content">
+            <div class="section-title">11. Full Detail Table & Trend Analysis</div>
+            <table class="trend-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>${currentYearNum - 2}</th>
+                  <th>${currentYearNum - 1}</th>
+                  <th>${currentYearNum}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Scope 1 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope1 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope1 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope1)}</td></tr>
+                <tr><td>Scope 2 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope2 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope2 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope2)}</td></tr>
+                <tr><td>Scope 3 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope3 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope3 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope3)}</td></tr>
+                <tr><td>Grand Total Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.total * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.total * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.grand)}</td></tr>
+              </tbody>
+            </table>
+            <div class="insight-box"><div class="insight-text">Historic year-wise values can be populated automatically as prior-year inventory snapshots are stored in the platform.</div></div>
+            <div class="page-number">14</div>
+          </div>
+        </div>
+        ` : ""}
+        <div class="back-cover"><div class="powered-by"><div class="powered-by-label">Powered by</div><div class="powered-by-name">Rethink Carbon</div></div></div>
+      </div>
+      `;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "800px";
+      wrapper.style.position = "absolute";
+      wrapper.style.left = "-99999px";
+      wrapper.style.top = "0";
+      wrapper.style.background = "#ffffff";
+      const reportHtmlWithHeaderName = reportHtml.replaceAll(
+        `${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}`,
+        `${escapeHtml(headerName)} &nbsp;|&nbsp; ${escapeHtml(period)}`
+      );
+      wrapper.innerHTML = `<style>${getReportCSS()}</style>${reportHtmlWithHeaderName}`;
+      document.body.appendChild(wrapper);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 0;
+      const pageNodes = Array.from(
+        wrapper.querySelectorAll(".cover, .inner-page, .back-cover")
+      ) as HTMLElement[];
+
+      const RENDER_SCALE = 1.2;
+      const JPEG_QUALITY = 0.62;
+
+      for (let i = 0; i < pageNodes.length; i++) {
+        const node = pageNodes[i];
+        const canvas = await html2canvas(node, {
+          scale: RENDER_SCALE,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          allowTaint: true,
+        });
+        const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+        if (i > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(imgData, "JPEG", margin, margin, pageWidth, pageHeight);
+      }
+      document.body.removeChild(wrapper);
+
+      const fileDate = new Date().toISOString().slice(0, 10);
+      pdf.save(downloadFileName ?? `Emission_Results_Report_${fileDate}.pdf`);

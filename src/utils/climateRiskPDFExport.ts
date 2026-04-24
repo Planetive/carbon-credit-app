@@ -16,6 +16,160 @@ const BRAND_COLORS = {
   danger: '#EF4444', // red-500
 };
 
+// Emission Calculator (EPA) PDF palette — src/pages/EmissionCalculatorEPA.tsx
+const REPORT_GREEN = {
+  frame: { r: 26, g: 61, b: 46 }, // #1a3d2e borders, headers, back cover
+  coverInner: { r: 232, g: 240, b: 235 }, // #e8f0eb
+  coverTitle: { r: 26, g: 61, b: 46 }, // #1a3d2e
+  coverMuted: { r: 90, g: 114, b: 96 }, // #5a7260
+  topBarText: { r: 232, g: 240, b: 235 }, // #e8f0eb on green band
+  backCover: { r: 26, g: 61, b: 46 },
+};
+
+const CONTENT_HEADER_H_MM = (52 / 800) * 210 * 0.85;
+const CONTENT_START_Y = CONTENT_HEADER_H_MM + 6;
+
+/** Same cover styling as `fullEmissionReportExport.ts` (Carbon Emissions Report). */
+const TCFD_COVER_PAGE_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .report { width: 800px; font-family: 'DM Sans', Arial, sans-serif; color: #1f2a23; background: #fff; line-height: 1.5; }
+
+  .cover { width: 800px; height: 1131px; background: #d9e0e3; position: relative; overflow: hidden; }
+  .cover-border-top { position: absolute; top: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-bottom { position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; background: #0c4a3f; }
+  .cover-border-left { position: absolute; top: 0; left: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-border-right { position: absolute; top: 0; right: 0; width: 30px; height: 100%; background: #0c4a3f; }
+  .cover-inner { position: absolute; top: 30px; right: 30px; bottom: 30px; left: 30px; padding: 28px 30px 34px; }
+  .cover-header { display: flex; justify-content: space-between; align-items: center; min-height: 96px; }
+  .cover-logo-wrap { display: flex; align-items: center; margin-top: 0; width: 360px; height: 96px; overflow: hidden; }
+  .cover-logo-wrap img {
+    height: 120px;
+    width: auto;
+    max-width: none;
+    display: block;
+    object-fit: contain;
+    transform: scale(2.6) translate(-18px, 6px);
+    transform-origin: left center;
+  }
+  .cover-year {
+    font-family: 'Playfair Display', serif;
+    font-size: 34px;
+    color: #0A3D2E;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    line-height: 1;
+  }
+  .cover-body { margin-top: 190px; padding-left: 20px; }
+  .cover-title { font-family: 'Playfair Display', serif; font-size: 62px; line-height: 1.04; letter-spacing: -0.6px; color: #0A3D2E; margin-bottom: 26px; }
+  .cover-company { font-family: 'Playfair Display', serif; font-size: 42px; color: #0A3D2E; margin-bottom: 8px; }
+  .cover-period { font-family: 'Playfair Display', serif; font-size: 34px; color: #0A3D2E; margin-bottom: 18px; }
+  .cover-footer { position: absolute; right: 20px; bottom: 8px; left: 20px; font-size: 10px; color: #3d4b42; text-align: center; font-family: 'DM Sans', Arial, sans-serif; }
+`;
+
+const escapeHtmlCover = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+/**
+ * First page: pixel-identical layout to the Carbon Emissions Report cover (logo, year, title block, footer).
+ */
+const addTcfdEmissionStyleCoverPage = async (
+  pdf: jsPDF,
+  organizationName: string,
+  periodLabel: string,
+  year: string
+): Promise<void> => {
+  const company = organizationName.trim() || 'Organization';
+  const safe = escapeHtmlCover;
+  const inner = `
+    <div class="report">
+      <div class="cover">
+        <div class="cover-border-top"></div><div class="cover-border-bottom"></div><div class="cover-border-left"></div><div class="cover-border-right"></div>
+        <div class="cover-inner">
+          <div class="cover-header">
+            <div class="cover-logo-wrap">
+              <img src="/new_logo.png" alt="Rethink Carbon logo" crossorigin="anonymous" />
+            </div>
+            <div class="cover-year">${safe(year)}</div>
+          </div>
+          <div class="cover-body">
+            <div class="cover-title">TCFD Risk Analysis</div>
+            <div class="cover-company">${safe(company)}</div>
+            <div class="cover-period">${safe(periodLabel)}</div>
+          </div>
+          <div class="cover-footer">This report contains proprietary and confidential information of ${safe(company)} and is intended solely for internal use and authorized stakeholders.</div>
+        </div>
+      </div>
+    </div>`;
+
+  const html2canvas = (await import('html2canvas')).default;
+  const wrapper = document.createElement('div');
+  wrapper.style.width = '800px';
+  wrapper.style.position = 'absolute';
+  wrapper.style.left = '-99999px';
+  wrapper.style.top = '0';
+  wrapper.style.background = '#ffffff';
+  wrapper.innerHTML = `<style>${TCFD_COVER_PAGE_CSS}</style>${inner}`;
+  document.body.appendChild(wrapper);
+
+  const coverEl = wrapper.querySelector('.cover') as HTMLElement;
+  const canvas = await html2canvas(coverEl, {
+    scale: 1.2,
+    backgroundColor: '#d9e0e3',
+    useCORS: true,
+    allowTaint: true,
+  });
+  const imgData = canvas.toDataURL('image/jpeg', 0.62);
+  document.body.removeChild(wrapper);
+
+  pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+};
+
+/** Inner-page header — same structure as EPA `page-header` */
+const addGreenContentHeader = (pdf: jsPDF, rightCaption: string): void => {
+  const h = CONTENT_HEADER_H_MM;
+  pdf.setFillColor(REPORT_GREEN.frame.r, REPORT_GREEN.frame.g, REPORT_GREEN.frame.b);
+  pdf.rect(0, 0, 210, h, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(10);
+  pdf.text('Rethink Carbon', 15, h * 0.62);
+  pdf.setTextColor(Math.round(255 * 0.7), Math.round(255 * 0.7), Math.round(255 * 0.7));
+  pdf.setFontSize(8);
+  pdf.text(rightCaption, 195, h * 0.62, { align: 'right' });
+};
+
+/** New content page with green header */
+const addContentPageWithHeader = (pdf: jsPDF, rightCaption: string): number => {
+  pdf.addPage();
+  addGreenContentHeader(pdf, rightCaption);
+  return CONTENT_START_Y;
+};
+
+/** Back cover — matches EPA `.back-cover` / `.powered-by` */
+const addBrandedBackCover = (pdf: jsPDF): void => {
+  pdf.addPage();
+  pdf.setFillColor(REPORT_GREEN.backCover.r, REPORT_GREEN.backCover.g, REPORT_GREEN.backCover.b);
+  pdf.rect(0, 0, 210, 297, 'F');
+  const labelRgb = Math.round(255 * 0.6);
+  pdf.setTextColor(labelRgb, labelRgb, labelRgb);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(11);
+  pdf.text('Powered by', 195, 252, { align: 'right' });
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(15);
+  pdf.text('Rethink Carbon', 195, 262, { align: 'right' });
+};
+
 // Helper function to format currency
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-PK', {
@@ -138,13 +292,21 @@ const addMetricCard = (
   pdf.text(value, x + 3, y + 14);
 };
 
+type AddTableContinuePage = {
+  /** Called after `pdf.addPage()` when a table spans pages (e.g. draw green header) */
+  afterBreak?: (p: jsPDF) => void;
+  /** Y position for continued table header row (default 20) */
+  startY?: number;
+};
+
 // Add table
 const addTable = (
   pdf: jsPDF,
   headers: string[],
   rows: string[][],
   yPos: number,
-  columnWidths: number[]
+  columnWidths: number[],
+  continuePage?: AddTableContinuePage
 ): number => {
   const rowHeight = 10;
   const headerHeight = 12;
@@ -188,8 +350,11 @@ const addTable = (
     if (currentY + estimatedRowHeight > 280) {
       // New page
       pdf.addPage();
-      currentY = 20;
-      
+      if (continuePage?.afterBreak) {
+        continuePage.afterBreak(pdf);
+      }
+      currentY = continuePage?.startY ?? 20;
+
       // Redraw header
       pdf.setFillColor(BRAND_COLORS.primaryDark);
       pdf.rect(startX, currentY, 180, headerHeight, 'FD');
@@ -421,33 +586,25 @@ export const exportClimateRiskReport = async (
 export const exportTCFDReport = async (
   results: ScenarioResult,
   portfolioEntries: any[],
-  selectedScenario?: string
+  selectedScenario?: string,
+  organizationName?: string
 ): Promise<void> => {
   const pdf = new jsPDF('p', 'mm', 'a4');
-  let yPos = 15;
-  
-  // Add header with logo
-  yPos = await addHeader(pdf, yPos);
-  
-  // TCFD Report title
-  pdf.setFontSize(18);
-  pdf.setTextColor(BRAND_COLORS.primaryDark);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('TCFD Climate Risk Disclosure Report', 15, yPos);
-  
-  yPos += 10;
-  
-  // TCFD Framework badge
-  pdf.setFillColor(BRAND_COLORS.primaryDark);
-  pdf.setDrawColor(BRAND_COLORS.primaryDark);
-  pdf.roundedRect(15, yPos, 50, 8, 2, 2, 'FD');
-  pdf.setFontSize(9);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('TCFD Compliant', 20, yPos + 5.5);
-  
-  yPos += 15;
-  
+  const innerHeaderRight = `${results.scenarioType} | TCFD Climate Risk Disclosure`;
+
+  const now = new Date();
+  const yearStr = String(now.getFullYear());
+  const periodLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const coverOrg =
+    organizationName?.trim() ||
+    'Organization';
+
+  await addTcfdEmissionStyleCoverPage(pdf, coverOrg, periodLabel, yearStr);
+
+  pdf.addPage();
+  addGreenContentHeader(pdf, innerHeaderRight);
+  let yPos = CONTENT_START_Y;
+
   // Executive Summary
   yPos = addSectionTitle(pdf, 'Executive Summary', yPos);
   
@@ -466,8 +623,7 @@ export const exportTCFDReport = async (
     const lines = pdf.splitTextToSize(text, 180);
     lines.forEach((line: string) => {
       if (yPos > 270) {
-        pdf.addPage();
-        yPos = 20;
+        yPos = addContentPageWithHeader(pdf, innerHeaderRight);
       }
       pdf.text(line, 15, yPos);
       yPos += 6;
@@ -489,8 +645,7 @@ export const exportTCFDReport = async (
   const descLines = pdf.splitTextToSize(scenarioDesc, 180);
   descLines.forEach((line: string) => {
     if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
+      yPos = addContentPageWithHeader(pdf, innerHeaderRight);
     }
     pdf.text(line, 15, yPos);
     yPos += 6;
@@ -515,8 +670,7 @@ export const exportTCFDReport = async (
   
   governanceText.forEach((text) => {
     if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
+      yPos = addContentPageWithHeader(pdf, innerHeaderRight);
     }
     pdf.text(`• ${text}`, 18, yPos);
     yPos += 6;
@@ -541,11 +695,13 @@ export const exportTCFDReport = async (
   
   strategyText.forEach((text) => {
     if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
+      yPos = addContentPageWithHeader(pdf, innerHeaderRight);
     }
     const lines = pdf.splitTextToSize(`• ${text}`, 177);
     lines.forEach((line: string) => {
+      if (yPos > 270) {
+        yPos = addContentPageWithHeader(pdf, innerHeaderRight);
+      }
       pdf.text(line, 18, yPos);
       yPos += 6;
     });
@@ -572,8 +728,7 @@ export const exportTCFDReport = async (
   
   riskMgmtText.forEach((text) => {
     if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
+      yPos = addContentPageWithHeader(pdf, innerHeaderRight);
     }
     if (text) {
       pdf.text(text, 18, yPos);
@@ -600,12 +755,15 @@ export const exportTCFDReport = async (
   ];
   const metricsWidths = [100, 80];
   
-  yPos = addTable(pdf, metricsHeaders, metricsRows, yPos, metricsWidths);
+  const tcfdTableContinue = {
+    afterBreak: (p: jsPDF) => addGreenContentHeader(p, innerHeaderRight),
+    startY: CONTENT_START_Y,
+  };
+  yPos = addTable(pdf, metricsHeaders, metricsRows, yPos, metricsWidths, tcfdTableContinue);
   
   // Top Exposures
   if (yPos > 250) {
-    pdf.addPage();
-    yPos = 20;
+    yPos = addContentPageWithHeader(pdf, innerHeaderRight);
   }
   
   yPos = addSectionTitle(pdf, 'Top Risk Exposures', yPos);
@@ -620,12 +778,11 @@ export const exportTCFDReport = async (
   ]);
   const topExposuresWidths = [15, 60, 40, 35, 30];
   
-  yPos = addTable(pdf, topExposuresHeaders, topExposuresRows, yPos, topExposuresWidths);
+  yPos = addTable(pdf, topExposuresHeaders, topExposuresRows, yPos, topExposuresWidths, tcfdTableContinue);
   
   // Sector Breakdown
   if (yPos > 250) {
-    pdf.addPage();
-    yPos = 20;
+    yPos = addContentPageWithHeader(pdf, innerHeaderRight);
   }
   
   yPos = addSectionTitle(pdf, 'Sector Risk Breakdown', yPos);
@@ -639,12 +796,11 @@ export const exportTCFDReport = async (
   ]);
   const sectorWidths = [85, 35, 25, 35];
   
-  yPos = addTable(pdf, sectorHeaders, sectorRows, yPos, sectorWidths);
+  yPos = addTable(pdf, sectorHeaders, sectorRows, yPos, sectorWidths, tcfdTableContinue);
   
   // Asset Class Breakdown
   if (yPos > 250) {
-    pdf.addPage();
-    yPos = 20;
+    yPos = addContentPageWithHeader(pdf, innerHeaderRight);
   }
   
   yPos = addSectionTitle(pdf, 'Asset Class Risk Breakdown', yPos);
@@ -658,12 +814,11 @@ export const exportTCFDReport = async (
   ]);
   const assetClassWidths = [70, 40, 30, 40];
   
-  yPos = addTable(pdf, assetClassHeaders, assetClassRows, yPos, assetClassWidths);
+  yPos = addTable(pdf, assetClassHeaders, assetClassRows, yPos, assetClassWidths, tcfdTableContinue);
   
   // TCFD Compliance Statement
   if (yPos > 250) {
-    pdf.addPage();
-    yPos = 20;
+    yPos = addContentPageWithHeader(pdf, innerHeaderRight);
   }
   
   yPos = addSectionTitle(pdf, 'TCFD Compliance Statement', yPos);
@@ -686,32 +841,39 @@ export const exportTCFDReport = async (
   
   complianceText.forEach((text) => {
     if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
+      yPos = addContentPageWithHeader(pdf, innerHeaderRight);
     }
     const lines = pdf.splitTextToSize(text, 180);
     lines.forEach((line: string) => {
+      if (yPos > 270) {
+        yPos = addContentPageWithHeader(pdf, innerHeaderRight);
+      }
       pdf.text(line, 15, yPos);
       yPos += 6;
     });
     yPos += 2;
   });
   
-  // Footer
+  addBrandedBackCover(pdf);
+
   const pageCount = (pdf as any).internal.pages.length;
+  const contentBodyPages = Math.max(1, pageCount - 2);
   for (let i = 1; i <= pageCount; i++) {
     pdf.setPage(i);
+    if (i === 1 || i === pageCount) {
+      continue;
+    }
     pdf.setFontSize(8);
     pdf.setTextColor(BRAND_COLORS.textLight);
     pdf.setFont('helvetica', 'normal');
+    const bodyIndex = i - 1;
     pdf.text(
-      `Page ${i} of ${pageCount} | TCFD Climate Risk Disclosure Report | ReThink Carbon | ${new Date().toLocaleDateString()}`,
+      `Page ${bodyIndex} of ${contentBodyPages} | TCFD Climate Risk Disclosure | ReThink Carbon | ${new Date().toLocaleDateString()}`,
       15,
       285
     );
   }
-  
-  // Save PDF
+
   pdf.save(`TCFD_Climate_Risk_Report_${results.scenarioType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
 };
 
