@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import { FormulaConfig } from '../types/formula';
 
 export interface Property {

@@ -1,4 +1,4 @@
-import MainHeader from "@/components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";

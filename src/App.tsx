@@ -9,7 +9,7 @@ import { CompanyProtectedRoute } from "@/components/CompanyProtectedRoute";
 import { PermissionProtectedRoute } from "@/components/PermissionProtectedRoute";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
-import Footer from "@/components/ui/Footer";
+import Footer from "@/components/layout/Footer";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -26,28 +26,38 @@ import ProjectReports from "./pages/ProjectReports";
 import ProjectDrafts from "./pages/ProjectDrafts";
 import NotFound from "./pages/NotFound";
 import ProjectDetails from "./pages/ProjectDetails";
-import ExploreProjects from "./pages/ExploreProjects";
+import ExploreProjects from "./pages/explore/sub-pages/global-projects";
 import ProjectTable from "./pages/ProjectTable";
 import ProjectCards from "./pages/ProjectCards";
-import ExploreHub from "./pages/ExploreHub";
-import MarketsMechanisms from "./pages/MarketsMechanisms";
+import ExploreHub from "./pages/explore";
+import MarketsMechanisms from "./pages/explore/sub-pages/markets-mechanisms";
 import FilteredProjects from "./pages/FilteredProjects";
 import FilteredProjectsLanding from "./pages/FilteredProjectsLanding";
 import FilteredCCUSProjects from "./pages/FilteredCCUSProjects";
 import FilteredMethodologies from "./pages/FilteredMethodologies";
-import AppHeader from "@/components/ui/AppHeader";
-import MainLayout from "@/components/ui/MainLayout";
-import ExploreCCUSProjects from "./pages/ExploreCCUSProjects";
-import CCUSProjectDetails from "./pages/CCUSProjectDetails";
-import ExploreCCUSPolicies from "./pages/ExploreCCUSPolicies";
-import ExploreBESS from "./pages/ExploreBESS";
-import CountryEmissions from "./pages/CountryEmissions";
-import CCUSManagementStrategy from "./pages/CCUSManagementStrategy";
+import AppHeader from "@/components/layout/AppHeader";
+import MainLayout from "@/components/layout/MainLayout";
+import ExploreCCUSProjects from "./pages/explore/sub-pages/ccus-projects";
+import CCUSProjectDetails from "./pages/explore/sub-pages/ccus-project-details";
+import ExploreCCUSPolicies from "./pages/explore/sub-pages/ccus-policies";
+import ExploreBESS from "./pages/explore/sub-pages/bess-projects";
+import CountryEmissions from "./pages/explore/sub-pages/country-emissions";
+import CCUSManagementStrategy from "./pages/explore/sub-pages/ccus-management-strategy";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
 import ContactSubmissions from "./pages/ContactSubmissions";
 import Pricing from "./pages/Pricing";
 import ESGHealthCheck from "./pages/ESGHealthCheck";
+import EsgManagementEntryRedirect from "./pages/esg-management/EsgManagementEntryRedirect";
+import BoundarySettingPage from "./pages/esg-management/BoundarySettingPage";
+import AirQualityPage from "./pages/esg-management/AirQualityPage";
+import AirQualityResultsPage from "./pages/esg-management/AirQualityResultsPage";
+import EsgTopicsPage from "./pages/esg-management/EsgTopicsPage";
+import GhgInventoryBoundaryPage from "./pages/esg-management/GhgInventoryBoundaryPage";
+import WaterManagementPage from "./pages/esg-management/WaterManagementPage";
+import WaterManagementResultsPage from "./pages/esg-management/WaterManagementResultsPage";
+import BiodiversityPage from "./pages/esg-management/BiodiversityPage";
+import BiodiversityResultsPage from "./pages/esg-management/BiodiversityResultsPage";
 import ESGResults from "./pages/ESGResults";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -268,6 +278,61 @@ const AppRoutes = () => {
           <Route path="/contact-submissions" element={
             <CompanyProtectedRoute>
               <ContactSubmissions />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management" element={
+            <CompanyProtectedRoute>
+              <EsgManagementEntryRedirect />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/topics" element={
+            <CompanyProtectedRoute>
+              <EsgTopicsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/boundary-setting" element={
+            <CompanyProtectedRoute>
+              <BoundarySettingPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/ghg/inventory-boundary" element={
+            <CompanyProtectedRoute>
+              <GhgInventoryBoundaryPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/air-quality/results" element={
+            <CompanyProtectedRoute>
+              <AirQualityResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/air-quality" element={
+            <CompanyProtectedRoute>
+              <AirQualityPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/water-management/results" element={
+            <CompanyProtectedRoute>
+              <WaterManagementResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/water-management" element={
+            <CompanyProtectedRoute>
+              <WaterManagementPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/biodiversity/results" element={
+            <CompanyProtectedRoute>
+              <BiodiversityResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/biodiversity" element={
+            <CompanyProtectedRoute>
+              <BiodiversityPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/modules" element={
+            <CompanyProtectedRoute>
+              <Navigate to="/esg-management/topics" replace />
             </CompanyProtectedRoute>
           } />
           <Route path="/esg-health-check" element={

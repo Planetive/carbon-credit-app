@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 
+type InputWithCachedValue = HTMLInputElement & { _value?: string };
+
 interface FranchisesSectionProps {
   emissionData: EmissionData;
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
@@ -20,19 +22,15 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
 }) => {
   const { toast } = useToast();
 
+  const getInputValue = (id: string): string => {
+    const element = document.getElementById(id) as InputWithCachedValue | null;
+    return element?._value ?? element?.value ?? "";
+  };
+
   const addFranchiseEntry = () => {
-    const details =
-      ((document.getElementById("fr-details") as any)?._value as string) ||
-      (document.getElementById("fr-details") as HTMLInputElement)?.value ||
-      "";
-    const ops =
-      ((document.getElementById("fr-ops") as any)?._value as string) ||
-      (document.getElementById("fr-ops") as HTMLInputElement)?.value ||
-      "";
-    const energy =
-      ((document.getElementById("fr-energy") as any)?._value as string) ||
-      (document.getElementById("fr-energy") as HTMLInputElement)?.value ||
-      "";
+    const details = getInputValue("fr-details");
+    const ops = getInputValue("fr-ops");
+    const energy = getInputValue("fr-energy");
 
     if (!details || !ops || !energy) {
       toast({
@@ -109,7 +107,10 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
           <Input
             id="fr-details"
             placeholder="Enter franchise info"
-            onChange={(e) => ((e.currentTarget as any)._value = e.target.value)}
+            onChange={(e) => {
+              const target = e.currentTarget as InputWithCachedValue;
+              target._value = e.target.value;
+            }}
           />
         </div>
         <div>
@@ -123,7 +124,10 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
           <Input
             id="fr-ops"
             placeholder="Describe ops practices"
-            onChange={(e) => ((e.currentTarget as any)._value = e.target.value)}
+            onChange={(e) => {
+              const target = e.currentTarget as InputWithCachedValue;
+              target._value = e.target.value;
+            }}
           />
         </div>
         <div>
@@ -137,7 +141,10 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
           <Input
             id="fr-energy"
             placeholder="e.g., kWh/year"
-            onChange={(e) => ((e.currentTarget as any)._value = e.target.value)}
+            onChange={(e) => {
+              const target = e.currentTarget as InputWithCachedValue;
+              target._value = e.target.value;
+            }}
           />
         </div>
       </div>

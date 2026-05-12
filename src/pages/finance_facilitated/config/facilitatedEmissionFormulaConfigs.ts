@@ -92,7 +92,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const verifiedEmissions = inputs.verified_emissions || 0;
@@ -183,7 +183,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const verifiedEmissions = inputs.verified_emissions || 0;
@@ -274,7 +274,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const unverifiedEmissions = inputs.unverified_emissions || 0;
@@ -365,7 +365,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const unverifiedEmissions = inputs.unverified_emissions || 0;
@@ -483,7 +483,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const energyConsumption = inputs.energy_consumption || 0;
@@ -609,7 +609,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const energyConsumption = inputs.energy_consumption || 0;
@@ -729,7 +729,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         ]
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const production = inputs.production || 0;
@@ -848,7 +848,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         ]
       }
     ],
-    calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => {
+    calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => {
       const facilitatedAmount = inputs.facilitated_amount || 0;
       const weightingFactor = inputs.weighting_factor || 0;
       const production = inputs.production || 0;

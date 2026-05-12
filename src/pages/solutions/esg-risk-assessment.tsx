@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import MainHeader from "../../components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 
 const ESGRiskAssessment = () => {
   return (

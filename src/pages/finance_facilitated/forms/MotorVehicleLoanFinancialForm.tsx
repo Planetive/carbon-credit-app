@@ -2,8 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FieldTooltip } from '../components/FieldTooltip';
-import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 
 interface MotorVehicleLoanFinancialFormProps {
   outstandingLoan: number;

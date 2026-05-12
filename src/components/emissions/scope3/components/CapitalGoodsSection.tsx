@@ -76,9 +76,8 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
       }
 
       try {
-        // Use untyped access for this table to avoid Supabase type constraints
         let query = supabase
-          .from("scope3_capital_goods" as any)
+          .from("scope3_capital_goods")
           .select("*")
           .eq("user_id", user.id);
 
@@ -88,13 +87,13 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
           query = query.is("counterparty_id", null);
         }
 
-        const { data, error } = await (query as any).order("created_at", {
+        const { data, error } = await query.order("created_at", {
           ascending: false,
         });
 
         if (error) throw error;
 
-        const loadedRows: CapitalGoodsRow[] = (data || []).map((raw: any) => {
+        const loadedRows: CapitalGoodsRow[] = (data || []).map((raw) => {
           const supplier: Supplier | null =
             raw.supplier_id != null
               ? {
@@ -118,11 +117,12 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
 
         setExistingCapitalGoods(loadedRows);
         setCapitalGoodsRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error("Error loading capital goods:", error);
         toast({
           title: "Error",
-          description: "Failed to load capital goods entries",
+          description: err.message || "Failed to load capital goods entries",
           variant: "destructive",
         });
       } finally {
@@ -204,7 +204,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         }));
 
         const { error } = await supabase
-          .from("scope3_capital_goods" as any)
+          .from("scope3_capital_goods")
           .insert(payload);
         if (error) throw error;
       }
@@ -212,7 +212,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
       if (changedExisting.length > 0) {
         const updates = changedExisting.map((r) =>
           supabase
-            .from("scope3_capital_goods" as any)
+            .from("scope3_capital_goods")
             .update({
               supplier_id: r.supplier!.id,
               supplier_name: r.supplier!.supplier_name,
@@ -224,7 +224,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
             .eq("id", r.dbId!),
         );
         const results = await Promise.all(updates);
-        const updateError = (results as any[]).find((r) => r.error)?.error;
+        const updateError = results.find((r) => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -234,7 +234,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
       });
 
       const { data: newData } = await supabase
-        .from("scope3_capital_goods" as any)
+        .from("scope3_capital_goods")
         .select("*")
         .eq("user_id", user.id)
         .is(
@@ -244,7 +244,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         .order("created_at", { ascending: false });
 
       if (newData) {
-        const updatedRows: CapitalGoodsRow[] = (newData as any[]).map((raw) => ({
+        const updatedRows: CapitalGoodsRow[] = newData.map((raw) => ({
           id: crypto.randomUUID(),
           dbId: String(raw.id),
           isExisting: true,
@@ -263,10 +263,11 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         setExistingCapitalGoods(updatedRows);
         setCapitalGoodsRows(updatedRows);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { message?: string };
       toast({
         title: "Error",
-        description: e.message || "Failed to save",
+        description: err.message || "Failed to save",
         variant: "destructive",
       });
     } finally {
@@ -292,7 +293,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
     setDeletingCapitalGoods((prev) => new Set(prev).add(id));
     try {
       const { error } = await supabase
-        .from("scope3_capital_goods" as any)
+        .from("scope3_capital_goods")
         .delete()
         .eq("id", row.dbId);
 
@@ -302,10 +303,11 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
 
       setCapitalGoodsRows((prev) => prev.filter((r) => r.id !== id));
       setExistingCapitalGoods((prev) => prev.filter((r) => r.id !== id));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Error",
-        description: error.message || "Failed to delete entry",
+        description: err.message || "Failed to delete entry",
         variant: "destructive",
       });
     } finally {

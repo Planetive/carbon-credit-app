@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import MainHeader from "../../components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,17 @@ import {
 } from "@/components/ui/dialog";
 import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
 import { confirmAction } from "@/utils/confirmAction";
+import {
+  deleteScope3FacilitatedEmission,
+  fetchLinkedCalculationDetails,
+  fetchScope3FacilitatedEmissions,
+  getOrCreateCorporateCounterparty,
+  insertScope3FacilitatedEmission,
+  updateScope3FacilitatedEmission,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
+import type { EmissionCalculationDetails, FinanceCalculationDetails } from "@/features/scope3/types/calculationDetails";
+import type { DetailEntryDto } from "@/features/scope3/types/reportDtos";
+import { SCOPE_EMISSION_UNIT } from "@/features/emissions/types/units";
 
 export interface FacilitatedEmissionRow {
   id: string;
@@ -35,36 +46,6 @@ interface FacilitatedEmissionsSectionProps {
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
 }
-
-type EmissionCalculationDetails = {
-  id: string;
-  calculation_type?: unknown;
-  company_type?: unknown;
-  formula_id?: unknown;
-  financed_emissions?: unknown;
-  attribution_factor?: unknown;
-  data_quality_score?: unknown;
-  status?: unknown;
-  created_at?: string | null;
-  inputs?: Record<string, unknown> | null;
-};
-
-type FinanceCalculationDetails = {
-  id: string;
-  calculation_type?: unknown;
-  formula_name?: unknown;
-  formula_id?: unknown;
-  company_type?: unknown;
-  outstanding_amount?: unknown;
-  financed_emissions?: unknown;
-  attribution_factor?: unknown;
-  data_quality_score?: unknown;
-  total_assets?: unknown;
-  evic?: unknown;
-  total_equity_plus_debt?: unknown;
-  status?: unknown;
-  created_at?: string | null;
-};
 
 function newRow(): FacilitatedEmissionRow {
   return {
@@ -135,6 +116,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const toastRef = useRef(toast);
   const [rows, setRows] = useState<FacilitatedEmissionRow[]>([]);
   const [existing, setExisting] = useState<FacilitatedEmissionRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -143,7 +125,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
   const [importOpen, setImportOpen] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [detailsByRowId, setDetailsByRowId] = useState<Record<string, Array<{ label: string; value: string }>>>({});
+  const [detailsByRowId, setDetailsByRowId] = useState<Record<string, DetailEntryDto[]>>({});
   const [userType, setUserType] = useState<string>("corporate");
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [corporateCompanyName, setCorporateCompanyName] = useState("");
@@ -152,6 +134,10 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     ReturnType<typeof fetchPortfolioCalculationsForScope3>
   >>([]);
   const isCorporateUser = userTypeResolved ? userType === "corporate" : true;
+
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
 
   const loadRows = useCallback(async () => {
     if (!user) return;
@@ -162,18 +148,8 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       return;
     }
     try {
-      let q = supabase
-        .from("scope3_facilitated_emissions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (companyContext && counterpartyId) {
-        q = q.eq("counterparty_id", counterpartyId);
-      }
-      // Main calculator (no company context): load all lines for this user.
-      const { data, error } = await q;
-      if (error) throw error;
-      const mapped: FacilitatedEmissionRow[] = (data || []).map((e: any) => ({
+      const data = await fetchScope3FacilitatedEmissions(user.id, companyContext, counterpartyId);
+      const mapped: FacilitatedEmissionRow[] = data.map((e) => ({
         id: crypto.randomUUID(),
         dbId: e.id,
         isExisting: true,
@@ -184,7 +160,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       }));
       setExisting(mapped);
       setRows(mapped.length ? mapped : []);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       toast({ title: "Error", description: "Failed to load facilitated emissions", variant: "destructive" });
     } finally {
@@ -216,33 +192,8 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     loadUserType();
   }, [user.id]);
 
-  const getOrCreateCorporateCounterparty = useCallback(
-    async (name: string): Promise<string> => {
-      const normalized = name.trim();
-      const { data: existingCounterparty, error: existingErr } = await (supabase as any)
-        .from("counterparties")
-        .select("id")
-        .eq("user_id", user.id)
-        .ilike("name", normalized)
-        .limit(1)
-        .maybeSingle();
-      if (existingErr) throw existingErr;
-      if (existingCounterparty?.id) return existingCounterparty.id;
-
-      const { data: created, error: createErr } = await (supabase as any)
-        .from("counterparties")
-        .insert({
-          user_id: user.id,
-          name: normalized,
-          sector: "General",
-          geography: "Unknown",
-          counterparty_type: "Corporate",
-        })
-        .select("id")
-        .single();
-      if (createErr) throw createErr;
-      return created.id as string;
-    },
+  const getOrCreateCorporateCounterpartyId = useCallback(
+    async (name: string): Promise<string> => getOrCreateCorporateCounterparty(user.id, name),
     [user.id],
   );
 
@@ -256,7 +207,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         id: r.id,
         category: "facilitated_emissions",
         activity: r.activityLabel.trim(),
-        unit: "tCO₂e",
+        unit: SCOPE_EMISSION_UNIT,
         quantity: r.emissions,
         emissions: r.emissions,
       };
@@ -275,8 +226,9 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         companyContext && counterpartyId ? counterpartyId : null,
       );
       setPortfolioRows(list);
-    } catch (e: any) {
-      toast({ title: "Could not load portfolio", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Could not load portfolio", description: err.message || "Failed to load", variant: "destructive" });
     } finally {
       setImportLoading(false);
     }
@@ -297,12 +249,14 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     } else {
       payload.linked_finance_emission_calculation_id = p.id;
     }
-    const { error } = await supabase.from("scope3_facilitated_emissions").insert(payload);
-    if (error) {
+    try {
+      await insertScope3FacilitatedEmission(payload);
+    } catch (e: unknown) {
+      const error = e as { code?: string; message?: string };
       if (error.code === "23505") {
         toast({ title: "Already added", description: "This portfolio result is already in Category 16." });
       } else {
-        toast({ title: "Import failed", description: error.message, variant: "destructive" });
+        toast({ title: "Import failed", description: error.message || "Failed to import", variant: "destructive" });
       }
       return;
     }
@@ -334,11 +288,14 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       } else {
         payload.linked_finance_emission_calculation_id = p.id;
       }
-      const { error } = await (supabase as any).from("scope3_facilitated_emissions").insert(payload);
-      if (!error) {
+      try {
+        await insertScope3FacilitatedEmission(payload);
         added += 1;
-      } else if (error.code !== "23505") {
-        throw error;
+      } catch (e: unknown) {
+        const error = e as { code?: string };
+        if (error.code !== "23505") {
+          throw e;
+        }
       }
     }
     if (added > 0) {
@@ -348,18 +305,19 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         description: `${added} facilitated line${added > 1 ? "s" : ""} added to Category 16.`,
       });
     }
-  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadRows, toast]);
+  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadRows]);
 
   useEffect(() => {
     if (!userTypeResolved || !isCorporateUser) return;
-    syncCorporateFacilitatedResults().catch((e: any) => {
-      toast({
+    syncCorporateFacilitatedResults().catch((e: unknown) => {
+      const err = e as { message?: string };
+      toastRef.current({
         title: "Sync error",
-        description: e?.message || "Failed to fetch facilitated questionnaire results.",
+        description: err.message || "Failed to fetch facilitated questionnaire results.",
         variant: "destructive",
       });
     });
-  }, [userTypeResolved, isCorporateUser, syncCorporateFacilitatedResults, toast]);
+  }, [userTypeResolved, isCorporateUser, syncCorporateFacilitatedResults]);
 
   const startCorporateFacilitatedJourney = async () => {
     const name = corporateCompanyName.trim();
@@ -369,7 +327,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     }
     setCreatingCorporateJourney(true);
     try {
-      const cpId = companyContext && counterpartyId ? counterpartyId : await getOrCreateCorporateCounterparty(name);
+      const cpId = companyContext && counterpartyId ? counterpartyId : await getOrCreateCorporateCounterpartyId(name);
       navigate("/finance-emission", {
         state: {
           mode: "facilitated",
@@ -377,10 +335,11 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
           returnUrl: "/emission-calculator",
         },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { message?: string };
       toast({
         title: "Unable to start questionnaire",
-        description: e?.message || "Could not create/open the facilitated emissions questionnaire.",
+        description: err.message || "Could not create/open the facilitated emissions questionnaire.",
         variant: "destructive",
       });
     } finally {
@@ -415,28 +374,25 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     setSaving(true);
     try {
       for (const r of pending) {
-        const { error } = await supabase.from("scope3_facilitated_emissions").insert({
+        await insertScope3FacilitatedEmission({
           user_id: user.id,
           counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
           activity_label: r.activityLabel.trim(),
           emissions: r.emissions ?? 0,
         });
-        if (error) throw error;
       }
       for (const r of updates) {
-        const { error } = await supabase
-          .from("scope3_facilitated_emissions")
-          .update({
-            activity_label: r.activityLabel.trim(),
-            emissions: r.emissions!,
-          })
-          .eq("id", r.dbId!);
-        if (error) throw error;
+        if (!r.dbId) continue;
+        await updateScope3FacilitatedEmission(r.dbId, {
+          activity_label: r.activityLabel.trim(),
+          emissions: r.emissions!,
+        });
       }
       toast({ title: "Saved", description: "Facilitated emissions saved." });
       await loadRows();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -453,12 +409,12 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     if (!confirmAction({ title: "Delete this facilitated emissions line?" })) return;
     setDeleting((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase.from("scope3_facilitated_emissions").delete().eq("id", r.dbId);
-      if (error) throw error;
+      await deleteScope3FacilitatedEmission(r.dbId);
       toast({ title: "Deleted" });
       await loadRows();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to delete", variant: "destructive" });
     } finally {
       setDeleting((prev) => {
         const n = new Set(prev);
@@ -501,35 +457,15 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       const emissionIds = [...new Set(linkedRows.map((r) => r.linkedEmissionCalculationId).filter(Boolean))] as string[];
       const financeIds = [...new Set(linkedRows.map((r) => r.linkedFinanceEmissionCalculationId).filter(Boolean))] as string[];
 
-      const [ecRes, fecRes] = await Promise.all([
-        emissionIds.length
-          ? (supabase as any)
-              .from("emission_calculations")
-              .select(
-                "id, calculation_type, company_type, formula_id, financed_emissions, attribution_factor, data_quality_score, status, created_at, inputs",
-              )
-              .in("id", emissionIds)
-          : Promise.resolve({ data: [] }),
-        financeIds.length
-          ? (supabase as any)
-              .from("finance_emission_calculations")
-              .select(
-                "id, calculation_type, formula_name, formula_id, company_type, outstanding_amount, financed_emissions, attribution_factor, data_quality_score, total_assets, evic, total_equity_plus_debt, status, created_at",
-              )
-              .in("id", financeIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const ecRows = (ecRes.data || []) as EmissionCalculationDetails[];
-      const fecRows = (fecRes.data || []) as FinanceCalculationDetails[];
+      const { emissionRows: ecRows, financeRows: fecRows } = await fetchLinkedCalculationDetails(emissionIds, financeIds);
       const ecMap = new Map<string, EmissionCalculationDetails>(ecRows.map((x) => [x.id, x]));
       const fecMap = new Map<string, FinanceCalculationDetails>(fecRows.map((x) => [x.id, x]));
-      const next: Record<string, Array<{ label: string; value: string }>> = {};
+      const next: Record<string, DetailEntryDto[]> = {};
 
       linkedRows.forEach((row) => {
         const ec = row.linkedEmissionCalculationId ? ecMap.get(row.linkedEmissionCalculationId) : null;
         const fec = row.linkedFinanceEmissionCalculationId ? fecMap.get(row.linkedFinanceEmissionCalculationId) : null;
-        const entries: Array<{ label: string; value: string }> = [];
+        const entries: DetailEntryDto[] = [];
 
         if (ec) {
           entries.push(

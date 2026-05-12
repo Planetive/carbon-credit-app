@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormulaConfig } from '../types/formula';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import type { FinanceFormData, FinanceFormValue } from "../types/contracts";
 
 interface CommercialRealEstateFormProps {
   selectedFormula: FormulaConfig | null;
-  formData: Record<string, any>;
-  onUpdateFormData: (field: string, value: any) => void;
+  formData: FinanceFormData;
+  onUpdateFormData: (field: string, value: FinanceFormValue) => void;
 }
 
 export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> = ({

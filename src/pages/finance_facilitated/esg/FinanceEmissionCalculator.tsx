@@ -28,8 +28,9 @@ import { CommercialRealEstateFinancialForm } from '../forms/CommercialRealEstate
 import { FacilitatedEmissionForm } from '../forms/FacilitatedEmissionForm';
 import { smartConvertUnit } from '../utils/unitConversions';
 import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChange } from '../utils/numberFormatting';
-import { FormattedNumberInput } from '../components/FormattedNumberInput';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import type { CalculationStepDto, EmissionResultRow, FinanceFormValue, FinanceMode } from "../types/contracts";
 
 
 
@@ -40,11 +41,7 @@ interface CalculationResult {
   evic: number;
   dataQualityScore?: number;
   methodology?: string;
-  calculationSteps?: Array<{
-    step: string;
-    value: number;
-    formula: string;
-  }>;
+  calculationSteps?: CalculationStepDto[];
 }
 
 interface FinanceEmissionCalculatorProps {
@@ -58,19 +55,11 @@ interface FinanceEmissionCalculatorProps {
   scope3Emissions?: number;
   verifiedEmissions?: number;
   unverifiedEmissions?: number;
-  activeTab: 'finance' | 'facilitated';
-  onTabChange?: (tab: 'finance' | 'facilitated') => void;
+  activeTab: FinanceMode;
+  onTabChange?: (tab: FinanceMode) => void;
   onResults?: (
-    results: Array<{
-      type: string;
-      label: string;
-      attributionFactor: number;
-      financedEmissions: number;
-      denominatorLabel: string;
-      denominatorValue: number;
-      dataQualityScore?: number;
-    }>,
-    formData?: any
+    results: EmissionResultRow[],
+    formData?: Record<string, unknown>
   ) => void;
 }
 
@@ -117,9 +106,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   };
 
   // Per-loan-instance form data store so duplicate types don't overwrite each other
-  const [perLoanFormData, setPerLoanFormData] = useState<Record<string, any>>({});
+  const [perLoanFormData, setPerLoanFormData] = useState<Record<string, Record<string, unknown>>>({});
 
-  const persistCurrentLoanForm = (loanInstanceKey: string, data: any) => {
+  const persistCurrentLoanForm = (loanInstanceKey: string, data: Record<string, unknown>) => {
     if (!loanInstanceKey) return;
     setPerLoanFormData(prev => ({ ...prev, [loanInstanceKey]: data }));
   };
@@ -406,7 +395,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const resolvedCounterpartyId = (() => {
     if (propCounterpartyId) return propCounterpartyId;
     const urlParams = new URLSearchParams(window.location.search);
-    const locationState = (window.location as any).state;
+    const locationState = (window.history.state?.usr || {}) as {
+      counterpartyId?: string;
+      counterparty?: string;
+      id?: string;
+    };
     return (
       urlParams.get('counterpartyId') ||
       locationState?.counterpartyId ||
@@ -754,7 +747,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     return formData[field] || 0;
   };
 
-  const updateFormData = (field: string, value: number) => {
+  const updateFormData = (field: string, value: FinanceFormValue) => {
     // Prevent editing of auto-filled emissions when user has emissions
     if (hasEmissions === 'yes' && (field === 'verified_emissions' || field === 'unverified_emissions')) {
       return;
@@ -1147,7 +1140,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       estimated_energy_consumption_from_labels: loanTypeKey === 'mortgage' ? totalEstimatedEnergyFromLabels : smartConvertUnit(loanFormData.estimated_energy_consumption_from_labels || 0, loanFormData.estimated_energy_consumption_from_labels_unit),
       estimated_energy_consumption_from_statistics: loanTypeKey === 'mortgage' ? totalEstimatedEnergyFromStatistics : smartConvertUnit(loanFormData.estimated_energy_consumption_from_statistics || 0, loanFormData.estimated_energy_consumption_from_statistics_unit),
       floor_area: loanTypeKey === 'mortgage' ? totalFloorArea : (loanFormData.floor_area || 0)
-    } as Record<string, any>;
+    } as Record<string, unknown>;
 
     const pcafResult = calculationEngine.calculate(selectedId, pcafInputs, companyType);
 
@@ -1769,7 +1762,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               {input.unitOptions && (
                 <div className="w-48">
                   <Label htmlFor={unitFieldName}>Unit</Label>
-                  <Select value={String(unitValue)} onValueChange={(value) => updateFormData(unitFieldName, value as any)} disabled={isEmissionAutoFilled}>
+                  <Select value={String(unitValue)} onValueChange={(value) => updateFormData(unitFieldName, value)} disabled={isEmissionAutoFilled}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select unit" />
                     </SelectTrigger>

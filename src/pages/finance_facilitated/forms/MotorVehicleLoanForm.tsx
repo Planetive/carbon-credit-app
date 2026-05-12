@@ -6,13 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Info } from 'lucide-react';
 import { FormulaConfig } from '../types/formula';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import { passengerTypeTooltipText } from '@/components/emissions/shared/ukPassengerFactors';
+import type { FinanceFormData, FinanceFormValue } from "../types/contracts";
 
 interface MotorVehicleLoanFormProps {
   selectedFormula: FormulaConfig | null;
-  formData: Record<string, any>;
-  onUpdateFormData: (field: string, value: any) => void;
+  formData: FinanceFormData;
+  onUpdateFormData: (field: string, value: FinanceFormValue) => void;
 }
 
 interface VehicleEntry {
@@ -124,7 +125,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     calculateTotalEmissions(updatedEntries);
   };
 
-  const updateVehicleEntry = (id: string, field: keyof VehicleEntry, value: any) => {
+  const updateVehicleEntry = (id: string, field: keyof VehicleEntry, value: VehicleEntry[keyof VehicleEntry]) => {
     const updatedEntries = vehicleEntries.map(entry => {
       if (entry.id === id) {
         const updatedEntry = { ...entry, [field]: value };

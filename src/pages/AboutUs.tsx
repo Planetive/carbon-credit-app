@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import MainHeader from "@/components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 import { Link } from "react-router-dom";
 import {
   Carousel,

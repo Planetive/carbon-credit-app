@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import AppHeader from "@/components/ui/AppHeader";
+import AppHeader from "@/components/layout/AppHeader";
 
 const FilteredMethodologies = () => {
   const location = useLocation();

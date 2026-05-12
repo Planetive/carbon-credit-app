@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Briefcase, BookOpen, DollarSign, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import AppHeader from "@/components/ui/AppHeader";
+import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";

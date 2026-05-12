@@ -1,5 +1,5 @@
 import React from 'react'
-import MainHeader from '../../components/ui/MainHeader'
+import MainHeader from "@/components/layout/MainHeader";
 
 const DecarbonizationPage = () => {
   return (

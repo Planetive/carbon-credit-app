@@ -23,7 +23,7 @@ export interface FormulaConfig {
   optionCode: string; // '1a', '1b', '2a', etc.
   dataQualityScore: number; // 1-5, where 1 is best
   inputs: FormulaInput[];
-  calculate: (inputs: Record<string, any>, companyType: 'listed' | 'private') => CalculationResult;
+  calculate: (inputs: Record<string, unknown>, companyType: 'listed' | 'private') => CalculationResult;
   applicableScopes?: ('scope1' | 'scope2' | 'scope3')[];
   notes?: string[];
   metadata?: {
@@ -31,7 +31,7 @@ export interface FormulaConfig {
     optionCode?: string;
     category?: string;
     formula?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -46,7 +46,7 @@ export interface CalculationResult {
     value: number;
     formula: string;
   }[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CompanyData {

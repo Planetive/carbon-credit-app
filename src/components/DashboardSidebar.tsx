@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Building2,
   Globe2,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -69,7 +70,8 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'start-portfolio', title: 'Start New Portfolio', icon: Plus, path: '/bank-portfolio' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
-        { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
+        { id: 'esg-management', title: 'ESG Management', icon: Layers, path: '/esg-management' },
+        { id: 'esg-assessment', title: 'ESG Assessment', icon: FileText, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
         { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
       ]
@@ -78,7 +80,8 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         { id: 'portfolio', title: 'My Projects', icon: FileText, path: '/dashboard' },
         { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
         { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
-        { id: 'esg', title: 'ESG Assessment', icon: BarChart3, path: '/esg-health-check' },
+        { id: 'esg-management', title: 'ESG Management', icon: Layers, path: '/esg-management' },
+        { id: 'esg-assessment', title: 'ESG Assessment', icon: FileText, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
         { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
       ];
@@ -119,6 +122,15 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     }
     if (item.id === 'overview') {
       return location.pathname === '/dashboard' && (!activeSection || activeSection === 'overview');
+    }
+    if (item.id === 'esg-management' && item.path) {
+      return location.pathname.startsWith('/esg-management');
+    }
+    if (item.id === 'esg-assessment' && item.path) {
+      return (
+        location.pathname === item.path ||
+        location.pathname.startsWith('/esg-results')
+      );
     }
     if (item.id === 'emissions' && item.path) {
       return location.pathname === item.path || location.pathname === '/emission-calculator-uk' || location.pathname === '/emission-calculator-epa';

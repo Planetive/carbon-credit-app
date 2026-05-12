@@ -13,10 +13,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Building2, Users, CheckCircle, TrendingUp, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save } from 'lucide-react';
 import { FinanceEmissionCalculator } from './FinanceEmissionCalculator';
-import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { EmissionResultRow, FinanceMode, WizardLocationState, WizardResumePayload } from "../types/contracts";
+
+type RefreshPortfolioWindow = Window & {
+  refreshPortfolioData?: () => Promise<void>;
+};
 
 interface WizardStep {
   id: string;
@@ -29,12 +34,10 @@ export const ESGWizard: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const mode: 'finance' | 'facilitated' = (location.state as any)?.mode || 'finance';
+  const locationState = (location.state || {}) as WizardLocationState;
+  const mode: FinanceMode = locationState.mode || 'finance';
   const getCounterpartyIdFromSources = (): string | undefined => {
-    const stateId =
-      (location.state as any)?.counterpartyId ||
-      (location.state as any)?.counterparty ||
-      (location.state as any)?.id;
+    const stateId = locationState.counterpartyId || locationState.counterparty || locationState.id;
     if (stateId) return stateId;
 
     try {
@@ -44,7 +47,9 @@ export const ESGWizard: React.FC = () => {
         const sessionId = parsed?.counterpartyId || parsed?.formData?.counterpartyId;
         if (sessionId) return sessionId;
       }
-    } catch {}
+    } catch (error) {
+      void error;
+    }
 
     return new URLSearchParams(window.location.search).get('counterpartyId') || undefined;
   };
@@ -57,10 +62,11 @@ export const ESGWizard: React.FC = () => {
       setCounterpartyId(latest);
     }
   }, [location.state, counterpartyId]);
-  const startFresh: boolean = (location.state as any)?.startFresh === true;
-  const returnUrl: string | undefined = (location.state as any)?.returnUrl;
-  const originalState = (location.state || {}) as any;
+  const startFresh: boolean = locationState.startFresh === true;
+  const returnUrl: string | undefined = locationState.returnUrl;
+  const originalState = locationState;
   const hasPortfolioState = !!(originalState?.company || originalState?.counterpartyId || originalState?.id);
+  const resolvedReturnUrl = returnUrl || "/emission-calculator";
   
   // Debug logging to see what we're receiving
   useEffect(() => {
@@ -109,7 +115,7 @@ export const ESGWizard: React.FC = () => {
       }
 
       // IMPORTANT: Check if sessionStorage has data for a different mode and clear it
-      let resumePayload: any = null;
+      let resumePayload: WizardResumePayload | null = null;
       try {
         const saved = sessionStorage.getItem('esgWizardState');
         if (saved) {
@@ -141,7 +147,7 @@ export const ESGWizard: React.FC = () => {
           console.log('Found existing questionnaire:', questionnaire);
           
           // Load loan types from emission calculations for this counterparty (only for finance mode)
-          let loanTypes: Array<{ type: string; quantity: number }> = [];
+          const loanTypes: Array<{ type: string; quantity: number }> = [];
           if (mode === 'finance') {
             const { data: emissionCalculations } = await supabase
               .from('emission_calculations')
@@ -158,7 +164,7 @@ export const ESGWizard: React.FC = () => {
               const shapeCounters = { singularLoanType: 0, arrayLoanTypes: 0, missingLoanTypeData: 0 };
               emissionCalculations.forEach(calc => {
                 if (calc.inputs && typeof calc.inputs === 'object') {
-                  const inputs = calc.inputs as any;
+                  const inputs = calc.inputs as Record<string, unknown>;
                   if (Array.isArray(inputs.loanTypes) && inputs.loanTypes.length > 0) {
                     inputs.loanTypes.forEach((loanType: unknown) => {
                       const normalizedType = typeof loanType === 'string' ? loanType : '';
@@ -313,7 +319,11 @@ export const ESGWizard: React.FC = () => {
   };
   const saveSharedAnswers = (data: SharedAnswers) => {
     if (!sharedKey) return;
-    try { localStorage.setItem(sharedKey, JSON.stringify(data)); } catch {}
+    try {
+      localStorage.setItem(sharedKey, JSON.stringify(data));
+    } catch (error) {
+      void error;
+    }
   };
 
   const sharedPrefill = loadSharedAnswers();
@@ -447,17 +457,7 @@ export const ESGWizard: React.FC = () => {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [results, setResults] = useState<
-    Array<{
-      type: string;
-      label: string;
-      attributionFactor: number;
-      financedEmissions: number;
-      denominatorLabel: string;
-      denominatorValue: number;
-      dataQualityScore?: number;
-    }>
-  >([]);
+  const [results, setResults] = useState<EmissionResultRow[]>([]);
 
   // Track per-loan-type quantity inputs before adding
   const [pendingQuantities, setPendingQuantities] = useState<Record<string, number>>({});
@@ -708,7 +708,7 @@ export const ESGWizard: React.FC = () => {
       denominatorValue: number;
       dataQualityScore?: number;
     }>,
-    formData?: any
+    formData?: Record<string, unknown>
   ) => {
     console.log('🔍 ESGWizard - saveEmissionCalculations called');
     console.log('🔍 ESGWizard - counterpartyId:', counterpartyId);
@@ -946,9 +946,10 @@ export const ESGWizard: React.FC = () => {
       });
 
       // Refresh portfolio data if available
-      if (typeof (window as any).refreshPortfolioData === 'function') {
+      const appWindow = window as RefreshPortfolioWindow;
+      if (typeof appWindow.refreshPortfolioData === 'function') {
         try {
-          await (window as any).refreshPortfolioData();
+          await appWindow.refreshPortfolioData();
           console.log('Portfolio data refreshed after saving emission calculations');
         } catch (error) {
           console.warn('Failed to refresh portfolio data:', error);
@@ -1130,7 +1131,10 @@ export const ESGWizard: React.FC = () => {
     return errors;
   };
 
-  const updateFormData = (field: string, value: any) => {
+  const updateFormData = (
+    field: string,
+    value: string | number | Array<{ type: string; quantity: number }>,
+  ) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
@@ -1270,7 +1274,7 @@ export const ESGWizard: React.FC = () => {
           </div>
         );
 
-      case 'loan-type':
+      case 'loan-type': {
         if (mode === 'facilitated') {
           // Skip rendering loan-type step entirely for facilitated mode (defensive)
           return null;
@@ -1434,6 +1438,7 @@ export const ESGWizard: React.FC = () => {
             )}
           </div>
         );
+      }
 
       case 'emission-status':
         return (
@@ -1611,7 +1616,9 @@ export const ESGWizard: React.FC = () => {
                         mode, 
                         ts: Date.now() 
                       }));
-                    } catch {}
+                    } catch (error) {
+                      void error;
+                    }
                     // Navigate to the site's main emission calculator with counterpartyId
                     const url = `/emission-calculator?from=wizard&mode=${mode}${counterpartyId ? `&counterpartyId=${counterpartyId}` : ''}`;
                     window.location.href = url;
@@ -1680,7 +1687,7 @@ export const ESGWizard: React.FC = () => {
           }}
         />;
 
-      case 'results':
+      case 'results': {
         console.log('ESGWizard - Results array:', results);
         
         // Calculate totals for summary
@@ -1704,6 +1711,21 @@ export const ESGWizard: React.FC = () => {
         const averageAttributionFactor = validResults.length > 0 
           ? validResults.reduce((sum, r) => sum + (r.attributionFactor || 0), 0) / validResults.length 
           : 0;
+
+        const formatWithSeparators = (value: number, maximumFractionDigits = 2): string =>
+          new Intl.NumberFormat("en-US", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits,
+          }).format(Number.isFinite(value) ? value : 0);
+
+        const formatCompact = (value: number): string =>
+          new Intl.NumberFormat("en-US", {
+            notation: "compact",
+            maximumFractionDigits: 2,
+          }).format(Number.isFinite(value) ? value : 0);
+
+        const valueClassName =
+          "text-xl md:text-2xl font-bold leading-tight text-wrap break-all";
 
         return (
           <div className="space-y-8">
@@ -1757,8 +1779,11 @@ export const ESGWizard: React.FC = () => {
                           </div>
                           <div>
                             <div className="text-sm font-semibold text-blue-700 mb-1">Total Emissions</div>
-                            <div className="text-3xl font-bold text-blue-900">
-                              {isFinite(totalEmissions) ? totalEmissions.toFixed(2) : '0.00'} <span className="text-lg text-blue-700">tCO₂e</span>
+                            <div className={`${valueClassName} text-blue-900`} title={formatWithSeparators(totalEmissions, 2)}>
+                              {formatCompact(totalEmissions)} <span className="text-base text-blue-700">tCO₂e</span>
+                            </div>
+                            <div className="text-xs text-blue-700/80 mt-1">
+                              {formatWithSeparators(totalEmissions, 2)} tCO₂e
                             </div>
                           </div>
                         </div>
@@ -1780,8 +1805,11 @@ export const ESGWizard: React.FC = () => {
                           </div>
                           <div>
                             <div className="text-sm font-semibold text-green-700 mb-1">Average Attribution</div>
-                            <div className="text-3xl font-bold text-green-900">
-                              {isFinite(averageAttributionFactor) ? (averageAttributionFactor * 100).toFixed(2) : '0.00'}%
+                            <div className={`${valueClassName} text-green-900`} title={`${formatWithSeparators(averageAttributionFactor * 100, 2)}%`}>
+                              {formatWithSeparators(averageAttributionFactor * 100, 2)}%
+                            </div>
+                            <div className="text-xs text-green-700/80 mt-1">
+                              {formatWithSeparators(averageAttributionFactor * 100, 2)}%
                             </div>
                           </div>
                         </div>
@@ -1805,8 +1833,11 @@ export const ESGWizard: React.FC = () => {
                             <div className="text-sm font-semibold text-purple-700 mb-1">
                               {formData.corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'}
                             </div>
-                            <div className="text-3xl font-bold text-purple-900">
-                              {sharedEVIC > 0 ? sharedEVIC.toLocaleString() : '0'} <span className="text-lg text-purple-700">PKR</span>
+                            <div className={`${valueClassName} text-purple-900`} title={`${formatWithSeparators(sharedEVIC, 0)} PKR`}>
+                              {formatCompact(sharedEVIC)} <span className="text-base text-purple-700">PKR</span>
+                            </div>
+                            <div className="text-xs text-purple-700/80 mt-1">
+                              {formatWithSeparators(sharedEVIC, 0)} PKR
                             </div>
                           </div>
                         </div>
@@ -1858,19 +1889,19 @@ export const ESGWizard: React.FC = () => {
                                   </td>
                                   <td className="py-4 px-4 text-right">
                                     <span className="font-semibold text-teal-700">
-                                      {(result.attributionFactor * 100).toFixed(2)}%
+                                      {formatWithSeparators(result.attributionFactor * 100, 2)}%
                                     </span>
                                   </td>
                                   <td className="py-4 px-4 text-right">
                                     <span className="font-bold text-blue-700">
-                                      {result.financedEmissions.toFixed(2)} <span className="text-sm font-normal text-gray-600">tCO₂e</span>
+                                      {formatWithSeparators(result.financedEmissions, 2)} <span className="text-sm font-normal text-gray-600">tCO₂e</span>
                                     </span>
                                   </td>
                                   <td className="py-4 px-4 text-right">
                                     <div className="text-sm text-gray-600">
                                       <div className="font-medium">{result.denominatorLabel}</div>
                                       <div className="text-xs text-gray-500 mt-0.5">
-                                        {result.denominatorValue.toLocaleString()} PKR
+                                        {formatWithSeparators(result.denominatorValue, 0)} PKR
                                       </div>
                                     </div>
                                   </td>
@@ -1917,7 +1948,7 @@ export const ESGWizard: React.FC = () => {
                   ) : (
                     <Button 
                       onClick={() => {
-                        const target = returnUrl || '/dashboard';
+                        const target = resolvedReturnUrl;
                         if (hasPortfolioState && returnUrl) {
                           navigate(target, { state: originalState });
                         } else {
@@ -1933,7 +1964,7 @@ export const ESGWizard: React.FC = () => {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const target = returnUrl || '/dashboard';
+                      const target = resolvedReturnUrl;
                       if (hasPortfolioState && returnUrl) {
                         navigate(target, { state: originalState });
                       } else {
@@ -1949,6 +1980,7 @@ export const ESGWizard: React.FC = () => {
             )}
           </div>
         );
+      }
 
       default:
         return null;

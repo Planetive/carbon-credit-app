@@ -26,7 +26,7 @@ import { formatEmissions } from "../shared/utils";
 
 interface LeasedAssetsSectionProps {
   type: 'upstream' | 'downstream';
-  onSave?: (data: any) => void;
+  onSave?: (data: unknown) => void;
 }
 
 type FuelType = "Gaseous fuels" | "Liquid fuels" | "Solid fuels";
@@ -716,7 +716,10 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             <div>
               <h3 className="text-lg font-medium mb-4">Grid sources</h3>
               <Label>Electricity provider country</Label>
-              <Select value={gridCountry} onValueChange={v => setGridCountry(v as any)}>
+              <Select
+                value={gridCountry}
+                onValueChange={(v) => setGridCountry(v as "UAE" | "Pakistan")}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
@@ -1271,7 +1274,10 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               <div>
                 <h3 className="text-lg font-medium mb-4">Grid sources</h3>
                 <Label>Electricity provider country</Label>
-                <Select value={equipmentGridCountry} onValueChange={v => setEquipmentGridCountry(v as any)}>
+                <Select
+                  value={equipmentGridCountry}
+                  onValueChange={(v) => setEquipmentGridCountry(v as "UAE" | "Pakistan")}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
@@ -1831,7 +1837,12 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               <div>
                 <h3 className="text-lg font-medium mb-4">Grid sources</h3>
                 <Label>Electricity provider country</Label>
-                <Select value={infrastructureGridCountry} onValueChange={v => setInfrastructureGridCountry(v as any)}>
+                <Select
+                  value={infrastructureGridCountry}
+                  onValueChange={(v) =>
+                    setInfrastructureGridCountry(v as "UAE" | "Pakistan")
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>

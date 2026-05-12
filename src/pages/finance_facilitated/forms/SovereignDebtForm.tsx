@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FormulaConfig } from '../types/formula';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import type { FinanceFormData, FinanceFormValue } from "../types/contracts";
 
 interface SovereignDebtFormProps {
   selectedFormula: FormulaConfig | null;
-  formData: Record<string, any>;
-  onUpdateFormData: (field: string, value: any) => void;
+  formData: FinanceFormData;
+  onUpdateFormData: (field: string, value: FinanceFormValue) => void;
   totalEmission?: number; // Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)
 }
 

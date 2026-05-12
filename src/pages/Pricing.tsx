@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Check, Globe, Users, Zap, Shield, BarChart3, Star, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import MainHeader from "@/components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 
 const Pricing = () => {
   const features = [

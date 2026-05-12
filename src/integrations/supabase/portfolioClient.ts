@@ -57,8 +57,8 @@ export interface EmissionCalculation {
   calculation_type: string;
   company_type: string;
   formula_id: string;
-  inputs: any;
-  results: any;
+  inputs: Record<string, unknown>;
+  results: Record<string, unknown>;
   financed_emissions: number;
   attribution_factor: number | null;
   data_quality_score: number | null;
@@ -372,7 +372,22 @@ export class PortfolioClient {
       if (financeErr) {
         console.error('❌ PortfolioClient - finance_emission_calculations fallback error:', financeErr);
       } else if (financeRows && financeRows.length > 0) {
-        rows = financeRows.map((r: any) => ({
+        rows = financeRows.map((r: {
+          id: string;
+          user_id: string;
+          counterparty_id: string | null;
+          calculation_type: string;
+          company_type: string;
+          formula_id: string;
+          formula_name: string | null;
+          financed_emissions: number;
+          attribution_factor: number | null;
+          evic: number | null;
+          total_equity_plus_debt: number | null;
+          status: 'draft' | 'completed' | 'failed';
+          created_at: string;
+          updated_at: string;
+        }) => ({
           id: r.id,
           user_id: r.user_id,
           counterparty_id: r.counterparty_id,
@@ -410,8 +425,8 @@ export class PortfolioClient {
         calculation_type: c.calculation_type,
         formula_id: c.formula_id,
         financed_emissions: c.financed_emissions,
-        created_at: (c as any).created_at,
-        updated_at: (c as any).updated_at
+        created_at: c.created_at,
+        updated_at: c.updated_at
       }))
     });
 
@@ -736,7 +751,7 @@ export class PortfolioClient {
     formula_name: string;
     company_type: 'listed' | 'unlisted';
     data_quality_score?: number | null;
-    [key: string]: any;
+    [key: string]: unknown;
   }): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');

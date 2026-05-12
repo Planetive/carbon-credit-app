@@ -35,7 +35,7 @@ export async function fetchPortfolioCalculationsForScope3(
   const ecTypes = mode === "finance" ? ["finance"] : ["facilitated"];
   const fecType = mode === "finance" ? "finance_emission" : "facilitated_emission";
 
-  let fecQ = (supabase as any)
+  let fecQ = supabase
     .from("finance_emission_calculations")
     .select("id, counterparty_id, formula_id, formula_name, financed_emissions, status, created_at")
     .eq("user_id", userId)
@@ -47,7 +47,7 @@ export async function fetchPortfolioCalculationsForScope3(
     fecQ = fecQ.eq("counterparty_id", counterpartyId);
   }
 
-  let ecQ = (supabase as any)
+  let ecQ = supabase
     .from("emission_calculations")
     .select("id, counterparty_id, calculation_type, formula_id, financed_emissions, status, created_at")
     .eq("user_id", userId)
@@ -99,7 +99,7 @@ export async function fetchPortfolioCalculationsForScope3(
 
   const nameById = new Map<string, string>();
   if (cpIds.length > 0) {
-    const { data: cps, error: cpErr } = await (supabase as any)
+    const { data: cps, error: cpErr } = await supabase
       .from("counterparties")
       .select("id, name")
       .in("id", cpIds);

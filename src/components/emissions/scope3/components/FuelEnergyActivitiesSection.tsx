@@ -96,11 +96,12 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
 
         setExistingFuelEnergy(loadedRows);
         setFuelEnergyRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error("Error loading fuel energy activities:", error);
         toast({
           title: "Error",
-          description: "Failed to load fuel energy activities",
+          description: err.message || "Failed to load fuel energy activities",
           variant: "destructive",
         });
       } finally {
@@ -202,7 +203,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
             .eq("id", r.dbId!),
         );
         const results = await Promise.all(updates);
-        const updateError = (results as any[]).find((r) => r.error)?.error;
+        const updateError = results.find((r) => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -231,10 +232,11 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
         setExistingFuelEnergy(updatedRows);
         setFuelEnergyRows(updatedRows);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { message?: string };
       toast({
         title: "Error",
-        description: e.message || "Failed to save",
+        description: err.message || "Failed to save",
         variant: "destructive",
       });
     } finally {
@@ -270,10 +272,11 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
 
       setFuelEnergyRows((prev) => prev.filter((r) => r.id !== id));
       setExistingFuelEnergy((prev) => prev.filter((r) => r.id !== id));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Error",
-        description: error.message || "Failed to delete entry",
+        description: err.message || "Failed to delete entry",
         variant: "destructive",
       });
     } finally {

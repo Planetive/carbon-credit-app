@@ -97,12 +97,12 @@ export const calculateAttributionFactor = (outstandingAmount: number, totalAsset
   return isFinite(result) ? result : 0;
 };
 
-export const calculateEVIC = (inputs: any): number => {
-  const sharePrice = inputs.sharePrice || 0;
-  const outstandingShares = inputs.outstandingShares || 0;
-  const totalDebt = inputs.totalDebt || 0;
-  const minorityInterest = inputs.minorityInterest || 0;
-  const preferredStock = inputs.preferredStock || 0;
+export const calculateEVIC = (inputs: Record<string, unknown>): number => {
+  const sharePrice = Number(inputs.sharePrice || 0);
+  const outstandingShares = Number(inputs.outstandingShares || 0);
+  const totalDebt = Number(inputs.totalDebt || 0);
+  const minorityInterest = Number(inputs.minorityInterest || 0);
+  const preferredStock = Number(inputs.preferredStock || 0);
   
   const marketCap = sharePrice * outstandingShares;
   const result = marketCap + totalDebt + minorityInterest + preferredStock;
@@ -110,9 +110,9 @@ export const calculateEVIC = (inputs: any): number => {
   return isFinite(result) ? result : 0;
 };
 
-export const calculateTotalEquityPlusDebt = (inputs: any): number => {
-  const totalEquity = inputs.totalEquity || 0;
-  const totalDebt = inputs.totalDebt || 0;
+export const calculateTotalEquityPlusDebt = (inputs: Record<string, unknown>): number => {
+  const totalEquity = Number(inputs.totalEquity || 0);
+  const totalDebt = Number(inputs.totalDebt || 0);
   const result = totalEquity + totalDebt;
   
   return isFinite(result) ? result : 0;

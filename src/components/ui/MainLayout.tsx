@@ -15,12 +15,16 @@ const MainLayout = () => {
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [showFirstLoginLegal, setShowFirstLoginLegal] = useState(false);
 
-  // Routes that should show the sidebar
+  // Routes that should show the sidebar (keep shell aligned with DashboardSidebar destinations)
   const sidebarRoutes = [
     '/dashboard',
     '/bank-portfolio',
+    '/esg-management',
     '/esg-health-check',
-    '/project-wizard'
+    '/project-wizard',
+    '/reports',
+    '/emission-calculator',
+    '/supply-chain-intelligence',
   ];
 
   const shouldShowSidebar = sidebarRoutes.some(route => location.pathname.startsWith(route));

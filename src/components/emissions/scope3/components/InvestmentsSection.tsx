@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,19 @@ import type { InvestmentRow, InvestmentLineType } from "../types/scope3Types";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
 import { confirmAction } from "@/utils/confirmAction";
+import {
+  deleteScope3Investment,
+  fetchLinkedCalculationDetails,
+  fetchScope3Investments,
+  findScope3InvestmentDuplicate,
+  getOrCreateCorporateCounterparty,
+  insertScope3Investment,
+  insertScope3Investments,
+  updateScope3Investment,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
+import type { EmissionCalculationDetails, FinanceCalculationDetails } from "@/features/scope3/types/calculationDetails";
+import type { DetailEntryDto } from "@/features/scope3/types/reportDtos";
+import { SCOPE_EMISSION_UNIT } from "@/features/emissions/types/units";
 
 interface InvestmentsSectionProps {
   user: { id: string };
@@ -27,44 +40,6 @@ interface InvestmentsSectionProps {
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
 }
-
-type EmissionCalculationDetails = {
-  id: string;
-  calculation_type?: unknown;
-  company_type?: unknown;
-  formula_id?: unknown;
-  financed_emissions?: unknown;
-  attribution_factor?: unknown;
-  data_quality_score?: unknown;
-  evic?: unknown;
-  total_equity_plus_debt?: unknown;
-  status?: unknown;
-  created_at?: string | null;
-  inputs?: Record<string, unknown> | null;
-};
-
-type FinanceCalculationDetails = {
-  id: string;
-  calculation_type?: unknown;
-  formula_name?: unknown;
-  formula_id?: unknown;
-  company_type?: unknown;
-  outstanding_amount?: unknown;
-  financed_emissions?: unknown;
-  attribution_factor?: unknown;
-  data_quality_score?: unknown;
-  total_assets?: unknown;
-  evic?: unknown;
-  total_equity_plus_debt?: unknown;
-  share_price?: unknown;
-  outstanding_shares?: unknown;
-  total_debt?: unknown;
-  total_equity?: unknown;
-  minority_interest?: unknown;
-  preferred_stock?: unknown;
-  status?: unknown;
-  created_at?: string | null;
-};
 
 function investeeTotalFromDb(entry: Record<string, unknown>): number {
   const v = entry.emissions ?? entry.total_emissions;
@@ -137,6 +112,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const toastRef = useRef(toast);
   const [tab, setTab] = useState<"equity" | "financed">("equity");
   const [investmentRows, setInvestmentRows] = useState<InvestmentRow[]>([]);
   const [existingInvestments, setExistingInvestments] = useState<InvestmentRow[]>([]);
@@ -150,14 +126,16 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
   const [corporateCompanyName, setCorporateCompanyName] = useState("");
   const [creatingCorporateJourney, setCreatingCorporateJourney] = useState(false);
   const [expandedFinancedRows, setExpandedFinancedRows] = useState<Set<string>>(new Set());
-  const [financedDetailsByRowId, setFinancedDetailsByRowId] = useState<
-    Record<string, Array<{ label: string; value: string }>>
-  >({});
+  const [financedDetailsByRowId, setFinancedDetailsByRowId] = useState<Record<string, DetailEntryDto[]>>({});
   const [portfolioRows, setPortfolioRows] = useState<Awaited<ReturnType<typeof fetchPortfolioCalculationsForScope3>>>(
     [],
   );
 
   const isCorporateUser = userTypeResolved ? userType === "corporate" : true;
+
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
 
   const newInvestmentRow = (): InvestmentRow => ({
     id: `inv-${Date.now()}-${Math.random()}`,
@@ -202,15 +180,8 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       return;
     }
     try {
-      let query = (supabase as any).from("scope3_investments").select("*").eq("user_id", user.id);
-      if (companyContext && counterpartyId) {
-        query = query.eq("counterparty_id", counterpartyId);
-      } else {
-        query = query.is("counterparty_id", null);
-      }
-      const { data, error } = await query.order("created_at", { ascending: false });
-      if (error) throw error;
-      const loadedRows: InvestmentRow[] = (data || []).map((entry: Record<string, unknown>) => {
+      const data = await fetchScope3Investments(user.id, companyContext, counterpartyId);
+      const loadedRows: InvestmentRow[] = data.map((entry: Record<string, unknown>) => {
         const lt = lineTypeFromDb(entry);
         const inv = investeeTotalFromDb(entry);
         const pct = Number(entry.ownership_percentage) || 0;
@@ -266,33 +237,8 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     loadUserType();
   }, [user.id]);
 
-  const getOrCreateCorporateCounterparty = useCallback(
-    async (name: string): Promise<string> => {
-      const normalized = name.trim();
-      const { data: existing, error: existingErr } = await (supabase as any)
-        .from("counterparties")
-        .select("id")
-        .eq("user_id", user.id)
-        .ilike("name", normalized)
-        .limit(1)
-        .maybeSingle();
-      if (existingErr) throw existingErr;
-      if (existing?.id) return existing.id;
-
-      const { data: created, error: createErr } = await (supabase as any)
-        .from("counterparties")
-        .insert({
-          user_id: user.id,
-          name: normalized,
-          sector: "General",
-          geography: "Unknown",
-          counterparty_type: "Corporate",
-        })
-        .select("id")
-        .single();
-      if (createErr) throw createErr;
-      return created.id as string;
-    },
+  const getOrCreateCorporateCounterpartyId = useCallback(
+    async (name: string): Promise<string> => getOrCreateCorporateCounterparty(user.id, name),
     [user.id],
   );
 
@@ -308,7 +254,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           id: r.id,
           category: "investments",
           activity: `${r.companyName.trim()} (financed)`,
-          unit: "tCO₂e",
+          unit: SCOPE_EMISSION_UNIT,
           quantity: 100,
           factor: r.emissions ?? r.calculatedEmissions,
           emissions: r.calculatedEmissions,
@@ -327,7 +273,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         id: r.id,
         category: "investments",
         activity: `${r.companyName.trim()} (${r.percentage}% owned)`,
-        unit: "tCO₂e",
+        unit: SCOPE_EMISSION_UNIT,
         quantity: r.percentage,
         factor: r.emissions,
         emissions: r.calculatedEmissions || 0,
@@ -358,21 +304,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
   const importFinanceRow = async (p: (typeof portfolioRows)[0]) => {
     const name = p.counterpartyName || "Financed counterparty";
     const fe = p.financedEmissions;
-    const dupQ =
-      p.source === "emission_calculations"
-        ? (supabase as any)
-            .from("scope3_investments")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("linked_emission_calculation_id", p.id)
-            .maybeSingle()
-        : (supabase as any)
-            .from("scope3_investments")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("linked_finance_emission_calculation_id", p.id)
-            .maybeSingle();
-    const { data: dup } = await dupQ;
+    const dup = await findScope3InvestmentDuplicate(user.id, p.source, p.id);
     if (dup?.id) {
       toast({ title: "Already added", description: "This finance result is already in Investments." });
       return;
@@ -392,12 +324,14 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       basePayload.linked_finance_emission_calculation_id = p.id;
     }
 
-    const { error } = await (supabase as any).from("scope3_investments").insert(basePayload as Record<string, unknown>);
-    if (error) {
+    try {
+      await insertScope3Investment(basePayload);
+    } catch (e: unknown) {
+      const error = e as { code?: string; message?: string };
       if (error.code === "23505") {
         toast({ title: "Already added", description: "This finance result is already linked." });
       } else {
-        toast({ title: "Import failed", description: error.message, variant: "destructive" });
+        toast({ title: "Import failed", description: error.message || "Failed to import", variant: "destructive" });
       }
       return;
     }
@@ -433,11 +367,14 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       } else {
         basePayload.linked_finance_emission_calculation_id = p.id;
       }
-      const { error } = await (supabase as any).from("scope3_investments").insert(basePayload as Record<string, unknown>);
-      if (!error) {
+      try {
+        await insertScope3Investment(basePayload);
         added += 1;
-      } else if (error.code !== "23505") {
-        throw error;
+      } catch (e: unknown) {
+        const error = e as { code?: string };
+        if (error.code !== "23505") {
+          throw e;
+        }
       }
     }
     if (added > 0) {
@@ -447,18 +384,19 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         description: `${added} financed line${added > 1 ? "s" : ""} added to Investments.`,
       });
     }
-  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadInvestments, toast]);
+  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadInvestments]);
 
   useEffect(() => {
     if (!userTypeResolved || tab !== "financed" || !isCorporateUser) return;
-    syncCorporateFinanceResults().catch((e: any) => {
-      toast({
+    syncCorporateFinanceResults().catch((e: unknown) => {
+      const err = e as { message?: string };
+      toastRef.current({
         title: "Sync error",
-        description: e?.message || "Failed to fetch finance questionnaire results.",
+        description: err.message || "Failed to fetch finance questionnaire results.",
         variant: "destructive",
       });
     });
-  }, [userTypeResolved, tab, isCorporateUser, syncCorporateFinanceResults, toast]);
+  }, [userTypeResolved, tab, isCorporateUser, syncCorporateFinanceResults]);
 
   const saveInvestments = async () => {
     if (!user) {
@@ -505,25 +443,20 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           linked_emission_calculation_id: null,
           linked_finance_emission_calculation_id: null,
         }));
-        const { error } = await (supabase as any).from("scope3_investments").insert(payload);
-        if (error) throw error;
+        await insertScope3Investments(payload);
       }
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((r) =>
-          (supabase as any)
-            .from("scope3_investments")
-            .update({
-              company_name: r.companyName,
-              emissions: r.emissions!,
-              ownership_percentage: r.percentage!,
-              calculated_emissions: r.calculatedEmissions!,
-              line_type: "equity",
-            })
-            .eq("id", r.dbId!),
-        );
-        const results = await Promise.all(updates);
-        const updateError = results.find((x) => (x as { error?: { message: string } }).error)?.error;
-        if (updateError) throw updateError;
+        const updates = changedExisting.map((r) => {
+          if (!r.dbId) return Promise.resolve();
+          return updateScope3Investment(r.dbId, {
+            company_name: r.companyName,
+            emissions: r.emissions!,
+            ownership_percentage: r.percentage!,
+            calculated_emissions: r.calculatedEmissions!,
+            line_type: "equity",
+          });
+        });
+        await Promise.all(updates);
       }
       toast({
         title: "Saved",
@@ -547,8 +480,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     if (!confirmAction({ title: "Delete this entry?" })) return;
     setDeletingInvestments((prev) => new Set(prev).add(id));
     try {
-      const { error } = await (supabase as any).from("scope3_investments").delete().eq("id", row.dbId);
-      if (error) throw error;
+      await deleteScope3Investment(row.dbId);
       toast({ title: "Deleted" });
       setInvestmentRows((prev) => prev.filter((r) => r.id !== id));
       setExistingInvestments((prev) => prev.filter((r) => r.id !== id));
@@ -572,7 +504,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     }
     setCreatingCorporateJourney(true);
     try {
-      const cpId = companyContext && counterpartyId ? counterpartyId : await getOrCreateCorporateCounterparty(name);
+      const cpId = companyContext && counterpartyId ? counterpartyId : await getOrCreateCorporateCounterpartyId(name);
       navigate("/finance-emission", {
         state: {
           mode: "finance",
@@ -580,10 +512,11 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           returnUrl: "/emission-calculator",
         },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { message?: string };
       toast({
         title: "Unable to start questionnaire",
-        description: e?.message || "Could not create/open the company finance questionnaire.",
+        description: err.message || "Could not create/open the company finance questionnaire.",
         variant: "destructive",
       });
     } finally {
@@ -626,35 +559,15 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       const emissionIds = [...new Set(linkedRows.map((r) => r.linkedEmissionCalculationId).filter(Boolean))] as string[];
       const financeIds = [...new Set(linkedRows.map((r) => r.linkedFinanceEmissionCalculationId).filter(Boolean))] as string[];
 
-      const [ecRes, fecRes] = await Promise.all([
-        emissionIds.length
-          ? (supabase as any)
-              .from("emission_calculations")
-              .select(
-                "id, calculation_type, company_type, formula_id, financed_emissions, attribution_factor, data_quality_score, evic, total_equity_plus_debt, status, created_at, inputs",
-              )
-              .in("id", emissionIds)
-          : Promise.resolve({ data: [] }),
-        financeIds.length
-          ? (supabase as any)
-              .from("finance_emission_calculations")
-              .select(
-                "id, calculation_type, formula_name, formula_id, company_type, outstanding_amount, financed_emissions, attribution_factor, data_quality_score, total_assets, evic, total_equity_plus_debt, share_price, outstanding_shares, total_debt, total_equity, minority_interest, preferred_stock, status, created_at",
-              )
-              .in("id", financeIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const ecRows = (ecRes.data || []) as EmissionCalculationDetails[];
-      const fecRows = (fecRes.data || []) as FinanceCalculationDetails[];
+      const { emissionRows: ecRows, financeRows: fecRows } = await fetchLinkedCalculationDetails(emissionIds, financeIds);
       const ecMap = new Map<string, EmissionCalculationDetails>(ecRows.map((x) => [x.id, x]));
       const fecMap = new Map<string, FinanceCalculationDetails>(fecRows.map((x) => [x.id, x]));
-      const next: Record<string, Array<{ label: string; value: string }>> = {};
+      const next: Record<string, DetailEntryDto[]> = {};
 
       linkedRows.forEach((row) => {
         const ec = row.linkedEmissionCalculationId ? ecMap.get(row.linkedEmissionCalculationId) : null;
         const fec = row.linkedFinanceEmissionCalculationId ? fecMap.get(row.linkedFinanceEmissionCalculationId) : null;
-        const entries: Array<{ label: string; value: string }> = [];
+        const entries: DetailEntryDto[] = [];
 
         if (ec) {
           entries.push(

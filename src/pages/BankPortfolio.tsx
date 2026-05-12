@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormattedNumberInput } from './finance_facilitated/components/FormattedNumberInput';
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, TrendingUp, Upload, Download, FileSpreadsheet, Edit, Trash2, X, Grid3X3, FileText, BarChart3, Factory, Sparkles, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PortfolioClient, Counterparty, Exposure } from '@/integrations/supabase/portfolioClient';

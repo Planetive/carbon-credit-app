@@ -116,11 +116,12 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
 
         setExistingPurchasedGoods(loadedRows);
         setPurchasedGoodsRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error("Error loading purchased goods:", error);
         toast({
           title: "Error",
-          description: "Failed to load purchased goods entries",
+          description: err.message || "Failed to load purchased goods entries",
           variant: "destructive",
         });
       } finally {
@@ -225,7 +226,7 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
             .eq("id", r.dbId!),
         );
         const results = await Promise.all(updates);
-        const updateError = (results as any[]).find((r) => r.error)?.error;
+        const updateError = results.find((r) => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -262,10 +263,11 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
         setExistingPurchasedGoods(updatedRows);
         setPurchasedGoodsRows(updatedRows);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { message?: string };
       toast({
         title: "Error",
-        description: e.message || "Failed to save",
+        description: err.message || "Failed to save",
         variant: "destructive",
       });
     } finally {
@@ -298,10 +300,11 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
 
       setPurchasedGoodsRows((prev) => prev.filter((r) => r.id !== id));
       setExistingPurchasedGoods((prev) => prev.filter((r) => r.id !== id));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Error",
-        description: error.message || "Failed to delete entry",
+        description: err.message || "Failed to delete entry",
         variant: "destructive",
       });
     } finally {

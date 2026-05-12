@@ -1,4 +1,4 @@
-import MainHeader from "@/components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

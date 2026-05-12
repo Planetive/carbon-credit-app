@@ -9,11 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CalculationEngine } from '../engines/CalculationEngine';
+import type { FormulaInput } from '../types/formula';
 import { ALL_FACILITATED_FORMULAS, getFacilitatedFormulaById } from '../config/facilitatedEmissionFormulaConfigs';
 import { smartConvertUnit } from '../utils/unitConversions';
 import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChange } from '../utils/numberFormatting';
-import { FormattedNumberInput } from '../components/FormattedNumberInput';
-import { FieldTooltip } from '../components/FieldTooltip';
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
+import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import type { FacilitatedCalculationResult } from "../types/contracts";
 
 interface FacilitatedEmissionFormProps {
   corporateStructure?: string; // 'listed' or 'unlisted'
@@ -21,21 +23,7 @@ interface FacilitatedEmissionFormProps {
   verificationStatus?: string; // 'verified' or 'unverified'
   verifiedEmissions?: number; // Auto-calculated verified emissions from parent
   unverifiedEmissions?: number; // Auto-calculated unverified emissions from parent
-  onCalculationComplete?: (result: any) => void;
-}
-
-interface CalculationResult {
-  attributionFactor: number;
-  facilitatedEmission: number;
-  evic?: number;
-  totalEquityPlusDebt?: number;
-  dataQualityScore?: number;
-  methodology?: string;
-  calculationSteps?: Array<{
-    step: string;
-    value: number;
-    formula: string;
-  }>;
+  onCalculationComplete?: (result: FacilitatedCalculationResult) => void;
 }
 
 export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = ({
@@ -90,10 +78,15 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       try {
         // First, try to load from database if we have a counterparty ID
         const urlParams = new URLSearchParams(window.location.search);
+        const locationState = (window.history.state?.usr || {}) as {
+          counterpartyId?: string;
+          counterparty?: string;
+          id?: string;
+        };
         const counterpartyId = urlParams.get('counterpartyId') || 
-                              (window.location.state as any)?.counterpartyId ||
-                              (window.location.state as any)?.counterparty ||
-                              (window.location.state as any)?.id;
+                              locationState.counterpartyId ||
+                              locationState.counterparty ||
+                              locationState.id;
         
         if (counterpartyId) {
           const { PortfolioClient } = await import('@/integrations/supabase/portfolioClient');
@@ -224,6 +217,11 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   // Unit conversion using centralized utility
 
   const updateFormData = (field: string, value: number | string) => {
+    if (field === "underwritingShare" && typeof value === "number") {
+      const clampedShare = Math.min(100, Math.max(0, value));
+      setFormData(prev => ({ ...prev, [field]: clampedShare }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -249,10 +247,30 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
     }
 
     try {
+      if (formData.underwritingAmount <= 0) {
+        throw new Error("Underwriting amount must be greater than 0.");
+      }
+      if (formData.underwritingShare <= 0) {
+        throw new Error("Underwriting share (%) must be greater than 0.");
+      }
+      if (formData.underwritingShare > 100) {
+        throw new Error("Underwriting share (%) cannot be greater than 100.");
+      }
+      if (facilitatedAmount <= 0) {
+        throw new Error("Calculated facilitated amount must be greater than 0.");
+      }
+
       // Calculate EVIC or Total Equity + Debt based on company type
       const totalAssetsValue = companyType === 'listed' ? 
         (formData.sharePrice * formData.outstandingShares) + formData.totalDebt + formData.minorityInterest + formData.preferredStock :
         formData.totalEquity + formData.totalDebt;
+      if (totalAssetsValue <= 0) {
+        throw new Error(
+          companyType === "listed"
+            ? "EVIC must be greater than 0. Fill in share price, outstanding shares, debt, minority interest, and preferred stock."
+            : "Total Equity + Debt must be greater than 0. Fill in total equity and total debt."
+        );
+      }
 
        // Prepare inputs for calculation
        const calculationInputs = {
@@ -285,7 +303,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
 
       const calculationResult = calculationEngine.calculate(selectedFormula, calculationInputs, companyType === 'unlisted' ? 'private' : companyType);
       
-      const result: CalculationResult = {
+      const result: FacilitatedCalculationResult = {
         attributionFactor: calculationResult.attributionFactor,
         facilitatedEmission: calculationResult.financedEmissions,
         evic: companyType === 'listed' ? totalAssetsValue : undefined,
@@ -303,7 +321,9 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
           companyType,
           ts: Date.now()
         }));
-      } catch {}
+      } catch (error) {
+        void error;
+      }
       
       if (onCalculationComplete) {
         onCalculationComplete(result);
@@ -347,7 +367,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   };
 
   // Render input field based on configuration
-  const renderInputField = (inputConfig: any) => {
+  const renderInputField = (inputConfig: FormulaInput) => {
     const { name, label, type, required, unit, description, validation, unitOptions } = inputConfig;
     const value = formData[name] || '';
     
@@ -370,15 +390,17 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
           />
           {unitOptions && (
             <Select 
-              value={formData[`${name}Unit`] || unitOptions[0]} 
+              value={formData[`${name}Unit`] || unitOptions[0]?.value} 
               onValueChange={(value) => updateFormData(`${name}Unit`, value)}
             >
               <SelectTrigger className="w-32 mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {unitOptions.map((option: string) => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                {unitOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -507,11 +529,11 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                 <div className="md:col-span-2">
                   <div className="p-4 bg-primary/5 rounded-lg">
                     <div className="text-sm font-medium text-muted-foreground">Calculated Facilitated Amount</div>
-                    <div className="text-xl font-bold text-primary">
-                      ${facilitatedAmount.toLocaleString()}
+                    <div className="text-xl font-bold text-primary break-all">
+                      {facilitatedAmount.toLocaleString()} PKR
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {formData.underwritingAmount.toLocaleString()} × {formData.underwritingShare}% = ${facilitatedAmount.toLocaleString()}
+                      {formData.underwritingAmount.toLocaleString()} × {formData.underwritingShare}% = {facilitatedAmount.toLocaleString()} PKR
                     </p>
                   </div>
                 </div>
@@ -608,7 +630,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                     <div className="p-4 bg-primary/5 rounded-lg">
                       <div className="text-sm font-medium text-muted-foreground">Calculated EVIC</div>
                       <div className="text-xl font-bold text-primary">
-                        ${((formData.sharePrice * formData.outstandingShares) + formData.totalDebt + formData.minorityInterest + formData.preferredStock).toLocaleString()}
+                        {((formData.sharePrice * formData.outstandingShares) + formData.totalDebt + formData.minorityInterest + formData.preferredStock).toLocaleString()} PKR
                       </div>
                     </div>
                   </div>
@@ -644,7 +666,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                     <div className="p-4 bg-primary/5 rounded-lg">
                       <div className="text-sm font-medium text-muted-foreground">Total Equity + Debt</div>
                       <div className="text-xl font-bold text-primary">
-                        ${(formData.totalEquity + formData.totalDebt).toLocaleString()}
+                        {(formData.totalEquity + formData.totalDebt).toLocaleString()} PKR
                       </div>
                     </div>
                   </div>

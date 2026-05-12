@@ -502,7 +502,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
       try {
         let query = supabase
-          .from('scope3_upstream_transportation' as any)
+          .from('scope3_upstream_transportation')
           .select('*')
           .eq('user_id', user.id);
 
@@ -512,11 +512,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           query = query.is('counterparty_id', null);
         }
 
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -528,9 +528,14 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
         setExistingUpstreamTransport(loadedRows);
         setUpstreamTransportRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error('Error loading upstream transportation:', error);
-        toast({ title: "Error", description: "Failed to load upstream transportation entries", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load upstream transportation entries",
+          variant: "destructive",
+        });
       } finally {
         setIsInitialLoadUpstreamTransport(false);
       }
@@ -612,11 +617,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           query = query.is('counterparty_id', null);
         }
 
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -628,9 +633,14 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
         setExistingDownstreamTransport(loadedRows);
         setDownstreamTransportRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error('Error loading downstream transportation:', error);
-        toast({ title: "Error", description: "Failed to load downstream transportation entries", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load downstream transportation entries",
+          variant: "destructive",
+        });
       } finally {
         setIsInitialLoadDownstreamTransport(false);
       }
@@ -703,7 +713,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
       try {
         let query = supabase
-          .from('scope3_waste_generated' as any)
+          .from('scope3_waste_generated')
           .select('*')
           .eq('user_id', user.id);
 
@@ -713,11 +723,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           query = query.is('counterparty_id', null);
         }
 
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -729,9 +739,14 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
         setExistingWasteGenerated(loadedRows);
         setWasteGeneratedRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error('Error loading waste generated:', error);
-        toast({ title: "Error", description: "Failed to load waste generated entries", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load waste generated entries",
+          variant: "destructive",
+        });
       } finally {
         setIsInitialLoadWasteGenerated(false);
       }
@@ -817,11 +832,11 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           query = query.is('counterparty_id', null);
         }
 
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -832,9 +847,14 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
         setExistingBusinessTravel(loadedRows);
         setBusinessTravelRows(loadedRows.length > 0 ? loadedRows : []);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as { message?: string };
         console.error('Error loading business travel:', error);
-        toast({ title: "Error", description: "Failed to load business travel entries", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load business travel entries",
+          variant: "destructive",
+        });
       } finally {
         setIsInitialLoadBusinessTravel(false);
       }
@@ -1214,7 +1234,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_upstream_transportation' as any).insert(payload);
+        const { error } = await supabase.from('scope3_upstream_transportation').insert(payload);
         if (error) throw error;
       }
 
@@ -1222,7 +1242,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         const updates = changedExisting.map(r => {
           const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
           return supabase
-            .from('scope3_upstream_transportation' as any)
+            .from('scope3_upstream_transportation')
             .update({
               vehicle_type_id: r.vehicleTypeId,
               vehicle_type_name: vehicleType?.vehicle_type || '',
@@ -1234,7 +1254,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             .eq('id', r.dbId!);
         });
         const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
+        const updateError = results.find(r => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -1243,15 +1263,20 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await supabase
-        .from('scope3_upstream_transportation' as any)
+      let refreshUpstreamQuery = supabase
+        .from('scope3_upstream_transportation')
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshUpstreamQuery =
+        companyContext && counterpartyId
+          ? refreshUpstreamQuery.eq('counterparty_id', counterpartyId)
+          : refreshUpstreamQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshUpstreamQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -1263,8 +1288,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         setExistingUpstreamTransport(updatedRows);
         setUpstreamTransportRows(updatedRows);
       }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
       setSavingUpstreamTransport(false);
     }
@@ -1285,7 +1311,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     setDeletingUpstreamTransport(prev => new Set(prev).add(id));
     try {
       const { error } = await supabase
-        .from('scope3_upstream_transportation' as any)
+        .from('scope3_upstream_transportation')
         .delete()
         .eq('id', row.dbId);
 
@@ -1295,8 +1321,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       
       setUpstreamTransportRows(prev => prev.filter(r => r.id !== id));
       setExistingUpstreamTransport(prev => prev.filter(r => r.id !== id));
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to delete entry", variant: "destructive" });
     } finally {
       setDeletingUpstreamTransport(prev => {
         const newSet = new Set(prev);
@@ -1350,7 +1377,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_waste_generated' as any).insert(payload);
+        const { error } = await supabase.from('scope3_waste_generated').insert(payload);
         if (error) throw error;
       }
 
@@ -1359,7 +1386,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           const material = wasteMaterials.find(m => m.id === r.materialId);
           const factor = material ? getEmissionFactor(material, r.disposalMethod as DisposalMethod) : 0;
           return supabase
-            .from('scope3_waste_generated' as any)
+            .from('scope3_waste_generated')
             .update({
               material_id: r.materialId,
               material_name: material?.[" Material "] || '',
@@ -1371,7 +1398,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             .eq('id', r.dbId!);
         });
         const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
+        const updateError = results.find(r => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -1380,15 +1407,20 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await supabase
-        .from('scope3_waste_generated' as any)
+      let refreshWasteGeneratedQuery = supabase
+        .from('scope3_waste_generated')
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshWasteGeneratedQuery =
+        companyContext && counterpartyId
+          ? refreshWasteGeneratedQuery.eq('counterparty_id', counterpartyId)
+          : refreshWasteGeneratedQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshWasteGeneratedQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -1400,8 +1432,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         setExistingWasteGenerated(updatedRows);
         setWasteGeneratedRows(updatedRows);
       }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
       setSavingWasteGenerated(false);
     }
@@ -1422,7 +1455,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     setDeletingWasteGenerated(prev => new Set(prev).add(id));
     try {
       const { error } = await supabase
-        .from('scope3_waste_generated' as any)
+        .from('scope3_waste_generated')
         .delete()
         .eq('id', row.dbId);
 
@@ -1432,8 +1465,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       
       setWasteGeneratedRows(prev => prev.filter(r => r.id !== id));
       setExistingWasteGenerated(prev => prev.filter(r => r.id !== id));
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to delete entry", variant: "destructive" });
     } finally {
       setDeletingWasteGenerated(prev => {
         const newSet = new Set(prev);
@@ -1488,7 +1522,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_business_travel' as any).insert(payload);
+        const { error } = await supabase.from('scope3_business_travel').insert(payload);
         if (error) throw error;
       }
 
@@ -1500,7 +1534,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             factorPerKm = travelType.co2_factor / 1.60934;
           }
           return supabase
-            .from('scope3_business_travel' as any)
+            .from('scope3_business_travel')
             .update({
               travel_type_id: r.travelTypeId,
               travel_type_name: travelType?.vehicle_type || '',
@@ -1511,7 +1545,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
             .eq('id', r.dbId!);
         });
         const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
+        const updateError = results.find(r => r.error)?.error;
         if (updateError) throw updateError;
       }
 
@@ -1520,15 +1554,20 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await supabase
-        .from('scope3_business_travel' as any)
+      let refreshBusinessTravelQuery = supabase
+        .from('scope3_business_travel')
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshBusinessTravelQuery =
+        companyContext && counterpartyId
+          ? refreshBusinessTravelQuery.eq('counterparty_id', counterpartyId)
+          : refreshBusinessTravelQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshBusinessTravelQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -1539,8 +1578,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         setExistingBusinessTravel(updatedRows);
         setBusinessTravelRows(updatedRows);
       }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
       setSavingBusinessTravel(false);
     }
@@ -1561,7 +1601,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     setDeletingBusinessTravel(prev => new Set(prev).add(id));
     try {
       const { error } = await supabase
-        .from('scope3_business_travel' as any)
+        .from('scope3_business_travel')
         .delete()
         .eq('id', row.dbId);
 
@@ -1571,8 +1611,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       
       setBusinessTravelRows(prev => prev.filter(r => r.id !== id));
       setExistingBusinessTravel(prev => prev.filter(r => r.id !== id));
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to delete entry", variant: "destructive" });
     } finally {
       setDeletingBusinessTravel(prev => {
         const newSet = new Set(prev);
@@ -1662,12 +1703,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await supabase
+      let refreshEmployeeCommutingQuery = supabase
         .from('scope3_employee_commuting' as any)
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshEmployeeCommutingQuery =
+        companyContext && counterpartyId
+          ? refreshEmployeeCommutingQuery.eq('counterparty_id', counterpartyId)
+          : refreshEmployeeCommutingQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshEmployeeCommutingQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
         const updatedRows = newData.map((entry: any) => ({
@@ -1797,15 +1843,20 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await (supabase
-        .from('scope3_downstream_transportation') as any)
+      let refreshDownstreamQuery = supabase
+        .from('scope3_downstream_transportation')
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshDownstreamQuery =
+        companyContext && counterpartyId
+          ? refreshDownstreamQuery.eq('counterparty_id', counterpartyId)
+          : refreshDownstreamQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshDownstreamQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           isExisting: true,
@@ -1817,8 +1868,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         setExistingDownstreamTransport(updatedRows);
         setDownstreamTransportRows(updatedRows);
       }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
     } finally {
       setSavingDownstreamTransport(false);
     }
@@ -1849,8 +1901,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       
       setDownstreamTransportRows(prev => prev.filter(r => r.id !== id));
       setExistingDownstreamTransport(prev => prev.filter(r => r.id !== id));
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      toast({ title: "Error", description: err.message || "Failed to delete entry", variant: "destructive" });
     } finally {
       setDeletingDownstreamTransport(prev => {
         const newSet = new Set(prev);
@@ -1941,12 +1994,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      const { data: newData } = await supabase
+      let refreshEndOfLifeQuery = supabase
         .from('scope3_end_of_life_treatment' as any)
         .select('*')
-        .eq('user_id', user.id)
-        .is('counterparty_id', companyContext && counterpartyId ? counterpartyId : null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      refreshEndOfLifeQuery =
+        companyContext && counterpartyId
+          ? refreshEndOfLifeQuery.eq('counterparty_id', counterpartyId)
+          : refreshEndOfLifeQuery.is('counterparty_id', null);
+      const { data: newData } = await refreshEndOfLifeQuery.order('created_at', {
+        ascending: false,
+      });
 
       if (newData) {
         const updatedRows = newData.map((entry: any) => ({

@@ -64,7 +64,7 @@ export class CalculationEngine {
   /**
    * Validate inputs for a specific formula
    */
-  validateInputs(formulaId: string, inputs: Record<string, any>): FormulaValidationResult {
+  validateInputs(formulaId: string, inputs: Record<string, unknown>): FormulaValidationResult {
     const formula = this.getFormulaById(formulaId);
     
     // DEBUG: Log validation details
@@ -94,7 +94,10 @@ export class CalculationEngine {
           console.log(`❌ CALCULATION ENGINE DEBUG - Missing required input: ${input.name}`);
           missingInputs.push(input.name);
           errors.push(`${input.label} is required`);
-        } else if (input.type === 'number' && (isNaN(inputs[input.name]) || inputs[input.name] < 0)) {
+        } else if (
+          input.type === 'number' &&
+          (typeof inputs[input.name] !== 'number' || Number.isNaN(inputs[input.name]) || inputs[input.name] < 0)
+        ) {
           console.log(`❌ CALCULATION ENGINE DEBUG - Invalid number input: ${input.name} = ${inputs[input.name]}`);
           errors.push(`${input.label} must be a non-negative number`);
         } else {
@@ -147,7 +150,7 @@ export class CalculationEngine {
    */
   calculate(
     formulaId: string, 
-    inputs: Record<string, any>, 
+    inputs: Record<string, unknown>, 
     companyType: 'listed' | 'private'
   ): CalculationResult {
     const formula = this.getFormulaById(formulaId);
@@ -181,7 +184,7 @@ export class CalculationEngine {
    */
   calculateMultiple(
     formulaIds: string[],
-    inputs: Record<string, any>,
+    inputs: Record<string, unknown>,
     companyType: 'listed' | 'private'
   ): Map<string, CalculationResult> {
     const results = new Map<string, CalculationResult>();
@@ -269,7 +272,7 @@ export class CalculationEngine {
    */
   private addFormulaSpecificValidations(
     formula: FormulaConfig,
-    inputs: Record<string, any>,
+    inputs: Record<string, unknown>,
     errors: string[],
     warnings: string[]
   ): void {
@@ -308,19 +311,21 @@ export class CalculationEngine {
       case 'json':
         return JSON.stringify(Array.from(results.entries()), null, 2);
       
-      case 'csv':
+      case 'csv': {
         const csvHeaders = 'Formula,Data Quality Score,Attribution Factor,Emission Factor,Financed Emissions,Methodology';
         const csvRows = Array.from(results.entries()).map(([formulaId, result]) => 
           `${formulaId},${result.dataQualityScore},${result.attributionFactor},${result.emissionFactor},${result.financedEmissions},"${result.methodology}"`
         );
         return [csvHeaders, ...csvRows].join('\n');
+      }
       
-      case 'summary':
+      case 'summary': {
         const summary = Array.from(results.entries()).map(([formulaId, result]) => {
           const summaryData = this.getCalculationSummary(result);
           return `${formulaId}: ${summaryData.dataQuality} - ${result.financedEmissions.toFixed(2)} tCO2e`;
         });
         return summary.join('\n');
+      }
       
       default:
         throw new Error(`Unsupported export format: ${format}`);

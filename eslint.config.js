@@ -24,6 +24,16 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
     },
-  }
+  },
+  {
+    files: [
+      "src/components/emissions/scope3/components/InvestmentsSection.tsx",
+      "src/components/emissions/scope3/components/FacilitatedEmissionsSection.tsx",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
 );

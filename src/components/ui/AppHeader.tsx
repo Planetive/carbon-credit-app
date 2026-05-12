@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus, Grid3X3, Factory } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus, Grid3X3, Factory, Layers } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -390,6 +390,13 @@ const AppHeader = () => {
                   <span>Reports &amp; Analytics</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onClick={() => navigate("/esg-management")}
+                  className="cursor-pointer"
+                >
+                  <Layers className="mr-2 h-4 w-4" />
+                  <span>ESG Management</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => navigate("/esg-health-check")}
                   className="cursor-pointer"
                 >
@@ -473,6 +480,7 @@ const AppHeader = () => {
                       location.pathname === "/project-wizard" ||
                       location.pathname === "/bank-portfolio" ||
                       location.pathname === "/reports" ||
+                      location.pathname.startsWith("/esg-management") ||
                       location.pathname === "/esg-health-check" ||
                       location.pathname === "/emission-calculator" ||
                       location.pathname === "/emission-calculator-uk" ||
@@ -491,6 +499,8 @@ const AppHeader = () => {
                     const isStartProjectActive = location.pathname === "/project-wizard";
                     const isStartPortfolioActive = location.pathname === "/bank-portfolio";
                     const isReportsActive = location.pathname === "/reports";
+                    const isEsgManagementActive =
+                      location.pathname.startsWith("/esg-management");
                     const isEsgActive =
                       location.pathname === "/esg-health-check";
                     const isEmissionsActive =
@@ -672,6 +682,21 @@ const AppHeader = () => {
                             >
                               <BarChart3 className="h-4 w-4" />
                               <span>Reports &amp; Analytics</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/esg-management");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isEsgManagementActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <Layers className="h-4 w-4" />
+                              <span>ESG Management</span>
                             </button>
                             <button
                               type="button"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import MainHeader from "@/components/ui/MainHeader";
+import MainHeader from "@/components/layout/MainHeader";
 import {
   Card,
   CardContent,

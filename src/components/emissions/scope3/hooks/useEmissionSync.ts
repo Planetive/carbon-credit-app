@@ -23,7 +23,7 @@ interface UseEmissionSyncOptions<Row> {
   rows: Row[];
   isInitialLoad?: boolean;
   enabled?: boolean;
-  deps?: any[];
+  deps?: unknown[];
   mapRowToEntry: (row: Row) => EmissionEntry | null;
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
 }

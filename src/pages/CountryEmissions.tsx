@@ -11,6 +11,7 @@ import enLocale from "i18n-iso-countries/langs/en.json";
 import { fetchAllCountryEmissions } from "@/features/country-emissions/api";
 import type { CountryAggregateRow, CountryEmissionRecord } from "@/features/country-emissions/types";
 import { DEFAULT_TREND_CHART, pickNearestHoverPoint, type TrendHoverPoint } from "@/features/country-emissions/trendHover";
+import LoadingScreen from "@/components/LoadingScreen";
 
 countries.registerLocale(enLocale);
 
@@ -307,6 +308,30 @@ const CountryEmissions: React.FC = () => {
   };
 
   const filtered = useMemo(() => {
+    const parsedSectorFilter =
+      sectorFilter === "all"
+        ? { type: "all" as const }
+        : sectorFilter.startsWith("subsector::")
+          ? (() => {
+              const [, encodedSector, encodedSubSector] = sectorFilter.split("::");
+              return {
+                type: "subsector" as const,
+                sector: decodeFilterPart(encodedSector || ""),
+                subSector: decodeFilterPart(encodedSubSector || ""),
+              };
+            })()
+          : sectorFilter.startsWith("sector::")
+            ? (() => {
+                const [, encodedSector] = sectorFilter.split("::");
+                return {
+                  type: "sector" as const,
+                  sector: decodeFilterPart(encodedSector || ""),
+                };
+              })()
+            : { type: "all" as const };
+    const hasRegionFilter = region !== "all";
+    const hasGasFilter = gas !== "all";
+
     return rows.filter((r) => {
       const rowSector = getRowSector(r);
       const rowSubSector = getRowSubSector(r);
@@ -320,23 +345,16 @@ const CountryEmissions: React.FC = () => {
           : (startPeriod == null || rowPeriod >= startPeriod) && (endPeriod == null || rowPeriod <= endPeriod);
 
       let sectorMatch = true;
-      if (sectorFilter !== "all") {
-        if (sectorFilter.startsWith("subsector::")) {
-          const [, encodedSector, encodedSubSector] = sectorFilter.split("::");
-          const selectedSector = decodeFilterPart(encodedSector || "");
-          const selectedSubSector = decodeFilterPart(encodedSubSector || "");
-          sectorMatch = rowSector === selectedSector && rowSubSector === selectedSubSector;
-        } else if (sectorFilter.startsWith("sector::")) {
-          const [, encodedSector] = sectorFilter.split("::");
-          const selectedSector = decodeFilterPart(encodedSector || "");
-          sectorMatch = rowSector === selectedSector;
-        }
+      if (parsedSectorFilter.type === "subsector") {
+        sectorMatch = rowSector === parsedSectorFilter.sector && rowSubSector === parsedSectorFilter.subSector;
+      } else if (parsedSectorFilter.type === "sector") {
+        sectorMatch = rowSector === parsedSectorFilter.sector;
       }
 
       return (
         sectorMatch &&
-        (region === "all" || rowRegion === region) &&
-        (gas === "all" || rowGas === gas) &&
+        (!hasRegionFilter || rowRegion === region) &&
+        (!hasGasFilter || rowGas === gas) &&
         timeRangeMatch
       );
     });
@@ -502,14 +520,16 @@ const CountryEmissions: React.FC = () => {
 
   const trendChart = DEFAULT_TREND_CHART;
 
-  const trendHoverTargets = useMemo(() => {
+  const trendHoverTargetsByIndex = useMemo(() => {
     const maxIndex = Math.max(1, trendData.labels.length - 1);
-    return visibleTrendSeries.flatMap((series) => {
+    const byIndex = new Map<number, TrendHoverPoint[]>();
+
+    visibleTrendSeries.forEach((series) => {
       const color = sectorColorMap.get(series.name) || "#22a3ad";
-      return series.values.map((val, idx) => {
+      series.values.forEach((val, idx) => {
         const x = trendChart.xMin + (idx / maxIndex) * (trendChart.xMax - trendChart.xMin);
         const y = trendChart.yMin + (1 - val / trendChartMax) * (trendChart.yMax - trendChart.yMin);
-        return {
+        const point: TrendHoverPoint = {
           x,
           y,
           sector: series.name,
@@ -517,12 +537,19 @@ const CountryEmissions: React.FC = () => {
           label: trendData.labels[idx],
           color,
         };
+        const bucket = byIndex.get(idx);
+        if (bucket) {
+          bucket.push(point);
+        } else {
+          byIndex.set(idx, [point]);
+        }
       });
     });
+    return byIndex;
   }, [visibleTrendSeries, trendData.labels, trendChartMax, trendChart.xMax, trendChart.xMin, trendChart.yMax, trendChart.yMin, sectorColorMap]);
 
   const handleTrendMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (trendHoverTargets.length === 0) {
+    if (trendHoverTargetsByIndex.size === 0) {
       setHoveredTrendPoint(null);
       return;
     }
@@ -530,8 +557,18 @@ const CountryEmissions: React.FC = () => {
     const sx = ((e.clientX - rect.left) / rect.width) * trendChart.viewWidth;
     const sy = ((e.clientY - rect.top) / rect.height) * trendChart.viewHeight;
 
+    const maxIndex = Math.max(1, trendData.labels.length - 1);
+    const ratio = (sx - trendChart.xMin) / Math.max(1, trendChart.xMax - trendChart.xMin);
+    const nearestIdx = Math.round(Math.max(0, Math.min(1, ratio)) * maxIndex);
+    const candidatePoints: TrendHoverPoint[] = [];
+    for (const idx of [nearestIdx - 1, nearestIdx, nearestIdx + 1]) {
+      if (idx < 0 || idx > maxIndex) continue;
+      const bucket = trendHoverTargetsByIndex.get(idx);
+      if (bucket) candidatePoints.push(...bucket);
+    }
+
     const hoverRadius = 26;
-    latestHoverPointRef.current = pickNearestHoverPoint(trendHoverTargets, sx, sy, hoverRadius);
+    latestHoverPointRef.current = pickNearestHoverPoint(candidatePoints, sx, sy, hoverRadius);
     if (hoverRafRef.current != null) return;
     hoverRafRef.current = window.requestAnimationFrame(() => {
       hoverRafRef.current = null;
@@ -551,12 +588,10 @@ const CountryEmissions: React.FC = () => {
 
   if (loading && rows.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
+      <LoadingScreen
+        message="Loading Country Emissions"
+        subMessage="Preparing global emissions trends and sector insights..."
+      />
     );
   }
 
@@ -845,7 +880,6 @@ const CountryEmissions: React.FC = () => {
                             {r.alpha2 && (
                               <ReactCountryFlag
                                 countryCode={r.alpha2}
-                                svg
                                 style={{ width: "1.25em", height: "1.25em" }}
                                 aria-label={r.name}
                               />
