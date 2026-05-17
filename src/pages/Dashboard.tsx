@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, FolderOpen, Clock, BarChart3, Settings, LogOut, User, Globe, Sparkles, TrendingUp, FileText, ArrowRight, Search, Filter, Factory } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,12 +92,13 @@ const Dashboard = () => {
         setProjects(projectsData || []);
       }
 
-      // Fetch ESG assessment
+      // Fetch ISSB readiness assessment
       const { data: esgData, error: esgError } = await supabase
         .from("esg_assessments")
-        .select("*")
+        .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
         .eq("user_id", user.id)
-        .single();
+        .eq("assessment_type", "issb_readiness_v1")
+        .maybeSingle();
 
       if (!esgError && esgData) {
         setEsgAssessment(esgData);
@@ -106,9 +106,9 @@ const Dashboard = () => {
         // Fetch admin scores if assessment exists
         const { data: scoresData, error: scoresError } = await supabase
           .from("esg_scores")
-          .select("*")
+          .select("readiness_overall_score, readiness_maturity_band, scored_at")
           .eq("assessment_id", esgData.id)
-          .single();
+          .maybeSingle();
           
         if (!scoresError && scoresData) {
           const updatedAtMs = esgData?.updated_at ? new Date(esgData.updated_at).getTime() : 0;
@@ -505,21 +505,15 @@ const Dashboard = () => {
                              <div className="flex items-center space-x-2">
                                <div className="h-3 w-3 bg-green-400 rounded-full"></div>
                                <span className="text-sm text-emerald-100">
-                                 E: {esgAssessment.environmental_completion}%
+                                 Progress: {esgAssessment.total_completion ?? 0}%
                                </span>
                              </div>
-                             <div className="flex items-center space-x-2">
-                               <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
+                             {esgScores?.readiness_overall_score != null && (
                                <span className="text-sm text-emerald-100">
-                                 S: {esgAssessment.social_completion}%
+                                 Readiness: {Math.round(esgScores.readiness_overall_score)}%
+                                 {esgScores.readiness_maturity_band ? ` (${esgScores.readiness_maturity_band})` : ""}
                                </span>
-                             </div>
-                             <div className="flex items-center space-x-2">
-                               <div className="h-3 w-3 bg-purple-400 rounded-full"></div>
-                               <span className="text-sm text-emerald-100">
-                                 G: {esgAssessment.governance_completion}%
-                               </span>
-                             </div>
+                             )}
                            </div>
                          )}
                          {esgAssessment && (
@@ -623,7 +617,7 @@ const Dashboard = () => {
                    variant="outline" 
                    size="lg" 
                    className="w-full bg-gradient-to-r from-emerald-400 to-teal-500 text-white border-white/20 hover:bg-gradient-to-r hover:from-emerald-500 hover:to-teal-600 hover:border-white/30 hover:text-white hover:scale-105 transition-all duration-300 py-6 text-lg font-semibold shadow-lg"
-                  onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-calculator' : '/emission-results')}
+                  onClick={() => navigate('/emission-results-calculator')}
                  >
                    View Emission Results
                  </Button>

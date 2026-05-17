@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Download, Share2, BarChart3, TrendingDown, Factory, Leaf, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { isMariEnergiesUserEmail } from '@/utils/roleUtils';
 import {
   exportFullEmissionReportPdf,
   mapEmissionResultsPageToCalculatorShape,
@@ -67,6 +66,12 @@ const EmissionResults = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  useEffect(() => {
+    if (isEPA) {
+      navigate('/emission-results-calculator', { replace: true });
+    }
+  }, [isEPA, navigate]);
 
   const scope1Total = useMemo(() => {
     if (isEPA) {
@@ -453,7 +458,7 @@ const EmissionResults = () => {
       await exportFullEmissionReportPdf({
         user,
         results: mapped,
-        isMariUser: isMariEnergiesUserEmail(user.email),
+        isMariUser: isEPA,
         fuelFramework: isEPA ? "epa" : "uk",
         submittedAt: results?.submitted_at,
       });
@@ -707,7 +712,7 @@ const EmissionResults = () => {
         <div className="text-center relative z-10">
           <p className="text-gray-700 mb-4 text-lg">No emission results found</p>
           <Button onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')} className="bg-teal-600 hover:bg-teal-700">
-            Go to {isEPA ? 'EPA Calculator' : 'Emission Calculator'}
+            Go to {isEPA ? 'EPA' : 'Emission Calculator'}
           </Button>
         </div>
       </div>

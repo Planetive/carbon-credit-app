@@ -43,7 +43,6 @@ import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmi
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/components/emissions/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
-import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
 
 type EmissionPdfReportData = {
@@ -194,9 +193,8 @@ const EmissionCalculatorEPA = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const isMariUser = isMariEnergiesUserEmail(user?.email);
   const defaultManualCategory = "fuel";
-  const mariScope1CategoryIds = [
+  const ipccScope1CategoryIds = [
     "flaring",
     "venting",
     "vehicularCarbonFootprints",
@@ -244,7 +242,7 @@ const EmissionCalculatorEPA = () => {
   const [onRoadDieselAltFuelRows, setOnRoadDieselAltFuelRows] = useState<Array<{ emissions?: number }>>([]);
   const [nonRoadVehicleRows, setNonRoadVehicleRows] = useState<Array<{ emissions?: number }>>([]);
   const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
-  const [mariIpccScope1Totals, setMariIpccScope1Totals] = useState<Record<string, number>>({});
+  const [ipccScope1Totals, setIpccScope1Totals] = useState<Record<string, number>>({});
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
@@ -257,7 +255,7 @@ const EmissionCalculatorEPA = () => {
           onRoadDieselAltFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           nonRoadVehicleRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          (isMariUser ? Object.values(mariIpccScope1Totals).reduce((sum, v) => sum + (v || 0), 0) : 0),
+          Object.values(ipccScope1Totals).reduce((sum, v) => sum + (v || 0), 0),
     scope2:
       calculationMode === "lca"
         ? emissionData.scope3.find((r) => r.category === "lca_scope2")?.emissions || 0
@@ -636,7 +634,7 @@ const EmissionCalculatorEPA = () => {
     };
 
     setEmissionData(blankEmissionData);
-    setMariIpccScope1Totals({});
+    setIpccScope1Totals({});
     setActiveScope("scope1");
     setActiveCategory(defaultManualCategory);
     setResetKey((prev) => prev + 1);
@@ -647,8 +645,8 @@ const EmissionCalculatorEPA = () => {
     });
   };
 
-  const handleMariScope1TotalChange = (categoryId: string, totalMeT: number) => {
-    setMariIpccScope1Totals((prev) => {
+  const handleIpccScope1TotalChange = (categoryId: string, totalMeT: number) => {
+    setIpccScope1Totals((prev) => {
       if (prev[categoryId] === totalMeT) return prev;
       return { ...prev, [categoryId]: totalMeT };
     });
@@ -664,7 +662,7 @@ const EmissionCalculatorEPA = () => {
     { id: "nonRoadVehicle", title: "Non-Road Vehicle", icon: Truck, description: "Non-road vehicle fuel using Non-Road Vehicle table" },
   ];
 
-  const mariIpccScope1Categories = [
+  const ipccScope1Categories = [
     { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator" },
     { id: "venting", title: "Venting", icon: Flame, description: "Scope 1 venting calculator" },
     {
@@ -683,18 +681,14 @@ const EmissionCalculatorEPA = () => {
     { id: "heatingFootprints", title: "Heating", icon: Thermometer, description: "Scope 1 heating emissions calculator" },
   ];
 
-  const scope1Categories = isMariUser
-    ? [...baseScope1Categories, ...mariIpccScope1Categories]
-    : baseScope1Categories;
+  const scope1Categories = [...baseScope1Categories, ...ipccScope1Categories];
 
   const sidebarItems = [
     {
       id: "scope1",
       title: "Scope 1",
       icon: Factory,
-      description: isMariUser
-        ? "Scope 1 calculators available for your account"
-        : "Direct emissions from fuel combustion (EPA factors)",
+      description: "Direct emissions from fuel combustion and related activities (EPA factors)",
       categories: scope1Categories,
     },
     {
@@ -906,13 +900,13 @@ const EmissionCalculatorEPA = () => {
       onRoadGasolineRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
       onRoadDieselAltFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
       nonRoadVehicleRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      (mariIpccScope1Totals.vehicularCarbonFootprints || 0);
-    const fugitive = (mariIpccScope1Totals.flaring || 0) + (mariIpccScope1Totals.venting || 0);
+      (ipccScope1Totals.vehicularCarbonFootprints || 0);
+    const fugitive = (ipccScope1Totals.flaring || 0) + (ipccScope1Totals.venting || 0);
     const process =
       scope1HeatSteamRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      (mariIpccScope1Totals.kitchenFootprints || 0) +
-      (mariIpccScope1Totals.powerFuelConsumption || 0) +
-      (mariIpccScope1Totals.heatingFootprints || 0);
+      (ipccScope1Totals.kitchenFootprints || 0) +
+      (ipccScope1Totals.powerFuelConsumption || 0) +
+      (ipccScope1Totals.heatingFootprints || 0);
 
     const electricity = emissionData.scope2.find((item: any) => item.id === "electricity-total")?.emissions || 0;
     const heat = emissionData.scope2.find((item: any) => item.id === "heat-total")?.emissions || 0;
@@ -1031,7 +1025,7 @@ const EmissionCalculatorEPA = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => navigate(isMariUser ? "/emission-results-calculator" : "/emission-results?source=epa")}
+                onClick={() => navigate("/emission-results-calculator")}
                 className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
               >
                 <span className="text-sm font-medium">Results</span>
@@ -1044,7 +1038,7 @@ const EmissionCalculatorEPA = () => {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                  Emission Calculator
+                  EPA
                 </h1>
               </div>
             </div>
@@ -1402,12 +1396,12 @@ const EmissionCalculatorEPA = () => {
 
           {calculationMode === "manual" && (
             <>
-              {isMariUser && activeScope === "scope1" && mariScope1CategoryIds.includes(activeCategory) && (
-                <div className="w-full" key={`mari-ipcc-embedded-${activeCategory}-${resetKey}`}>
+              {activeScope === "scope1" && ipccScope1CategoryIds.includes(activeCategory) && (
+                <div className="w-full" key={`ipcc-embedded-${activeCategory}-${resetKey}`}>
                   <EmissionCalculatorIPCC
                     embedded
                     forcedCategory={activeCategory}
-                    onScope1CategoryTotalChange={handleMariScope1TotalChange}
+                    onScope1CategoryTotalChange={handleIpccScope1TotalChange}
                   />
                 </div>
               )}

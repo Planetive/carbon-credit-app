@@ -28,8 +28,7 @@ import {
   type ScoreValue,
 } from "@/features/esg-readiness/config";
 import { computeReadiness, sanitizeReadinessAnswers } from "@/features/esg-readiness/scoring";
-
-const ASSESSMENT_TYPE = "issb_readiness_v1";
+import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 
 const scoreLabels: Record<number, string> = {
   0: "Not in place",
@@ -74,7 +73,7 @@ const ESGHealthCheck = () => {
           .from("esg_assessments")
           .select("id, readiness_answers, status, assessment_type")
           .eq("user_id", user.id)
-          .eq("assessment_type", ASSESSMENT_TYPE)
+          .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
           .order("updated_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -134,7 +133,7 @@ const ESGHealthCheck = () => {
 
       const payload = {
         user_id: user.id,
-        assessment_type: ASSESSMENT_TYPE,
+        assessment_type: ESG_READINESS_ASSESSMENT_TYPE,
         status,
         readiness_answers: answers,
         total_completion: readiness.completionPercent,

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, BarChart3, Download, Factory, Leaf, TrendingDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadEpaIpccResults, EpaIpccResultsData } from "@/lib/epaIpccResults";
-import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { exportFullEmissionReportPdf } from "@/utils/fullEmissionReportExport";
 
@@ -130,11 +129,6 @@ const EmissionResultsEpaIpcc = () => {
         return;
       }
 
-      if (!isMariEnergiesUserEmail(user.email)) {
-        navigate("/emission-results?source=epa", { replace: true });
-        return;
-      }
-
       try {
         const data = await loadEpaIpccResults(user.id);
         setResults(data);
@@ -187,7 +181,7 @@ const EmissionResultsEpaIpcc = () => {
       await exportFullEmissionReportPdf({
         user,
         results,
-        isMariUser: isMariEnergiesUserEmail(user?.email),
+        isMariUser: true,
         fuelFramework: "epa",
         submittedAt,
       });

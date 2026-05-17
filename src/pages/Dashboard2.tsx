@@ -29,7 +29,6 @@ import {
   Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { isMariEnergiesUserEmail } from "@/utils/roleUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -201,12 +200,13 @@ const Dashboard2 = () => {
         setProjects(projectsData || []);
       }
 
-      // Fetch ESG assessment
+      // Fetch ISSB readiness assessment
       const { data: esgData, error: esgError } = await (supabase as any)
         .from("esg_assessments")
-        .select("*")
+        .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
         .eq("user_id", user.id)
-        .single();
+        .eq("assessment_type", "issb_readiness_v1")
+        .maybeSingle();
 
       if (!esgError && esgData) {
         setEsgAssessment(esgData);
@@ -214,9 +214,9 @@ const Dashboard2 = () => {
         // Fetch admin scores if assessment exists
         const { data: scoresData, error: scoresError } = await supabase
           .from("esg_scores")
-          .select("*")
+          .select("readiness_overall_score, readiness_maturity_band, scored_at")
           .eq("assessment_id", esgData.id)
-          .single();
+          .maybeSingle();
           
         if (!scoresError && scoresData) {
           const updatedAtMs = esgData?.updated_at ? new Date(esgData.updated_at).getTime() : 0;
@@ -244,14 +244,13 @@ const Dashboard2 = () => {
 
       // Load emission totals for Scope 1, 2, and 3
       try {
-        // Mari users use the EPA+IPCC calculator tables, so load from the unified results loader.
-        if (isMariEnergiesUserEmail(user?.email)) {
-          const mariResults = await loadEpaIpccResults(user.id);
-          setScope1Total(mariResults.totals.scope1);
-          setScope2Total(mariResults.totals.scope2);
-          setScope3Total(mariResults.totals.scope3);
-          setHasAnyEmissions(mariResults.totals.grand > 0);
-        } else {
+        // EPA calculator uses unified EPA+IPCC tables for totals.
+        const epaResults = await loadEpaIpccResults(user.id);
+        setScope1Total(epaResults.totals.scope1);
+        setScope2Total(epaResults.totals.scope2);
+        setScope3Total(epaResults.totals.scope3);
+        setHasAnyEmissions(epaResults.totals.grand > 0);
+        if (false) {
         // Scope 1 - Load all categories
         const [fuelRes, refRes, passRes, delRes] = await Promise.all([
           (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
@@ -1105,12 +1104,12 @@ const Dashboard2 = () => {
                         <div>
                           <p className="text-sm font-medium text-gray-500 mb-2">ESG Score</p>
                           <motion.p 
-                            key={esgScores?.overall_score}
+                            key={esgScores?.readiness_overall_score}
                             initial={{ scale: 1.3, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
                           >
-                            {esgScores ? `${Math.round(esgScores.overall_score || 0)}%` : (
+                            {esgScores?.readiness_overall_score != null ? `${Math.round(esgScores.readiness_overall_score)}%` : (
                               <span className="text-gray-400 text-xl">—</span>
                             )}
                           </motion.p>
@@ -1290,7 +1289,7 @@ const Dashboard2 = () => {
                       <motion.div className="mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                         <Button 
                           className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
-                          onClick={() => navigate(isMariEnergiesUserEmail(user?.email) ? '/emission-results-calculator' : '/emission-results')}
+                          onClick={() => navigate('/emission-results-calculator')}
                         >
                           {hasAnyEmissions ? 'View Emission Results' : 'Start Emission Calculation'}
                         </Button>
@@ -1319,46 +1318,27 @@ const Dashboard2 = () => {
                         <div className="space-y-6">
                           <div className="space-y-3">
                             <div className="flex justify-between text-sm font-medium">
-                              <span className="text-gray-700">Environmental</span>
-                              <span className="text-gray-900 font-bold">{esgAssessment.environmental_completion}%</span>
+                              <span className="text-gray-700">Assessment progress</span>
+                              <span className="text-gray-900 font-bold">{esgAssessment.total_completion ?? 0}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                              <motion.div 
+                              <motion.div
                                 initial={{ width: 0 }}
-                                animate={{ width: `${esgAssessment.environmental_completion}%` }}
+                                animate={{ width: `${esgAssessment.total_completion ?? 0}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
-                                className="bg-gradient-to-r from-green-500 to-emerald-600 h-3 rounded-full shadow-lg"
+                                className="bg-gradient-to-r from-teal-500 to-cyan-600 h-3 rounded-full shadow-lg"
                               />
                             </div>
                           </div>
-                          <div className="space-y-3">
-                            <div className="flex justify-between text-sm font-medium">
-                              <span className="text-gray-700">Social</span>
-                              <span className="text-gray-900 font-bold">{esgAssessment.social_completion}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${esgAssessment.social_completion}%` }}
-                                transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
-                                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full shadow-lg"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="flex justify-between text-sm font-medium">
-                              <span className="text-gray-700">Governance</span>
-                              <span className="text-gray-900 font-bold">{esgAssessment.governance_completion}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${esgAssessment.governance_completion}%` }}
-                                transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
-                                className="bg-gradient-to-r from-purple-500 to-pink-600 h-3 rounded-full shadow-lg"
-                              />
-                            </div>
-                          </div>
+                          {esgScores?.readiness_overall_score != null && (
+                            <p className="text-sm text-gray-600">
+                              Readiness score:{" "}
+                              <span className="font-semibold text-gray-900">
+                                {Math.round(esgScores.readiness_overall_score)}%
+                              </span>
+                              {esgScores.readiness_maturity_band ? ` · ${esgScores.readiness_maturity_band}` : ""}
+                            </p>
+                          )}
                           <motion.div className="mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                             <Button 
                               className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 

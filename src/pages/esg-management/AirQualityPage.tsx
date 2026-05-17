@@ -236,8 +236,8 @@ const AirQualityPage = () => {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Air quality</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Capture workbook-aligned air data for each asset. Annual pollutant masses are manual entries only; fuel and test
-          data are structured for future calculation methods.
+          Capture workbook-aligned air data for each asset. Annual pollutant masses are manual entries only; fuel, equipment,
+          LDAR, and stack test sections record operational data alongside those totals.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period (from boundary setting): <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -314,16 +314,6 @@ const AirQualityPage = () => {
             ))}
           </div>
         </CardContent>
-      </Card>
-
-      <Card className={sectionShell("border-l-4 border-l-indigo-500")}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Future calculation methods</CardTitle>
-          <CardDescription className="text-slate-600">
-            Planned approaches (not computed here): emission factors and fuel quality for SOx/NOx, combustion models for
-            equipment, LDAR leak rates, and stack-test conversion to mass emissions where stack parameters exist.
-          </CardDescription>
-        </CardHeader>
       </Card>
 
       <Card className={sectionShell("border-l-4 border-l-teal-500")}>

@@ -65,7 +65,6 @@ import AdminScoring from "./pages/AdminScoring";
 import EmissionCalculator from "./pages/EmissionCalculator";
 import EmissionCalculatorChoice from "./pages/EmissionCalculatorChoice";
 import EmissionCalculatorEPA from "./pages/EmissionCalculatorEPA";
-import EmissionCalculatorIPCC from "./pages/EmissionCalculatorIPCC";
 import EmissionResults from "./pages/EmissionResults";
 import EmissionResultsEpaIpcc from "./pages/EmissionResultsEpaIpcc";
 import EmissionHistory from "./pages/EmissionHistory";
@@ -228,11 +227,7 @@ const AppRoutes = () => {
               <EmissionCalculatorEPA />
             </CompanyProtectedRoute>
           } />
-          <Route path="/emission-calculator-ipcc" element={
-            <CompanyProtectedRoute>
-              <EmissionCalculatorIPCC />
-            </CompanyProtectedRoute>
-          } />
+          <Route path="/emission-calculator-ipcc" element={<Navigate to="/emission-calculator-epa" replace />} />
           <Route path="/emission-history" element={
             <CompanyProtectedRoute>
               <EmissionHistory />

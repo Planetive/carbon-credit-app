@@ -9,8 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { computeReadiness, sanitizeReadinessAnswers, type ReadinessComputation } from "@/features/esg-readiness/scoring";
 import { type ReadinessAnswers } from "@/features/esg-readiness/config";
-
-const ASSESSMENT_TYPE = "issb_readiness_v1";
+import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 
 const severityBadgeClass = (severity: string) => {
   if (severity === "Critical") return "bg-red-100 text-red-700";
@@ -35,7 +34,7 @@ const ESGResults = () => {
           .from("esg_assessments")
           .select("id, readiness_answers, submitted_at, status, assessment_type")
           .eq("user_id", user.id)
-          .eq("assessment_type", ASSESSMENT_TYPE)
+          .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
           .eq("status", "submitted")
           .order("updated_at", { ascending: false })
           .limit(1)

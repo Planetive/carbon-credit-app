@@ -343,7 +343,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       }
 
       const gasTotalsKg: Record<"CO2" | "CH4" | "N2O" | "CO2e", number> = { CO2: 0, CH4: 0, N2O: 0, CO2e: 0 };
-      if (isMariUser && user?.id) {
+      if ((isMariUser || fuelFramework === "epa") && user?.id) {
         const [onRoadGasRows, onRoadDieselRows, nonRoadRows, roadVehicleRows, usaRows, altFuelRows, ventingRows] =
           await Promise.all([
             (supabase as any).from("scope1_epa_on_road_gasoline_entries").select("emissions, emission_selection").eq("user_id", user.id),
@@ -575,7 +575,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         { gas: "CO2e (other/mixed)", value: gasTotalsKg.CO2e },
       ].filter((r) => r.value > 0);
       const gasGrand = gasRows.reduce((sum, r) => sum + r.value, 0);
-      const hasGasBreakdown = isMariUser && gasGrand > 0;
+      const hasGasBreakdown = (isMariUser || fuelFramework === "epa") && gasGrand > 0;
 
       const topScope1Category = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
       const topScope2Category = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
@@ -1225,7 +1225,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
             </table>
 
             ${hasGasBreakdown ? `
-            <div class="subsection-title" style="margin-top:14px;">A.1 Gas Breakdown (Mari)</div>
+            <div class="subsection-title" style="margin-top:14px;">A.1 Gas Breakdown</div>
             <table class="inventory-table">
               <thead><tr><th>Gas</th><th>Emissions (kg CO2e)</th><th>% Contribution</th></tr></thead>
               <tbody>

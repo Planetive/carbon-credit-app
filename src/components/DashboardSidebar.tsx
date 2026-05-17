@@ -133,7 +133,12 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
       );
     }
     if (item.id === 'emissions' && item.path) {
-      return location.pathname === item.path || location.pathname === '/emission-calculator-uk' || location.pathname === '/emission-calculator-epa';
+      return (
+        location.pathname === item.path ||
+        location.pathname === '/emission-calculator-uk' ||
+        location.pathname === '/emission-calculator-epa' ||
+        location.pathname.startsWith('/emission-results')
+      );
     }
     if (item.path && location.pathname === item.path) {
       return true;

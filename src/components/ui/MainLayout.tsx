@@ -23,7 +23,6 @@ const MainLayout = () => {
     '/esg-health-check',
     '/project-wizard',
     '/reports',
-    '/emission-calculator',
     '/supply-chain-intelligence',
   ];
 

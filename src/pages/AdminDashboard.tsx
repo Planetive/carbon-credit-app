@@ -24,9 +24,7 @@ interface Assessment {
   user_id: string;
   status: 'draft' | 'submitted';
   total_completion: number;
-  environmental_completion: number;
-  social_completion: number;
-  governance_completion: number;
+  assessment_type: string;
   created_at: string;
   submitted_at: string | null;
   updated_at?: string;
@@ -63,7 +61,8 @@ const AdminDashboard = () => {
       // First, fetch all assessments using admin client to bypass RLS
       const { data: assessmentsData, error: assessmentsError } = await (adminSupabase as any)
         .from('esg_assessments')
-        .select('*')
+        .select('id, user_id, status, total_completion, assessment_type, created_at, submitted_at, updated_at')
+        .eq('assessment_type', 'issb_readiness_v1')
         .order('created_at', { ascending: false });
 
       console.log('Assessments query result:', { data: assessmentsData, error: assessmentsError }); // Debug log
@@ -244,7 +243,7 @@ const AdminDashboard = () => {
               </Button>
               <div className="text-center sm:text-left">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">ESG Assessment Admin</h1>
-                <p className="text-sm sm:text-base text-gray-600">Manage and score ESG assessments</p>
+                <p className="text-sm sm:text-base text-gray-600">View ISSB readiness assessments (auto-scored on submit)</p>
               </div>
             </div>
             <Button
