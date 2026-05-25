@@ -188,12 +188,6 @@ const AboutUs = () => {
       bio: "Farhan is a Climate Tech expert focused on building the core product experience. With a degree in Financial Technology and combining a deep interest in climate-tech, software engineering, and financial systems, he translates complex carbon and ESG data into simple and user-friendly experiences.",
       image: "/team/farhan (2).jpeg",
     },
-    {
-      name: "Rija Zahid",
-      role: "Business Analyst",
-      bio: "As a Business Analyst at ReThink Carbon, she supports strategic initiatives through data-driven insights and thoughtful analysis. With a background that blends analytical thinking and creative problem-solving, she works closely with teams to translate complex information into clear, actionable outcomes.",
-      image: "/team/Rija.jpeg",
-    },
   ];
 
   return (
