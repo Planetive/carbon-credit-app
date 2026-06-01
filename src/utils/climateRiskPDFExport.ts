@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import { ScenarioResult } from '@/pages/scenario-building/types';
+import { ScenarioResult } from '@/features/climate-risk/core/types';
 
 // Brand colors - Teal/Cyan theme
 const BRAND_COLORS = {

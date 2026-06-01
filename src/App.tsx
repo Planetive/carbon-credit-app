@@ -17,10 +17,10 @@ import ConfirmEmail from "./pages/ConfirmEmail";
 import Dashboard from "./pages/Dashboard";
 import AIAdvisor from "./pages/AIAdvisor";
 import ProjectWizard from "./pages/ProjectWizard";
-import BankPortfolio from "./pages/BankPortfolio";
-import CompanyDetail from "./pages/CompanyDetail";
-import SimpleScenarioBuilding from "./pages/SimpleScenarioBuilding";
-import ClimateRiskResults from "./pages/ClimateRiskResults";
+import BankPortfolio from "@/features/portfolio/screens/BankPortfolioScreen";
+import CompanyDetail from "@/features/portfolio/screens/CompanyDetailScreen";
+import SimpleScenarioBuilding from "@/features/climate-risk/screens/ScenarioBuildingScreen";
+import ClimateRiskResults from "@/features/climate-risk/results/ClimateRiskResultsScreen";
 import ProjectResults from "./pages/ProjectResults";
 import ProjectReports from "./pages/ProjectReports";
 import ProjectDrafts from "./pages/ProjectDrafts";
@@ -72,7 +72,7 @@ import ESGFinancialInstitutions from "./pages/solutions/esg-financial-institutio
 import CorporateSolutions from "./pages/solutions/corporate";
 import Dashboard2 from "./pages/Dashboard2";
 // Removed ESGWizard import - now handled through IntegratedFinanceEmission
-import IntegratedFinanceEmission from "./pages/IntegratedFinanceEmission";
+import IntegratedFinanceEmission from "@/features/finance-emissions/screens/FinanceEmissionScreen";
 import LoginChoice from "./pages/LoginChoice";
 // import RegisterChoice from "./pages/RegisterChoice";
 import OrganizationManagement from "./pages/OrganizationManagement";

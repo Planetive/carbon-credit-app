@@ -41,7 +41,7 @@ import OnRoadDieselAltFuelEmissions from "@/components/emissions/scope1/OnRoadDi
 import NonRoadVehicleEmissions from "@/components/emissions/scope1/NonRoadVehicleEmissions";
 import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmissions";
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
-import Scope3Section from "@/components/emissions/scope3/Scope3Section";
+import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
 import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
 

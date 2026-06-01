@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAdminAuth } from '@/features/admin/hooks/useAdminAuth';
 
 interface AdminProtectedRouteProps {
   children: React.ReactNode;
