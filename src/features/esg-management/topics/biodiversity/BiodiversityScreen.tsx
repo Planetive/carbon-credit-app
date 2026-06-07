@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,8 +19,24 @@ import { loadBoundaryDraft } from "../../boundary/storage";
 import type { BoundaryDraftV2 } from "../../boundary/boundaryTypes";
 import { formatPeriodRangeLabel } from "../shared/periodUtils";
 import { filesToMetaList } from "../shared/fileMeta";
-import { PROXIMITY_PLACEHOLDER_ROWS } from "./types";
-import type { BiodiversityAssetData } from "./types";
+import { newTopicRowId } from "../shared/newId";
+import {
+  PRODUCT_TYPES_SPILLED,
+  PROXIMITY_PLACEHOLDER_ROWS,
+  REGULATORY_NOTIFICATION_STATUSES,
+  SPILL_CAUSES,
+  WELL_BARRIER_STATUSES,
+} from "./types";
+import type { BiodiversityAssetData, SpillRow, WellIntegrityRow } from "./types";
+import {
+  calcPctSpillsInSensitiveAreas,
+  calcPctVolumeRecovered,
+  calcPctWellsWithIntegrityIssues,
+  calcSpillCount,
+  calcTotalSpillVolumeCubicM,
+  calcWellIntegrityFailures,
+  formatBioNum,
+} from "./calculations";
 import {
   defaultBiodiversityAssetData,
   getBiodiversityDataForAsset,
@@ -99,6 +116,65 @@ const BiodiversityScreen = () => {
     selectedAssetId != null
       ? `/esg-management/biodiversity/results?assetId=${encodeURIComponent(selectedAssetId)}`
       : "/esg-management/biodiversity/results";
+
+  const spillCount = calcSpillCount(data.spillRows);
+  const totalSpillVolume = calcTotalSpillVolumeCubicM(data.spillRows);
+  const pctSensitive = calcPctSpillsInSensitiveAreas(data.spillRows);
+  const pctRecovered = calcPctVolumeRecovered(data.spillRows);
+  const wellsAssessed = data.wellIntegrityRows.length;
+  const wellFailures = calcWellIntegrityFailures(data.wellIntegrityRows);
+  const pctWellIssues = calcPctWellsWithIntegrityIssues(data.wellIntegrityRows);
+
+  const addSpillRow = () => {
+    const row: SpillRow = {
+      id: newTopicRowId(),
+      spillDate: "",
+      assetLocation: "",
+      spillVolumeCubicM: 0,
+      spillVolumeUnit: "m³",
+      productTypeSpilled: "Crude oil",
+      spillCause: "Other",
+      sensitiveAreaFlag: false,
+      volumeRecoveredCubicM: 0,
+      responseActions: [],
+      regulatoryNotification: "No",
+      regulatorName: "",
+      notificationDate: "",
+    };
+    patchData((d) => ({ ...d, spillRows: [...d.spillRows, row] }));
+  };
+
+  const updateSpillRow = (id: string, patch: Partial<SpillRow>) => {
+    patchData((d) => ({
+      ...d,
+      spillRows: d.spillRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const removeSpillRow = (id: string) => {
+    patchData((d) => ({ ...d, spillRows: d.spillRows.filter((r) => r.id !== id) }));
+  };
+
+  const addWellIntegrityRow = () => {
+    const row: WellIntegrityRow = {
+      id: newTopicRowId(),
+      wellId: "",
+      inspectionDate: "",
+      barrierStatus: "All barriers intact",
+    };
+    patchData((d) => ({ ...d, wellIntegrityRows: [...d.wellIntegrityRows, row] }));
+  };
+
+  const updateWellIntegrityRow = (id: string, patch: Partial<WellIntegrityRow>) => {
+    patchData((d) => ({
+      ...d,
+      wellIntegrityRows: d.wellIntegrityRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const removeWellIntegrityRow = (id: string) => {
+    patchData((d) => ({ ...d, wellIntegrityRows: d.wellIntegrityRows.filter((r) => r.id !== id) }));
+  };
 
   return (
     <div className="min-w-0 max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -263,6 +339,19 @@ const BiodiversityScreen = () => {
               </ul>
             )}
           </div>
+          <div className="space-y-2">
+            <Label className="text-slate-800">Environmental Management Policies — Narrative</Label>
+            <p className="text-xs text-slate-500">
+              Describe EMPs, biodiversity action plans, and restoration commitments for active sites. (EM-EP-160a.3)
+            </p>
+            <Textarea
+              className="border-2 border-slate-200 min-h-[100px]"
+              disabled={!selectedAsset}
+              value={data.envManagementPoliciesNarrative}
+              onChange={(e) => patchData((d) => ({ ...d, envManagementPoliciesNarrative: e.target.value }))}
+              placeholder="Describe environmental management policies, biodiversity action plans, and any site restoration commitments..."
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -308,12 +397,335 @@ const BiodiversityScreen = () => {
         </CardContent>
       </Card>
 
+      <div className="border-t-2 border-slate-200 pt-6 space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Environmental Management of E&P Activities</h2>
+          <p className="text-sm text-slate-600 mt-1">EM-EP-160b — Spills & Well Integrity</p>
+        </div>
+
+        <Card className={sectionShell("border-l-4 border-l-orange-500")}>
+          <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg text-slate-900">Hydrocarbon Spill Register (EM-EP-160b.1)</CardTitle>
+              <CardDescription className="text-slate-600">Record hydrocarbon spills to the environment.</CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addSpillRow}>
+              <Plus className="h-4 w-4" />
+              Add row
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse min-w-[1200px]">
+                <thead>
+                  <tr className="border-b-2 border-slate-200">
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Spill Date</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Asset / Location</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Volume</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Unit</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Product Type</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Cause</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Sensitive Area</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Volume Recovered (m³)</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Regulatory Notification</th>
+                    <th className="py-2 w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.spillRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-6 text-slate-500">
+                        No spill rows yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.spillRows.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100 align-top">
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            type="date"
+                            value={r.spillDate}
+                            disabled={!selectedAsset}
+                            onChange={(e) => updateSpillRow(r.id, { spillDate: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            placeholder="Asset name or location"
+                            value={r.assetLocation}
+                            disabled={!selectedAsset}
+                            onChange={(e) => updateSpillRow(r.id, { assetLocation: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={r.spillVolumeCubicM || ""}
+                            disabled={!selectedAsset}
+                            onChange={(e) => {
+                              const n = e.target.value === "" ? 0 : Number(e.target.value);
+                              updateSpillRow(r.id, { spillVolumeCubicM: Number.isFinite(n) ? n : 0 });
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Select
+                            value={r.spillVolumeUnit}
+                            disabled={!selectedAsset}
+                            onValueChange={(v) => updateSpillRow(r.id, { spillVolumeUnit: v as SpillRow["spillVolumeUnit"] })}
+                          >
+                            <SelectTrigger className="border-2 border-slate-200 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="m³">m³</SelectItem>
+                              <SelectItem value="bbl">bbl</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Select
+                            value={r.productTypeSpilled}
+                            disabled={!selectedAsset}
+                            onValueChange={(v) =>
+                              updateSpillRow(r.id, { productTypeSpilled: v as SpillRow["productTypeSpilled"] })
+                            }
+                          >
+                            <SelectTrigger className="border-2 border-slate-200 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PRODUCT_TYPES_SPILLED.map((p) => (
+                                <SelectItem key={p} value={p}>
+                                  {p}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Select
+                            value={r.spillCause}
+                            disabled={!selectedAsset}
+                            onValueChange={(v) => updateSpillRow(r.id, { spillCause: v as SpillRow["spillCause"] })}
+                          >
+                            <SelectTrigger className="border-2 border-slate-200 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SPILL_CAUSES.map((c) => (
+                                <SelectItem key={c} value={c}>
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <div className="flex items-center gap-2 pt-2">
+                            <Checkbox
+                              id={`sensitive-${r.id}`}
+                              checked={r.sensitiveAreaFlag}
+                              disabled={!selectedAsset}
+                              onCheckedChange={(c) => updateSpillRow(r.id, { sensitiveAreaFlag: c === true })}
+                            />
+                            <Label htmlFor={`sensitive-${r.id}`} className="text-xs text-slate-600 cursor-pointer">
+                              Yes
+                            </Label>
+                          </div>
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={r.volumeRecoveredCubicM || ""}
+                            disabled={!selectedAsset}
+                            onChange={(e) => {
+                              const n = e.target.value === "" ? 0 : Number(e.target.value);
+                              updateSpillRow(r.id, { volumeRecoveredCubicM: Number.isFinite(n) ? n : 0 });
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Select
+                            value={r.regulatoryNotification}
+                            disabled={!selectedAsset}
+                            onValueChange={(v) =>
+                              updateSpillRow(r.id, { regulatoryNotification: v as SpillRow["regulatoryNotification"] })
+                            }
+                          >
+                            <SelectTrigger className="border-2 border-slate-200 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {REGULATORY_NOTIFICATION_STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-slate-500"
+                            disabled={!selectedAsset}
+                            onClick={() => removeSpillRow(r.id)}
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 text-sm">
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">Total Spills: </span>
+                {spillCount}
+              </p>
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">Total Volume Released: </span>
+                {formatBioNum(totalSpillVolume)} m³
+              </p>
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">% in Sensitive Areas: </span>
+                {formatBioNum(pctSensitive, 1)}%
+              </p>
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">% Volume Recovered: </span>
+                {formatBioNum(pctRecovered, 1)}%
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={sectionShell("border-l-4 border-l-rose-500")}>
+          <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg text-slate-900">Well Integrity Register (EM-EP-160b.2)</CardTitle>
+              <CardDescription className="text-slate-600">Well barrier status and inspection records.</CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addWellIntegrityRow}>
+              <Plus className="h-4 w-4" />
+              Add row
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse min-w-[640px]">
+                <thead>
+                  <tr className="border-b-2 border-slate-200">
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Well ID</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Inspection Date</th>
+                    <th className="py-2 pr-2 font-semibold text-slate-800">Barrier Status</th>
+                    <th className="py-2 w-10" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.wellIntegrityRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-slate-500">
+                        No well integrity rows yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.wellIntegrityRows.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100 align-top">
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            placeholder="Well ID or name"
+                            value={r.wellId}
+                            disabled={!selectedAsset}
+                            onChange={(e) => updateWellIntegrityRow(r.id, { wellId: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Input
+                            className="border-2 border-slate-200 h-9"
+                            type="date"
+                            value={r.inspectionDate}
+                            disabled={!selectedAsset}
+                            onChange={(e) => updateWellIntegrityRow(r.id, { inspectionDate: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <Select
+                            value={r.barrierStatus}
+                            disabled={!selectedAsset}
+                            onValueChange={(v) =>
+                              updateWellIntegrityRow(r.id, { barrierStatus: v as WellIntegrityRow["barrierStatus"] })
+                            }
+                          >
+                            <SelectTrigger className="border-2 border-slate-200 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {WELL_BARRIER_STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-slate-500"
+                            disabled={!selectedAsset}
+                            onClick={() => removeWellIntegrityRow(r.id)}
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3 text-sm">
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">Total Wells Assessed: </span>
+                {wellsAssessed}
+              </p>
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">Well Integrity Failures: </span>
+                {wellFailures}
+              </p>
+              <p className="text-slate-700">
+                <span className="font-medium text-slate-900">% Wells with Integrity Issues: </span>
+                {formatBioNum(pctWellIssues, 1)}%
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {draft.assets.length > 0 && (
         <Card className={sectionShell("border-l-4 border-l-slate-700")}>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-slate-900">Summary</CardTitle>
             <CardDescription className="text-slate-600">
-              Open a dedicated page for incidents, EMP status, planned proximity checks, and Scope 1 availability.
+              Open a dedicated page for incidents, EMP status, spill KPIs, well integrity, and planned proximity checks.
             </CardDescription>
           </CardHeader>
           <CardContent>

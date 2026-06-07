@@ -241,6 +241,12 @@ const WaterManagementResultsScreen = () => {
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 sm:col-span-2">
+                      <p className="text-xs text-slate-600">Total withdrawn (thousand m³, reporting period)</p>
+                      <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">
+                        {formatNum(toThousandM3ForPeriod(withdrawalMonthly, months))} thousand m³
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 sm:col-span-2">
                       <p className="text-xs text-slate-600">Total consumed (thousand m³, reporting period)</p>
                       <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">
                         {formatNum(toThousandM3ForPeriod(consumedMonthly, months))} thousand m³

@@ -38,7 +38,7 @@ const MainLayout = () => {
       // Default to overview if on dashboard without state
       setActiveSection('overview');
     } else if (location.pathname === '/bank-portfolio') {
-      setActiveSection('start-project');
+      setActiveSection('portfolio');
     }
   }, [location.state, location.pathname]);
 

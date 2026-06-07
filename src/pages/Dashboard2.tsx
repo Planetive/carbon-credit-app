@@ -838,8 +838,6 @@ const Dashboard2 = () => {
     'overview': 'Company Overview',
     'portfolio': userType === 'financial_institution' ? 'My Portfolio' : 'My Projects',
     'projects': 'My Projects',
-    'start-project': 'Start New Project',
-    'start-portfolio': 'Start New Portfolio',
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
     'emissions': 'Emission Calculator',

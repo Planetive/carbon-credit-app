@@ -56,6 +56,8 @@ import EsgTopicsPage from "./pages/esg-management/EsgTopicsPage";
 import GhgInventoryBoundaryPage from "./pages/esg-management/GhgInventoryBoundaryPage";
 import WaterManagementPage from "./pages/esg-management/WaterManagementPage";
 import WaterManagementResultsPage from "./pages/esg-management/WaterManagementResultsPage";
+import WasteManagementPage from "./pages/esg-management/WasteManagementPage";
+import WasteManagementResultsPage from "./pages/esg-management/WasteManagementResultsPage";
 import BiodiversityPage from "./pages/esg-management/BiodiversityPage";
 import BiodiversityResultsPage from "./pages/esg-management/BiodiversityResultsPage";
 import ESGResults from "./pages/ESGResults";
@@ -313,6 +315,16 @@ const AppRoutes = () => {
           <Route path="/esg-management/water-management" element={
             <CompanyProtectedRoute>
               <WaterManagementPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/waste-management/results" element={
+            <CompanyProtectedRoute>
+              <WasteManagementResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/waste-management" element={
+            <CompanyProtectedRoute>
+              <WasteManagementPage />
             </CompanyProtectedRoute>
           } />
           <Route path="/esg-management/biodiversity/results" element={

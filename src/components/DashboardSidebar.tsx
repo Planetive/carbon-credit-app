@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { 
   Grid3X3,
   FileText,
-  Plus,
   BarChart3,
   Factory,
   ArrowRight,
@@ -67,30 +66,25 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'projects', title: 'My Projects', icon: FolderOpen, path: '/dashboard' },
         { id: 'portfolio', title: 'My Portfolio', icon: Building2, path: '/dashboard' },
-        { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
-        { id: 'start-portfolio', title: 'Start New Portfolio', icon: Plus, path: '/bank-portfolio' },
-        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
         { id: 'esg-management', title: 'ESG Management', icon: Layers, path: '/esg-management' },
         { id: 'esg-assessment', title: 'ESG Assessment', icon: FileText, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
         { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
+        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
       ]
     : [
         { id: 'overview', title: 'Company Overview', icon: Grid3X3, path: '/dashboard' },
         { id: 'portfolio', title: 'My Projects', icon: FileText, path: '/dashboard' },
-        { id: 'start-project', title: 'Start New Project', icon: Plus, path: '/project-wizard' },
-        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
         { id: 'esg-management', title: 'ESG Management', icon: Layers, path: '/esg-management' },
         { id: 'esg-assessment', title: 'ESG Assessment', icon: FileText, path: '/esg-health-check' },
         { id: 'emissions', title: 'Emission Calculator', icon: Factory, path: '/emission-calculator' },
         { id: 'supply-chain-intel', title: 'Supply Chain intelligence', icon: Globe2, path: '/supply-chain-intelligence' },
+        { id: 'reports', title: 'Reports & Analytics', icon: BarChart3, path: '/reports' },
       ];
 
   // Hide portfolio entries for specific restricted ID
   if (isPortfolioRestrictedUser) {
-    sidebarItems = sidebarItems.filter(
-      (item) => item.id !== 'portfolio' && item.id !== 'start-portfolio'
-    );
+    sidebarItems = sidebarItems.filter((item) => item.id !== 'portfolio');
   }
 
   const handleSidebarClick = (item: SidebarItem) => {
@@ -108,12 +102,6 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   };
 
   const isActive = (item: SidebarItem) => {
-    if (item.id === 'start-project') {
-      return location.pathname === '/project-wizard';
-    }
-    if (item.id === 'start-portfolio') {
-      return location.pathname === '/bank-portfolio';
-    }
     if (item.id === 'portfolio') {
       return location.pathname === '/dashboard' && activeSection === 'portfolio';
     }

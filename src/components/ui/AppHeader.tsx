@@ -349,20 +349,6 @@ const AppHeader = () => {
                       <FileText className="mr-2 h-4 w-4" />
                       <span>My Portfolio</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate("/project-wizard")}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>Start New Project</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate("/bank-portfolio")}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>Start New Portfolio</span>
-                    </DropdownMenuItem>
                   </>
                 ) : (
                   <>
@@ -373,22 +359,8 @@ const AppHeader = () => {
                       <FileText className="mr-2 h-4 w-4" />
                       <span>My Projects</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate("/project-wizard")}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>Start New Project</span>
-                    </DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem
-                  onClick={() => navigate("/reports")}
-                  className="cursor-pointer"
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  <span>Reports &amp; Analytics</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/esg-management")}
                   className="cursor-pointer"
@@ -409,6 +381,13 @@ const AppHeader = () => {
                 >
                   <Factory className="mr-2 h-4 w-4" />
                   <span>Emission Calculator</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/reports")}
+                  className="cursor-pointer"
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  <span>Reports &amp; Analytics</span>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -496,8 +475,6 @@ const AppHeader = () => {
                     const isPortfolioActive =
                       location.pathname === "/dashboard" &&
                       activeDashboardSection === "portfolio";
-                    const isStartProjectActive = location.pathname === "/project-wizard";
-                    const isStartPortfolioActive = location.pathname === "/bank-portfolio";
                     const isReportsActive = location.pathname === "/reports";
                     const isEsgManagementActive =
                       location.pathname.startsWith("/esg-management");
@@ -601,36 +578,6 @@ const AppHeader = () => {
                                   <FileText className="h-4 w-4" />
                                   <span>My Portfolio</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigate("/project-wizard");
-                                    setIsMobileMenuOpen(false);
-                                  }}
-                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
-                                    isStartProjectActive
-                                      ? "bg-primary text-white"
-                                      : "text-gray-700 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  <span>Start New Project</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigate("/bank-portfolio");
-                                    setIsMobileMenuOpen(false);
-                                  }}
-                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
-                                    isStartPortfolioActive
-                                      ? "bg-primary text-white"
-                                      : "text-gray-700 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  <span>Start New Portfolio</span>
-                                </button>
                               </>
                             ) : (
                               <>
@@ -651,38 +598,8 @@ const AppHeader = () => {
                                   <FileText className="h-4 w-4" />
                                   <span>My Projects</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigate("/project-wizard");
-                                    setIsMobileMenuOpen(false);
-                                  }}
-                                  className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
-                                    isStartProjectActive
-                                      ? "bg-primary text-white"
-                                      : "text-gray-700 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  <span>Start New Project</span>
-                                </button>
                               </>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigate("/reports");
-                                setIsMobileMenuOpen(false);
-                              }}
-                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
-                                isReportsActive
-                                  ? "bg-primary text-white"
-                                  : "text-gray-700 hover:bg-gray-100"
-                              }`}
-                            >
-                              <BarChart3 className="h-4 w-4" />
-                              <span>Reports &amp; Analytics</span>
-                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -727,6 +644,21 @@ const AppHeader = () => {
                             >
                               <Factory className="h-4 w-4" />
                               <span>Emission Calculator</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/reports");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isReportsActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                              <span>Reports &amp; Analytics</span>
                             </button>
                           </div>
                         )}

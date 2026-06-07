@@ -21,6 +21,15 @@ import {
   getBiodiversityDataForAsset,
   loadBiodiversityStore,
 } from "./storage";
+import {
+  calcPctSpillsInSensitiveAreas,
+  calcPctVolumeRecovered,
+  calcPctWellsWithIntegrityIssues,
+  calcSpillCount,
+  calcTotalSpillVolumeCubicM,
+  calcWellIntegrityFailures,
+  formatBioNum,
+} from "./calculations";
 
 const sectionShell = (accent: string) =>
   `border-2 border-slate-200 bg-white shadow-sm rounded-xl overflow-hidden ${accent}`;
@@ -91,12 +100,24 @@ const BiodiversityResultsScreen = () => {
   const empStatusLabel =
     data.empInPlace === "yes" ? "In place" : data.empInPlace === "no" ? "Not in place" : "Not specified";
 
+  const spillCount = calcSpillCount(data.spillRows);
+  const totalSpillVolume = calcTotalSpillVolumeCubicM(data.spillRows);
+  const pctSensitive = calcPctSpillsInSensitiveAreas(data.spillRows);
+  const pctRecovered = calcPctVolumeRecovered(data.spillRows);
+  const wellFailures = calcWellIntegrityFailures(data.wellIntegrityRows);
+  const pctWellIssues = calcPctWellsWithIntegrityIssues(data.wellIntegrityRows);
+  const hasSpillData = data.spillRows.length > 0;
+  const hasWellData = data.wellIntegrityRows.length > 0;
+
   const bioHasEntryData = useMemo(() => {
     return (
       data.incidentCount.trim() !== "" ||
       data.incidentNarrative.trim() !== "" ||
       data.empInPlace !== "" ||
-      data.empFilesMeta.length > 0
+      data.empFilesMeta.length > 0 ||
+      data.envManagementPoliciesNarrative.trim() !== "" ||
+      data.spillRows.length > 0 ||
+      data.wellIntegrityRows.length > 0
     );
   }, [data]);
 
@@ -227,6 +248,14 @@ const BiodiversityResultsScreen = () => {
                 ) : (
                   <p className="text-sm text-slate-600 mt-1">No document references saved.</p>
                 )}
+                <p className="text-sm text-slate-700 mt-3">
+                  <span className="font-medium text-slate-800">Environmental Management Policies: </span>
+                  {data.envManagementPoliciesNarrative.trim() ? (
+                    <span className="block mt-1 whitespace-pre-wrap">{data.envManagementPoliciesNarrative.trim()}</span>
+                  ) : (
+                    "Not provided"
+                  )}
+                </p>
               </div>
 
               <div>
@@ -259,6 +288,36 @@ const BiodiversityResultsScreen = () => {
                 <p className="text-sm text-slate-600">
                   Unavailable until GIS and greenhouse gas data are integrated. This field is not editable here.
                 </p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                  Environmental Management of E&P Activities (EM-EP-160b)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { label: "Total Spills", value: String(spillCount) },
+                    { label: "Total Volume Released", value: `${formatBioNum(totalSpillVolume)} m³` },
+                    {
+                      label: "% Spills in Sensitive Areas",
+                      value: hasSpillData ? `${formatBioNum(pctSensitive, 1)}%` : "—",
+                    },
+                    {
+                      label: "% Volume Recovered",
+                      value: hasSpillData ? `${formatBioNum(pctRecovered, 1)}%` : "—",
+                    },
+                    { label: "Well Integrity Failures", value: String(wellFailures) },
+                    {
+                      label: "% Wells with Integrity Issues",
+                      value: hasWellData ? `${formatBioNum(pctWellIssues, 1)}%` : "—",
+                    },
+                  ].map((kpi) => (
+                    <div key={kpi.label} className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
+                      <p className="text-xs text-slate-600">{kpi.label}</p>
+                      <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">{kpi.value}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}
