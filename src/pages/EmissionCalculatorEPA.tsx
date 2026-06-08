@@ -1232,13 +1232,13 @@ const EmissionCalculatorEPA = () => {
                                   onClick={() =>
                                     setScope1GroupsExpanded((prev) => ({ ...prev, [group.id]: !prev[group.id] }))
                                   }
-                                  className={`w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${group.headerClass}`}
+                                  className={`w-full flex items-center justify-between gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-200 text-left ${group.headerClass}`}
                                 >
-                                  <span>{group.label}</span>
+                                  <span className="flex-1 min-w-0 text-left leading-snug">{group.label}</span>
                                   {scope1GroupsExpanded[group.id] ? (
-                                    <ChevronDown className="h-4 w-4" />
+                                    <ChevronDown className="h-4 w-4 shrink-0" />
                                   ) : (
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-4 w-4 shrink-0" />
                                   )}
                                 </button>
                                 {scope1GroupsExpanded[group.id] && (

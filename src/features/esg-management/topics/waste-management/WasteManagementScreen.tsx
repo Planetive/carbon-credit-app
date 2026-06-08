@@ -95,21 +95,34 @@ const GENERATION_GROUP_STYLES: Record<WasteGenerationCategory, string> = {
   maintenance: "bg-blue-50 border-l-4 border-l-blue-400",
 };
 
-const DIVERTED_METHODS: WasteDivertedRow["method"][] = [
-  "Recycling",
-  "Reuse",
-  "Recovery",
-  "Composting",
-  "Other Diversion",
-];
+type DivertedMethodGroup = Extract<WasteDivertedRow["method"], "Recycling" | "Reuse" | "Recovery">;
 
-const DISPOSAL_METHODS: WasteDisposalRow["disposalMethod"][] = [
+const DIVERTED_METHOD_GROUPS: DivertedMethodGroup[] = ["Recycling", "Reuse", "Recovery"];
+
+const DIVERTED_GROUP_STYLES: Record<DivertedMethodGroup, string> = {
+  Recycling: "bg-emerald-50 border-l-4 border-l-emerald-500",
+  Reuse: "bg-teal-50 border-l-4 border-l-teal-500",
+  Recovery: "bg-blue-50 border-l-4 border-l-blue-500",
+};
+
+type DisposalMethodGroup = Extract<
+  WasteDisposalRow["disposalMethod"],
+  "Landfill" | "Incineration" | "Deep Well Injection" | "Waste Treatment Facility"
+>;
+
+const DISPOSAL_METHOD_GROUPS: DisposalMethodGroup[] = [
   "Landfill",
   "Incineration",
   "Deep Well Injection",
   "Waste Treatment Facility",
-  "Other Disposal",
 ];
+
+const DISPOSAL_GROUP_STYLES: Record<DisposalMethodGroup, string> = {
+  Landfill: "bg-slate-50 border-l-4 border-l-slate-500",
+  Incineration: "bg-orange-50 border-l-4 border-l-orange-400",
+  "Deep Well Injection": "bg-amber-50 border-l-4 border-l-amber-400",
+  "Waste Treatment Facility": "bg-blue-50 border-l-4 border-l-blue-400",
+};
 
 const MONTHS = [
   { value: 1, label: "Jan" },
@@ -145,6 +158,19 @@ const WasteManagementScreen = () => {
     maintenance: false,
   });
   const [generationRowDetailsOpen, setGenerationRowDetailsOpen] = useState<Record<string, boolean>>({});
+  const [divertedGroupsOpen, setDivertedGroupsOpen] = useState<Record<DivertedMethodGroup, boolean>>({
+    Recycling: true,
+    Reuse: true,
+    Recovery: true,
+  });
+  const [divertedRowDetailsOpen, setDivertedRowDetailsOpen] = useState<Record<string, boolean>>({});
+  const [disposalGroupsOpen, setDisposalGroupsOpen] = useState<Record<DisposalMethodGroup, boolean>>({
+    Landfill: true,
+    Incineration: true,
+    "Deep Well Injection": true,
+    "Waste Treatment Facility": true,
+  });
+  const [disposalRowDetailsOpen, setDisposalRowDetailsOpen] = useState<Record<string, boolean>>({});
 
   const refreshBoundary = useCallback(() => {
     const d = loadBoundaryDraft();
@@ -264,6 +290,44 @@ const WasteManagementScreen = () => {
       ...d,
       disposalRows: d.disposalRows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
     }));
+  };
+
+  const addDivertedRowForMethod = (method: DivertedMethodGroup) => {
+    const row: WasteDivertedRow = {
+      id: newTopicRowId(),
+      wasteCategory: "",
+      field: "",
+      businessUnit: "",
+      month: new Date().getMonth() + 1,
+      quantity: 0,
+      unit: "tonnes",
+      method,
+      reportingYear,
+    };
+    patchData((d) => ({ ...d, divertedRows: [...d.divertedRows, row] }));
+  };
+
+  const removeDivertedRow = (id: string) => {
+    patchData((d) => ({ ...d, divertedRows: d.divertedRows.filter((r) => r.id !== id) }));
+  };
+
+  const addDisposalRowForMethod = (disposalMethod: DisposalMethodGroup) => {
+    const row: WasteDisposalRow = {
+      id: newTopicRowId(),
+      wasteCategory: "",
+      field: "",
+      businessUnit: "",
+      month: new Date().getMonth() + 1,
+      quantity: 0,
+      unit: "tonnes",
+      disposalMethod,
+      reportingYear,
+    };
+    patchData((d) => ({ ...d, disposalRows: [...d.disposalRows, row] }));
+  };
+
+  const removeDisposalRow = (id: string) => {
+    patchData((d) => ({ ...d, disposalRows: d.disposalRows.filter((r) => r.id !== id) }));
   };
 
   return (
@@ -475,131 +539,125 @@ const WasteManagementScreen = () => {
                       {categoryRows.length === 0 ? (
                         <p className="text-sm text-slate-500 py-2">No rows in this category yet.</p>
                       ) : (
-                        <table className="w-full text-sm text-left border-collapse">
-                          <thead>
-                            <tr className="border-b-2 border-slate-200">
-                              <th className="py-2 pr-2 font-semibold text-slate-800">Waste Type</th>
-                              <th className="py-2 pr-2 font-semibold text-slate-800">Quantity (tonnes)</th>
-                              <th className="py-2 pr-2 font-semibold text-slate-800">Month</th>
-                              <th className="py-2 pr-2 font-semibold text-slate-800">Year</th>
-                              <th className="py-2 w-10" />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {categoryRows.map((r) => {
-                              const detailsOpen = generationRowDetailsOpen[r.id] === true;
-                              return (
-                                <tr key={r.id} className="border-b border-slate-100 align-top">
-                                  <td colSpan={5} className="py-0">
-                                    <div className="py-2">
-                                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-start sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.6fr)_minmax(0,0.5fr)_auto]">
+                        <div className="text-sm">
+                          <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 px-2 pb-1 text-sm font-semibold text-slate-700 border-b border-slate-200">
+                            <span>Waste Type</span>
+                            <span>Quantity (tonnes)</span>
+                            <span>Month</span>
+                            <span>Year</span>
+                            <span />
+                          </div>
+                          {categoryRows.map((r) => {
+                            const detailsOpen = generationRowDetailsOpen[r.id] === true;
+                            return (
+                              <div key={r.id} className="border-b border-slate-100 py-2">
+                                <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 items-center py-1">
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    placeholder="Waste type"
+                                    value={r.wasteType}
+                                    onChange={(e) => updateGenerationRow(r.id, { wasteType: e.target.value })}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    min={0}
+                                    step="any"
+                                    value={r.quantity || ""}
+                                    onChange={(e) => {
+                                      const n = e.target.value === "" ? 0 : Number(e.target.value);
+                                      updateGenerationRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Select
+                                    value={String(r.month)}
+                                    onValueChange={(v) => updateGenerationRow(r.id, { month: Number(v) })}
+                                    disabled={!selectedAsset}
+                                  >
+                                    <SelectTrigger className="w-full border-2 border-slate-200 h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {MONTHS.map((m) => (
+                                        <SelectItem key={m.value} value={String(m.value)}>
+                                          {m.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    value={r.reportingYear}
+                                    onChange={(e) => {
+                                      const n = Number(e.target.value);
+                                      updateGenerationRow(r.id, {
+                                        reportingYear: Number.isFinite(n) ? n : reportingYear,
+                                      });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <div className="flex justify-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 text-slate-500"
+                                      disabled={!selectedAsset}
+                                      onClick={() => removeGenerationRow(r.id)}
+                                      aria-label="Remove row"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Collapsible
+                                  open={detailsOpen}
+                                  onOpenChange={(open) =>
+                                    setGenerationRowDetailsOpen((prev) => ({ ...prev, [r.id]: open }))
+                                  }
+                                >
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                    >
+                                      Details {detailsOpen ? "▴" : "▾"}
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 pb-1">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Field name</Label>
                                         <Input
                                           className="border-2 border-slate-200 h-9"
-                                          placeholder="Waste type"
-                                          value={r.wasteType}
-                                          onChange={(e) => updateGenerationRow(r.id, { wasteType: e.target.value })}
+                                          placeholder="Field name"
+                                          value={r.field}
+                                          onChange={(e) => updateGenerationRow(r.id, { field: e.target.value })}
                                           disabled={!selectedAsset}
                                         />
-                                        <Input
-                                          className="border-2 border-slate-200 h-9"
-                                          type="number"
-                                          min={0}
-                                          step="any"
-                                          value={r.quantity || ""}
-                                          onChange={(e) => {
-                                            const n = e.target.value === "" ? 0 : Number(e.target.value);
-                                            updateGenerationRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
-                                          }}
-                                          disabled={!selectedAsset}
-                                        />
-                                        <Select
-                                          value={String(r.month)}
-                                          onValueChange={(v) => updateGenerationRow(r.id, { month: Number(v) })}
-                                          disabled={!selectedAsset}
-                                        >
-                                          <SelectTrigger className="border-2 border-slate-200 h-9">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {MONTHS.map((m) => (
-                                              <SelectItem key={m.value} value={String(m.value)}>
-                                                {m.label}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                        <Input
-                                          className="border-2 border-slate-200 h-9"
-                                          type="number"
-                                          value={r.reportingYear}
-                                          onChange={(e) => {
-                                            const n = Number(e.target.value);
-                                            updateGenerationRow(r.id, {
-                                              reportingYear: Number.isFinite(n) ? n : reportingYear,
-                                            });
-                                          }}
-                                          disabled={!selectedAsset}
-                                        />
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-9 w-9 text-slate-500"
-                                          disabled={!selectedAsset}
-                                          onClick={() => removeGenerationRow(r.id)}
-                                          aria-label="Remove row"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
                                       </div>
-                                      <Collapsible
-                                        open={detailsOpen}
-                                        onOpenChange={(open) =>
-                                          setGenerationRowDetailsOpen((prev) => ({ ...prev, [r.id]: open }))
-                                        }
-                                      >
-                                        <CollapsibleTrigger asChild>
-                                          <button
-                                            type="button"
-                                            className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
-                                          >
-                                            Details {detailsOpen ? "▴" : "▾"}
-                                          </button>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent>
-                                          <div className="mt-2 grid gap-2 sm:grid-cols-2 pb-1">
-                                            <div className="space-y-1">
-                                              <Label className="text-xs text-slate-600">Field name</Label>
-                                              <Input
-                                                className="border-2 border-slate-200 h-9"
-                                                placeholder="Field name"
-                                                value={r.field}
-                                                onChange={(e) => updateGenerationRow(r.id, { field: e.target.value })}
-                                                disabled={!selectedAsset}
-                                              />
-                                            </div>
-                                            <div className="space-y-1">
-                                              <Label className="text-xs text-slate-600">Business unit</Label>
-                                              <Input
-                                                className="border-2 border-slate-200 h-9"
-                                                placeholder="Business unit"
-                                                value={r.businessUnit}
-                                                onChange={(e) =>
-                                                  updateGenerationRow(r.id, { businessUnit: e.target.value })
-                                                }
-                                                disabled={!selectedAsset}
-                                              />
-                                            </div>
-                                          </div>
-                                        </CollapsibleContent>
-                                      </Collapsible>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Business unit</Label>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Business unit"
+                                          value={r.businessUnit}
+                                          onChange={(e) =>
+                                            updateGenerationRow(r.id, { businessUnit: e.target.value })
+                                          }
+                                          disabled={!selectedAsset}
+                                        />
+                                      </div>
                                     </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </CollapsibleContent>
@@ -628,120 +686,186 @@ const WasteManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-teal-500")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">GRI 306-4 — Waste Diverted from Disposal</CardTitle>
-          <CardDescription className="text-slate-600">Waste diverted by recovery route.</CardDescription>
+          <CardDescription className="text-slate-600">
+            Pre-seeded waste streams grouped by diversion method — expand a group to edit or add rows.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse min-w-[1100px]">
-              <thead>
-                <tr className="border-b-2 border-slate-200">
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Waste Category</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Field</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Business Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Month</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Quantity</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Method</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Reporting Year</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.divertedRows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 align-top">
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        value={r.wasteCategory}
-                        onChange={(e) => updateDivertedRow(r.id, { wasteCategory: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Field name"
-                        value={r.field}
-                        onChange={(e) => updateDivertedRow(r.id, { field: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Business unit"
-                        value={r.businessUnit}
-                        onChange={(e) => updateDivertedRow(r.id, { businessUnit: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={String(r.month)}
-                        onValueChange={(v) => updateDivertedRow(r.id, { month: Number(v) })}
-                        disabled={!selectedAsset}
+        <CardContent className="space-y-3">
+          {DIVERTED_METHOD_GROUPS.map((method) => {
+            const methodRows = data.divertedRows.filter((r) => r.method === method);
+            const methodSubtotal = methodRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+            const streamLabel = methodRows.length === 1 ? "1 stream" : `${methodRows.length} streams`;
+            const isOpen = divertedGroupsOpen[method];
+
+            return (
+              <Collapsible
+                key={method}
+                open={isOpen}
+                onOpenChange={(open) => setDivertedGroupsOpen((prev) => ({ ...prev, [method]: open }))}
+              >
+                <div className={cn("rounded-lg border border-slate-200 overflow-hidden", DIVERTED_GROUP_STYLES[method])}>
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4">
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
                       >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MONTHS.map((m) => (
-                            <SelectItem key={m.value} value={String(m.value)}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={r.quantity || ""}
-                        onChange={(e) => {
-                          const n = e.target.value === "" ? 0 : Number(e.target.value);
-                          updateDivertedRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2 text-slate-600">tonnes</td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={r.method}
-                        onValueChange={(v) => updateDivertedRow(r.id, { method: v as WasteDivertedRow["method"] })}
-                        disabled={!selectedAsset}
-                      >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DIVERTED_METHODS.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        value={r.reportingYear}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateDivertedRow(r.id, { reportingYear: Number.isFinite(n) ? n : reportingYear });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900">{method}</p>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {streamLabel} · {formatWasteNum(methodSubtotal)} tonnes
+                          </p>
+                        </div>
+                        {isOpen ? (
+                          <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        )}
+                      </button>
+                    </CollapsibleTrigger>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 bg-white/80"
+                      disabled={!selectedAsset}
+                      onClick={() => addDivertedRowForMethod(method)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add row
+                    </Button>
+                  </div>
+
+                  <CollapsibleContent>
+                    <div className="border-t border-slate-200/80 bg-white px-3 py-3 sm:px-4">
+                      {methodRows.length === 0 ? (
+                        <p className="text-sm text-slate-500 py-2">No rows in this group yet.</p>
+                      ) : (
+                        <div className="text-sm">
+                          <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 px-2 pb-1 text-sm font-semibold text-slate-700 border-b border-slate-200">
+                            <span>Waste Category</span>
+                            <span>Quantity (tonnes)</span>
+                            <span>Month</span>
+                            <span>Year</span>
+                            <span />
+                          </div>
+                          {methodRows.map((r) => {
+                            const detailsOpen = divertedRowDetailsOpen[r.id] === true;
+                            return (
+                              <div key={r.id} className="border-b border-slate-100 py-2">
+                                <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 items-center py-1">
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    placeholder="Waste category"
+                                    value={r.wasteCategory}
+                                    onChange={(e) => updateDivertedRow(r.id, { wasteCategory: e.target.value })}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    min={0}
+                                    step="any"
+                                    value={r.quantity || ""}
+                                    onChange={(e) => {
+                                      const n = e.target.value === "" ? 0 : Number(e.target.value);
+                                      updateDivertedRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Select
+                                    value={String(r.month)}
+                                    onValueChange={(v) => updateDivertedRow(r.id, { month: Number(v) })}
+                                    disabled={!selectedAsset}
+                                  >
+                                    <SelectTrigger className="w-full border-2 border-slate-200 h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {MONTHS.map((m) => (
+                                        <SelectItem key={m.value} value={String(m.value)}>
+                                          {m.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    value={r.reportingYear}
+                                    onChange={(e) => {
+                                      const n = Number(e.target.value);
+                                      updateDivertedRow(r.id, {
+                                        reportingYear: Number.isFinite(n) ? n : reportingYear,
+                                      });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <div className="flex justify-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 text-slate-500"
+                                      disabled={!selectedAsset}
+                                      onClick={() => removeDivertedRow(r.id)}
+                                      aria-label="Remove row"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Collapsible
+                                  open={detailsOpen}
+                                  onOpenChange={(open) =>
+                                    setDivertedRowDetailsOpen((prev) => ({ ...prev, [r.id]: open }))
+                                  }
+                                >
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                    >
+                                      Details {detailsOpen ? "▴" : "▾"}
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 pb-1">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Field name</Label>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Field name"
+                                          value={r.field}
+                                          onChange={(e) => updateDivertedRow(r.id, { field: e.target.value })}
+                                          disabled={!selectedAsset}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Business unit</Label>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Business unit"
+                                          value={r.businessUnit}
+                                          onChange={(e) => updateDivertedRow(r.id, { businessUnit: e.target.value })}
+                                          disabled={!selectedAsset}
+                                        />
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
+
           <p className="text-sm text-slate-700">
             <span className="font-medium text-slate-900">Total Waste Diverted: </span>
             {formatWasteNum(totalDiverted)} tonnes
@@ -752,122 +876,191 @@ const WasteManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">GRI 306-5 — Waste Directed to Disposal</CardTitle>
-          <CardDescription className="text-slate-600">Waste sent to disposal routes.</CardDescription>
+          <CardDescription className="text-slate-600">
+            Pre-seeded waste streams grouped by disposal method — expand a group to edit or add rows.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse min-w-[1100px]">
-              <thead>
-                <tr className="border-b-2 border-slate-200">
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Waste Category</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Field</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Business Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Month</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Quantity</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Disposal Method</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Reporting Year</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.disposalRows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 align-top">
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        value={r.wasteCategory}
-                        onChange={(e) => updateDisposalRow(r.id, { wasteCategory: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Field name"
-                        value={r.field}
-                        onChange={(e) => updateDisposalRow(r.id, { field: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Business unit"
-                        value={r.businessUnit}
-                        onChange={(e) => updateDisposalRow(r.id, { businessUnit: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={String(r.month)}
-                        onValueChange={(v) => updateDisposalRow(r.id, { month: Number(v) })}
-                        disabled={!selectedAsset}
+        <CardContent className="space-y-3">
+          {DISPOSAL_METHOD_GROUPS.map((disposalMethod) => {
+            const methodRows = data.disposalRows.filter((r) => r.disposalMethod === disposalMethod);
+            const methodSubtotal = methodRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+            const streamLabel = methodRows.length === 1 ? "1 stream" : `${methodRows.length} streams`;
+            const isOpen = disposalGroupsOpen[disposalMethod];
+
+            return (
+              <Collapsible
+                key={disposalMethod}
+                open={isOpen}
+                onOpenChange={(open) => setDisposalGroupsOpen((prev) => ({ ...prev, [disposalMethod]: open }))}
+              >
+                <div
+                  className={cn(
+                    "rounded-lg border border-slate-200 overflow-hidden",
+                    DISPOSAL_GROUP_STYLES[disposalMethod]
+                  )}
+                >
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4">
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
                       >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MONTHS.map((m) => (
-                            <SelectItem key={m.value} value={String(m.value)}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={r.quantity || ""}
-                        onChange={(e) => {
-                          const n = e.target.value === "" ? 0 : Number(e.target.value);
-                          updateDisposalRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2 text-slate-600">tonnes</td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={r.disposalMethod}
-                        onValueChange={(v) =>
-                          updateDisposalRow(r.id, { disposalMethod: v as WasteDisposalRow["disposalMethod"] })
-                        }
-                        disabled={!selectedAsset}
-                      >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DISPOSAL_METHODS.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        value={r.reportingYear}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateDisposalRow(r.id, { reportingYear: Number.isFinite(n) ? n : reportingYear });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900">{disposalMethod}</p>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {streamLabel} · {formatWasteNum(methodSubtotal)} tonnes
+                          </p>
+                        </div>
+                        {isOpen ? (
+                          <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        )}
+                      </button>
+                    </CollapsibleTrigger>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 bg-white/80"
+                      disabled={!selectedAsset}
+                      onClick={() => addDisposalRowForMethod(disposalMethod)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add row
+                    </Button>
+                  </div>
+
+                  <CollapsibleContent>
+                    <div className="border-t border-slate-200/80 bg-white px-3 py-3 sm:px-4">
+                      {methodRows.length === 0 ? (
+                        <p className="text-sm text-slate-500 py-2">No rows in this group yet.</p>
+                      ) : (
+                        <div className="text-sm">
+                          <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 px-2 pb-1 text-sm font-semibold text-slate-700 border-b border-slate-200">
+                            <span>Waste Category</span>
+                            <span>Quantity (tonnes)</span>
+                            <span>Month</span>
+                            <span>Year</span>
+                            <span />
+                          </div>
+                          {methodRows.map((r) => {
+                            const detailsOpen = disposalRowDetailsOpen[r.id] === true;
+                            return (
+                              <div key={r.id} className="border-b border-slate-100 py-2">
+                                <div className="grid grid-cols-[2fr_1fr_120px_80px_40px] gap-2 items-center py-1">
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    placeholder="Waste category"
+                                    value={r.wasteCategory}
+                                    onChange={(e) => updateDisposalRow(r.id, { wasteCategory: e.target.value })}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    min={0}
+                                    step="any"
+                                    value={r.quantity || ""}
+                                    onChange={(e) => {
+                                      const n = e.target.value === "" ? 0 : Number(e.target.value);
+                                      updateDisposalRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <Select
+                                    value={String(r.month)}
+                                    onValueChange={(v) => updateDisposalRow(r.id, { month: Number(v) })}
+                                    disabled={!selectedAsset}
+                                  >
+                                    <SelectTrigger className="w-full border-2 border-slate-200 h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {MONTHS.map((m) => (
+                                        <SelectItem key={m.value} value={String(m.value)}>
+                                          {m.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Input
+                                    className="w-full border-2 border-slate-200 h-9"
+                                    type="number"
+                                    value={r.reportingYear}
+                                    onChange={(e) => {
+                                      const n = Number(e.target.value);
+                                      updateDisposalRow(r.id, {
+                                        reportingYear: Number.isFinite(n) ? n : reportingYear,
+                                      });
+                                    }}
+                                    disabled={!selectedAsset}
+                                  />
+                                  <div className="flex justify-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 text-slate-500"
+                                      disabled={!selectedAsset}
+                                      onClick={() => removeDisposalRow(r.id)}
+                                      aria-label="Remove row"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Collapsible
+                                  open={detailsOpen}
+                                  onOpenChange={(open) =>
+                                    setDisposalRowDetailsOpen((prev) => ({ ...prev, [r.id]: open }))
+                                  }
+                                >
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                    >
+                                      Details {detailsOpen ? "▴" : "▾"}
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 pb-1">
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Field name</Label>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Field name"
+                                          value={r.field}
+                                          onChange={(e) => updateDisposalRow(r.id, { field: e.target.value })}
+                                          disabled={!selectedAsset}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs text-slate-600">Business unit</Label>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Business unit"
+                                          value={r.businessUnit}
+                                          onChange={(e) => updateDisposalRow(r.id, { businessUnit: e.target.value })}
+                                          disabled={!selectedAsset}
+                                        />
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
+
           <p className="text-sm text-slate-700">
             <span className="font-medium text-slate-900">Total Waste Directed to Disposal: </span>
             {formatWasteNum(totalDisposed)} tonnes
