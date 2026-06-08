@@ -149,7 +149,7 @@ const BusinessEthicsScreen = () => {
           Business Ethics &amp; Payments Transparency
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-510a metrics for reserves in high-risk jurisdictions, government payments, whistleblower programmes, and anti-corruption controls.
+          Reserves in high-risk jurisdictions, government payments, whistleblower programmes, and anti-corruption controls.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -194,7 +194,7 @@ const BusinessEthicsScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-red-600")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">
-            Reserves in High-Risk Jurisdictions (EM-EP-510a.1)
+            Reserves in High-Risk Jurisdictions
           </CardTitle>
           <CardDescription className="text-slate-600">
             Proved and probable reserves located in countries with high corruption risk.
@@ -255,7 +255,7 @@ const BusinessEthicsScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-amber-600")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Payments to Governments (ETH-01)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Payments to Governments</CardTitle>
             <CardDescription className="text-slate-600">Disclose payments made to governments by country and type.</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addPaymentRow}>
@@ -356,7 +356,7 @@ const BusinessEthicsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Whistleblower Reports (ETH-03, ETH-04)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Whistleblower Reports</CardTitle>
           <CardDescription className="text-slate-600">Reports received and substantiated during the reporting period.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -389,7 +389,7 @@ const BusinessEthicsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-blue-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Anti-Corruption Training (ETH-05)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Anti-Corruption Training</CardTitle>
           <CardDescription className="text-slate-600">Share of employees who completed annual anti-corruption training.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -407,7 +407,7 @@ const BusinessEthicsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Governance Controls (EM-EP-510a.2)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Governance Controls</CardTitle>
           <CardDescription className="text-slate-600">Due diligence, code of conduct, audit findings, and corruption management systems.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

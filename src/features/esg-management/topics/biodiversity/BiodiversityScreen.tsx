@@ -266,7 +266,7 @@ const BiodiversityScreen = () => {
           <div className="space-y-2">
             <Label className="text-slate-800">Environmental Management Policies — Narrative</Label>
             <p className="text-xs text-slate-500">
-              Describe EMPs, biodiversity action plans, and restoration commitments for active sites. (EM-EP-160a.3)
+              Describe EMPs, biodiversity action plans, and restoration commitments for active sites.
             </p>
             <Textarea
               className="border-2 border-slate-200 min-h-[100px]"

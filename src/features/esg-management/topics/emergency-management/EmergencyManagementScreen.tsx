@@ -189,7 +189,7 @@ const EmergencyManagementScreen = () => {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Emergency Management</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-540a metrics for hydrocarbon releases, well control incidents, preparedness, and emergency systems.
+          Hydrocarbon releases, well control incidents, preparedness, and emergency systems.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -234,7 +234,7 @@ const EmergencyManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-red-600")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Significant Hydrocarbon Releases (EM-EP-540a.1)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Significant Hydrocarbon Releases</CardTitle>
             <CardDescription className="text-slate-600">Record significant hydrocarbon release incidents for the reporting period.</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addHydrocarbonRow}>
@@ -340,7 +340,7 @@ const EmergencyManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Well Control Incidents (EM-EP-540a.2)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Well Control Incidents</CardTitle>
             <CardDescription className="text-slate-600">Well control events including blowouts.</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addWellControlRow}>
@@ -583,7 +583,7 @@ const EmergencyManagementScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Emergency Management Systems Description (EM-EP-540a.3)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Emergency Management Systems Description</CardTitle>
           <CardDescription className="text-slate-600">Narrative on emergency management systems and preparedness.</CardDescription>
         </CardHeader>
         <CardContent>

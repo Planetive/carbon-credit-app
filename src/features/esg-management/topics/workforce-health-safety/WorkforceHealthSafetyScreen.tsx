@@ -115,8 +115,7 @@ const WorkforceHealthSafetyScreen = () => {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Workforce Health &amp; Safety</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-320a metrics for recordable and lost-time incident rates, fatalities, training, and management
-          systems.
+          Recordable and lost-time incident rates, fatalities, training, and management systems.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -160,7 +159,7 @@ const WorkforceHealthSafetyScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-blue-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Employee Workforce Data (EM-EP-320a.1)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Employee Workforce Data</CardTitle>
           <CardDescription className="text-slate-600">
             Hours worked and incident counts for direct employees only.
           </CardDescription>
@@ -226,7 +225,7 @@ const WorkforceHealthSafetyScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Contractor Workforce Data (EM-EP-320a.1)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Contractor Workforce Data</CardTitle>
           <CardDescription className="text-slate-600">
             Hours worked and incident counts for contractors only.
           </CardDescription>
@@ -235,7 +234,7 @@ const WorkforceHealthSafetyScreen = () => {
           <Alert className="border-amber-200 bg-amber-50/80 border-2">
             <AlertTitle className="text-amber-950 text-sm">Separate reporting required</AlertTitle>
             <AlertDescription className="text-sm text-amber-950/90">
-              SASB requires employees and contractors reported separately. Do not combine figures.
+              Report employees and contractors separately. Do not combine figures.
             </AlertDescription>
           </Alert>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -323,7 +322,7 @@ const WorkforceHealthSafetyScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-emerald-600")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Health &amp; Safety Training (EM-EP-320a.1)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Health &amp; Safety Training</CardTitle>
           <CardDescription className="text-slate-600">Total training hours and average headcount for the reporting period.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -356,7 +355,7 @@ const WorkforceHealthSafetyScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">H&amp;S Management System (EM-EP-320a.2)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">H&amp;S Management System</CardTitle>
           <CardDescription className="text-slate-600">Certification and narrative on your health and safety management approach.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

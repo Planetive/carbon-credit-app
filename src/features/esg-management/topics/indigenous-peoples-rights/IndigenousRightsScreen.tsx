@@ -155,7 +155,7 @@ const IndigenousRightsScreen = () => {
           Security, Human Rights &amp; Rights of Indigenous Peoples
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-210a metrics for land proximity, FPIC, community grievances, and indigenous peoples engagement.
+          Land proximity, FPIC, community grievances, and indigenous peoples engagement.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -200,7 +200,7 @@ const IndigenousRightsScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-amber-600")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">
-            Operations &amp; Indigenous Land Proximity (EM-EP-210a.1)
+            Operations &amp; Indigenous Land Proximity
           </CardTitle>
           <CardDescription className="text-slate-600">
             Whether operations are in or near indigenous peoples&apos; lands.
@@ -284,7 +284,7 @@ const IndigenousRightsScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-red-600")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Community Grievances (EM-EP-210a.3)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Community Grievances</CardTitle>
             <CardDescription className="text-slate-600">Register and track community grievances and resolutions.</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addGrievanceRow}>
@@ -411,7 +411,7 @@ const IndigenousRightsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">FPIC Policy &amp; Process (EM-EP-210a.2)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">FPIC Policy &amp; Process</CardTitle>
           <CardDescription className="text-slate-600">Policy status and narrative on FPIC processes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -449,7 +449,7 @@ const IndigenousRightsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-blue-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">IFC Performance Standard 7 (IND-07)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">IFC Performance Standard 7</CardTitle>
           <CardDescription className="text-slate-600">Indigenous peoples assessment under IFC PS7.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">

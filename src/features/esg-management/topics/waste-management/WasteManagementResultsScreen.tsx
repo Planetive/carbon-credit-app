@@ -143,14 +143,9 @@ const WasteManagementResultsScreen = () => {
             Back to data entry
           </Link>
         </Button>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Waste management — summary</h1>
-          <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50">
-            GRI 306
-          </Badge>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Waste management — summary</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only GRI 306 summary from your saved inputs. Edit data on the previous page.
+          Read-only summary from your saved inputs. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -206,7 +201,7 @@ const WasteManagementResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">GRI 306-1 — Policy assessment</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">Policy assessment</h3>
                 <p className="text-xs text-slate-500 mb-2">{RECORD_METADATA_NOTE}</p>
                 <div className="rounded-lg border border-slate-200 overflow-hidden">
                   <table className="w-full text-sm">
@@ -253,7 +248,7 @@ const WasteManagementResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">GRI 306-3 — Waste generated</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">Waste generated</h3>
                 <p className="text-xs text-slate-500 mb-2">{RECORD_METADATA_NOTE}</p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
@@ -272,7 +267,7 @@ const WasteManagementResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">GRI 306-4 & 306-5 — Diversion and disposal</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">Diversion and disposal</h3>
                 <p className="text-xs text-slate-500 mb-2">{RECORD_METADATA_NOTE}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">

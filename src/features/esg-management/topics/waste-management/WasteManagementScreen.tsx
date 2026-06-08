@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -340,14 +339,9 @@ const WasteManagementScreen = () => {
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
         </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Waste Management</h1>
-          <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50">
-            GRI 306
-          </Badge>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Waste Management</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          GRI 306 Aligned — Waste Generation, Diversion and Disposal
+          Waste Generation, Diversion and Disposal
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -400,7 +394,7 @@ const WasteManagementScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">GRI 306-1 — Waste Management and Waste-Related Impacts</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Waste Management and Waste-Related Impacts</CardTitle>
           <CardDescription className="text-slate-600">Policy and management practice assessment.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -483,7 +477,7 @@ const WasteManagementScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-sky-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">GRI 306-3 — Waste Generated</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Waste Generated</CardTitle>
           <CardDescription className="text-slate-600">
             Pre-seeded waste streams grouped by category — expand a group to edit or add rows.
           </CardDescription>
@@ -685,7 +679,7 @@ const WasteManagementScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-teal-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">GRI 306-4 — Waste Diverted from Disposal</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Waste Diverted from Disposal</CardTitle>
           <CardDescription className="text-slate-600">
             Pre-seeded waste streams grouped by diversion method — expand a group to edit or add rows.
           </CardDescription>
@@ -875,7 +869,7 @@ const WasteManagementScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">GRI 306-5 — Waste Directed to Disposal</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Waste Directed to Disposal</CardTitle>
           <CardDescription className="text-slate-600">
             Pre-seeded waste streams grouped by disposal method — expand a group to edit or add rows.
           </CardDescription>

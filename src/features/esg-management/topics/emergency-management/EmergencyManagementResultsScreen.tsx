@@ -115,7 +115,7 @@ const EmergencyManagementResultsScreen = () => {
         </Button>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Emergency Management — summary</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-540a metrics. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -173,7 +173,7 @@ const EmergencyManagementResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-540a.1 — Hydrocarbon releases</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Hydrocarbon releases</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-red-200 bg-red-50/50 px-3 py-3">
                     <p className="text-xs text-slate-600">Total releases (count)</p>
@@ -213,7 +213,7 @@ const EmergencyManagementResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-540a.2 — Well control incidents</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Well control incidents</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-orange-200 bg-orange-50/50 px-3 py-3">
                     <p className="text-xs text-slate-600">Well control incidents</p>
@@ -251,7 +251,7 @@ const EmergencyManagementResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-540a.3 — Preparedness &amp; systems</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Preparedness &amp; systems</h3>
                 <div className="rounded-lg border border-slate-200 overflow-hidden mb-4">
                   <table className="w-full text-sm">
                     <tbody className="text-slate-700">

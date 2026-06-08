@@ -102,7 +102,7 @@ const CommunityRelationsResultsScreen = () => {
         </Button>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Community Relations — summary</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-210b metrics. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -147,11 +147,11 @@ const CommunityRelationsResultsScreen = () => {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-xl border-2 border-slate-200 bg-white p-5">
-              <p className="text-xs text-slate-500 font-medium">EM-EP-210b.2 — Delay events</p>
+              <p className="text-xs text-slate-500 font-medium">Delay events</p>
               <p className="text-2xl font-bold text-slate-900 mt-2 tabular-nums">{formatCommunityNum(delayCount)}</p>
             </div>
             <div className="rounded-xl border-2 border-slate-200 bg-white p-5">
-              <p className="text-xs text-slate-500 font-medium">EM-EP-210b.3 — Total delay days</p>
+              <p className="text-xs text-slate-500 font-medium">Total delay days</p>
               <p className="text-2xl font-bold text-slate-900 mt-2 tabular-nums">{formatCommunityNum(delayDays)}</p>
             </div>
             <div className="rounded-xl border-2 border-slate-200 bg-white p-5">
@@ -164,7 +164,7 @@ const CommunityRelationsResultsScreen = () => {
 
           <Card className={sectionShell("border-l-4 border-l-violet-500")}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-slate-900">EM-EP-210b.1 — Community rights process</CardTitle>
+              <CardTitle className="text-lg text-slate-900">Community rights process</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{narrative(data.communityRightsProcessNarrative)}</p>
@@ -173,7 +173,7 @@ const CommunityRelationsResultsScreen = () => {
 
           <Card className={sectionShell("border-l-4 border-l-orange-500")}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-slate-900">EM-EP-210b.4 — Delays and costs</CardTitle>
+              <CardTitle className="text-lg text-slate-900">Delays and costs</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{narrative(data.delayCostsNarrative)}</p>
@@ -182,7 +182,7 @@ const CommunityRelationsResultsScreen = () => {
 
           <Card className={sectionShell("border-l-4 border-l-amber-500")}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-slate-900">EM-EP-210b.5 — Root causes</CardTitle>
+              <CardTitle className="text-lg text-slate-900">Root causes</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{narrative(data.delayRootCauseNarrative)}</p>
@@ -191,7 +191,7 @@ const CommunityRelationsResultsScreen = () => {
 
           <Card className={sectionShell("border-l-4 border-l-teal-500")}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-slate-900">EM-EP-210b.6 — Corrective actions</CardTitle>
+              <CardTitle className="text-lg text-slate-900">Corrective actions</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">

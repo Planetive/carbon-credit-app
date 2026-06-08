@@ -123,7 +123,7 @@ const WorkforceHealthSafetyResultsScreen = () => {
           Workforce Health &amp; Safety — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-320a metrics. Employees and contractors are reported separately.
+          Read-only summary. Employees and contractors are reported separately.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -181,7 +181,7 @@ const WorkforceHealthSafetyResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-320a.1 — TRIR (per 200,000 hrs)</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">TRIR (per 200,000 hrs)</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-3">
                     <p className="text-xs text-slate-600">Employees</p>
@@ -195,7 +195,7 @@ const WorkforceHealthSafetyResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-320a.1 — LTIR (per 200,000 hrs)</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">LTIR (per 200,000 hrs)</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-3">
                     <p className="text-xs text-slate-600">Employees</p>
@@ -227,7 +227,7 @@ const WorkforceHealthSafetyResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-320a.1 — Training</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Training</h3>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-3">
                   <p className="text-xs text-slate-600">Average H&amp;S training hours per employee</p>
                   <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">{formatHsNum(avgTrainingHours)} hrs</p>
@@ -239,7 +239,7 @@ const WorkforceHealthSafetyResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-320a.2 — Management system</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Management system</h3>
                 <div className="space-y-3 text-sm text-slate-700">
                   <div>
                     <p className="font-medium text-slate-800 mb-1">Certification status</p>

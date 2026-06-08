@@ -105,7 +105,7 @@ const EnvironmentalManagementResultsScreen = () => {
           Environmental Management of E&amp;P Activities — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-160b metrics. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -163,7 +163,7 @@ const EnvironmentalManagementResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">EM-EP-160b.1 — Hydrocarbon spills</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Hydrocarbon spills</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="rounded-lg border border-red-200 bg-red-50/40 px-3 py-3">
                     <p className="text-xs text-slate-600">Total spill count</p>
@@ -191,7 +191,7 @@ const EnvironmentalManagementResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">EM-EP-160b.2 — Well integrity</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">Well integrity</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                   <div className="rounded-lg border border-orange-200 bg-orange-50/40 px-3 py-3">
                     <p className="text-xs text-slate-600">Well integrity failures</p>

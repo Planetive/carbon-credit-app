@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   AIR_QUALITY_TOPIC_ID,
@@ -134,14 +133,6 @@ const EsgTopicsScreen = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold text-sm sm:text-base leading-snug text-slate-800">{t.label}</p>
-                    {t.id === WASTE_TOPIC_ID && (
-                      <Badge
-                        variant="outline"
-                        className="border-green-600 text-green-700 bg-green-50 text-[10px]"
-                      >
-                        GRI 306
-                      </Badge>
-                    )}
                     {!isLive && (
                       <span className="text-[10px] uppercase tracking-wide font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                         Coming soon

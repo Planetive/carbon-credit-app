@@ -119,7 +119,7 @@ const BusinessEthicsResultsScreen = () => {
           Business Ethics &amp; Payments Transparency — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-510a metrics. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -177,7 +177,7 @@ const BusinessEthicsResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-510a.1 — Reserves in high-risk countries</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Reserves in high-risk countries</h3>
                 <div className="grid gap-3 sm:grid-cols-2 mb-3">
                   <div className="rounded-lg border border-red-200 bg-red-50/40 px-3 py-3">
                     <p className="text-xs text-slate-600">% proved reserves in high-risk countries</p>
@@ -201,14 +201,14 @@ const BusinessEthicsResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-510a.2 — Corruption management</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Corruption management</h3>
                 <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-700">
                   {data.corruptionManagementNarrative.trim() || "Not entered"}
                 </p>
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">Government payments (ETH-01)</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Government payments</h3>
                 <p className="text-sm text-slate-700 mb-3">
                   Total payments:{" "}
                   <span className="font-semibold text-slate-900 tabular-nums">{formatBusinessEthicsUsd(totalPaymentsUsd)} USD</span>
@@ -240,7 +240,7 @@ const BusinessEthicsResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">Whistleblower programme (ETH-03, ETH-04)</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Whistleblower programme</h3>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-orange-200 bg-orange-50/40 px-3 py-3">
                     <p className="text-xs text-slate-600">Reports received</p>
@@ -260,7 +260,7 @@ const BusinessEthicsResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">Anti-corruption training (ETH-05)</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Anti-corruption training</h3>
                 <div className="rounded-lg border border-blue-200 bg-blue-50/40 px-3 py-3 max-w-xs">
                   <p className="text-xs text-slate-600">% employees trained</p>
                   <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">
@@ -275,7 +275,7 @@ const BusinessEthicsResultsScreen = () => {
                   <table className="w-full text-sm">
                     <tbody className="text-slate-700">
                       <tr className="border-b border-slate-100">
-                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50 w-2/5">Third-party due diligence (ETH-06)</td>
+                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50 w-2/5">Third-party due diligence</td>
                         <td className="py-2 px-3">
                           {data.thirdPartyDueDiligenceInPlace}
                           {data.thirdPartyDueDiligenceInPlace === "Yes" && data.dueDiligenceToolName.trim()
@@ -284,11 +284,11 @@ const BusinessEthicsResultsScreen = () => {
                         </td>
                       </tr>
                       <tr className="border-b border-slate-100">
-                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50">Code of conduct (ETH-07)</td>
+                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50">Code of conduct</td>
                         <td className="py-2 px-3">{data.codeOfConductInPlace}</td>
                       </tr>
                       <tr>
-                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50">Internal audit ethics findings (ETH-08)</td>
+                        <td className="py-2 px-3 font-medium text-slate-800 bg-slate-50">Internal audit ethics findings</td>
                         <td className="py-2 px-3 tabular-nums">{data.internalAuditEthicsFindings}</td>
                       </tr>
                     </tbody>

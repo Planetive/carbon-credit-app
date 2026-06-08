@@ -114,10 +114,9 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
   {
     id: WASTE_TOPIC_ID,
     label: "Waste Management",
-    description: "Track waste generation, diversion and disposal aligned with GRI 306.",
+    description: "Track waste generation, diversion and disposal.",
     icon: Trash2,
     implementation: "full",
-    framework: "GRI 306",
   },
 ];
 

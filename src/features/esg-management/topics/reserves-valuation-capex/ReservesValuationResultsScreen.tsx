@@ -128,7 +128,7 @@ const ReservesValuationResultsScreen = () => {
           Reserves Valuation &amp; Capital Expenditures — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-420a metrics and TCFD narratives. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -186,7 +186,7 @@ const ReservesValuationResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-420a.1 — Carbon price assumptions</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Carbon price assumptions</h3>
                 <div className="rounded-lg border border-slate-200 overflow-hidden">
                   <table className="w-full text-sm">
                     <tbody className="text-slate-700">
@@ -212,7 +212,7 @@ const ReservesValuationResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-420a.2 — Embedded CO₂ in proved reserves</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Embedded CO₂ in proved reserves</h3>
                 <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3">
                   <p className="text-xs text-slate-600">Total embedded CO₂ (oil + gas)</p>
                   <p className="text-lg font-semibold text-slate-900 tabular-nums mt-1">
@@ -243,7 +243,7 @@ const ReservesValuationResultsScreen = () => {
 
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 mb-2">
-                  EM-EP-420a.3 — Reserves in carbon-regulated jurisdictions
+                  Reserves in carbon-regulated jurisdictions
                 </h3>
                 <p className="text-sm text-slate-700">
                   <span className="font-medium text-slate-800 tabular-nums">{formatReservesNum(pctRegulated, 1)}%</span> of
@@ -278,7 +278,7 @@ const ReservesValuationResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-420a.4 — Capital allocation &amp; TCFD</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Capital allocation &amp; TCFD</h3>
                 <p className="text-sm text-slate-700 mb-3">
                   <span className="font-medium text-slate-800">% capex to low-carbon activities: </span>
                   <span className="tabular-nums">{formatReservesNum(pctCapexLowCarbon, 1)}%</span>

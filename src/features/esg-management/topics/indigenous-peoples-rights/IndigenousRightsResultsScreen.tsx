@@ -113,7 +113,7 @@ const IndigenousRightsResultsScreen = () => {
           Security, Human Rights &amp; Rights of Indigenous Peoples — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          Read-only SASB EM-EP-210a metrics. Edit data on the previous page.
+          Read-only summary. Edit data on the previous page.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -171,7 +171,7 @@ const IndigenousRightsResultsScreen = () => {
           ) : (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-210a.1 — Land proximity</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Land proximity</h3>
                 <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-3">
                   <p className="text-xs text-slate-600">Operations in or near indigenous peoples&apos; lands</p>
                   <p className="text-lg font-semibold text-slate-900 mt-1">{data.proximityToIndigenousLands}</p>
@@ -179,7 +179,7 @@ const IndigenousRightsResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-210a.2 — FPIC &amp; process</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">FPIC &amp; process</h3>
                 <div className="rounded-lg border border-slate-200 overflow-hidden mb-3">
                   <table className="w-full text-sm">
                     <tbody className="text-slate-700">
@@ -222,7 +222,7 @@ const IndigenousRightsResultsScreen = () => {
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">EM-EP-210a.3 — Community grievances</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-2">Community grievances</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
                   <div className="rounded-lg border border-red-200 bg-red-50/40 px-3 py-3">
                     <p className="text-xs text-slate-600">Total</p>

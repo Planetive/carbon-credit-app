@@ -178,7 +178,7 @@ const EnvironmentalManagementScreen = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
           Environmental Management of E&amp;P Activities
         </h1>
-        <p className="text-sm text-slate-600 max-w-2xl mt-1">EM-EP-160b — Spills &amp; Well Integrity</p>
+        <p className="text-sm text-slate-600 max-w-2xl mt-1">Spills &amp; Well Integrity</p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
         </p>
@@ -222,7 +222,7 @@ const EnvironmentalManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-red-600")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Hydrocarbon Spill Register (EM-EP-160b.1)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Hydrocarbon Spill Register</CardTitle>
             <CardDescription className="text-slate-600">
               Record all spills to land or water — not just reportable spills.
             </CardDescription>
@@ -436,7 +436,7 @@ const EnvironmentalManagementScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Well Integrity Register (EM-EP-160b.2)</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Well Integrity Register</CardTitle>
             <CardDescription className="text-slate-600">
               Track well barrier status across all operated wells.
             </CardDescription>

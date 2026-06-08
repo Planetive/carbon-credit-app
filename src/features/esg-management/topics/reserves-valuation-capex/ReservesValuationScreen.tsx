@@ -141,8 +141,7 @@ const ReservesValuationScreen = () => {
           Reserves Valuation &amp; Capital Expenditures
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-420a metrics for proved reserves, carbon price assumptions, capital allocation, and TCFD climate
-          risk narratives.
+          Proved reserves, carbon price assumptions, capital allocation, and TCFD climate risk narratives.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -186,7 +185,7 @@ const ReservesValuationScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-blue-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Proved Reserves (1P) — EM-EP-420a.2</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Proved Reserves (1P)</CardTitle>
           <CardDescription className="text-slate-600">
             Enter proved (1P) reserve volumes used for embedded CO₂ calculations.
           </CardDescription>
@@ -231,7 +230,7 @@ const ReservesValuationScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-slate-500")}>
         <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
           <div>
-            <CardTitle className="text-lg text-slate-900">Reserves by Country — EM-EP-420a.3</CardTitle>
+            <CardTitle className="text-lg text-slate-900">Reserves by Country</CardTitle>
             <CardDescription className="text-slate-600">
               Break down proved reserves by jurisdiction and carbon regulation status.
             </CardDescription>
@@ -359,7 +358,7 @@ const ReservesValuationScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-amber-600")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Carbon Price Assumptions — EM-EP-420a.1</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Carbon Price Assumptions</CardTitle>
           <CardDescription className="text-slate-600">Internal and IEA scenario carbon prices ($/tCO₂).</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -404,7 +403,7 @@ const ReservesValuationScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-emerald-600")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Capital Allocation — EM-EP-420a.4</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Capital Allocation</CardTitle>
           <CardDescription className="text-slate-600">
             Share of capital expenditure directed to low-carbon activities.
           </CardDescription>
@@ -430,7 +429,7 @@ const ReservesValuationScreen = () => {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">TCFD Climate Risk Disclosure</CardTitle>
           <CardDescription className="text-slate-600">
-            Narrative disclosures aligned with TCFD recommendations (EM-EP-420a.4).
+            Narrative disclosures aligned with TCFD recommendations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -482,7 +481,7 @@ const ReservesValuationScreen = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-slate-900">Summary</CardTitle>
             <CardDescription className="text-slate-600">
-              Open a dedicated page for SASB EM-EP-420a metrics and TCFD narratives.
+              Open a dedicated page for read-only metrics and TCFD narratives.
             </CardDescription>
           </CardHeader>
           <CardContent>

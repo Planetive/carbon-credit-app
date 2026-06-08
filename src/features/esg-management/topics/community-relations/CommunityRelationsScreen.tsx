@@ -103,7 +103,7 @@ const CommunityRelationsScreen = () => {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Community Relations</h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
-          SASB EM-EP-210b metrics for community rights management and non-technical project delays.
+          Community rights management and non-technical project delays.
         </p>
         <p className="text-xs text-slate-500 mt-2">
           Reporting period: <span className="font-medium text-slate-700">{periodLabel}</span>
@@ -157,7 +157,7 @@ const CommunityRelationsScreen = () => {
       <Card className={sectionShell("border-l-4 border-l-violet-500")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">
-            Community Rights &amp; Interests (EM-EP-210b.1)
+            Community Rights &amp; Interests
           </CardTitle>
           <CardDescription className="text-slate-600">
             Discussion of the process to manage risks and opportunities associated with community rights and interests.
@@ -176,7 +176,7 @@ const CommunityRelationsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-amber-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Non-Technical Delays (EM-EP-210b.2–210b.3)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Non-Technical Delays</CardTitle>
           <CardDescription className="text-slate-600">
             Count and duration of delays not caused by technical or operational factors.
           </CardDescription>
@@ -227,14 +227,14 @@ const CommunityRelationsScreen = () => {
 
       <Card className={sectionShell("border-l-4 border-l-orange-500")}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-slate-900">Delay Analysis &amp; Response (EM-EP-210b.4–210b.6)</CardTitle>
+          <CardTitle className="text-lg text-slate-900">Delay Analysis &amp; Response</CardTitle>
           <CardDescription className="text-slate-600">
             Narrative disclosure on specific delays, root causes, costs, and corrective actions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-slate-800">Specific delays and associated costs (210b.4)</Label>
+            <Label className="text-slate-800">Specific delays and associated costs</Label>
             <Textarea
               className="border-2 border-slate-200 min-h-[100px]"
               placeholder="Discuss specific non-technical delays and estimated or actual costs incurred."
@@ -244,7 +244,7 @@ const CommunityRelationsScreen = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-slate-800">Root cause discussion (210b.5)</Label>
+            <Label className="text-slate-800">Root cause discussion</Label>
             <Textarea
               className="border-2 border-slate-200 min-h-[100px]"
               placeholder="Describe root causes of non-technical delays (e.g. community opposition, permitting, land access)."
@@ -254,7 +254,7 @@ const CommunityRelationsScreen = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-slate-800">Corrective actions (210b.6)</Label>
+            <Label className="text-slate-800">Corrective actions</Label>
             <Textarea
               className="border-2 border-slate-200 min-h-[100px]"
               placeholder="Describe corrective actions taken to prevent recurrence of non-technical delays."
@@ -270,7 +270,7 @@ const CommunityRelationsScreen = () => {
         <Card className={sectionShell("border-l-4 border-l-slate-700")}>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-slate-900">Summary</CardTitle>
-            <CardDescription className="text-slate-600">Open a dedicated page for read-only SASB disclosure summary.</CardDescription>
+            <CardDescription className="text-slate-600">Open a dedicated page for read-only disclosure summary.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
