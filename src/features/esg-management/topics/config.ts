@@ -18,7 +18,12 @@ export const AIR_QUALITY_TOPIC_ID = "air_quality";
 export const WATER_TOPIC_ID = "water_management";
 export const WASTE_TOPIC_ID = "waste_management";
 export const BIODIVERSITY_TOPIC_ID = "biodiversity";
+export const ENVIRONMENTAL_MANAGEMENT_TOPIC_ID = "environmental_management";
 export const BUSINESS_ETHICS_TOPIC_ID = "business_ethics";
+export const RESERVES_VALUATION_CAPEX_TOPIC_ID = "reserves_valuation_capex";
+export const WORKFORCE_HEALTH_SAFETY_TOPIC_ID = "workforce_health_safety";
+export const EMERGENCY_MANAGEMENT_TOPIC_ID = "emergency_management";
+export const INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID = "indigenous_peoples_rights";
 
 export type TopicImplementation = "full" | "coming_soon";
 
@@ -62,49 +67,49 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     label: "Biodiversity Impacts",
     description: "Habitats, species, and nature-related impacts.",
     icon: Leaf,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
-    id: "environmental_management",
+    id: ENVIRONMENTAL_MANAGEMENT_TOPIC_ID,
     label: "Environmental Management of E&P Activities",
     description: "Environmental systems, compliance, and permits.",
     icon: ClipboardCheck,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
-    id: "reserves_valuation_capex",
+    id: RESERVES_VALUATION_CAPEX_TOPIC_ID,
     label: "Reserves Valuation & Capital Expenditures",
     description: "Reserves, asset valuation, and investment in operations.",
     icon: LineChart,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
-    id: "workforce_health_safety",
+    id: WORKFORCE_HEALTH_SAFETY_TOPIC_ID,
     label: "Workforce Health & Safety",
     description: "Health, safety, and wellbeing at work.",
     icon: HeartPulse,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
-    id: "emergency_management",
+    id: EMERGENCY_MANAGEMENT_TOPIC_ID,
     label: "Emergency Management",
     description: "Preparedness, response, and business continuity.",
     icon: ShieldAlert,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
-    id: "indigenous_peoples_rights",
+    id: INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
     label: "Indigenous Peoples' Rights",
     description: "Consent, land rights, engagement, and cultural heritage.",
     icon: Handshake,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
     id: BUSINESS_ETHICS_TOPIC_ID,
     label: "Business Ethics & Payments Transparency",
     description: "Anti-corruption, integrity, and ethical conduct.",
     icon: Scale,
-    implementation: "coming_soon",
+    implementation: "full",
   },
   {
     id: WASTE_TOPIC_ID,

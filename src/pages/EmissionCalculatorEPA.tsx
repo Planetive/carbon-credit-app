@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import type { LucideIcon } from "lucide-react";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -10,6 +11,8 @@ import {
   Thermometer,
   Flame,
   Truck,
+  Car,
+  Wind,
   Building2,
   HandCoins,
   X,
@@ -44,6 +47,86 @@ import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmiss
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
 import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
+
+type Scope1GroupId = "stationary" | "mobile" | "fugitive" | "facility";
+
+type EpaSidebarCategory = {
+  id: string;
+  title: string;
+  icon: LucideIcon;
+  description: string;
+  group?: Scope1GroupId | "upstream" | "downstream";
+};
+
+const SCOPE1_NAV_GROUPS: { id: Scope1GroupId; label: string; headerClass: string }[] = [
+  { id: "stationary", label: "Stationary combustion", headerClass: "text-teal-700/90 hover:bg-teal-50/50" },
+  { id: "mobile", label: "Mobile combustion & vehicles", headerClass: "text-blue-700/90 hover:bg-blue-50/50" },
+  { id: "fugitive", label: "Fugitive emissions", headerClass: "text-amber-700/90 hover:bg-amber-50/50" },
+  { id: "facility", label: "On-site fuel use", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
+];
+
+const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
+  { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)", group: "stationary" },
+  {
+    id: "scope1HeatSteam",
+    title: "Heat and Steam",
+    icon: Thermometer,
+    description: "Heat and steam (Scope 1, same form as Fuel)",
+    group: "stationary",
+  },
+  { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table", group: "mobile" },
+  {
+    id: "onRoadGasoline",
+    title: "On-Road Gasoline",
+    icon: Car,
+    description: "On-road gasoline using On-Road Gasoline table",
+    group: "mobile",
+  },
+  {
+    id: "onRoadDieselAltFuel",
+    title: "On-Road Diesel & Alt Fuel",
+    icon: Car,
+    description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table",
+    group: "mobile",
+  },
+  {
+    id: "nonRoadVehicle",
+    title: "Non-Road Vehicle",
+    icon: Truck,
+    description: "Non-road vehicle fuel using Non-Road Vehicle table",
+    group: "mobile",
+  },
+  {
+    id: "vehicularCarbonFootprints",
+    title: "Vehicular Carbon Footprints",
+    icon: Car,
+    description: "Scope 1 vehicular emissions calculator (IPCC)",
+    group: "mobile",
+  },
+  { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator (IPCC)", group: "fugitive" },
+  { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "fugitive" },
+  {
+    id: "kitchenFootprints",
+    title: "Kitchen Footprints",
+    icon: Flame,
+    description: "Scope 1 kitchen emissions calculator (IPCC)",
+    group: "facility",
+  },
+  {
+    id: "powerFuelConsumption",
+    title: "Fuel Consumption for Power",
+    icon: Factory,
+    description: "Scope 1 power fuel emissions calculator (IPCC)",
+    group: "facility",
+  },
+  {
+    id: "heatingFootprints",
+    title: "Heating",
+    icon: Thermometer,
+    description: "Scope 1 heating emissions calculator (IPCC)",
+    group: "facility",
+  },
+];
 
 type EmissionPdfReportData = {
   company: string;
@@ -221,6 +304,12 @@ const EmissionCalculatorEPA = () => {
   const [scope3GroupsExpanded, setScope3GroupsExpanded] = useState<{ upstream: boolean; downstream: boolean }>({
     upstream: false,
     downstream: false,
+  });
+  const [scope1GroupsExpanded, setScope1GroupsExpanded] = useState<Record<Scope1GroupId, boolean>>({
+    stationary: true,
+    mobile: false,
+    fugitive: false,
+    facility: false,
   });
   const [initialQuestionnaireCompleted, setInitialQuestionnaireCompleted] = useState(false);
   const [calculationMode, setCalculationMode] = useState<"lca" | "manual" | null>(null);
@@ -652,36 +741,12 @@ const EmissionCalculatorEPA = () => {
     });
   };
 
-  // Sidebar – EPA version: Scope 1 Fuel only, Scope 2 Electricity + Heat & Steam, Scope 3 unchanged
-  const baseScope1Categories = [
-    { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)" },
-    { id: "scope1HeatSteam", title: "Heat and Steam", icon: Thermometer, description: "Heat and steam (Scope 1, same form as Fuel)" },
-    { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table" },
-    { id: "onRoadGasoline", title: "On-Road Gasoline", icon: Truck, description: "On-road gasoline using On-Road Gasoline table" },
-    { id: "onRoadDieselAltFuel", title: "On-Road Diesel & Alt Fuel", icon: Truck, description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table" },
-    { id: "nonRoadVehicle", title: "Non-Road Vehicle", icon: Truck, description: "Non-road vehicle fuel using Non-Road Vehicle table" },
-  ];
-
-  const ipccScope1Categories = [
-    { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator" },
-    { id: "venting", title: "Venting", icon: Flame, description: "Scope 1 venting calculator" },
-    {
-      id: "vehicularCarbonFootprints",
-      title: "Vehicular Carbon Footprints",
-      icon: Truck,
-      description: "Scope 1 vehicular emissions calculator",
-    },
-    { id: "kitchenFootprints", title: "Kitchen Footprints", icon: Flame, description: "Scope 1 kitchen emissions calculator" },
-    {
-      id: "powerFuelConsumption",
-      title: "Fuel Consumption for Power",
-      icon: Factory,
-      description: "Scope 1 power fuel emissions calculator",
-    },
-    { id: "heatingFootprints", title: "Heating", icon: Thermometer, description: "Scope 1 heating emissions calculator" },
-  ];
-
-  const scope1Categories = [...baseScope1Categories, ...ipccScope1Categories];
+  const expandScope1GroupForCategory = (categoryId: string) => {
+    const group = EPA_SCOPE1_CATEGORIES.find((c) => c.id === categoryId)?.group;
+    if (group && group !== "upstream" && group !== "downstream") {
+      setScope1GroupsExpanded((prev) => ({ ...prev, [group]: true }));
+    }
+  };
 
   const sidebarItems = [
     {
@@ -689,7 +754,7 @@ const EmissionCalculatorEPA = () => {
       title: "Scope 1",
       icon: Factory,
       description: "Direct emissions from fuel combustion and related activities (EPA factors)",
-      categories: scope1Categories,
+      categories: EPA_SCOPE1_CATEGORIES,
     },
     {
       id: "scope2",
@@ -748,6 +813,9 @@ const EmissionCalculatorEPA = () => {
   const handleCategoryClick = (scopeId: string, categoryId: string) => {
     setActiveScope(scopeId);
     setActiveCategory(categoryId);
+    if (scopeId === "scope1") {
+      expandScope1GroupForCategory(categoryId);
+    }
   };
 
   const getNextCategory = (
@@ -788,6 +856,10 @@ const EmissionCalculatorEPA = () => {
 
       if (!expandedScopes[next.scope]) {
         setExpandedScopes((prev) => ({ ...prev, [next.scope]: true }));
+      }
+
+      if (next.scope === "scope1") {
+        expandScope1GroupForCategory(next.category);
       }
 
       setTimeout(() => {
@@ -1146,7 +1218,58 @@ const EmissionCalculatorEPA = () => {
 
                   {expandedScopes[scope.id] && (
                     <div className="ml-2 mt-2 space-y-1.5 pl-2 border-l-2 border-gray-200/50">
-                      {scope.id !== "scope3" ? (
+                      {scope.id === "scope1" ? (
+                        <div className="space-y-3">
+                          {SCOPE1_NAV_GROUPS.map((group, groupIndex) => {
+                            const groupCategories = scope.categories.filter(
+                              (c) => (c as EpaSidebarCategory).group === group.id,
+                            );
+                            if (groupCategories.length === 0) return null;
+                            return (
+                              <div key={group.id} className={groupIndex > 0 ? "pt-3 border-t border-gray-200/50" : ""}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setScope1GroupsExpanded((prev) => ({ ...prev, [group.id]: !prev[group.id] }))
+                                  }
+                                  className={`w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${group.headerClass}`}
+                                >
+                                  <span>{group.label}</span>
+                                  {scope1GroupsExpanded[group.id] ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                                {scope1GroupsExpanded[group.id] && (
+                                  <div className="mt-1.5 space-y-1">
+                                    {groupCategories.map((category) => (
+                                      <button
+                                        key={category.id}
+                                        onClick={() => handleCategoryClick(scope.id, category.id)}
+                                        className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
+                                          activeScope === scope.id && activeCategory === category.id
+                                            ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                            : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
+                                        }`}
+                                      >
+                                        <category.icon
+                                          className={`h-4 w-4 flex-shrink-0 ${
+                                            activeScope === scope.id && activeCategory === category.id
+                                              ? "text-teal-600"
+                                              : "text-gray-500"
+                                          }`}
+                                        />
+                                        <span className="text-left leading-snug">{category.title}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : scope.id === "scope2" ? (
                         scope.categories.map((category) => (
                           <button
                             key={category.id}
@@ -1166,7 +1289,7 @@ const EmissionCalculatorEPA = () => {
                             />
                             <span className="flex items-center gap-1.5 text-left">
                               {category.title}
-                              {scope.id === "scope2" && category.id === "heatSteam" && (
+                              {category.id === "heatSteam" && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Info className="h-3.5 w-3.5 text-gray-400 hover:text-teal-600" />

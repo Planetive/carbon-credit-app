@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Info, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Info, Plus, Trash2, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { loadBoundaryDraft } from "../../boundary/storage";
 import type { BoundaryDraftV2 } from "../../boundary/boundaryTypes";
 import { formatPeriodRangeLabel } from "../shared/periodUtils";
@@ -77,6 +79,22 @@ const GENERATION_CATEGORY_LABELS: Record<WasteGenerationCategory, string> = {
   maintenance: "Maintenance",
 };
 
+const GENERATION_GROUP_LABELS: Record<WasteGenerationCategory, string> = {
+  hazardous: "Hazardous Waste",
+  non_hazardous: "Non-Hazardous Waste",
+  drilling: "Drilling",
+  production: "Production",
+  maintenance: "Maintenance",
+};
+
+const GENERATION_GROUP_STYLES: Record<WasteGenerationCategory, string> = {
+  hazardous: "bg-red-50 border-l-4 border-l-red-400",
+  non_hazardous: "bg-slate-50 border-l-4 border-l-slate-400",
+  drilling: "bg-amber-50 border-l-4 border-l-amber-400",
+  production: "bg-orange-50 border-l-4 border-l-orange-400",
+  maintenance: "bg-blue-50 border-l-4 border-l-blue-400",
+};
+
 const DIVERTED_METHODS: WasteDivertedRow["method"][] = [
   "Recycling",
   "Reuse",
@@ -119,6 +137,14 @@ const WasteManagementScreen = () => {
   const [draft, setDraft] = useState<BoundaryDraftV2>(() => loadBoundaryDraft());
   const [store, setStore] = useState(() => loadWasteStore(loadBoundaryDraft()));
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [generationGroupsOpen, setGenerationGroupsOpen] = useState<Record<WasteGenerationCategory, boolean>>({
+    hazardous: true,
+    non_hazardous: true,
+    drilling: false,
+    production: false,
+    maintenance: false,
+  });
+  const [generationRowDetailsOpen, setGenerationRowDetailsOpen] = useState<Record<string, boolean>>({});
 
   const refreshBoundary = useCallback(() => {
     const d = loadBoundaryDraft();
@@ -200,14 +226,14 @@ const WasteManagementScreen = () => {
     }));
   };
 
-  const addGenerationRow = () => {
+  const addGenerationRowForCategory = (category: WasteGenerationCategory) => {
     const row: WasteGenerationRow = {
       id: newTopicRowId(),
       wasteType: "",
       field: "",
       businessUnit: "",
       month: new Date().getMonth() + 1,
-      category: "non_hazardous",
+      category,
       quantity: 0,
       unit: "tonnes",
       reportingYear,
@@ -392,143 +418,197 @@ const WasteManagementScreen = () => {
       </Card>
 
       <Card className={sectionShell("border-l-4 border-l-sky-500")}>
-        <CardHeader className="pb-2 flex flex-row flex-wrap items-end justify-between gap-2">
-          <div>
-            <CardTitle className="text-lg text-slate-900">GRI 306-3 — Waste Generated</CardTitle>
-            <CardDescription className="text-slate-600">Pre-seeded waste streams — edit quantities or add rows.</CardDescription>
-          </div>
-          <Button type="button" variant="outline" size="sm" disabled={!selectedAsset} onClick={addGenerationRow}>
-            <Plus className="h-4 w-4" />
-            Add row
-          </Button>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg text-slate-900">GRI 306-3 — Waste Generated</CardTitle>
+          <CardDescription className="text-slate-600">
+            Pre-seeded waste streams grouped by category — expand a group to edit or add rows.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse min-w-[1100px]">
-              <thead>
-                <tr className="border-b-2 border-slate-200">
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Waste Type</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Field</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Business Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Month</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Category</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Quantity</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Unit</th>
-                  <th className="py-2 pr-2 font-semibold text-slate-800">Reporting Year</th>
-                  <th className="py-2 w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.generationRows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 align-top">
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        value={r.wasteType}
-                        onChange={(e) => updateGenerationRow(r.id, { wasteType: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Field name"
-                        value={r.field}
-                        onChange={(e) => updateGenerationRow(r.id, { field: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        placeholder="Business unit"
-                        value={r.businessUnit}
-                        onChange={(e) => updateGenerationRow(r.id, { businessUnit: e.target.value })}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={String(r.month)}
-                        onValueChange={(v) => updateGenerationRow(r.id, { month: Number(v) })}
-                        disabled={!selectedAsset}
-                      >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MONTHS.map((m) => (
-                            <SelectItem key={m.value} value={String(m.value)}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Select
-                        value={r.category}
-                        onValueChange={(v) => updateGenerationRow(r.id, { category: v as WasteGenerationCategory })}
-                        disabled={!selectedAsset}
-                      >
-                        <SelectTrigger className="border-2 border-slate-200 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GENERATION_CATEGORIES.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {GENERATION_CATEGORY_LABELS[c]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        min={0}
-                        step="any"
-                        value={r.quantity || ""}
-                        onChange={(e) => {
-                          const n = e.target.value === "" ? 0 : Number(e.target.value);
-                          updateGenerationRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2 pr-2 text-slate-600">tonnes</td>
-                    <td className="py-2 pr-2">
-                      <Input
-                        className="border-2 border-slate-200 h-9"
-                        type="number"
-                        value={r.reportingYear}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          updateGenerationRow(r.id, { reportingYear: Number.isFinite(n) ? n : reportingYear });
-                        }}
-                        disabled={!selectedAsset}
-                      />
-                    </td>
-                    <td className="py-2">
-                      <Button
+        <CardContent className="space-y-3">
+          {GENERATION_CATEGORIES.map((category) => {
+            const categoryRows = data.generationRows.filter((r) => r.category === category);
+            const categorySubtotal = categoryRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+            const streamLabel = categoryRows.length === 1 ? "1 stream" : `${categoryRows.length} streams`;
+            const isOpen = generationGroupsOpen[category];
+
+            return (
+              <Collapsible
+                key={category}
+                open={isOpen}
+                onOpenChange={(open) => setGenerationGroupsOpen((prev) => ({ ...prev, [category]: open }))}
+              >
+                <div className={cn("rounded-lg border border-slate-200 overflow-hidden", GENERATION_GROUP_STYLES[category])}>
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:px-4">
+                    <CollapsibleTrigger asChild>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-slate-500"
-                        disabled={!selectedAsset}
-                        onClick={() => removeGenerationRow(r.id)}
-                        aria-label="Remove row"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900">{GENERATION_GROUP_LABELS[category]}</p>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {streamLabel} · {formatWasteNum(categorySubtotal)} tonnes
+                          </p>
+                        </div>
+                        {isOpen ? (
+                          <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        )}
+                      </button>
+                    </CollapsibleTrigger>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 bg-white/80"
+                      disabled={!selectedAsset}
+                      onClick={() => addGenerationRowForCategory(category)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add row
+                    </Button>
+                  </div>
+
+                  <CollapsibleContent>
+                    <div className="border-t border-slate-200/80 bg-white px-3 py-3 sm:px-4">
+                      {categoryRows.length === 0 ? (
+                        <p className="text-sm text-slate-500 py-2">No rows in this category yet.</p>
+                      ) : (
+                        <table className="w-full text-sm text-left border-collapse">
+                          <thead>
+                            <tr className="border-b-2 border-slate-200">
+                              <th className="py-2 pr-2 font-semibold text-slate-800">Waste Type</th>
+                              <th className="py-2 pr-2 font-semibold text-slate-800">Quantity (tonnes)</th>
+                              <th className="py-2 pr-2 font-semibold text-slate-800">Month</th>
+                              <th className="py-2 pr-2 font-semibold text-slate-800">Year</th>
+                              <th className="py-2 w-10" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {categoryRows.map((r) => {
+                              const detailsOpen = generationRowDetailsOpen[r.id] === true;
+                              return (
+                                <tr key={r.id} className="border-b border-slate-100 align-top">
+                                  <td colSpan={5} className="py-0">
+                                    <div className="py-2">
+                                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-start sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.6fr)_minmax(0,0.5fr)_auto]">
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          placeholder="Waste type"
+                                          value={r.wasteType}
+                                          onChange={(e) => updateGenerationRow(r.id, { wasteType: e.target.value })}
+                                          disabled={!selectedAsset}
+                                        />
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          type="number"
+                                          min={0}
+                                          step="any"
+                                          value={r.quantity || ""}
+                                          onChange={(e) => {
+                                            const n = e.target.value === "" ? 0 : Number(e.target.value);
+                                            updateGenerationRow(r.id, { quantity: Number.isFinite(n) ? n : 0 });
+                                          }}
+                                          disabled={!selectedAsset}
+                                        />
+                                        <Select
+                                          value={String(r.month)}
+                                          onValueChange={(v) => updateGenerationRow(r.id, { month: Number(v) })}
+                                          disabled={!selectedAsset}
+                                        >
+                                          <SelectTrigger className="border-2 border-slate-200 h-9">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {MONTHS.map((m) => (
+                                              <SelectItem key={m.value} value={String(m.value)}>
+                                                {m.label}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Input
+                                          className="border-2 border-slate-200 h-9"
+                                          type="number"
+                                          value={r.reportingYear}
+                                          onChange={(e) => {
+                                            const n = Number(e.target.value);
+                                            updateGenerationRow(r.id, {
+                                              reportingYear: Number.isFinite(n) ? n : reportingYear,
+                                            });
+                                          }}
+                                          disabled={!selectedAsset}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-9 w-9 text-slate-500"
+                                          disabled={!selectedAsset}
+                                          onClick={() => removeGenerationRow(r.id)}
+                                          aria-label="Remove row"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      <Collapsible
+                                        open={detailsOpen}
+                                        onOpenChange={(open) =>
+                                          setGenerationRowDetailsOpen((prev) => ({ ...prev, [r.id]: open }))
+                                        }
+                                      >
+                                        <CollapsibleTrigger asChild>
+                                          <button
+                                            type="button"
+                                            className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                          >
+                                            Details {detailsOpen ? "▴" : "▾"}
+                                          </button>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                          <div className="mt-2 grid gap-2 sm:grid-cols-2 pb-1">
+                                            <div className="space-y-1">
+                                              <Label className="text-xs text-slate-600">Field name</Label>
+                                              <Input
+                                                className="border-2 border-slate-200 h-9"
+                                                placeholder="Field name"
+                                                value={r.field}
+                                                onChange={(e) => updateGenerationRow(r.id, { field: e.target.value })}
+                                                disabled={!selectedAsset}
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-xs text-slate-600">Business unit</Label>
+                                              <Input
+                                                className="border-2 border-slate-200 h-9"
+                                                placeholder="Business unit"
+                                                value={r.businessUnit}
+                                                onChange={(e) =>
+                                                  updateGenerationRow(r.id, { businessUnit: e.target.value })
+                                                }
+                                                disabled={!selectedAsset}
+                                              />
+                                            </div>
+                                          </div>
+                                        </CollapsibleContent>
+                                      </Collapsible>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
+
+          <div className="rounded-lg border-2 border-slate-200 bg-slate-50/80 px-4 py-3 grid gap-2 sm:grid-cols-3 text-sm">
             <p className="text-slate-700">
               <span className="font-medium text-slate-900">Total Hazardous Waste Generated: </span>
               {formatWasteNum(totalHazardous)} tonnes

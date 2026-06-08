@@ -4,7 +4,20 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { AIR_QUALITY_TOPIC_ID, ESG_TOPIC_CARDS, GHG_TOPIC_ID, WASTE_TOPIC_ID, WATER_TOPIC_ID } from "../topics/config";
+import {
+  AIR_QUALITY_TOPIC_ID,
+  ESG_TOPIC_CARDS,
+  GHG_TOPIC_ID,
+  RESERVES_VALUATION_CAPEX_TOPIC_ID,
+  WASTE_TOPIC_ID,
+  WATER_TOPIC_ID,
+  WORKFORCE_HEALTH_SAFETY_TOPIC_ID,
+  EMERGENCY_MANAGEMENT_TOPIC_ID,
+  INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
+  BUSINESS_ETHICS_TOPIC_ID,
+  BIODIVERSITY_TOPIC_ID,
+  ENVIRONMENTAL_MANAGEMENT_TOPIC_ID,
+} from "../topics/config";
 
 const WORKSPACE_STORAGE_KEY = "esg_modules_workspace_v1";
 
@@ -40,6 +53,34 @@ const EsgTopicsScreen = () => {
     }
     if (topicId === WASTE_TOPIC_ID) {
       navigate("/esg-management/waste-management");
+      return;
+    }
+    if (topicId === RESERVES_VALUATION_CAPEX_TOPIC_ID) {
+      navigate("/esg-management/reserves-valuation");
+      return;
+    }
+    if (topicId === WORKFORCE_HEALTH_SAFETY_TOPIC_ID) {
+      navigate("/esg-management/workforce-health-safety");
+      return;
+    }
+    if (topicId === EMERGENCY_MANAGEMENT_TOPIC_ID) {
+      navigate("/esg-management/emergency-management");
+      return;
+    }
+    if (topicId === INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID) {
+      navigate("/esg-management/indigenous-rights");
+      return;
+    }
+    if (topicId === BUSINESS_ETHICS_TOPIC_ID) {
+      navigate("/esg-management/business-ethics");
+      return;
+    }
+    if (topicId === BIODIVERSITY_TOPIC_ID) {
+      navigate("/esg-management/biodiversity");
+      return;
+    }
+    if (topicId === ENVIRONMENTAL_MANAGEMENT_TOPIC_ID) {
+      navigate("/esg-management/environmental-management");
       return;
     }
   };

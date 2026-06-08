@@ -60,6 +60,18 @@ import WasteManagementPage from "./pages/esg-management/WasteManagementPage";
 import WasteManagementResultsPage from "./pages/esg-management/WasteManagementResultsPage";
 import BiodiversityPage from "./pages/esg-management/BiodiversityPage";
 import BiodiversityResultsPage from "./pages/esg-management/BiodiversityResultsPage";
+import ReservesValuationPage from "./pages/esg-management/ReservesValuationPage";
+import ReservesValuationResultsPage from "./pages/esg-management/ReservesValuationResultsPage";
+import WorkforceHealthSafetyPage from "./pages/esg-management/WorkforceHealthSafetyPage";
+import WorkforceHealthSafetyResultsPage from "./pages/esg-management/WorkforceHealthSafetyResultsPage";
+import EmergencyManagementPage from "./pages/esg-management/EmergencyManagementPage";
+import EmergencyManagementResultsPage from "./pages/esg-management/EmergencyManagementResultsPage";
+import IndigenousRightsPage from "./pages/esg-management/IndigenousRightsPage";
+import IndigenousRightsResultsPage from "./pages/esg-management/IndigenousRightsResultsPage";
+import BusinessEthicsPage from "./pages/esg-management/BusinessEthicsPage";
+import BusinessEthicsResultsPage from "./pages/esg-management/BusinessEthicsResultsPage";
+import EnvironmentalManagementPage from "./pages/esg-management/EnvironmentalManagementPage";
+import EnvironmentalManagementResultsPage from "./pages/esg-management/EnvironmentalManagementResultsPage";
 import ESGResults from "./pages/ESGResults";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -335,6 +347,66 @@ const AppRoutes = () => {
           <Route path="/esg-management/biodiversity" element={
             <CompanyProtectedRoute>
               <BiodiversityPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/reserves-valuation/results" element={
+            <CompanyProtectedRoute>
+              <ReservesValuationResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/reserves-valuation" element={
+            <CompanyProtectedRoute>
+              <ReservesValuationPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/workforce-health-safety/results" element={
+            <CompanyProtectedRoute>
+              <WorkforceHealthSafetyResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/workforce-health-safety" element={
+            <CompanyProtectedRoute>
+              <WorkforceHealthSafetyPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/emergency-management/results" element={
+            <CompanyProtectedRoute>
+              <EmergencyManagementResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/emergency-management" element={
+            <CompanyProtectedRoute>
+              <EmergencyManagementPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/indigenous-rights/results" element={
+            <CompanyProtectedRoute>
+              <IndigenousRightsResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/indigenous-rights" element={
+            <CompanyProtectedRoute>
+              <IndigenousRightsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/business-ethics/results" element={
+            <CompanyProtectedRoute>
+              <BusinessEthicsResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/business-ethics" element={
+            <CompanyProtectedRoute>
+              <BusinessEthicsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/environmental-management/results" element={
+            <CompanyProtectedRoute>
+              <EnvironmentalManagementResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/environmental-management" element={
+            <CompanyProtectedRoute>
+              <EnvironmentalManagementPage />
             </CompanyProtectedRoute>
           } />
           <Route path="/esg-management/modules" element={
