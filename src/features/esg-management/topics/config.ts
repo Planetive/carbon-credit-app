@@ -8,8 +8,8 @@ import {
   Leaf,
   LineChart,
   Scale,
-  ShieldAlert,
   Trash2,
+  Users,
   Wind,
 } from "lucide-react";
 
@@ -24,6 +24,7 @@ export const RESERVES_VALUATION_CAPEX_TOPIC_ID = "reserves_valuation_capex";
 export const WORKFORCE_HEALTH_SAFETY_TOPIC_ID = "workforce_health_safety";
 export const EMERGENCY_MANAGEMENT_TOPIC_ID = "emergency_management";
 export const INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID = "indigenous_peoples_rights";
+export const COMMUNITY_RELATIONS_TOPIC_ID = "community_relations";
 
 export type TopicImplementation = "full" | "coming_soon";
 
@@ -37,8 +38,7 @@ export type EsgTopicCard = {
 };
 
 /**
- * Fixed order: 11 topic cards.
- * Active: GHG, Air Quality, Water Management, Waste Management. Coming soon: Biodiversity + six other topics below.
+ * Fixed order: 11 topic cards shown on ESG topics screen. All listed topics are live (implementation: full).
  */
 export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
   {
@@ -91,17 +91,17 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     implementation: "full",
   },
   {
-    id: EMERGENCY_MANAGEMENT_TOPIC_ID,
-    label: "Emergency Management",
-    description: "Preparedness, response, and business continuity.",
-    icon: ShieldAlert,
+    id: INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
+    label: "Security, Human Rights & Rights of Indigenous Peoples",
+    description: "Security, human rights, FPIC, community engagement, and indigenous peoples' lands.",
+    icon: Handshake,
     implementation: "full",
   },
   {
-    id: INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
-    label: "Indigenous Peoples' Rights",
-    description: "Consent, land rights, engagement, and cultural heritage.",
-    icon: Handshake,
+    id: COMMUNITY_RELATIONS_TOPIC_ID,
+    label: "Community Relations",
+    description: "Community rights, engagement processes, and non-technical project delays.",
+    icon: Users,
     implementation: "full",
   },
   {

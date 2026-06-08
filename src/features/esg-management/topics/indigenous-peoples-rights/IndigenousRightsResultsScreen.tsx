@@ -110,7 +110,7 @@ const IndigenousRightsResultsScreen = () => {
           </Link>
         </Button>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-          Indigenous Peoples&apos; Rights — summary
+          Security, Human Rights &amp; Rights of Indigenous Peoples — summary
         </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
           Read-only SASB EM-EP-210a metrics. Edit data on the previous page.

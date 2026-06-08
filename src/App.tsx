@@ -70,6 +70,8 @@ import IndigenousRightsPage from "./pages/esg-management/IndigenousRightsPage";
 import IndigenousRightsResultsPage from "./pages/esg-management/IndigenousRightsResultsPage";
 import BusinessEthicsPage from "./pages/esg-management/BusinessEthicsPage";
 import BusinessEthicsResultsPage from "./pages/esg-management/BusinessEthicsResultsPage";
+import CommunityRelationsPage from "./pages/esg-management/CommunityRelationsPage";
+import CommunityRelationsResultsPage from "./pages/esg-management/CommunityRelationsResultsPage";
 import EnvironmentalManagementPage from "./pages/esg-management/EnvironmentalManagementPage";
 import EnvironmentalManagementResultsPage from "./pages/esg-management/EnvironmentalManagementResultsPage";
 import ESGResults from "./pages/ESGResults";
@@ -387,6 +389,16 @@ const AppRoutes = () => {
           <Route path="/esg-management/indigenous-rights" element={
             <CompanyProtectedRoute>
               <IndigenousRightsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/community-relations/results" element={
+            <CompanyProtectedRoute>
+              <CommunityRelationsResultsPage />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/esg-management/community-relations" element={
+            <CompanyProtectedRoute>
+              <CommunityRelationsPage />
             </CompanyProtectedRoute>
           } />
           <Route path="/esg-management/business-ethics/results" element={

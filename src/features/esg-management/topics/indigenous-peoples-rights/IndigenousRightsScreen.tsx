@@ -151,7 +151,9 @@ const IndigenousRightsScreen = () => {
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Indigenous Peoples&apos; Rights</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          Security, Human Rights &amp; Rights of Indigenous Peoples
+        </h1>
         <p className="text-sm text-slate-600 max-w-2xl mt-1">
           SASB EM-EP-210a metrics for land proximity, FPIC, community grievances, and indigenous peoples engagement.
         </p>

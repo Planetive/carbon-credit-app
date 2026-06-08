@@ -12,8 +12,8 @@ import {
   WASTE_TOPIC_ID,
   WATER_TOPIC_ID,
   WORKFORCE_HEALTH_SAFETY_TOPIC_ID,
-  EMERGENCY_MANAGEMENT_TOPIC_ID,
   INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
+  COMMUNITY_RELATIONS_TOPIC_ID,
   BUSINESS_ETHICS_TOPIC_ID,
   BIODIVERSITY_TOPIC_ID,
   ENVIRONMENTAL_MANAGEMENT_TOPIC_ID,
@@ -63,12 +63,12 @@ const EsgTopicsScreen = () => {
       navigate("/esg-management/workforce-health-safety");
       return;
     }
-    if (topicId === EMERGENCY_MANAGEMENT_TOPIC_ID) {
-      navigate("/esg-management/emergency-management");
-      return;
-    }
     if (topicId === INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID) {
       navigate("/esg-management/indigenous-rights");
+      return;
+    }
+    if (topicId === COMMUNITY_RELATIONS_TOPIC_ID) {
+      navigate("/esg-management/community-relations");
       return;
     }
     if (topicId === BUSINESS_ETHICS_TOPIC_ID) {

@@ -13,6 +13,7 @@ import {
   Truck,
   Car,
   Wind,
+  Cloud,
   Building2,
   HandCoins,
   X,
@@ -48,7 +49,7 @@ import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
 import EmissionCalculatorIPCC from "@/pages/EmissionCalculatorIPCC";
 
-type Scope1GroupId = "stationary" | "mobile" | "fugitive" | "facility";
+type Scope1GroupId = "stationary" | "mobile" | "flaringVenting" | "fugitive" | "facility";
 
 type EpaSidebarCategory = {
   id: string;
@@ -56,11 +57,13 @@ type EpaSidebarCategory = {
   icon: LucideIcon;
   description: string;
   group?: Scope1GroupId | "upstream" | "downstream";
+  comingSoon?: boolean;
 };
 
 const SCOPE1_NAV_GROUPS: { id: Scope1GroupId; label: string; headerClass: string }[] = [
   { id: "stationary", label: "Stationary combustion", headerClass: "text-teal-700/90 hover:bg-teal-50/50" },
   { id: "mobile", label: "Mobile combustion & vehicles", headerClass: "text-blue-700/90 hover:bg-blue-50/50" },
+  { id: "flaringVenting", label: "Flaring & venting", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
   { id: "fugitive", label: "Fugitive emissions", headerClass: "text-amber-700/90 hover:bg-amber-50/50" },
   { id: "facility", label: "On-site fuel use", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
 ];
@@ -103,8 +106,16 @@ const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
     description: "Scope 1 vehicular emissions calculator (IPCC)",
     group: "mobile",
   },
-  { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator (IPCC)", group: "fugitive" },
-  { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "fugitive" },
+  { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator (IPCC)", group: "flaringVenting" },
+  { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "flaringVenting" },
+  {
+    id: "fugitiveEmissions",
+    title: "Fugitive emissions",
+    icon: Cloud,
+    description: "Refrigerants, equipment leaks, and other fugitive sources",
+    group: "fugitive",
+    comingSoon: true,
+  },
   {
     id: "kitchenFootprints",
     title: "Kitchen Footprints",
@@ -308,6 +319,7 @@ const EmissionCalculatorEPA = () => {
   const [scope1GroupsExpanded, setScope1GroupsExpanded] = useState<Record<Scope1GroupId, boolean>>({
     stationary: true,
     mobile: false,
+    flaringVenting: false,
     fugitive: false,
     facility: false,
   });
@@ -811,6 +823,13 @@ const EmissionCalculatorEPA = () => {
   };
 
   const handleCategoryClick = (scopeId: string, categoryId: string) => {
+    const category = EPA_SCOPE1_CATEGORIES.find((c) => c.id === categoryId);
+    if (category?.comingSoon) {
+      toast({
+        title: "Coming soon",
+        description: `${category.title} calculators will be available in a future release.`,
+      });
+    }
     setActiveScope(scopeId);
     setActiveCategory(categoryId);
     if (scopeId === "scope1") {
@@ -1243,26 +1262,35 @@ const EmissionCalculatorEPA = () => {
                                 </button>
                                 {scope1GroupsExpanded[group.id] && (
                                   <div className="mt-1.5 space-y-1">
-                                    {groupCategories.map((category) => (
-                                      <button
-                                        key={category.id}
-                                        onClick={() => handleCategoryClick(scope.id, category.id)}
-                                        className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
-                                          activeScope === scope.id && activeCategory === category.id
-                                            ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
-                                            : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
-                                        }`}
-                                      >
-                                        <category.icon
-                                          className={`h-4 w-4 flex-shrink-0 ${
+                                    {groupCategories.map((category) => {
+                                      const epaCategory = category as EpaSidebarCategory;
+                                      const isComingSoon = epaCategory.comingSoon === true;
+                                      return (
+                                        <button
+                                          key={category.id}
+                                          onClick={() => handleCategoryClick(scope.id, category.id)}
+                                          className={`w-full flex items-center justify-start gap-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                             activeScope === scope.id && activeCategory === category.id
-                                              ? "text-teal-600"
-                                              : "text-gray-500"
+                                              ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                              : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                                           }`}
-                                        />
-                                        <span className="text-left leading-snug">{category.title}</span>
-                                      </button>
-                                    ))}
+                                        >
+                                          <category.icon
+                                            className={`h-4 w-4 flex-shrink-0 ${
+                                              activeScope === scope.id && activeCategory === category.id
+                                                ? "text-teal-600"
+                                                : "text-gray-500"
+                                            }`}
+                                          />
+                                          <span className="flex-1 min-w-0 text-left leading-snug">{category.title}</span>
+                                          {isComingSoon && (
+                                            <span className="shrink-0 text-[10px] uppercase tracking-wide font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                              Soon
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -1526,6 +1554,23 @@ const EmissionCalculatorEPA = () => {
                     forcedCategory={activeCategory}
                     onScope1CategoryTotalChange={handleIpccScope1TotalChange}
                   />
+                </div>
+              )}
+
+              {activeScope === "scope1" && activeCategory === "fugitiveEmissions" && (
+                <div className="w-full" key={`fugitive-emissions-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-8 text-center max-w-lg mx-auto">
+                      <Cloud className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+                      <h2 className="text-xl font-semibold text-gray-900">Fugitive emissions</h2>
+                      <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                        Coming soon. This section will cover refrigerant leaks, equipment fugitives, and other
+                        non-flaring, non-venting sources. Use <span className="font-medium">Flaring</span> and{" "}
+                        <span className="font-medium">Venting</span> under Flaring &amp; venting for those calculators
+                        today.
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
