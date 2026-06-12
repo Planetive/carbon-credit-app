@@ -116,6 +116,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     return query.or("emission_framework.eq.epa,emission_framework.is.null");
   };
 
+  const getScope1EntriesTable = () =>
+    variant === "scope1HeatSteam" ? "scope1_heatsteam_entries_epa" : "scope1_fuel_entries";
+
   const types = useMemo(() => {
     if (isUkActive) return Object.keys(ukFactorsMap).sort((a, b) => a.localeCompare(b));
     return Object.keys(effectiveFactors) as FuelType[];
@@ -780,16 +783,18 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     setDeletingRows(prev => new Set(prev).add(id));
     try {
       const { error } = await (supabase as any)
-        .from('scope1_fuel_entries')
+        .from(getScope1EntriesTable())
         .delete()
-        .eq('id', row.dbId);
+        .eq("id", row.dbId);
 
       if (error) throw error;
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
-      
-      setRows(prev => prev.filter(r => r.id !== id));
-      setExistingEntries(prev => prev.filter(r => r.id !== id));
+
+      const remaining = rows.filter((r) => r.id !== id);
+      setRows(remaining);
+      setExistingEntries((prev) => prev.filter((r) => r.id !== id));
+      onDataChange(remaining);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
     } finally {

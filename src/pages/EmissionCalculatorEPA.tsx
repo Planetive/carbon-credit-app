@@ -14,6 +14,7 @@ import {
   Car,
   Wind,
   Cloud,
+  Snowflake,
   Building2,
   HandCoins,
   X,
@@ -44,6 +45,7 @@ import OnRoadGasolineEmissions from "@/components/emissions/scope1/OnRoadGasolin
 import OnRoadDieselAltFuelEmissions from "@/components/emissions/scope1/OnRoadDieselAltFuelEmissions";
 import NonRoadVehicleEmissions from "@/components/emissions/scope1/NonRoadVehicleEmissions";
 import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmissions";
+import RefrigerantEmissions from "@/components/emissions/scope1/RefrigerantEmissions";
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
@@ -109,10 +111,17 @@ const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
   { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator (IPCC)", group: "flaringVenting" },
   { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "flaringVenting" },
   {
+    id: "ukRefrigerant",
+    title: "Refrigerant",
+    icon: Snowflake,
+    description: "UK refrigerant factors (temporary until EPA refrigerant is available)",
+    group: "fugitive",
+  },
+  {
     id: "fugitiveEmissions",
-    title: "Fugitive emissions",
+    title: "Fugitive emissions (EPA)",
     icon: Cloud,
-    description: "Refrigerants, equipment leaks, and other fugitive sources",
+    description: "Native EPA refrigerants and other fugitive sources",
     group: "fugitive",
     comingSoon: true,
   },
@@ -356,6 +365,7 @@ const EmissionCalculatorEPA = () => {
           onRoadDieselAltFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           nonRoadVehicleRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
+          emissionData.scope1.refrigerant.reduce((sum, r) => sum + (r.emissions || 0), 0) +
           Object.values(ipccScope1Totals).reduce((sum, v) => sum + (v || 0), 0),
     scope2:
       calculationMode === "lca"
@@ -407,6 +417,13 @@ const EmissionCalculatorEPA = () => {
     setScope1HeatSteamRows(data);
   };
 
+  const handleRefrigerantDataChange = (data: Array<{ emissions?: number }>) => {
+    setEmissionData((prev) => ({
+      ...prev,
+      scope1: { ...prev.scope1, refrigerant: data },
+    }));
+  };
+
   const handleHeatSteamTotalChange = (total: number) => {
     setEmissionData((prev) => ({
       ...prev,
@@ -449,12 +466,19 @@ const EmissionCalculatorEPA = () => {
           electricityTotal = Number((gridPart + otherPart).toFixed(6));
         }
 
-        const { data: heatRows } = await (supabase as any)
-          .from("scope2_heatsteam_entries_epa")
-          .select("emissions")
-          .eq("user_id", user.id);
+        const [{ data: heatRows }, { data: refrigerantRows }] = await Promise.all([
+          (supabase as any).from("scope2_heatsteam_entries_epa").select("emissions").eq("user_id", user.id),
+          (supabase as any)
+            .from("scope1_refrigerant_entries")
+            .select("emissions")
+            .eq("user_id", user.id)
+            .eq("emission_framework", "uk_epa"),
+        ]);
         const heatTotal = Number(
           ((heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
+        );
+        const refrigerantTotal = Number(
+          ((refrigerantRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
         );
 
         const sumEmissions = (rows: any[] | null | undefined) =>
@@ -523,6 +547,13 @@ const EmissionCalculatorEPA = () => {
 
         setEmissionData((prev) => ({
           ...prev,
+          scope1: {
+            ...prev.scope1,
+            refrigerant:
+              refrigerantTotal > 0
+                ? [{ id: "uk-refrigerant-hydrated", emissions: refrigerantTotal, isExisting: true } as any]
+                : prev.scope1.refrigerant,
+          },
           scope2: [
             ...prev.scope2.filter((item: any) => item.id !== "electricity-total" && item.id !== "heat-total"),
             { id: "electricity-total", emissions: electricityTotal },
@@ -992,7 +1023,10 @@ const EmissionCalculatorEPA = () => {
       onRoadDieselAltFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
       nonRoadVehicleRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
       (ipccScope1Totals.vehicularCarbonFootprints || 0);
-    const fugitive = (ipccScope1Totals.flaring || 0) + (ipccScope1Totals.venting || 0);
+    const fugitive =
+      (ipccScope1Totals.flaring || 0) +
+      (ipccScope1Totals.venting || 0) +
+      emissionData.scope1.refrigerant.reduce((sum, row) => sum + (row.emissions || 0), 0);
     const process =
       scope1HeatSteamRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
       (ipccScope1Totals.kitchenFootprints || 0) +
@@ -1557,17 +1591,33 @@ const EmissionCalculatorEPA = () => {
                 </div>
               )}
 
+              {activeScope === "scope1" && activeCategory === "ukRefrigerant" && (
+                <div className="w-full" key={`uk-refrigerant-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-8">
+                      <RefrigerantEmissions
+                        onDataChange={handleRefrigerantDataChange}
+                        companyContext={!!companyContext}
+                        onSaveAndNext={navigateToNextCategory}
+                        storageFramework="uk_epa"
+                        sectionTitle="Refrigerant"
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
               {activeScope === "scope1" && activeCategory === "fugitiveEmissions" && (
                 <div className="w-full" key={`fugitive-emissions-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-8 text-center max-w-lg mx-auto">
                       <Cloud className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-                      <h2 className="text-xl font-semibold text-gray-900">Fugitive emissions</h2>
+                      <h2 className="text-xl font-semibold text-gray-900">Fugitive emissions (EPA)</h2>
                       <p className="text-sm text-gray-600 mt-2 leading-relaxed">
-                        Coming soon. This section will cover refrigerant leaks, equipment fugitives, and other
-                        non-flaring, non-venting sources. Use <span className="font-medium">Flaring</span> and{" "}
-                        <span className="font-medium">Venting</span> under Flaring &amp; venting for those calculators
-                        today.
+                        Coming soon. Native EPA refrigerant factors and other fugitive sources will live here. For now,
+                        use <span className="font-medium">Refrigerant</span> under Fugitive emissions, or{" "}
+                        <span className="font-medium">Flaring</span> and <span className="font-medium">Venting</span>{" "}
+                        under Flaring &amp; venting.
                       </p>
                     </CardContent>
                   </Card>

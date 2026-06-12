@@ -10,10 +10,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { RefrigerantRow, UkRefrigerantBasis } from "@/components/emissions/shared/types";
 import { newRefrigerantRow, refrigerantRowChanged } from "@/components/emissions/shared/utils";
 
+/** Persists rows under scope1_refrigerant_entries.emission_framework (isolates calculators). */
+export type RefrigerantStorageFramework = "uk" | "uk_epa";
+
 interface RefrigerantEmissionsProps {
   onDataChange: (data: RefrigerantRow[]) => void;
   companyContext?: boolean;
   onSaveAndNext?: () => void;
+  /** Which calculator owns saved rows. Default: UK calculator (`uk`). */
+  storageFramework?: RefrigerantStorageFramework;
+  sectionTitle?: string;
+  sectionDescription?: string;
 }
 
 type UkRefrigCell = { kyoto?: number; nonKyoto?: number; total?: number };
@@ -55,6 +62,9 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
   onDataChange,
   companyContext = false,
   onSaveAndNext,
+  storageFramework = "uk",
+  sectionTitle = "Refrigerant Entries",
+  sectionDescription = "",
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -74,8 +84,8 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
   const ukInputsLocked = !ukReferenceReady;
 
   const getDraftKey = () => {
-    if (userId) return `refrigerantDraft:uk:user:${userId}`;
-    return `refrigerantDraft:uk:anon`;
+    if (userId) return `refrigerantDraft:${storageFramework}:user:${userId}`;
+    return `refrigerantDraft:${storageFramework}:anon`;
   };
 
   const activities = useMemo(() => {
@@ -219,7 +229,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
           .from("scope1_refrigerant_entries")
           .select("*")
           .eq("user_id", userId)
-          .eq("emission_framework", "uk")
+          .eq("emission_framework", storageFramework)
           .order("created_at", { ascending: false });
 
         if (refrigerantError) throw refrigerantError;
@@ -251,7 +261,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
     };
 
     loadExistingEntries();
-  }, [userId, toast, companyContext]);
+  }, [userId, toast, companyContext, storageFramework]);
 
   useEffect(() => {
     if (!isInitialLoad) {
@@ -375,8 +385,10 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      const remaining = rows.filter((r) => r.id !== id);
+      setRows(remaining);
       setExistingEntries((prev) => prev.filter((r) => r.id !== id));
+      onDataChange(remaining);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
     } finally {
@@ -425,7 +437,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
     try {
       const payload = newEntries.map((v) => ({
         user_id: user.id,
-        emission_framework: "uk",
+        emission_framework: storageFramework,
         refrigerant_type: v.refrigerantType!,
         quantity: v.quantity!,
         emission_factor: v.factor!,
@@ -445,7 +457,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
           (supabase as any)
             .from("scope1_refrigerant_entries")
             .update({
-              emission_framework: "uk",
+              emission_framework: storageFramework,
               refrigerant_type: v.refrigerantType!,
               quantity: v.quantity!,
               emission_factor: v.factor!,
@@ -474,7 +486,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         .from("scope1_refrigerant_entries")
         .select("*")
         .eq("user_id", user.id)
-        .eq("emission_framework", "uk")
+        .eq("emission_framework", storageFramework)
         .order("created_at", { ascending: false });
 
       if (newData) {
@@ -496,7 +508,8 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Refrigerant Entries</h4>
+          <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
+          {sectionDescription ? <p className="text-sm text-gray-600 mt-1">{sectionDescription}</p> : null}
           {ukInputsLocked && <p className="text-sm text-teal-700 mt-1">Loading UK refrigerant factors…</p>}
           {ukReferenceReady && !isUkActive && (
             <p className="text-sm text-amber-700 mt-2">

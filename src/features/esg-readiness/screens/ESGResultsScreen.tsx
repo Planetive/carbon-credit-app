@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Lightbulb, Target } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Lightbulb, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { computeReadiness, sanitizeReadinessAnswers, type ReadinessComputation } from "@/features/esg-readiness/scoring";
 import { type ReadinessAnswers } from "@/features/esg-readiness/config";
 import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
+import { exportEsgReadinessPdf } from "@/utils/esgReadinessPdfExport";
 
 const severityBadgeClass = (severity: string) => {
   if (severity === "Critical") return "bg-red-100 text-red-700";
@@ -21,9 +23,13 @@ const severityBadgeClass = (severity: string) => {
 const ESGResultsScreen = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [resultData, setResultData] = useState<ReadinessComputation | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [organizationName, setOrganizationName] = useState("Organization");
+  const [userName, setUserName] = useState("User");
 
   useEffect(() => {
     const loadResults = async () => {
@@ -58,6 +64,24 @@ const ESGResultsScreen = () => {
 
         const snapshot = (scoreData as any)?.readiness_results as ReadinessComputation | null;
         setResultData(snapshot ?? computeReadiness(answers));
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name, organization_name")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        setOrganizationName(
+          (profile as { organization_name?: string } | null)?.organization_name?.trim() ||
+            user.user_metadata?.organization_name?.trim() ||
+            "Organization"
+        );
+        setUserName(
+          (profile as { display_name?: string } | null)?.display_name?.trim() ||
+            user.user_metadata?.display_name?.trim() ||
+            user.email?.split("@")[0] ||
+            "User"
+        );
       } catch (error) {
         console.error("Error loading readiness results:", error);
         setResultData(null);
@@ -72,6 +96,32 @@ const ESGResultsScreen = () => {
     () => resultData?.findings.find((finding) => finding.finding.toLowerCase().includes("red flag")),
     [resultData]
   );
+
+  const handleDownloadPdf = async () => {
+    if (!resultData) return;
+    setIsGeneratingPdf(true);
+    try {
+      await exportEsgReadinessPdf({
+        resultData,
+        submittedAt,
+        organizationName,
+        userName,
+      });
+      toast({
+        title: "PDF downloaded",
+        description: "Your ESG assessment results have been saved as a PDF.",
+      });
+    } catch (error) {
+      console.error("ESG PDF export failed:", error);
+      toast({
+        title: "PDF generation failed",
+        description: "Could not generate the report PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-600">Loading readiness results...</div>;
@@ -103,10 +153,20 @@ const ESGResultsScreen = () => {
               {submittedAt ? `Completed on ${new Date(submittedAt).toLocaleDateString()}` : "Latest submitted readiness snapshot"}
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isGeneratingPdf ? "Generating PDF..." : "Download PDF"}
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </div>
         </div>
 
         <Card className="border border-slate-200 shadow-sm">

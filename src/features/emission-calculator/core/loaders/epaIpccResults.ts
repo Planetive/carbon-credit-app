@@ -54,6 +54,23 @@ const safeSelect = async (table: string, columns: string, userId: string) => {
   return data || [];
 };
 
+const safeSelectFiltered = async (
+  table: string,
+  columns: string,
+  userId: string,
+  filters: Record<string, string>
+) => {
+  let query = (supabase as any).from(table).select(columns).eq("user_id", userId);
+  for (const [column, value] of Object.entries(filters)) {
+    query = query.eq(column, value);
+  }
+  const { data, error } = await query;
+  if (error) {
+    return [] as any[];
+  }
+  return data || [];
+};
+
 const calculateScope2ElectricityTotal = async (userId: string): Promise<number> => {
   const { data: mainRow } = await (supabase as any)
     .from("scope2_electricity_main")
@@ -94,6 +111,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     scope1OnRoadDieselRows,
     scope1NonRoadRows,
     scope1HeatSteamRows,
+    scope1UkRefrigerantRows,
     scope1FlaringRows,
     scope1VentingRows,
     scope1VehicularRows,
@@ -120,6 +138,9 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     safeSelect("scope1_epa_on_road_diesel_alt_fuel_entries", "emissions", userId),
     safeSelect("scope1_epa_non_road_vehicle_entries", "emissions", userId),
     safeSelect("scope1_heatsteam_entries_epa", "emissions", userId),
+    safeSelectFiltered("scope1_refrigerant_entries", "emissions", userId, {
+      emission_framework: "uk_epa",
+    }),
     safeSelect("ipcc_scope1_flaring_entries", "result", userId),
     safeSelect("ipcc_scope1_venting_entries", "result", userId),
     safeSelect("ipcc_scope1_vehicular_entries", "result", userId),
@@ -150,6 +171,11 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     { key: "onroad_diesel", label: "On-road Diesel & Alt Fuel", value: sumEmissionsField(scope1OnRoadDieselRows) },
     { key: "nonroad", label: "Non-road Vehicle", value: sumEmissionsField(scope1NonRoadRows) },
     { key: "heatsteam", label: "Heat & Steam (Scope 1)", value: sumEmissionsField(scope1HeatSteamRows) },
+    {
+      key: "uk_refrigerant",
+      label: "Refrigerant",
+      value: sumEmissionsField(scope1UkRefrigerantRows),
+    },
     { key: "flaring", label: "Flaring", value: sumResultKgField(scope1FlaringRows) },
     { key: "venting", label: "Venting", value: sumResultKgField(scope1VentingRows) },
     { key: "vehicular", label: "Vehicular Footprints", value: sumResultKgField(scope1VehicularRows) },

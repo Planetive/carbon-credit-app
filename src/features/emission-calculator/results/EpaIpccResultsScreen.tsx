@@ -235,6 +235,13 @@ const EpaIpccResultsScreen = () => {
         case "heatsteam":
           query = (supabase as any).from("scope1_heatsteam_entries_epa").select("*").eq("user_id", user.id);
           break;
+        case "uk_refrigerant":
+          query = (supabase as any)
+            .from("scope1_refrigerant_entries")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("emission_framework", "uk_epa");
+          break;
         case "flaring":
           query = (supabase as any).from("ipcc_scope1_flaring_entries").select("*").eq("user_id", user.id);
           break;
