@@ -29,7 +29,7 @@ interface FuelEmissionsProps {
   sectionTitle?: string;
   /** Override section description */
   sectionDescription?: string;
-  /** When "scope1HeatSteam", same form as Fuel but no DB persist; uses draft only */
+  /** When "scope1HeatSteam", same form as Fuel but persists to scope1_heatsteam_entries_epa */
   variant?: "fuel" | "scope1HeatSteam";
   /** Select where factor options come from for this screen */
   factorMode?: "epa" | "uk_supabase";
@@ -67,6 +67,9 @@ function ukFactorBasisFromDb(raw: unknown): UkFactorBasis | undefined {
   return undefined;
 }
 
+const fuelRowFingerprint = (row: Pick<FuelRow, "type" | "fuel" | "unit" | "quantity" | "dbId">) =>
+  `${row.dbId ?? ""}|${row.type ?? ""}|${row.fuel ?? ""}|${row.unit ?? ""}|${row.quantity ?? ""}`;
+
 const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   onDataChange,
   companyContext = false,
@@ -103,6 +106,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
       return `fuelEmissionsDraft:${suffix}:user:${user.id}`;
     }
     return `fuelEmissionsDraft:${suffix}:anon`;
+  };
+
+  const clearDraftStorage = () => {
+    try {
+      sessionStorage.removeItem(getDraftKey());
+    } catch {
+      // ignore
+    }
   };
 
   const effectiveFactors: EpaFuelFactorsMap = fuelFactors ?? {};
@@ -490,6 +501,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       // Scope 1 Heat and Steam variant: load from scope1_heatsteam_entries_epa
       if (variant === "scope1HeatSteam") {
+        if (companyContext && !counterpartyId) {
+          setRows([]);
+          setExistingEntries([]);
+          onDataChange([]);
+          setIsInitialLoad(false);
+          return;
+        }
+
         try {
           let q = (supabase as any)
             .from("scope1_heatsteam_entries_epa")
@@ -513,14 +532,17 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           }));
           setExistingEntries(heatRows);
           setRows(heatRows.length > 0 ? heatRows : []);
+          onDataChange(heatRows);
           if (heatRows.length > 0) {
-            onDataChange(heatRows);
             const u = String(heatData?.[0]?.emissions_output_unit || "") as OutputUnit;
             if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
               setOutputUnit(u);
               setInitialOutputUnit(u);
             }
           }
+          // DB is the source of truth — stale browser drafts were re-inserting deleted rows.
+          clearDraftStorage();
+          hasRestoredDraftRef.current = true;
         } catch (err: any) {
           console.error("Error loading Scope 1 Heat and Steam entries:", err);
           toast({ title: "Error", description: "Failed to load Heat and Steam entries", variant: "destructive" });
@@ -658,7 +680,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   // Restore unsaved draft rows from sessionStorage after initial DB load completes
   useEffect(() => {
-    if (isInitialLoad || hasRestoredDraftRef.current) return;
+    if (variant === "scope1HeatSteam" || isInitialLoad || hasRestoredDraftRef.current) return;
 
     try {
       const key = getDraftKey();
@@ -682,8 +704,12 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
       if (draftRows.length > 0) {
         setRows((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
+          const existingFingerprints = new Set(prev.map((r) => fuelRowFingerprint(r)));
           const mergedDraft = draftRows
-            .filter((r: any) => r && r.id && !existingIds.has(r.id))
+            .filter((r: any) => {
+              if (!r?.id || existingIds.has(r.id)) return false;
+              return !existingFingerprints.has(fuelRowFingerprint(r));
+            })
             .map((r: any) => ({
               ...r,
               isExisting: false,
@@ -703,7 +729,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   // Persist unsaved draft rows (non-existing rows) to sessionStorage
   useEffect(() => {
-    if (isInitialLoad || !hasRestoredDraftRef.current) return;
+    if (variant === "scope1HeatSteam" || isInitialLoad || !hasRestoredDraftRef.current) return;
 
     try {
       const key = getDraftKey();
@@ -727,7 +753,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   // Row management functions
   const addRow = () => setRows(prev => [...prev, newFuelRow()]);
-  const removeRow = (id: string) => setRows(prev => prev.filter(r => r.id !== id));
+  const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
    // Update functions
   const updateRow = (id: string, patch: Partial<FuelRow>) => {
@@ -782,18 +808,29 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await (supabase as any)
+      let deleteQuery = (supabase as any)
         .from(getScope1EntriesTable())
         .delete()
-        .eq("id", row.dbId);
+        .eq("id", row.dbId)
+        .select("id");
+      if (userId) deleteQuery = deleteQuery.eq("user_id", userId);
+
+      const { data: deletedRows, error } = await deleteQuery;
 
       if (error) throw error;
+      if (!deletedRows?.length) {
+        throw new Error("Entry was not removed from the database. Refresh the page and try again.");
+      }
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 
-      const remaining = rows.filter((r) => r.id !== id);
+      const deletedFp = fuelRowFingerprint(row);
+      const remaining = rows.filter(
+        (r) => r.id !== id && fuelRowFingerprint(r) !== deletedFp
+      );
       setRows(remaining);
-      setExistingEntries((prev) => prev.filter((r) => r.id !== id));
+      setExistingEntries((prev) => prev.filter((r) => r.id !== id && r.dbId !== row.dbId));
+      clearDraftStorage();
       onDataChange(remaining);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to delete entry", variant: "destructive" });
@@ -891,10 +928,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               ? "Updated output unit for existing Heat and Steam entries."
               : `Saved ${newEntries.length} new and updated ${changedExisting.length} Heat and Steam entries.`,
         });
-        try {
-          const key = getDraftKey();
-          sessionStorage.removeItem(key);
-        } catch {}
+        clearDraftStorage();
         let reloadQ = (supabase as any).from(table).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
         if (companyContext && counterpartyId) reloadQ = reloadQ.eq("counterparty_id", counterpartyId);
         else reloadQ = reloadQ.is("counterparty_id", null);
