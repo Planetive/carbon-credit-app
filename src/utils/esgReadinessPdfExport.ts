@@ -8,9 +8,13 @@ const BRAND_COLORS = {
   textLight: "#6B7280",
   border: "#E5E7EB",
   danger: "#EF4444",
+  coverBg: "#D9E0E3",
+  coverAccent: "#0C4A3F",
 };
 
 const PAGE_BOTTOM = 280;
+const PAGE_WIDTH = 210;
+const PAGE_HEIGHT = 297;
 
 const hexToRgb = (hex: string) => {
   const value = hex.replace("#", "");
@@ -39,6 +43,98 @@ const addSectionTitle = (pdf: jsPDF, title: string, yPos: number): number => {
   pdf.setLineWidth(0.3);
   pdf.line(15, yPos + 2, 195, yPos + 2);
   return yPos + 10;
+};
+
+const drawCoverPage = (
+  pdf: jsPDF,
+  organizationName: string,
+  userName: string,
+  dateLabel: string
+) => {
+  const coverBg = hexToRgb(BRAND_COLORS.coverBg);
+  const coverAccent = hexToRgb(BRAND_COLORS.coverAccent);
+  const textRgb = hexToRgb(BRAND_COLORS.text);
+
+  pdf.setFillColor(coverBg.r, coverBg.g, coverBg.b);
+  pdf.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "F");
+
+  pdf.setFillColor(coverAccent.r, coverAccent.g, coverAccent.b);
+  pdf.rect(0, 0, PAGE_WIDTH, 10, "F");
+  pdf.rect(0, PAGE_HEIGHT - 10, PAGE_WIDTH, 10, "F");
+  pdf.rect(0, 0, 10, PAGE_HEIGHT, "F");
+  pdf.rect(PAGE_WIDTH - 10, 0, 10, PAGE_HEIGHT, "F");
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(34);
+  pdf.setTextColor(coverAccent.r, coverAccent.g, coverAccent.b);
+  pdf.text("ESG Assessment", 22, 105);
+  pdf.text("Results Report", 22, 122);
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(13);
+  pdf.setTextColor(textRgb.r, textRgb.g, textRgb.b);
+  pdf.text(`Organization: ${organizationName}`, 22, 150);
+  pdf.text(`Prepared for: ${userName}`, 22, 160);
+  pdf.text(`Assessment date: ${dateLabel}`, 22, 170);
+
+  pdf.setFontSize(10);
+  pdf.setTextColor(70, 85, 78);
+  pdf.text("Powered by Rethink Carbon", 22, 190);
+};
+
+const drawPageHeader = (pdf: jsPDF, organizationName: string) => {
+  const coverAccent = hexToRgb(BRAND_COLORS.coverAccent);
+  pdf.setFillColor(coverAccent.r, coverAccent.g, coverAccent.b);
+  pdf.rect(0, 0, PAGE_WIDTH, 12, "F");
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(9);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("Rethink Carbon", 15, 7.5);
+  pdf.setFont("helvetica", "normal");
+  pdf.text(organizationName, 195, 7.5, { align: "right" });
+};
+
+const drawSummaryCard = (
+  pdf: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  label: string,
+  value: string
+) => {
+  const border = hexToRgb(BRAND_COLORS.border);
+  const primaryDark = hexToRgb(BRAND_COLORS.primaryDark);
+  const textLight = hexToRgb(BRAND_COLORS.textLight);
+
+  pdf.setDrawColor(border.r, border.g, border.b);
+  pdf.setFillColor(244, 248, 245);
+  pdf.roundedRect(x, y, w, h, 2, 2, "FD");
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8);
+  pdf.setTextColor(textLight.r, textLight.g, textLight.b);
+  pdf.text(label.toUpperCase(), x + 4, y + 6);
+
+  pdf.setFontSize(16);
+  pdf.setTextColor(primaryDark.r, primaryDark.g, primaryDark.b);
+  pdf.text(value, x + 4, y + 16);
+};
+
+const drawBackCoverPage = (pdf: jsPDF) => {
+  const coverAccent = hexToRgb(BRAND_COLORS.coverAccent);
+  pdf.setFillColor(coverAccent.r, coverAccent.g, coverAccent.b);
+  pdf.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "F");
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(14);
+  pdf.setTextColor(210, 225, 218);
+  pdf.text("Powered by", 190, 275, { align: "right" });
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(24);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("Rethink Carbon", 190, 286, { align: "right" });
 };
 
 const addWrappedText = (
@@ -161,25 +257,25 @@ export async function exportEsgReadinessPdf({
     ? new Date(submittedAt).toLocaleDateString()
     : new Date().toLocaleDateString();
 
-  let yPos = 20;
+  drawCoverPage(pdf, organizationName, userName, dateLabel);
+  pdf.addPage();
+  drawPageHeader(pdf, organizationName);
+  let yPos = 24;
 
   pdf.setFontSize(20);
   pdf.setTextColor(primaryDark.r, primaryDark.g, primaryDark.b);
   pdf.setFont("helvetica", "bold");
-  pdf.text("ESG Assessment Results", 15, yPos);
-  yPos += 10;
+  pdf.text("ESG Assessment Summary", 15, yPos);
+  yPos += 4;
+  pdf.setDrawColor(180, 195, 188);
+  pdf.line(15, yPos + 1, 195, yPos + 1);
+  yPos += 8;
 
-  pdf.setFontSize(10);
-  pdf.setTextColor(textLight.r, textLight.g, textLight.b);
-  pdf.setFont("helvetica", "normal");
-  pdf.text(`Organization: ${organizationName}`, 15, yPos);
-  yPos += 5;
-  pdf.text(`Prepared for: ${userName}`, 15, yPos);
-  yPos += 5;
-  pdf.text(`Assessment date: ${dateLabel}`, 15, yPos);
-  yPos += 5;
-  pdf.text("Powered by Rethink Carbon", 15, yPos);
-  yPos += 12;
+  drawSummaryCard(pdf, 15, yPos, 42, 24, "Overall score", `${Math.round(resultData.overallReadinessPercent)}%`);
+  drawSummaryCard(pdf, 61, yPos, 42, 24, "Maturity", resultData.maturityBand);
+  drawSummaryCard(pdf, 107, yPos, 42, 24, "Completion", `${resultData.completionPercent}%`);
+  drawSummaryCard(pdf, 153, yPos, 42, 24, "Pillars", String(resultData.pillarSummary.length));
+  yPos += 32;
 
   yPos = addSectionTitle(pdf, "Overall Readiness Score", yPos);
   pdf.setFontSize(28);
@@ -267,9 +363,16 @@ export async function exportEsgReadinessPdf({
     [42, 48, 48, 22]
   );
 
+  pdf.addPage();
+  drawBackCoverPage(pdf);
+
   const pageCount = (pdf as { internal: { pages: unknown[] } }).internal.pages.length - 1;
   for (let i = 1; i <= pageCount; i++) {
     pdf.setPage(i);
+    if (i > 1 && i < pageCount) {
+      drawPageHeader(pdf, organizationName);
+    }
+    if (i === pageCount) continue;
     pdf.setFontSize(8);
     pdf.setTextColor(textLight.r, textLight.g, textLight.b);
     pdf.setFont("helvetica", "normal");
