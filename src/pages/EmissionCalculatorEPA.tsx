@@ -13,7 +13,6 @@ import {
   Truck,
   Car,
   Wind,
-  Cloud,
   Snowflake,
   Building2,
   HandCoins,
@@ -45,7 +44,7 @@ import OnRoadGasolineEmissions from "@/components/emissions/scope1/OnRoadGasolin
 import OnRoadDieselAltFuelEmissions from "@/components/emissions/scope1/OnRoadDieselAltFuelEmissions";
 import NonRoadVehicleEmissions from "@/components/emissions/scope1/NonRoadVehicleEmissions";
 import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmissions";
-import RefrigerantEmissions from "@/components/emissions/scope1/RefrigerantEmissions";
+import EpaRefrigerantEmissions from "@/components/emissions/scope1/EpaRefrigerantEmissions";
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
@@ -114,16 +113,8 @@ const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
     id: "ukRefrigerant",
     title: "Refrigerant",
     icon: Snowflake,
-    description: "UK refrigerant factors (temporary until EPA refrigerant is available)",
+    description: "Refrigerant leakage using GWP-based calculations",
     group: "fugitive",
-  },
-  {
-    id: "fugitiveEmissions",
-    title: "Fugitive emissions (EPA)",
-    icon: Cloud,
-    description: "Native EPA refrigerants and other fugitive sources",
-    group: "fugitive",
-    comingSoon: true,
   },
   {
     id: "kitchenFootprints",
@@ -472,7 +463,7 @@ const EmissionCalculatorEPA = () => {
             .from("scope1_refrigerant_entries")
             .select("emissions")
             .eq("user_id", user.id)
-            .eq("emission_framework", "uk_epa"),
+            .in("emission_framework", ["epa", "uk_epa"]),
         ]);
         const heatTotal = Number(
           ((heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
@@ -1592,33 +1583,13 @@ const EmissionCalculatorEPA = () => {
               )}
 
               {activeScope === "scope1" && activeCategory === "ukRefrigerant" && (
-                <div className="w-full" key={`uk-refrigerant-${resetKey}`}>
+                <div className="w-full" key={`epa-refrigerant-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-8">
-                      <RefrigerantEmissions
+                      <EpaRefrigerantEmissions
                         onDataChange={handleRefrigerantDataChange}
-                        companyContext={!!companyContext}
                         onSaveAndNext={navigateToNextCategory}
-                        storageFramework="uk_epa"
-                        sectionTitle="Refrigerant"
                       />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {activeScope === "scope1" && activeCategory === "fugitiveEmissions" && (
-                <div className="w-full" key={`fugitive-emissions-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8 text-center max-w-lg mx-auto">
-                      <Cloud className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-                      <h2 className="text-xl font-semibold text-gray-900">Fugitive emissions (EPA)</h2>
-                      <p className="text-sm text-gray-600 mt-2 leading-relaxed">
-                        Coming soon. Native EPA refrigerant factors and other fugitive sources will live here. For now,
-                        use <span className="font-medium">Refrigerant</span> under Fugitive emissions, or{" "}
-                        <span className="font-medium">Flaring</span> and <span className="font-medium">Venting</span>{" "}
-                        under Flaring &amp; venting.
-                      </p>
                     </CardContent>
                   </Card>
                 </div>

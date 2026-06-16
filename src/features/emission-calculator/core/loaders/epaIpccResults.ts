@@ -71,6 +71,18 @@ const safeSelectFiltered = async (
   return data || [];
 };
 
+const safeSelectRefrigerantEpa = async (userId: string) => {
+  const { data, error } = await (supabase as any)
+    .from("scope1_refrigerant_entries")
+    .select("emissions")
+    .eq("user_id", userId)
+    .in("emission_framework", ["epa", "uk_epa"]);
+  if (error) {
+    return [] as any[];
+  }
+  return data || [];
+};
+
 const calculateScope2ElectricityTotal = async (userId: string): Promise<number> => {
   const { data: mainRow } = await (supabase as any)
     .from("scope2_electricity_main")
@@ -138,9 +150,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     safeSelect("scope1_epa_on_road_diesel_alt_fuel_entries", "emissions", userId),
     safeSelect("scope1_epa_non_road_vehicle_entries", "emissions", userId),
     safeSelect("scope1_heatsteam_entries_epa", "emissions", userId),
-    safeSelectFiltered("scope1_refrigerant_entries", "emissions", userId, {
-      emission_framework: "uk_epa",
-    }),
+    safeSelectRefrigerantEpa(userId),
     safeSelect("ipcc_scope1_flaring_entries", "result", userId),
     safeSelect("ipcc_scope1_venting_entries", "result", userId),
     safeSelect("ipcc_scope1_vehicular_entries", "result", userId),

@@ -240,7 +240,7 @@ const EpaIpccResultsScreen = () => {
             .from("scope1_refrigerant_entries")
             .select("*")
             .eq("user_id", user.id)
-            .eq("emission_framework", "uk_epa");
+            .in("emission_framework", ["epa", "uk_epa"]);
           break;
         case "flaring":
           query = (supabase as any).from("ipcc_scope1_flaring_entries").select("*").eq("user_id", user.id);
