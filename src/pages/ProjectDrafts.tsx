@@ -8,7 +8,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -19,8 +18,6 @@ const ProjectDrafts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [goalFilter, setGoalFilter] = useState("");
-  const [uniqueGoals, setUniqueGoals] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const navigate = useNavigate();
@@ -49,12 +46,6 @@ const ProjectDrafts = () => {
     };
     fetchDrafts();
   }, [user]);
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 70) return "bg-green-500";
-    if (progress >= 40) return "bg-yellow-500";
-    return "bg-red-500";
-  };
 
   const getTypeColor = (type: string) => {
     switch (type) {

@@ -59,7 +59,6 @@ export default function UserManagement() {
     currentOrganization, 
     fetchOrganizationUsers, 
     updateUserRole, 
-    updateUserPermissions, 
     removeUserFromOrganization,
     fetchPendingInvitations,
     cancelInvitation,

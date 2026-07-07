@@ -30,8 +30,6 @@ const FilteredProjects = () => {
       setLoading(true);
       setError(null);
       const { areaOfInterest, type, goal } = state;
-      // Only use type for filtering and display
-      const filterType = type;
       try {
         const result: any = await supabase
           .from("global_projects"  as any)

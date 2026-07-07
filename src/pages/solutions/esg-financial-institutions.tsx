@@ -14,7 +14,7 @@ declare global {
 }
 
 const ESGFinancialInstitutions = () => {
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
+  const [, setVisibleCards] = useState<Set<number>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   // Demo video buttons are temporarily hidden from end users.
   const showDemoVideos = false;
@@ -48,7 +48,7 @@ const ESGFinancialInstitutions = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 relative overflow-hidden">
+    <div className="font-sans min-h-screen bg-white text-gray-900 relative overflow-hidden">
       <div className="relative z-10">
         <MainHeader />
 

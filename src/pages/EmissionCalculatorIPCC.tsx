@@ -353,7 +353,6 @@ const FLARING_TEMPERATURE_CORRECTION = 273.15 / 288.71;
 // Use workbook temperature denominator exactly as provided by user formula.
 const VENTING_REFERENCE_TEMPERATURE_K = 288.71;
 const VENTING_TEMPERATURE_CORRECTION = 273.15 / VENTING_REFERENCE_TEMPERATURE_K;
-const CO2_MOLAR_MASS_G_PER_MOL = 44.01;
 const FLARING_PRECISE_COMPONENT_FACTORS: Record<string, { molarMass: number; multiplier: number }> = {
   CO2: { molarMass: 44.01, multiplier: 1 },
   CH4: { molarMass: 16.04, multiplier: 28 },

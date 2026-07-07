@@ -24,7 +24,6 @@ import {
   Copy,
   Calendar,
   Sparkles,
-  ExternalLink,
   Trash2,
   AlertTriangle,
   UserPlus,
@@ -36,7 +35,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { PermissionGate } from '@/components/PermissionGate';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -84,13 +82,12 @@ export default function Settings() {
     deleteOrganization,
     fetchOrganizationUsers,
     updateUserRole,
-    updateUserPermissions,
     removeUserFromOrganization,
     fetchPendingInvitations,
     cancelInvitation,
     resendInvitation,
   } = useOrganization();
-  const { isAdmin, canManageUsers, canManageOrganizations, canInviteUsers, canRemoveUsers, canEditPermissions } = usePermission();
+  const { isAdmin, canManageUsers, canInviteUsers, canRemoveUsers, canEditPermissions } = usePermission();
   const { toast } = useToast();
   const navigate = useNavigate();
 

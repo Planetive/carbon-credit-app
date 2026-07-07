@@ -22,7 +22,7 @@ const Footer = () => {
               </div>
               <h3 className="text-xl font-bold text-white">ReThink Carbon</h3>
             </div>
-            <p className="text-gray-300 mb-4 max-w-md">
+            <p className="text-gray-300 text-[18px] mb-4 max-w-md">
               Empowering organizations to make a positive impact through carbon credit projects. 
               Discover, create, and manage sustainable initiatives worldwide.
             </p>
@@ -49,31 +49,31 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-lg font-semibold mb-4 text-white">Quick Links</h4>
+            <h4 className="text-xl font-semibold mb-4 text-white">Quick Links</h4>
             <ul className="space-y-2">
             <li>
-                <Link to="/" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/" className="text-gray-300 text-[18px] hover:text-teal-400 transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/explore" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/explore" className="text-gray-300 text-[18px] hover:text-teal-400 transition-colors">
                   Explore
                 </Link>
               </li>
               
               <li>
-                <Link to="/privacy-policy" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/privacy-policy" className="text-gray-300 text-[18px] hover:text-teal-400 transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/terms-and-conditions" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/terms-and-conditions" className="text-gray-300 text-[18px] hover:text-teal-400 transition-colors">
                   Terms and Conditions
                 </Link>
               </li>
               <li>
-                <Link to="/data-consent" className="text-gray-300 hover:text-teal-400 transition-colors">
+                <Link to="/data-consent" className="text-gray-300 text-[18px] hover:text-teal-400 transition-colors">
                   Data Consent
                 </Link>
               </li>
@@ -82,21 +82,21 @@ const Footer = () => {
 
           {/* Contact Info */}
           <div>
-            <h4 className="text-lg font-semibold mb-4 text-white">Contact</h4>
+            <h4 className="text-xl font-semibold mb-4 text-white">Contact</h4>
             <ul className="space-y-2">
-              <li className="flex items-center text-gray-300">
+              <li className="flex items-center text-gray-300 text-[18px]">
                 <Mail className="h-4 w-4 mr-2 text-teal-400" />
                 <a href="mailto:connect@rethinkcarbon.io" className="hover:text-teal-400 transition-colors">
                   connect@rethinkcarbon.io
                 </a>
               </li>
-              <li className="flex items-center text-gray-300">
+              <li className="flex items-center text-gray-300 text-[18px]">
                 <Phone className="h-4 w-4 mr-2 text-teal-400" />
                 <a href="tel:+923325473514" className="hover:text-teal-400 transition-colors">
                   +92 (332) 5473514
                 </a>
               </li>
-              <li className="flex items-start text-gray-300">
+              <li className="flex items-start text-gray-300 text-[18px]">
                 <MapPin className="h-4 w-4 mr-2 mt-0.5 text-teal-400" />
                 <span>ReThink Carbon<br />Al Hamra Industrial Zone-FZ<br />United Arab Emirates</span>
               </li>
@@ -107,17 +107,17 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-400 text-[15px]">
               © {currentYear} ReThink Carbon. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link to="/privacy-policy" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Privacy Policy</Link>
-              <Link to="/terms-and-conditions" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Terms and Conditions</Link>
-              <Link to="/data-consent" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">Data Consent</Link>
-              <a href="#" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
+              <Link to="/privacy-policy" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">Privacy Policy</Link>
+              <Link to="/terms-and-conditions" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">Terms and Conditions</Link>
+              <Link to="/data-consent" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">Data Consent</Link>
+              <a href="#" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">
                 FAQ's
               </a>
-              <a href="#" className="text-gray-400 hover:text-teal-400 text-sm transition-colors">
+              <a href="#" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">
                 Contact Us
               </a>
             </div>

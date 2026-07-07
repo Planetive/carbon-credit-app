@@ -1,41 +1,14 @@
 import { Button } from "@/components/ui/button";
 import MainHeader from "@/components/layout/MainHeader";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
-import {
-  Leaf,
-  BarChart3,
-  Shield,
-  Users,
-  Globe,
-  TrendingUp,
-  CheckCircle,
-  Star,
-  ArrowRight,
-  Play,
-  Zap,
-  Target,
-  Award,
-  Clock,
-  DollarSign,
-  ChevronRight,
-  ChevronLeft,
-} from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Landing = () => {
-  const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [activeFeatureSlide, setActiveFeatureSlide] = useState(0);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [showGetStarted, setShowGetStarted] = useState(false);
+  const [typedHeroSubtitle, setTypedHeroSubtitle] = useState("");
   
   // Keep explicit image-to-feature mapping so text always matches screenshot
   const featureSlides = [
@@ -75,8 +48,6 @@ const Landing = () => {
       const scrollTop = window.scrollY;
       const triggerPoint = window.innerHeight * 0.5; // 50vh (50% of viewport height)
       
-      setIsScrolled(scrollTop > 50);
-      // Show Get Started button only when scrolled past 50vh
       setShowGetStarted(scrollTop > triggerPoint);
     };
 
@@ -95,33 +66,21 @@ const Landing = () => {
     return () => window.clearInterval(interval);
   }, [featureSlides.length]);
 
+  useEffect(() => {
+    const subtitleText = "Advancing Decarbonisation Through Market Intelligence.";
+    let index = 0;
 
-  const testimonials = [
-    {
-      name: "Sarah Johnson",
-      role: "Sustainability Director",
-      company: "GreenTech Solutions",
-      content:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      rating: 5,
-    },
-    {
-      name: "Michael Chen",
-      role: "Environmental Manager",
-      company: "EcoCorp International",
-      content:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut enim ad minim veniam, quis nostrud exercitation ullamco.",
-      rating: 5,
-    },
-    {
-      name: "Emily Rodriguez",
-      role: "Carbon Analyst",
-      company: "ClimateFirst",
-      content:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis aute irure dolor in reprehenderit in voluptate.",
-      rating: 5,
-    },
-  ];
+    const typer = window.setInterval(() => {
+      index += 1;
+      setTypedHeroSubtitle(subtitleText.slice(0, index));
+
+      if (index >= subtitleText.length) {
+        window.clearInterval(typer);
+      }
+    }, 45);
+
+    return () => window.clearInterval(typer);
+  }, []);
 
   const userjourney = [
     {
@@ -150,53 +109,42 @@ const Landing = () => {
     },
   ];
 
-  const accordionFeatures = [
-    {
-      id: 0,
-      title: "Real-Time Feasibility Assessment",
-      description:
-        "Accelerates planning with instant insights for quicker strategic decisions.",
-    },
+  const valueProps = [
     {
       id: 1,
-      title: "AI-Powered Strategist",
+      title: "Accelerated Execution",
       description:
-        "Evaluating eligibility against global standards and estimating emission reductions in minutes.",
+        "Cut planning timelines to minutes rather than months through Artificial Intelligence",
     },
     {
       id: 2,
-      title: "Emissions Modeling",
+      title: "Expert Precision",
       description:
-        "Providing accurate precise estimates for overall business value and carbon credit potential.",
+        "Leverage real-time data and global benchmarks to select optimal technologies and ensure compliance",
     },
     {
       id: 3,
-      title: "Global Decarbonization & Energy Transition Databases",
-      description: "Offers strategic insights from worldwide projects.",
+      title: "Cost Optimization",
+      description: "Reducing errors and overruns with automated processes",
     },
     {
       id: 4,
-      title: "ESG Healthcheck",
+      title: "Strengthening Market Leadership",
       description:
-        "Efficiently measure the ESG performance of an organization, supply chain, or investment portfolio by having a clear snapshot of the current status of ESG management and risks.",
+        "Position your brand as a decarbonization pioneer, attracting ESG investors and top talent",
     },
     {
       id: 5,
-      title: "Comprehensive Reporting",
-      description: "Converting insights to reports for executive decisions.",
+      title: "Mitigate Risks",
+      description:
+        "Stay ahead of regulatory shifts with predictive analytics, avoiding penalties and delays",
     },
   ];
 
-  const stats = [
-    { number: "10,000+", label: "Projects Evaluated" },
-    { number: "500+", label: "Organizations" },
-    { number: "100+", label: "Countries" },
-    { number: "1.2M", label: "tCO2e Reduced" },
-  ];
   const activeFeatureIndex = activeFeatureSlide;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F8FCFA]" style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}>
       {/* Hero Section with Full Screen Video */}
       <section className="relative h-screen overflow-hidden">
         {/* Video Background */}
@@ -215,6 +163,7 @@ const Landing = () => {
             <div className="w-full h-full bg-gradient-to-br from-teal-50 via-cyan-50 to-green-50"></div>
           </video>
         </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/45 to-black/40 z-[1]" />
 
         {/* Header positioned on top of video */}
         <MainHeader />
@@ -223,17 +172,28 @@ const Landing = () => {
         <div className="container mx-auto px-4 sm:px-6 relative z-10 h-full flex items-center justify-center">
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '0.02em' }}>
-                  RETHINK CARBON
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white tracking-[0.01em]">
+                <span className="text-white">RETHINK</span>{" "}
+                <span className="bg-gradient-to-r from-[#7DD9B5] to-[#33C08A] bg-clip-text text-transparent">
+                  CARBON
+                </span>
               </h1>
             </div>
-            <p className="text-lg sm:text-xl md:text-2xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4 font-normal" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, letterSpacing: '0.01em' }}>
-              Advancing Decarbonisation Through Market Intelligence.
+            <p className="text-lg sm:text-xl md:text-2xl text-[#BFE3D3] mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4 font-normal tracking-[0.01em]">
+              {typedHeroSubtitle}
+              <motion.span
+                aria-hidden
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                className="ml-0.5 text-[#33C08A]"
+              >
+                |
+              </motion.span>
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
               <Button
                 size="lg"
-                className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
+                className="bg-[#1C7A53] hover:bg-[#186747] text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto text-white"
                 asChild
               >
                 <Link to="/login">
@@ -263,24 +223,48 @@ const Landing = () => {
       </section> */}
 
       {/* Features Section */}
-      <section id="features" className="py-16 sm:py-20 bg-gray-50">
+      <section id="features" className="py-16 sm:py-20 bg-gradient-to-br from-[#0A4D3E] via-[#0F5B49] to-[#0C3F34] text-white">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4">
+            <motion.h2
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4"
+            >
               One unified platform for every
-              <span className="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+              <motion.span
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.45, ease: "easeOut", delay: 0.15 }}
+                className="bg-gradient-to-r from-[#7DD9B5] to-[#33C08A] bg-clip-text text-transparent inline-block"
+              >
                 {" "}step of the journey
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto px-4">
+              </motion.span>
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.45, ease: "easeOut", delay: 0.22 }}
+              className="text-base sm:text-lg md:text-xl text-[#D6EFE5] max-w-3xl mx-auto px-4"
+            >
               Accelerating your decarbonization journey with AI-driven assessments, optimization, tracking, and market intelligence
-            </p>
+            </motion.p>
           </div>
 
-          <div className="flex justify-center items-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.45, ease: "easeOut", delay: 0.2 }}
+            className="flex justify-center items-center"
+          >
             <div className="w-full max-w-5xl">
-              <div className="rounded-3xl bg-transparent p-0 shadow-[0_20px_60px_rgba(15,23,42,0.16)]">
-                <div className="rounded-2xl bg-slate-900 p-1.5 sm:p-2">
+              <div className="rounded-3xl bg-transparent p-0 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+                <div className="rounded-2xl bg-[#083E32] p-1.5 sm:p-2 border border-[#1C7A53]/40">
                   <div className="mb-1.5 flex items-center justify-center">
                     <span className="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
                   </div>
@@ -296,7 +280,7 @@ const Landing = () => {
                           key={slide.image}
                           className="w-full flex-shrink-0 p-1 sm:p-1.5"
                         >
-                          <div className="rounded-lg bg-white/95 p-1.5 sm:p-2 shadow-md">
+                          <div className="rounded-lg bg-white/96 p-1.5 sm:p-2 shadow-md">
                             <img
                               src={slide.image}
                               alt={slide.title}
@@ -315,10 +299,10 @@ const Landing = () => {
               </div>
 
               <div className="mt-5 text-center">
-                <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">
+                <p className="text-sm sm:text-base md:text-lg font-semibold text-white">
                   {featureSlides[activeFeatureIndex]?.title}
                 </p>
-                <p className="mt-2 text-xs sm:text-sm md:text-base text-gray-600 max-w-3xl mx-auto">
+                <p className="mt-2 text-xs sm:text-sm md:text-base text-[#D6EFE5] max-w-3xl mx-auto">
                   {featureSlides[activeFeatureIndex]?.description}
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2">
@@ -330,62 +314,87 @@ const Landing = () => {
                       aria-label={`Show ${slide.title}`}
                       className={`h-2.5 rounded-full transition-all duration-300 ${
                         index === activeFeatureIndex
-                          ? "w-8 bg-teal-600"
-                          : "w-2.5 bg-gray-300 hover:bg-gray-400"
+                          ? "w-8 bg-[#33C08A]"
+                          : "w-2.5 bg-[#9BC4B5] hover:bg-[#BFE3D3]"
                       }`}
                     />
                   ))}
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* User Journey Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-teal-50 to-cyan-50">
+      <section className="py-16 sm:py-20 bg-gradient-to-br from-[#EEF7F3] to-[#E4F2EC]">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4">
-              Your Path to 
-              <span className="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+            <motion.h2
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4"
+            >
+              Your Path to
+              <motion.span
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{ duration: 0.45, ease: "easeOut", delay: 0.15 }}
+                className="bg-gradient-to-r from-[#1C7A53] to-[#33C08A] bg-clip-text text-transparent inline-block"
+              >
                 {" "}Carbon Excellence
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto px-4">
+              </motion.span>
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.45, ease: "easeOut", delay: 0.22 }}
+              className="text-base sm:text-lg md:text-xl text-[#456D5F] max-w-3xl mx-auto px-4"
+            >
               Follow our proven 4-step methodology to transform your carbon footprint and accelerate your sustainability journey
-            </p>
+            </motion.p>
           </div>
 
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 relative">
               {/* Connection lines for desktop */}
-              <div className="hidden lg:block absolute top-20 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-200 via-teal-300 to-teal-400" style={{ top: '80px' }}></div>
+              <div className="hidden lg:block absolute top-20 left-0 right-0 h-0.5 bg-gradient-to-r from-[#BFE3D3] via-[#7DD9B5] to-[#33C08A]" style={{ top: '80px' }}></div>
               
               {userjourney.map((step, index) => (
-                <div key={step.id} className="relative">
+                <motion.div
+                  key={step.id}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.3, ease: "easeOut", delay: index * 0.08 }}
+                  className="relative"
+                >
                   {/* Step number circle */}
                   <div className="relative z-10 mb-4 sm:mb-6">
                     <div className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-xl ${
-                      index === 0 ? 'bg-gradient-to-br from-teal-500 to-teal-600' :
-                      index === 1 ? 'bg-gradient-to-br from-teal-600 to-teal-700' :
-                      index === 2 ? 'bg-gradient-to-br from-teal-700 to-teal-800' :
-                      'bg-gradient-to-br from-teal-800 to-teal-900'
-                    }`} style={{ boxShadow: '8px 8px 16px rgba(13, 148, 136, 0.3)' }}>
+                      index === 0 ? 'bg-gradient-to-br from-[#33C08A] to-[#1C7A53]' :
+                      index === 1 ? 'bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E]' :
+                      index === 2 ? 'bg-gradient-to-br from-[#0A4D3E] to-[#083E32]' :
+                      'bg-gradient-to-br from-[#083E32] to-[#062F26]'
+                    }`} style={{ boxShadow: '8px 8px 16px rgba(10, 77, 62, 0.26)' }}>
                       {index + 1}
                     </div>
                   </div>
                   
                   {/* Step content */}
                   <div className="text-center px-2">
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">
+                    <h3 className="text-lg sm:text-xl font-semibold text-[#0A4D3E] mb-2 sm:mb-3">
                       {step.title}
                     </h3>
-                    <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                    <p className="text-sm sm:text-base text-[#456D5F] leading-relaxed">
                       {step.description}
                     </p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -393,96 +402,109 @@ const Landing = () => {
       </section>
 
       {/* What's In It For You Section */}
-      <section className="py-16 sm:py-20 relative overflow-hidden">
+      <section className="py-16 sm:py-20 relative overflow-hidden bg-[#0A4D3E]">
         {/* Background with overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-teal-50 to-cyan-50">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A4D3E] to-[#0C5A46]">
           {/* You can add a background image here if needed */}
         </div>
         
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="text-center mb-12 sm:mb-16">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-8 sm:mb-16 text-teal-900 drop-shadow-xl px-4">
-              WHAT'S IN IT FOR YOU?
-            </h1>
+            <motion.h1
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-8 sm:mb-16 text-white drop-shadow-xl px-4"
+            >
+              WHAT&apos;S IN IT FOR{" "}
+              <span className="bg-gradient-to-r from-[#BFE3D3] to-[#33C08A] bg-clip-text text-transparent">YOU?</span>
+            </motion.h1>
           </div>
           
           <div className="max-w-7xl mx-auto">
-            {/* Top Row - 3 bubbles */}
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8 md:mb-12">
-              {/* Bubble 1 */}
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 flex flex-col justify-center text-center text-white" style={{ background: 'linear-gradient(to bottom right, #0d9488, #0f766e)' }}>
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-teal-700 font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-teal-200">1</div>
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">Accelerated Execution</h2>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
-                  Cut planning timelines to minutes rather than months through Artificial Intelligence
-                </p>
-              </div>
-
-              {/* Bubble 2 */}
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 flex flex-col justify-center text-center text-white" style={{ background: 'linear-gradient(to bottom right, #0d9488, #0f766e)' }}>
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-teal-700 font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-teal-200">2</div>
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">Expert Precision</h2>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
-                  Leverage real-time data and global benchmarks to select optimal technologies and ensure compliance
-                </p>
-              </div>
-
-              {/* Bubble 3 */}
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 flex flex-col justify-center text-center text-white" style={{ background: 'linear-gradient(to bottom right, #0d9488, #0f766e)' }}>
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-teal-700 font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-teal-200">3</div>
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">Cost Optimization</h2>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
-                  Reducing errors and overruns with automated processes
-                </p>
-              </div>
+              {valueProps.slice(0, 3).map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.82 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.28, ease: "easeOut", delay: index * 0.05 }}
+                  className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
+                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #0A4D3E)" }}
+                >
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
+                    {item.id}
+                  </div>
+                  <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
+                    {item.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
+                    {item.description}
+                  </p>
+                </motion.div>
+              ))}
             </div>
 
-            {/* Bottom Row - 2 bubbles */}
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 md:gap-8">
-              {/* Bubble 4 */}
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 flex flex-col justify-center text-center text-white" style={{ background: 'linear-gradient(to bottom right, #0d9488, #0f766e)' }}>
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-teal-700 font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-teal-200">4</div>
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">Strengthening Market Leadership</h2>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
-                  Position your brand as a decarbonization pioneer, attracting ESG investors and top talent
-                </p>
-              </div>
-
-              {/* Bubble 5 */}
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 flex flex-col justify-center text-center text-white" style={{ background: 'linear-gradient(to bottom right, #0d9488, #0f766e)' }}>
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-teal-700 font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-teal-200">5</div>
-                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">Mitigate Risks</h2>
-                <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
-                  Stay ahead of regulatory shifts with predictive analytics, avoiding penalties and delays
-                </p>
-              </div>
+              {valueProps.slice(3).map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.82 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.28, ease: "easeOut", delay: index * 0.05 }}
+                  className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
+                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #0A4D3E)" }}
+                >
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
+                    {item.id}
+                  </div>
+                  <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
+                    {item.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
+                    {item.description}
+                  </p>
+                </motion.div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-teal-600 to-cyan-700 text-white">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4">
-            Ready to Transform Your
-            <span className="block">Decarbonization Journey?</span>
-          </h2>
-          <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto opacity-90 px-4">
-            Join industry leaders in accelerating sustainable change. Our proven strategies help you reduce emissions, optimize energy use, and meet your net-zero goals—efficiently and effectively.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
-              asChild
-            >
-              <Link to="/contact">
-                Contact Us
-                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-              </Link>
-            </Button>
+      <section className="py-16 sm:py-20 bg-[#EEF4F1] text-[#0A4D3E]">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="relative overflow-hidden rounded-[30px] border border-[#2F8F6D]/30 bg-[linear-gradient(140deg,#0A4D3E_0%,#11684E_52%,#22B87E_100%)] shadow-[0_18px_45px_rgba(10,77,62,0.30)] px-6 sm:px-10 md:px-14 py-14 sm:py-16 md:py-20 text-center text-white">
+            <div aria-hidden className="pointer-events-none absolute -bottom-8 -left-8 h-36 w-36 rounded-full border border-white/20" />
+            <div aria-hidden className="pointer-events-none absolute bottom-2 left-2 h-24 w-24 rounded-full border border-white/20" />
+            <div aria-hidden className="pointer-events-none absolute top-10 right-10 h-20 w-20 rotate-45 border border-white/18" />
+            <div aria-hidden className="pointer-events-none absolute top-6 right-6 h-28 w-28 rotate-45 border border-white/12" />
+
+            <h2 className="relative z-10 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4">
+              Ready to Transform Your
+              <span className="block">
+                <span className="text-[#BFE3D3]">Decarbonization</span>{" "}
+                <span className="text-white">Journey?</span>
+              </span>
+            </h2>
+            <p className="relative z-10 text-base sm:text-lg md:text-xl mb-7 sm:mb-8 max-w-3xl mx-auto text-[#E6F6EF] px-4">
+              Join industry leaders in accelerating <span className="text-[#BFE3D3] font-medium">sustainable change</span>. Our proven strategies help you reduce <span className="text-[#BFE3D3] font-medium">emissions</span>, optimize <span className="text-[#BFE3D3] font-medium">energy use</span>, and meet your <span className="text-[#BFE3D3] font-medium">net-zero goals</span> efficiently and effectively.
+            </p>
+            <div className="relative z-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4">
+              <Button
+                size="lg"
+                className="text-base sm:text-lg px-7 sm:px-9 py-4 sm:py-6 w-full sm:w-auto bg-[#33C08A] text-[#083E32] hover:bg-[#7DD9B5] rounded-full shadow-[0_10px_30px_rgba(51,192,138,0.35)]"
+                asChild
+              >
+                <Link to="/contact">
+                  Contact Us
+                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -499,7 +521,7 @@ const Landing = () => {
           >
             <Button
               size="lg"
-              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
+              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-[#33C08A] to-[#1C7A53] hover:from-[#2DB57F] hover:to-[#186747] text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 text-white"
               asChild
             >
               <Link to="/login">Get Started</Link>

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,14 +9,12 @@ import {
   Download, 
   Share2, 
   TrendingUp, 
-  TrendingDown, 
   AlertTriangle, 
   CheckCircle,
   DollarSign,
   Leaf,
   Calendar,
   BarChart3,
-  PieChart,
   FileText,
   Target,
   Bot
@@ -28,7 +25,6 @@ const ProjectResults = () => {
   const projectData = location.state?.projectData || {};
   const methodologyResults = location.state?.methodologyResults || [];
   const feasibilityAssessment = location.state?.feasibilityAssessment || {};
-  const isAISuggested = location.state?.isAISuggested || false;
   
   // Debug logging
   // console.log("ProjectResults - Received data:", {

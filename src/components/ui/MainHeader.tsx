@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MainHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [mobileSolutionsOpen, setMobileSolutionsOpen] = useState(false);
   const [solutionsOpenedByClick, setSolutionsOpenedByClick] = useState(false);
+  const [isInHero, setIsInHero] = useState(true);
   const solutionsRef = useRef<HTMLDivElement | null>(null);
   const hoverCloseTimer = useRef<number | null>(null);
   const location = useLocation();
   const isHome = location.pathname === "/";
+  const { user } = useAuth();
+  const logoTarget = user ? "/dashboard" : "/";
 
   // Close Solutions dropdown on outside click when opened by click
   useEffect(() => {
@@ -27,28 +31,61 @@ const MainHeader = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [solutionsOpen]);
 
-  // Home: glass-rounded pill; other pages: standard white header
+  // Home page: keep white nav text only while inside hero viewport
+  useEffect(() => {
+    if (!isHome) {
+      setIsInHero(false);
+      return;
+    }
+
+    const updateHeroState = () => {
+      const heroThreshold = window.innerHeight * 0.78;
+      setIsInHero(window.scrollY < heroThreshold);
+    };
+
+    updateHeroState();
+    window.addEventListener("scroll", updateHeroState);
+    window.addEventListener("resize", updateHeroState);
+
+    return () => {
+      window.removeEventListener("scroll", updateHeroState);
+      window.removeEventListener("resize", updateHeroState);
+    };
+  }, [isHome]);
+
+  // Home: glass in hero; light white bar with dark text after scroll
   const headerClass = isHome
-    ? "mx-3 my-2 rounded-[32px] bg-white/14 backdrop-blur-2xl border border-white/40 shadow-[0_18px_68px_-34px_rgba(0,0,0,0.55)]"
+    ? isInHero
+      ? "mx-3 my-2 rounded-[32px] bg-white/24 backdrop-blur-2xl border border-white/20 shadow-[0_18px_68px_-34px_rgba(0,0,0,0.45)]"
+      : "mx-3 my-2 rounded-[32px] bg-white/92 backdrop-blur-md border border-gray-200/70 shadow-md"
     : "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm";
 
-  const navLinkClass = "transition-colors duration-300 text-gray-700 hover:text-teal-600";
-  const buttonTextClass = "text-gray-900";
+  const navLinkClass = isHome && isInHero
+    ? "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-white/90 hover:text-[#BFE3D3]"
+    : "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-gray-800 hover:text-[#0A4D3E]";
+  const buttonTextClass = isHome && isInHero
+    ? "text-white/90 hover:text-[#BFE3D3] text-base lg:text-[17px] font-medium"
+    : "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-medium";
+  const mobileMenuButtonClass = isHome && isInHero
+    ? "md:hidden p-2 text-white/90 hover:text-[#BFE3D3] transition-colors"
+    : "md:hidden p-2 text-gray-800 hover:text-[#0A4D3E] transition-colors";
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerClass}`}
     >
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="container mx-auto px-4 py-2.5 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <div className="h-14 md:h-16 lg:h-20 w-28 md:w-40 lg:w-52 flex items-center justify-start ml-0 md:-ml-3 lg:-ml-12 overflow-hidden md:overflow-visible">
-            <img
-              src="/new_logo.png"
-              alt="ReThink Carbon Logo"
-              className="h-full w-auto object-contain origin-left scale-[2.5] -translate-x-6 md:scale-[2.9] md:-translate-x-9 lg:scale-[3.6] lg:-translate-x-16"
-            />
-          </div>
+          <Link to={logoTarget} aria-label="Go to home or dashboard" className="focus:outline-none focus-visible:outline-none">
+            <div className="h-10 md:h-12 lg:h-14 w-28 md:w-36 lg:w-44 flex items-center justify-start ml-0 md:-ml-2 lg:-ml-8 overflow-hidden md:overflow-visible">
+              <img
+                src="/new_logo.png"
+                alt="ReThink Carbon Logo"
+                className="h-full w-auto object-contain origin-left scale-[3.02] -translate-x-8 md:scale-[3.4] md:-translate-x-10 lg:scale-[3.83] lg:-translate-x-13"
+              />
+            </div>
+          </Link>
         </div>
 
         {/* Desktop Navigation */}
@@ -135,7 +172,7 @@ const MainHeader = () => {
             <Link to="/login" className={buttonTextClass}>Login</Link>
           </Button>
           <Button
-            className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
+            className="bg-[#1C7A53] hover:bg-[#186747]"
             asChild
           >
             <Link to="/contact">Contact Us</Link>
@@ -145,7 +182,7 @@ const MainHeader = () => {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden p-2 text-gray-600 hover:text-teal-600 transition-colors"
+          className={mobileMenuButtonClass}
           aria-label="Toggle mobile menu"
         >
           {isMobileMenuOpen ? (
@@ -182,14 +219,14 @@ const MainHeader = () => {
             <div className="space-y-2">
               <a
                 href="/"
-                className="flex items-center p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Home
               </a>
               <Link
                 to="/about"
-                className="flex items-center p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 About
@@ -197,7 +234,7 @@ const MainHeader = () => {
               {/* Mobile Solutions accordion */}
               <div className="border rounded-lg">
                 <button
-                  className="w-full flex items-center justify-between p-3 text-left text-gray-600 hover:bg-gray-100"
+                  className="w-full flex items-center justify-between p-3 text-left text-base font-medium text-gray-700 hover:bg-gray-100"
                   onClick={() => setMobileSolutionsOpen(v => !v)}
                 >
                   <span>Solutions</span>
@@ -209,14 +246,14 @@ const MainHeader = () => {
                   <div className="px-2 pb-2">
                     <Link
                       to="/solutions/corporate"
-                      className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100"
+                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Carbon Intelligence for corporates
                     </Link>
                     <Link
                       to="/solutions/financial-institutions"
-                      className="block p-2 rounded text-sm text-gray-600 hover:bg-gray-100"
+                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Carbon Intelligence for financial institutions
@@ -226,14 +263,14 @@ const MainHeader = () => {
               </div>
               <Link
                 to="/pricing"
-                className="flex items-center p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Pricing
               </Link>
               <Link
                 to="/contact"
-                className="flex items-center p-3 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Contact
@@ -247,7 +284,7 @@ const MainHeader = () => {
               <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Login</Link>
             </Button>
             <Button
-              className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
+              className="w-full bg-[#1C7A53] hover:bg-[#186747]"
               asChild
             >
               <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>

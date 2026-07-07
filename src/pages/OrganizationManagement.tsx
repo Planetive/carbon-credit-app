@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePermission } from '@/hooks/usePermission';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,6 @@ import {
   Building2, 
   Plus, 
   Settings, 
-  Users, 
   ChevronRight,
   Crown,
   User,
@@ -19,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function OrganizationManagement() {
-  const { organizations, currentOrganization, loading, refreshOrganizations } = useOrganization();
+  const { organizations, currentOrganization, loading } = useOrganization();
   const { canManageOrganizations, isAdmin } = usePermission();
   const navigate = useNavigate();
 

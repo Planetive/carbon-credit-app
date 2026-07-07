@@ -4,7 +4,7 @@ import MainHeader from "@/components/layout/MainHeader";
 
 const ESGRiskAssessment = () => {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="font-sans min-h-screen bg-white text-gray-900">
       <MainHeader />
   
       {/* Hero */}

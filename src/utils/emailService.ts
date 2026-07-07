@@ -1,5 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
-
 interface InvitationEmailData {
   email: string;
   organizationName: string;
@@ -98,39 +96,6 @@ export async function sendContactNotificationEmail(
     return { success: true };
   } catch (error) {
     console.error("Error sending contact notification email:", error);
-    return { success: false, error };
-  }
-}
-
-/**
- * Send email via EmailJS (if configured)
- */
-async function sendViaEmailJS(data: InvitationEmailData): Promise<{ success: boolean; error?: any }> {
-  try {
-    const emailjs = await import('@emailjs/browser');
-    
-    const templateParams = {
-      to_email: data.email,
-      organization_name: data.organizationName,
-      inviter_name: data.inviterName || 'Team',
-      role: data.role,
-      invitation_link: data.invitationLink,
-      expires_at: data.expiresAt.toLocaleDateString(),
-    };
-
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-
-    if (!serviceId || !templateId || !publicKey) {
-      throw new Error('EmailJS configuration missing');
-    }
-
-    await emailjs.send(serviceId, templateId, templateParams, publicKey);
-    
-    return { success: true };
-  } catch (error) {
-    console.error('EmailJS error:', error);
     return { success: false, error };
   }
 }

@@ -14,7 +14,7 @@ declare global {
 }
 
 const CorporateSolutions = () => {
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
+  const [, setVisibleCards] = useState<Set<number>>(new Set());
   const [visibleBenefits, setVisibleBenefits] = useState<Set<number>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const benefitRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -101,7 +101,7 @@ const CorporateSolutions = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 relative overflow-hidden">
+    <div className="font-sans min-h-screen bg-white text-gray-900 relative overflow-hidden">
       {/* Animated Background Orbs/Globes */}
       <div className="fixed inset-0 pointer-events-none z-0">
         {orbs.map((orb) => (

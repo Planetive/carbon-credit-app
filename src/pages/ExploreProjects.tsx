@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
-import { LogOut, Home, BarChart3, Compass, Filter, Search, MapPin, Calendar, Users, ArrowRight, Download, Eye, Globe, TrendingUp, Database, ArrowLeft, ChevronDown } from "lucide-react";
+import { Filter, MapPin, Eye, Globe, TrendingUp, Database, ArrowLeft, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import LoadingScreen from "@/components/LoadingScreen";
 
@@ -114,7 +114,6 @@ const ExploreProjects = () => {
 
   // Project data (minimal - only IDs until user clicks View Details)
   const [projects, setProjects] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   // Chart data
   const [countryData, setCountryData] = useState<{ country: string, count: number }[]>([]);
@@ -518,13 +517,6 @@ const ExploreProjects = () => {
     }
   }, [chartData, projects]);
 
-  const formatNumber = (num: number) => {
-    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-    return num.toString();
-  };
-
   // Multi-select dropdown component
   function MultiSelectDropdown({
     options,
@@ -589,9 +581,6 @@ const ExploreProjects = () => {
       </Popover>
     );
   }
-
-  // Custom label for country bars - removed to prevent overlap, using Y-axis labels instead
-  const CountryBarLabel = () => null;
 
   // Calculate stats from database aggregation if available, otherwise from projects
   const stats = useMemo(() => {

@@ -788,8 +788,7 @@ const generateRecommendations = (data: ESGAssessmentData, scores: ESGScoringResu
   // Q3: Turnover
   if (scores.s_q3_score !== null) {
     const fullTime = parseNumber(data.full_time_turnover);
-    const partTime = parseNumber(data.part_time_turnover);
-    
+
     if (scores.s_q3_score >= 2) {
       if (fullTime !== null && fullTime <= 10) {
         socialStrengths.push(`Excellent employee retention: ${fullTime}% full-time turnover rate`);

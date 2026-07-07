@@ -2,26 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-// TODO: If a dedicated FinanceEmissionCalculator exists later, import and use it.
-const FinanceEmissionCalculator: React.FC<{ hasEmissions: string; verificationStatus: string; corporateStructure: string; loanType: string; }> = ({ hasEmissions, verificationStatus, corporateStructure, loanType }) => {
-  return (
-    <div className="space-y-4">
-      <p className="text-muted-foreground">Finance emission calculator placeholder.</p>
-      <ul className="text-sm text-muted-foreground list-disc pl-5">
-        <li>Has Emissions: {hasEmissions || 'n/a'}</li>
-        <li>Verification: {verificationStatus || 'n/a'}</li>
-        <li>Corporate Structure: {corporateStructure || 'n/a'}</li>
-        <li>Loan Type: {loanType || 'n/a'}</li>
-      </ul>
-    </div>
-  );
-};
 
 interface WizardStep {
   id: string;

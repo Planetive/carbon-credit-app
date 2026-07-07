@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +28,6 @@ const ProjectReports = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -38,14 +37,13 @@ const ProjectReports = () => {
         return;
       }
       setLoading(true);
-      setError(null);
       try {
         const { data, error: fetchError } = await (supabase as any)
           .from("project_reports")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
-        if (fetchError) setError(fetchError.message);
+        if (fetchError) console.warn("Could not load reports:", fetchError.message);
         else setReports(data ?? []);
       } catch (err) {
         console.warn("Could not load reports:", err);

@@ -200,9 +200,7 @@ const getReportContent = (data: PortfolioPdfReportData): string => {
   };
 
   const companyPagesHtml = companyChunks
-    .map((chunk, index) => {
-      const start = index * rowsPerPage + 1;
-      const end = index * rowsPerPage + chunk.length;
+    .map((chunk) => {
       return page(`
         <div class="section-title">Detailed Company Breakdown</div>
         <table class="table">

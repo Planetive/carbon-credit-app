@@ -18,7 +18,7 @@ const FilteredProjectsLanding = () => {
   useEffect(() => {
     const fetchDisplayName = async () => {
       if (!user) return;
-      const { data, error } = await (supabase as any)
+      const { data } = await (supabase as any)
         .from("profiles")
         .select("display_name")
         .eq("user_id", user.id)
@@ -45,7 +45,7 @@ const FilteredProjectsLanding = () => {
         setNoProjectsFound(null);
         return;
       }
-      const { data, error } = await (supabase as any)
+      const { data } = await (supabase as any)
         .from("global_projects")
         .select("id")
         .eq("Area of Interest", areaOfInterest)
@@ -69,7 +69,7 @@ const FilteredProjectsLanding = () => {
         setHasCCUSProjects(false);
         return;
       }
-      const { data, error } = await (supabase as any)
+      const { data } = await (supabase as any)
         .from("ccus_projects")
         .select("id")
         .eq("Project type", type);

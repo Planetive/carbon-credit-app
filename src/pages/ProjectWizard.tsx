@@ -1,53 +1,31 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
   ArrowRight, 
   FileText, 
-  MapPin, 
   Settings, 
-  DollarSign, 
   Leaf, 
   AlertTriangle,
-  Calendar,
   CheckCircle,
   Bot,
-  LogOut,
-  Home,
   BarChart3,
-  Compass,
   User
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
-import { methodologyMatcher } from "@/lib/methodologyMatcher";
 import { getNames } from 'country-list';
 import { useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
-const steps = [
-  { number: 1, title: "Project Details", icon: FileText },
-  { number: 2, title: "Location & Geography", icon: MapPin },
-  { number: 3, title: "Technology & Methodology", icon: Settings },
-  { number: 4, title: "Financial Parameters", icon: DollarSign },
-  { number: 5, title: "Environmental Impact", icon: Leaf },
-  { number: 6, title: "Risk Assessment", icon: AlertTriangle },
-  { number: 7, title: "Timeline & Milestones", icon: Calendar }
-];
-
 const ProjectWizard = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [activePart, setActivePart] = useState<'user' | 'project'>('user');
@@ -173,7 +151,6 @@ const ProjectWizard = () => {
     }
     fetchGoals();
   }, [toast]);
-  const [types, setTypes] = useState<string[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(false);
   const [filteredTypes, setFilteredTypes] = useState<string[]>([]);
 

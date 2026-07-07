@@ -319,7 +319,6 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const { default: jsPDF } = await import("jspdf");
       const isMariUser = opts.isMariUser;
       const fuelFramework = opts.fuelFramework;
-      const submittedAtString = opts.submittedAt ?? new Date().toISOString();
       const downloadFileName = opts.fileName;
 
       const historicalByYear: Record<number, { scope1: number; scope2: number; scope3: number; total: number }> = {};
@@ -390,20 +389,6 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         });
       }
 
-      const mapScopeRows = (rows: EpaIpccResultsData["scope1"]) => {
-        const [a, b, c, d] = [...rows.filter((r) => r.value > 0), { value: 0 }, { value: 0 }, { value: 0 }, { value: 0 }];
-        return {
-          first: a.value || 0,
-          second: b.value || 0,
-          third: c.value || 0,
-          fourth: d.value || 0,
-        };
-      };
-
-      const scope1 = mapScopeRows(results.scope1);
-      const scope2 = mapScopeRows(results.scope2);
-      const scope3 = mapScopeRows(results.scope3);
-      const submitted = new Date(submittedAtString);
       const generatedAt = new Date();
       let company = "Organization";
       let headerName = user?.email?.split("@")[0] || "User";
@@ -436,7 +421,6 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const nextIterationStartText = nextIterationStart.toLocaleDateString("en-GB");
       const fmt = (n: number) => (n / 1000).toFixed(2);
       const pct = (value: number, total: number) => (total > 0 ? ((value / total) * 100).toFixed(1) : "0.0");
-      const pctNum = (value: number, total: number) => (total > 0 ? (value / total) * 100 : 0);
       const pctDisplay = (value: number, total: number) => {
         if (total <= 0) return "0.0";
         const p = (value / total) * 100;
@@ -463,10 +447,6 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const scope1Pct = pct(results.totals.scope1, results.totals.grand);
       const scope2Pct = pct(results.totals.scope2, results.totals.grand);
       const scope3Pct = pct(results.totals.scope3, results.totals.grand);
-      const scope1PctNum = pctNum(results.totals.scope1, results.totals.grand);
-      const scope2PctNum = pctNum(results.totals.scope2, results.totals.grand);
-      const scope3PctNum = pctNum(results.totals.scope3, results.totals.grand);
-
       const allRows = [
         ...results.scope1.map((r) => ({ scope: "Scope 1", label: r.label, value: r.value })),
         ...results.scope2.map((r) => ({ scope: "Scope 2", label: r.label, value: r.value })),
@@ -497,7 +477,6 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const topCount = Math.max(1, Math.ceil(scope3Sorted.length * 0.2));
       const topShare = scope3Sorted.slice(0, topCount).reduce((sum, r) => sum + r.value, 0);
       const topSharePct = pct(topShare, results.totals.scope3);
-      const scope3ChartRows = scope3Sorted.slice(0, 8);
 
       const monthLabel = (dateValue: string) => {
         const dt = new Date(dateValue);

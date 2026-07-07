@@ -6,59 +6,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Filter, ArrowLeft } from "lucide-react";
 
-function MultiSelectDropdown({
-  options, selected, setSelected, placeholder, loadingLabel = "Loading...", filtersLoading
-}: {
-  options: string[],
-  selected: string[],
-  setSelected: (v: string[]) => void,
-  placeholder: string,
-  loadingLabel?: string,
-  filtersLoading: boolean
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="w-56" disabled={filtersLoading}>
-          {filtersLoading
-            ? loadingLabel
-            : selected.length === 0
-              ? placeholder
-              : selected.length === 1
-                ? selected[0]
-                : `${selected.length} selected`}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 max-h-72 overflow-y-auto p-2">
-        <div className="flex flex-col gap-1">
-          <Button
-            variant={selected.length === 0 ? "default" : "outline"}
-            onClick={() => setSelected([])}
-            className="mb-1"
-          >
-            All
-          </Button>
-          {options.map((option) => (
-            <div key={option} className="flex items-center gap-2 py-1">
-              <Checkbox
-                id={`option-${option}`}
-                checked={selected.includes(option)}
-                onCheckedChange={(checked) => {
-                  if (checked) setSelected([...selected, option]);
-                  else setSelected(selected.filter((t) => t !== option));
-                }}
-              />
-              <label htmlFor={`option-${option}`} className="cursor-pointer select-none">
-                {option}
-              </label>
-            </div>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 const ProjectTable = () => {
   const navigate = useNavigate();
   // Filter options

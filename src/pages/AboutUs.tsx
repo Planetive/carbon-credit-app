@@ -191,30 +191,26 @@ const AboutUs = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="font-sans min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       {/* Header */}
       <MainHeader />
 
       {/* Hero Section */}
-      <section className="relative py-12 sm:py-16 md:py-20 bg-gradient-to-br from-teal-600 to-cyan-700 text-white">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
-          <Badge className="m-6 sm:m-6 bg-white/20 text-white border border-white/30">
-            About ReThink Carbon
-          </Badge>
+      <section className="relative overflow-hidden pt-28 sm:pt-32 pb-14 sm:pb-20 bg-[radial-gradient(900px_400px_at_15%_0%,rgba(45,212,191,0.35),transparent_55%),radial-gradient(700px_350px_at_88%_10%,rgba(34,197,94,0.28),transparent_60%),linear-gradient(135deg,#0f766e_0%,#0e7490_48%,#155e75_100%)] text-white">
+        <div aria-hidden className="absolute -top-12 left-10 h-48 w-48 rounded-full bg-teal-300/20 blur-3xl" />
+        <div aria-hidden className="absolute top-12 right-8 h-56 w-56 rounded-full bg-cyan-200/20 blur-3xl" />
+        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
           <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
-            Transforming Carbon Markets
-            <span className="block text-teal-200">Through Innovation</span>
+            Building climate intelligence
+            <span className="block text-teal-100">for real-world decarbonization</span>
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-teal-100 mb-6 sm:mb-8 max-w-4xl mx-auto leading-relaxed px-4">
-            We're on a mission to accelerate the world's transition to a
-            sustainable future by making carbon markets more accessible,
-            transparent, and effective.
+          <p className="text-lg sm:text-xl md:text-2xl text-teal-50/90 mb-8 sm:mb-10 max-w-4xl mx-auto leading-relaxed px-4">
+            We help organizations move from climate ambition to measurable action with AI-powered market insights, emissions intelligence, and ESG workflows.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <Button
               size="lg"
-              variant="secondary"
-              className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
+              className="bg-white text-teal-800 hover:bg-teal-50 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
               asChild
             >
               <Link to="/contact">
@@ -222,6 +218,18 @@ const AboutUs = () => {
                 <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
             </Button>
+          </div>
+          <div className="mx-auto max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {[
+              { label: "AI-led evaluations", value: "Minutes, not months" },
+              { label: "Market intelligence", value: "Global project coverage" },
+              { label: "Reporting readiness", value: "Audit-friendly outputs" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm px-4 py-3">
+                <p className="text-xs uppercase tracking-wider text-teal-100/90">{item.label}</p>
+                <p className="text-sm sm:text-base font-semibold text-white">{item.value}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
