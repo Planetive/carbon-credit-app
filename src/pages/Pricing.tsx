@@ -181,7 +181,7 @@ const Pricing = () => {
                 >
                   <Card
                     className={[
-                      "group relative h-full overflow-hidden border bg-gradient-to-br transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-2xl",
+                      "group relative z-0 h-full overflow-hidden border bg-gradient-to-br transition-[transform,box-shadow] duration-200 ease-out hover:z-10 hover:scale-[1.02] hover:shadow-[0_12px_28px_rgba(10,77,62,0.12)]",
                       tier.featured
                         ? "shadow-xl ring-1 ring-violet-300/60"
                         : "shadow-md",
@@ -197,7 +197,7 @@ const Pricing = () => {
                           <motion.div
                             aria-hidden
                             className="pointer-events-none absolute -inset-12 bg-gradient-to-r from-[#33C08A]/25 via-[#7DD9B5]/20 to-[#BFE3D3]/20"
-                            animate={{ opacity: [0.2, 0.38, 0.2], scale: [1, 1.03, 1] }}
+                            animate={{ opacity: [0.18, 0.28, 0.18], scale: [1, 1.01, 1] }}
                             transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
                           />
                         )}
@@ -205,13 +205,11 @@ const Pricing = () => {
                     )}
 
                     <CardHeader className="relative z-10">
-                      <motion.div
-                        animate={prefersReducedMotion ? undefined : { y: [0, -2, 0], rotate: [0, 1.3, 0] }}
-                        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: index * 0.1 }}
-                        className={`mb-4 h-12 w-12 rounded-full flex items-center justify-center bg-gradient-to-br shadow-[0_6px_16px_rgba(10,77,62,0.12)] ring-1 transition-transform duration-300 ease-out group-hover:scale-105 ${tier.iconClasses} ${tier.iconAccentClasses}`}
+                      <div
+                        className={`mb-4 h-12 w-12 rounded-full flex items-center justify-center bg-gradient-to-br shadow-[0_6px_16px_rgba(10,77,62,0.12)] ring-1 transition-transform duration-200 ease-out group-hover:scale-[1.03] ${tier.iconClasses} ${tier.iconAccentClasses}`}
                       >
                         <Icon className="h-6 w-6" />
-                      </motion.div>
+                      </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-2xl text-gray-900">{tier.name}</CardTitle>
                       </div>
@@ -244,7 +242,7 @@ const Pricing = () => {
                         <Button asChild className="w-full bg-[#0A4D3E] text-white hover:bg-[#083E32] group/btn">
                           <Link to="/contact">
                             Get a Quote
-                            <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 ease-out group-hover/btn:translate-x-1" />
+                            <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-200 ease-out group-hover/btn:translate-x-0.5" />
                           </Link>
                         </Button>
                       </div>

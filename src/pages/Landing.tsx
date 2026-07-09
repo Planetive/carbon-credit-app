@@ -1,46 +1,14 @@
 import { Button } from "@/components/ui/button";
 import MainHeader from "@/components/layout/MainHeader";
+import EcosystemSection from "@/components/landing/EcosystemSection";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Landing = () => {
-  const [activeFeatureSlide, setActiveFeatureSlide] = useState(0);
   const [showGetStarted, setShowGetStarted] = useState(false);
-  const [typedHeroSubtitle, setTypedHeroSubtitle] = useState("");
-  
-  // Keep explicit image-to-feature mapping so text always matches screenshot
-  const featureSlides = [
-    {
-      image: "/Features/AI%20Advisor.png",
-      title: "AI-Powered Strategist",
-      description:
-        "Evaluating eligibility against global standards and estimating emission reductions in minutes.",
-    },
-    {
-      image: "/Features/Decarbonization.png",
-      title: "Global Decarbonization & Energy Transition Databases",
-      description: "Offers strategic insights from worldwide projects.",
-    },
-    {
-      image: "/Features/emission%20result.png",
-      title: "Emissions Modeling",
-      description:
-        "Providing accurate precise estimates for overall business value and carbon credit potential.",
-    },
-    {
-      image: "/Features/ESG%20health%20check.png",
-      title: "ESG Healthcheck",
-      description:
-        "Efficiently measure ESG performance with a clear snapshot of management status and risks.",
-    },
-    {
-      image: "/Features/Reports.png",
-      title: "Comprehensive Reporting",
-      description: "Converting insights to reports for executive decisions.",
-    },
-  ];
+  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Handle scroll to change header background and show/hide Get Started button
   useEffect(() => {
@@ -58,28 +26,131 @@ const Landing = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Animated emissions/data curves behind the hero. Motion here is meaningful:
+  // slow, layered sine waves reading as live decarbonisation trend lines.
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setActiveFeatureSlide((prev) => (prev + 1) % featureSlides.length);
-    }, 3200);
+    const canvas = heroCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    return () => window.clearInterval(interval);
-  }, [featureSlides.length]);
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
 
-  useEffect(() => {
-    const subtitleText = "Advancing Decarbonisation Through Market Intelligence.";
-    let index = 0;
+    const lineColors = [
+      "rgba(93,202,165,0.28)", // #5DCAA5
+      "rgba(29,158,117,0.22)", // #1D9E75
+      "rgba(15,110,86,0.20)", // #0F6E56
+    ];
 
-    const typer = window.setInterval(() => {
-      index += 1;
-      setTypedHeroSubtitle(subtitleText.slice(0, index));
+    const glowColors = [
+      "rgba(93,202,165,0.9)", // #5DCAA5
+      "rgba(29,158,117,0.85)", // #1D9E75
+      "rgba(15,110,86,0.8)", // #0F6E56
+    ];
 
-      if (index >= subtitleText.length) {
-        window.clearInterval(typer);
+    let width = 0;
+    let height = 0;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Pointer parallax: waves subtly lean toward the cursor for a live feel.
+    let targetX = 0;
+    let targetY = 0;
+    let curX = 0;
+    let curY = 0;
+
+    const handlePointer = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      targetX = (e.clientX - rect.left) / rect.width - 0.5;
+      targetY = (e.clientY - rect.top) / rect.height - 0.5;
+    };
+    const resetPointer = () => {
+      targetX = 0;
+      targetY = 0;
+    };
+    if (!prefersReducedMotion) {
+      window.addEventListener("pointermove", handlePointer);
+      window.addEventListener("pointerleave", resetPointer);
+    }
+
+    let frameId = 0;
+    let t = 0;
+
+    const renderWaves = () => {
+      ctx.clearRect(0, 0, width, height);
+      // ease pointer toward target
+      curX += (targetX - curX) * 0.06;
+      curY += (targetY - curY) * 0.06;
+
+      for (let i = 0; i < 3; i++) {
+        const depth = 1 + i * 0.6; // deeper lines drift more (parallax)
+        const parallaxX = curX * 26 * depth;
+        const parallaxY = curY * 20 * depth;
+        const amp = height * 0.045 + i * height * 0.03;
+        const yOffset = height * 0.52 + i * height * 0.11 + parallaxY;
+        const speed = 1 + i * 0.3;
+
+        // riding highlight point that glides along the curve
+        const headX = ((t * (60 + i * 18)) % (width + 200)) - 100;
+        let headY = yOffset;
+
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 8) {
+          const y =
+            yOffset +
+            Math.sin((x - parallaxX) * 0.006 + t * speed + i * 2) * amp;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          if (Math.abs(x - headX) < 8) headY = y;
+        }
+        ctx.strokeStyle = lineColors[i];
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = glowColors[i];
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // glowing node traveling the line
+        const grad = ctx.createRadialGradient(headX, headY, 0, headX, headY, 7);
+        grad.addColorStop(0, glowColors[i]);
+        grad.addColorStop(1, "rgba(29,158,117,0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(headX, headY, 7, 0, Math.PI * 2);
+        ctx.fill();
       }
-    }, 45);
+    };
 
-    return () => window.clearInterval(typer);
+    const draw = () => {
+      t += 0.004;
+      renderWaves();
+      frameId = window.requestAnimationFrame(draw);
+    };
+
+    if (prefersReducedMotion) {
+      renderWaves();
+    } else {
+      draw();
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", handlePointer);
+      window.removeEventListener("pointerleave", resetPointer);
+    };
   }, []);
 
   const userjourney = [
@@ -141,69 +212,116 @@ const Landing = () => {
     },
   ];
 
-  const activeFeatureIndex = activeFeatureSlide;
+  // Headline split for a word-by-word blur-in reveal
+  const headlineLead = "The future of enterprise decarbonisation".split(" ");
+  const headlineAccent = ["starts", "here."];
+  const wordContainer = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.07, delayChildren: 0.15 },
+    },
+  };
+  const wordReveal = {
+    hidden: { opacity: 0, y: 18, filter: "blur(10px)" },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
+    },
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8FCFA]" style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}>
-      {/* Hero Section with Full Screen Video */}
-      <section className="relative h-screen overflow-hidden">
-        {/* Video Background */}
-        <div className="absolute inset-0 w-full h-full">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-            poster="/placeholder-video-poster.jpg"
-          >
-            <source src="/hero-background_3.mp4" type="video/mp4" />
-            <source src="/hero-background_3.webm" type="video/webm" />
-            {/* Fallback for browsers that don't support video */}
-            <div className="w-full h-full bg-gradient-to-br from-teal-50 via-cyan-50 to-green-50"></div>
-          </video>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/45 to-black/40 z-[1]" />
+    <div className="min-h-screen overflow-x-hidden bg-[#F8FCFA]" style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}>
+      {/* Hero Section — animated emissions curves on deep control-room ground */}
+      <section className="relative h-screen overflow-hidden bg-[#0a1a1d]">
+        {/* Animated data-curve canvas */}
+        <canvas
+          ref={heroCanvasRef}
+          aria-hidden
+          className="absolute inset-0 h-full w-full"
+        />
+        {/* Depth vignette + subtle radial lift behind the headline */}
+        <div
+          aria-hidden
+          className="absolute inset-0 z-[1]"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 50% 35%, rgba(29,158,117,0.1) 0%, rgba(10,26,29,0) 55%), linear-gradient(to bottom, rgba(10,26,29,0.35) 0%, rgba(10,26,29,0) 40%, rgba(10,26,29,0.75) 100%)",
+          }}
+        />
 
-        {/* Header positioned on top of video */}
+        {/* Real site header on top */}
         <MainHeader />
 
         {/* Hero Content */}
         <div className="container mx-auto px-4 sm:px-6 relative z-10 h-full flex items-center justify-center">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold leading-tight text-white tracking-[0.01em]">
-                <span className="text-white">RETHINK</span>{" "}
-                <span className="bg-gradient-to-r from-[#7DD9B5] to-[#33C08A] bg-clip-text text-transparent">
-                  CARBON
-                </span>
-              </h1>
-            </div>
-            <p className="text-lg sm:text-xl md:text-2xl text-[#BFE3D3] mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4 font-normal tracking-[0.01em]">
-              {typedHeroSubtitle}
-              <motion.span
-                aria-hidden
-                animate={{ opacity: [1, 0, 1] }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-                className="ml-0.5 text-[#33C08A]"
-              >
-                |
-              </motion.span>
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="mb-5 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.35em] text-[#9FE1CB]"
+            >
+              Measure. Decarbonise. Transform.
+            </motion.div>
+
+            <motion.h1
+              variants={wordContainer}
+              initial="hidden"
+              animate="show"
+              className="mx-auto max-w-[22ch] text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-semibold leading-[1.15] tracking-tight text-white"
+            >
+              {headlineLead.map((word, i) => (
+                <motion.span
+                  key={`lead-${i}`}
+                  variants={wordReveal}
+                  className="inline-block whitespace-pre"
+                >
+                  {word}{" "}
+                </motion.span>
+              ))}
+              {headlineAccent.map((word, i) => (
+                <motion.span
+                  key={`accent-${i}`}
+                  variants={wordReveal}
+                  className="hero-shimmer inline-block whitespace-pre bg-gradient-to-r from-[#33C08A] via-[#DFFBEF] to-[#33C08A] bg-clip-text text-transparent"
+                >
+                  {word}
+                  {i < headlineAccent.length - 1 ? " " : ""}
+                </motion.span>
+              ))}
+            </motion.h1>
+
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+              className="mt-9 flex justify-center"
+            >
               <Button
                 size="lg"
-                className="bg-[#1C7A53] hover:bg-[#186747] text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto text-white"
+                className="group bg-[#1D9E75] hover:bg-[#22B87E] text-[#04342C] font-semibold text-base px-7 py-6 rounded-full shadow-[0_14px_40px_-12px_rgba(29,158,117,0.6)]"
                 asChild
               >
                 <Link to="/login">
-                  Start Your Journey
-                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  See Rethink Carbon in action
+                  <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
                 </Link>
               </Button>
-            </div>
+            </motion.div>
           </div>
         </div>
+
+        {/* Bounce chevron cue */}
+        <motion.div
+          aria-hidden
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-white/40"
+        >
+          <ChevronDown className="h-5 w-5" />
+        </motion.div>
       </section>
 
       {/* Stats Section */}
@@ -222,177 +340,136 @@ const Landing = () => {
         </div>
       </section> */}
 
-      {/* Features Section */}
-      <section id="features" className="py-16 sm:py-20 bg-gradient-to-br from-[#0A4D3E] via-[#0F5B49] to-[#0C3F34] text-white">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 sm:mb-16">
-            <motion.h2
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4"
-            >
-              One unified platform for every
-              <motion.span
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 0.45, ease: "easeOut", delay: 0.15 }}
-                className="bg-gradient-to-r from-[#7DD9B5] to-[#33C08A] bg-clip-text text-transparent inline-block"
-              >
-                {" "}step of the journey
-              </motion.span>
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.22 }}
-              className="text-base sm:text-lg md:text-xl text-[#D6EFE5] max-w-3xl mx-auto px-4"
-            >
-              Accelerating your decarbonization journey with AI-driven assessments, optimization, tracking, and market intelligence
-            </motion.p>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.45, ease: "easeOut", delay: 0.2 }}
-            className="flex justify-center items-center"
-          >
-            <div className="w-full max-w-5xl">
-              <div className="rounded-3xl bg-transparent p-0 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-                <div className="rounded-2xl bg-[#083E32] p-1.5 sm:p-2 border border-[#1C7A53]/40">
-                  <div className="mb-1.5 flex items-center justify-center">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
-                  </div>
-                  <div className="overflow-hidden rounded-xl border border-slate-700/60">
-                    <div
-                      className="flex transition-transform duration-700 ease-out"
-                      style={{
-                        transform: `translateX(-${activeFeatureIndex * 100}%)`,
-                      }}
-                    >
-                      {featureSlides.map((slide, index) => (
-                        <div
-                          key={slide.image}
-                          className="w-full flex-shrink-0 p-1 sm:p-1.5"
-                        >
-                          <div className="rounded-lg bg-white/96 p-1.5 sm:p-2 shadow-md">
-                            <img
-                              src={slide.image}
-                              alt={slide.title}
-                              className="h-64 sm:h-80 md:h-[27rem] lg:h-[30rem] w-full object-cover rounded-md"
-                              style={{ objectPosition: "center" }}
-                              onError={(e) => {
-                                e.currentTarget.src = featureSlides[0].image;
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 text-center">
-                <p className="text-sm sm:text-base md:text-lg font-semibold text-white">
-                  {featureSlides[activeFeatureIndex]?.title}
-                </p>
-                <p className="mt-2 text-xs sm:text-sm md:text-base text-[#D6EFE5] max-w-3xl mx-auto">
-                  {featureSlides[activeFeatureIndex]?.description}
-                </p>
-                <div className="mt-3 flex items-center justify-center gap-2">
-                  {featureSlides.map((slide, index) => (
-                    <button
-                      key={`feature-dot-${index}`}
-                      type="button"
-                      onClick={() => setActiveFeatureSlide(index)}
-                      aria-label={`Show ${slide.title}`}
-                      className={`h-2.5 rounded-full transition-all duration-300 ${
-                        index === activeFeatureIndex
-                          ? "w-8 bg-[#33C08A]"
-                          : "w-2.5 bg-[#9BC4B5] hover:bg-[#BFE3D3]"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
+      {/* Platform ecosystem — full-bleed interactive constellation */}
+      <section className="relative z-20 w-full overflow-hidden bg-[#F7F4EE]">
+        <EcosystemSection />
       </section>
 
       {/* User Journey Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-br from-[#EEF7F3] to-[#E4F2EC]">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 sm:mb-16">
+      <section className="relative overflow-hidden bg-[#0a1a1d] py-16 sm:py-20">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(90% 60% at 50% 0%, rgba(29,158,117,0.14) 0%, rgba(10,26,29,0) 55%), linear-gradient(to bottom, rgba(10,26,29,0.2) 0%, rgba(10,26,29,0) 40%, rgba(10,26,29,0.55) 100%)",
+          }}
+        />
+
+        <div className="container relative z-10 mx-auto px-4 sm:px-6">
+          <div className="mb-12 text-center sm:mb-16">
             <motion.h2
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4"
+              initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+              whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              viewport={{ once: true, amount: 0.45 }}
+              transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+              className="mb-4 px-4 text-2xl font-bold text-white sm:mb-6 sm:text-3xl md:text-4xl lg:text-5xl"
             >
-              Your Path to
+              Your Path to{" "}
               <motion.span
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 0.45, ease: "easeOut", delay: 0.15 }}
-                className="bg-gradient-to-r from-[#1C7A53] to-[#33C08A] bg-clip-text text-transparent inline-block"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.45 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
+                className="inline-block bg-gradient-to-r from-[#33C08A] via-[#9FEED1] to-[#33C08A] bg-clip-text text-transparent"
               >
-                {" "}Carbon Excellence
+                Carbon Excellence
               </motion.span>
             </motion.h2>
             <motion.p
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.45, ease: "easeOut", delay: 0.22 }}
-              className="text-base sm:text-lg md:text-xl text-[#456D5F] max-w-3xl mx-auto px-4"
+              viewport={{ once: true, amount: 0.45 }}
+              transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+              className="mx-auto max-w-3xl px-4 text-base text-white/65 sm:text-lg md:text-xl"
             >
               Follow our proven 4-step methodology to transform your carbon footprint and accelerate your sustainability journey
             </motion.p>
           </div>
 
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 relative">
-              {/* Connection lines for desktop */}
-              <div className="hidden lg:block absolute top-20 left-0 right-0 h-0.5 bg-gradient-to-r from-[#BFE3D3] via-[#7DD9B5] to-[#33C08A]" style={{ top: '80px' }}></div>
-              
+          <div className="mx-auto max-w-6xl">
+            <div className="relative grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
+              {/* Desktop progress rail — draw once, then continuous glow sweep */}
+              <div className="journey-rail-track pointer-events-none hidden lg:block" aria-hidden>
+                <motion.div
+                  initial={{ scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.25 }}
+                  className="journey-rail-fill"
+                />
+                <div className="journey-rail-glow" />
+                <div className="journey-rail-head" />
+              </div>
+
               {userjourney.map((step, index) => (
                 <motion.div
                   key={step.id}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true, amount: 0.3 }}
-                  transition={{ duration: 0.3, ease: "easeOut", delay: index * 0.08 }}
+                  initial={{ opacity: 0, y: 36 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.35 }}
+                  transition={{
+                    duration: 0.55,
+                    ease: [0.22, 1, 0.36, 1],
+                    delay: 0.28 + index * 0.14,
+                  }}
                   className="relative"
                 >
-                  {/* Step number circle */}
-                  <div className="relative z-10 mb-4 sm:mb-6">
-                    <div className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-xl ${
-                      index === 0 ? 'bg-gradient-to-br from-[#33C08A] to-[#1C7A53]' :
-                      index === 1 ? 'bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E]' :
-                      index === 2 ? 'bg-gradient-to-br from-[#0A4D3E] to-[#083E32]' :
-                      'bg-gradient-to-br from-[#083E32] to-[#062F26]'
-                    }`} style={{ boxShadow: '8px 8px 16px rgba(10, 77, 62, 0.26)' }}>
+                  <div className="relative z-10 mb-5 sm:mb-6">
+                    <motion.div
+                      initial={{ scale: 0.55, opacity: 0 }}
+                      whileInView={{ scale: 1, opacity: 1 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 18,
+                        delay: 0.32 + index * 0.14,
+                      }}
+                      className={`journey-node-live mx-auto flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold text-white sm:h-16 sm:w-16 sm:text-xl ${
+                        index === 0
+                          ? "bg-gradient-to-br from-[#33C08A] to-[#1C7A53]"
+                          : index === 1
+                            ? "bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E]"
+                            : index === 2
+                              ? "bg-gradient-to-br from-[#0A4D3E] to-[#083E32]"
+                              : "bg-gradient-to-br from-[#083E32] to-[#062F26]"
+                      }`}
+                      style={{
+                        animationDelay: `${index * 0.35}s`,
+                      }}
+                    >
                       {index + 1}
-                    </div>
+                    </motion.div>
                   </div>
-                  
-                  {/* Step content */}
-                  <div className="text-center px-2">
-                    <h3 className="text-lg sm:text-xl font-semibold text-[#0A4D3E] mb-2 sm:mb-3">
+
+                  <div className="px-2 text-center">
+                    <motion.h3
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{
+                        duration: 0.4,
+                        ease: "easeOut",
+                        delay: 0.4 + index * 0.14,
+                      }}
+                      className="mb-2 text-lg font-semibold text-white sm:mb-3 sm:text-xl"
+                    >
                       {step.title}
-                    </h3>
-                    <p className="text-sm sm:text-base text-[#456D5F] leading-relaxed">
+                    </motion.h3>
+                    <motion.p
+                      initial={{ opacity: 0, y: 12 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{
+                        duration: 0.45,
+                        ease: "easeOut",
+                        delay: 0.48 + index * 0.14,
+                      }}
+                      className="text-sm leading-relaxed text-white/60 sm:text-base"
+                    >
                       {step.description}
-                    </p>
+                    </motion.p>
                   </div>
                 </motion.div>
               ))}
@@ -402,12 +479,7 @@ const Landing = () => {
       </section>
 
       {/* What's In It For You Section */}
-      <section className="py-16 sm:py-20 relative overflow-hidden bg-[#0A4D3E]">
-        {/* Background with overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A4D3E] to-[#0C5A46]">
-          {/* You can add a background image here if needed */}
-        </div>
-        
+      <section className="py-16 sm:py-20 relative overflow-hidden bg-[#F7F4EE]">
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="text-center mb-12 sm:mb-16">
             <motion.h1
@@ -415,10 +487,10 @@ const Landing = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-8 sm:mb-16 text-white drop-shadow-xl px-4"
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-8 sm:mb-16 text-[#0A4D3E] px-4"
             >
               WHAT&apos;S IN IT FOR{" "}
-              <span className="bg-gradient-to-r from-[#BFE3D3] to-[#33C08A] bg-clip-text text-transparent">YOU?</span>
+              <span className="bg-gradient-to-r from-[#1C7A53] to-[#33C08A] bg-clip-text text-transparent">YOU?</span>
             </motion.h1>
           </div>
           
@@ -432,7 +504,7 @@ const Landing = () => {
                   viewport={{ once: true, amount: 0.3 }}
                   transition={{ duration: 0.28, ease: "easeOut", delay: index * 0.05 }}
                   className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
-                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #0A4D3E)" }}
+                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #124740)" }}
                 >
                   <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
                     {item.id}
@@ -456,7 +528,7 @@ const Landing = () => {
                   viewport={{ once: true, amount: 0.3 }}
                   transition={{ duration: 0.28, ease: "easeOut", delay: index * 0.05 }}
                   className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
-                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #0A4D3E)" }}
+                  style={{ background: "linear-gradient(to bottom right, #1C7A53, #124740)" }}
                 >
                   <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
                     {item.id}
@@ -496,7 +568,7 @@ const Landing = () => {
             <div className="relative z-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4">
               <Button
                 size="lg"
-                className="text-base sm:text-lg px-7 sm:px-9 py-4 sm:py-6 w-full sm:w-auto bg-[#33C08A] text-[#083E32] hover:bg-[#7DD9B5] rounded-full shadow-[0_10px_30px_rgba(51,192,138,0.35)]"
+                className="text-base sm:text-lg px-7 sm:px-9 py-4 sm:py-6 w-full sm:w-auto bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold rounded-full shadow-[0_14px_40px_-12px_rgba(18,71,64,0.55)]"
                 asChild
               >
                 <Link to="/contact">
@@ -521,7 +593,7 @@ const Landing = () => {
           >
             <Button
               size="lg"
-              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-[#33C08A] to-[#1C7A53] hover:from-[#2DB57F] hover:to-[#186747] text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 text-white"
+              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3"
               asChild
             >
               <Link to="/login">Get Started</Link>

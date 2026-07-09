@@ -56,19 +56,36 @@ const MainHeader = () => {
   // Home: glass in hero; light white bar with dark text after scroll
   const headerClass = isHome
     ? isInHero
-      ? "mx-3 my-2 rounded-[32px] bg-white/24 backdrop-blur-2xl border border-white/20 shadow-[0_18px_68px_-34px_rgba(0,0,0,0.45)]"
+      ? "mx-3 my-2 rounded-[32px] bg-white/90 backdrop-blur-xl border border-white/80 shadow-[0_16px_44px_-24px_rgba(0,0,0,0.22)]"
       : "mx-3 my-2 rounded-[32px] bg-white/92 backdrop-blur-md border border-gray-200/70 shadow-md"
     : "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm";
 
   const navLinkClass = isHome && isInHero
-    ? "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-white/90 hover:text-[#BFE3D3]"
+    ? "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-gray-800 hover:text-[#0A4D3E]"
     : "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-gray-800 hover:text-[#0A4D3E]";
   const buttonTextClass = isHome && isInHero
-    ? "text-white/90 hover:text-[#BFE3D3] text-base lg:text-[17px] font-medium"
+    ? "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-medium"
     : "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-medium";
   const mobileMenuButtonClass = isHome && isInHero
-    ? "md:hidden p-2 text-white/90 hover:text-[#BFE3D3] transition-colors"
+    ? "md:hidden p-2 text-gray-800 hover:text-[#0A4D3E] transition-colors"
     : "md:hidden p-2 text-gray-800 hover:text-[#0A4D3E] transition-colors";
+  const solutionsDropdownClass =
+    "fixed left-0 right-0 top-[78px] z-50 border border-gray-200/90 bg-[#EEF1F0] px-6 py-5 shadow-[0_24px_55px_-28px_rgba(0,0,0,0.28)]";
+  const solutionsLinkClass =
+    "block px-4 py-3 text-sm text-gray-800 hover:bg-[#EAF7F1] hover:text-[#0A4D3E] transition-colors";
+  const megaMenuHeadingClass = "text-[20px] lg:text-[24px] font-semibold leading-tight text-[#173A32] mb-3";
+  const megaMenuLinkClass = "block py-1.5 text-[14px] lg:text-[15px] font-normal text-[#274C43]/85 hover:text-[#0A4D3E] transition-colors";
+  const moduleSolutionLinks = [
+    { label: "ESG Management", to: "/solutions/modules/esg" },
+    { label: "Carbon Accounting", to: "/solutions/modules/accounting" },
+    { label: "Digital MRV", to: "/solutions/modules/mrv" },
+    { label: "Carbon Management", to: "/solutions/modules/management" },
+    { label: "Climate Risk Analysis", to: "/solutions/modules/risk" },
+    { label: "Supply Chain Intelligence", to: "/solutions/modules/supplychain" },
+    { label: "AI Carbon Strategist", to: "/solutions/modules/ai" },
+    { label: "Carbon Markets", to: "/solutions/modules/markets" },
+    { label: "Portfolio Management", to: "/solutions/modules/portfolio" },
+  ] as const;
 
   return (
     <header
@@ -127,19 +144,54 @@ const MainHeader = () => {
               </svg>
             </button>
             {solutionsOpen && (
-              <div className="absolute left-0 mt-3 w-80 rounded-xl bg-white shadow-xl py-2 z-50 overflow-hidden border border-gray-200">
-                <Link
-                  to="/solutions/corporate"
-                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors"
-                >
-                  Carbon Intelligence for Corporates
-                </Link>
-                <Link
-                  to="/solutions/financial-institutions"
-                  className="block px-4 py-3 text-sm text-gray-700 hover:bg-teal-600 hover:text-white transition-colors"
-                >
-                  Carbon Intelligence for Financial Institutions
-                </Link>
+              <div className={solutionsDropdownClass}>
+                <div className="mx-auto grid w-full max-w-[1280px] grid-cols-12 gap-8">
+                  <div className="col-span-9 grid grid-cols-4 gap-8">
+                    <div>
+                      <p className={megaMenuHeadingClass}>Understand and Measure</p>
+                      <Link to="/solutions/modules/esg" className={megaMenuLinkClass}>ESG management</Link>
+                      <Link to="/solutions/modules/accounting" className={megaMenuLinkClass}>Scope 1, 2 and 3 accounting</Link>
+                      <Link to="/solutions/modules/mrv" className={megaMenuLinkClass}>Digital MRV</Link>
+                    </div>
+
+                    <div>
+                      <p className={megaMenuHeadingClass}>Manage and Mitigate</p>
+                      <Link to="/solutions/modules/management" className={megaMenuLinkClass}>Carbon management</Link>
+                      <Link to="/solutions/modules/risk" className={megaMenuLinkClass}>Climate risk analysis</Link>
+                      <Link to="/solutions/modules/supplychain" className={megaMenuLinkClass}>Supply chain intelligence</Link>
+                    </div>
+
+                    <div>
+                      <p className={megaMenuHeadingClass}>Act and Optimise</p>
+                      <Link to="/solutions/modules/ai" className={megaMenuLinkClass}>AI carbon consultant</Link>
+                      <Link to="/solutions/modules/markets" className={megaMenuLinkClass}>Carbon markets</Link>
+                      <Link to="/solutions/modules/portfolio" className={megaMenuLinkClass}>Portfolio management</Link>
+                    </div>
+
+                    <div>
+                      <p className={megaMenuHeadingClass}>Solutions by Sector</p>
+                      <Link to="/solutions/corporate" className={megaMenuLinkClass}>Corporates</Link>
+                      <Link to="/solutions/financial-institutions" className={megaMenuLinkClass}>Financial institutions</Link>
+                      <Link to="/contact" className={megaMenuLinkClass}>Energy and extractives</Link>
+                      <Link to="/contact" className={megaMenuLinkClass}>Manufacturing and textiles</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-span-3">
+                    <div className="rounded-xl bg-[#062D26] p-5 text-white">
+                      <p className="text-xl font-semibold leading-tight">Not sure where to start?</p>
+                      <p className="mt-2 text-sm text-white/75">
+                        Get a free ESG health check and see where you stand.
+                      </p>
+                      <Button
+                        className="mt-4 w-full bg-[#1D9E75] text-white hover:bg-[#168661]"
+                        asChild
+                      >
+                        <Link to="/contact">Get started</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -157,13 +209,6 @@ const MainHeader = () => {
           >
             Pricing
           </Link>
-          
-          <Link
-            to="/contact"
-            className={navLinkClass}
-          >
-            Contact
-          </Link>
         </div>
 
         {/* Desktop Auth Buttons */}
@@ -172,7 +217,7 @@ const MainHeader = () => {
             <Link to="/login" className={buttonTextClass}>Login</Link>
           </Button>
           <Button
-            className="bg-[#1C7A53] hover:bg-[#186747]"
+            className="bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold"
             asChild
           >
             <Link to="/contact">Contact Us</Link>
@@ -258,6 +303,24 @@ const MainHeader = () => {
                     >
                       Carbon Intelligence for financial institutions
                     </Link>
+                    <Link
+                      to="/solutions/modules/ai"
+                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Sustainability solution modules
+                    </Link>
+                    <div className="my-1 border-t border-gray-200/80" />
+                    {moduleSolutionLinks.map((item) => (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
@@ -268,13 +331,6 @@ const MainHeader = () => {
               >
                 Pricing
               </Link>
-              <Link
-                to="/contact"
-                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Contact
-              </Link>
             </div>
           </nav>
 
@@ -284,7 +340,7 @@ const MainHeader = () => {
               <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Login</Link>
             </Button>
             <Button
-              className="w-full bg-[#1C7A53] hover:bg-[#186747]"
+              className="w-full bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold"
               asChild
             >
               <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>

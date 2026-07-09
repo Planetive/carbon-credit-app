@@ -123,6 +123,24 @@ All colors MUST be HSL.
     animation: float 8s ease-in-out infinite;
   }
 
+  /* Slow light sweep across gradient text (hero headline accent) */
+  @keyframes heroShimmer {
+    to {
+      background-position: 200% center;
+    }
+  }
+
+  .hero-shimmer {
+    background-size: 200% auto;
+    animation: heroShimmer 5s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-shimmer {
+      animation: none;
+    }
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -341,6 +359,126 @@ All colors MUST be HSL.
 
   .animate-progress {
     animation: progress 2s ease-in-out infinite;
+  }
+
+  /* Journey section — continuous glowing rail sweep */
+  @keyframes journeyRailSweep {
+    0% {
+      transform: translateX(-120%);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(220%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes journeyNodePulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px rgba(159, 238, 209, 0.18),
+        0 12px 32px rgba(0, 0, 0, 0.35),
+        0 0 22px rgba(51, 192, 138, 0.2);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px rgba(159, 238, 209, 0.32),
+        0 12px 32px rgba(0, 0, 0, 0.35),
+        0 0 36px rgba(51, 192, 138, 0.45);
+    }
+  }
+
+  .journey-rail-track {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 32px;
+    height: 2px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(159, 238, 209, 0.12);
+  }
+
+  .journey-rail-fill {
+    position: absolute;
+    inset: 0;
+    transform-origin: left center;
+    background: linear-gradient(
+      90deg,
+      rgba(29, 158, 117, 0.35),
+      rgba(93, 202, 165, 0.75),
+      rgba(51, 192, 138, 0.55)
+    );
+  }
+
+  .journey-rail-glow {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 38%;
+    height: 10px;
+    margin-top: -5px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(93, 202, 165, 0.15) 20%,
+      rgba(159, 238, 209, 0.95) 50%,
+      rgba(51, 192, 138, 0.35) 80%,
+      transparent 100%
+    );
+    filter: blur(3px);
+    animation: journeyRailSweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    will-change: transform, opacity;
+  }
+
+  .journey-rail-head {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    margin-top: -5px;
+    margin-left: -5px;
+    border-radius: 50%;
+    background: #dffbef;
+    box-shadow:
+      0 0 10px rgba(159, 238, 209, 0.95),
+      0 0 22px rgba(51, 192, 138, 0.7);
+    animation: journeyRailSweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    will-change: transform, opacity;
+  }
+
+  .journey-node-live {
+    animation: journeyNodePulse 2.6s ease-in-out infinite;
+  }
+
+  .journey-node-live:nth-child(1) {
+    animation-delay: 0s;
+  }
+  .journey-node-live:nth-child(2) {
+    animation-delay: 0.35s;
+  }
+  .journey-node-live:nth-child(3) {
+    animation-delay: 0.7s;
+  }
+  .journey-node-live:nth-child(4) {
+    animation-delay: 1.05s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .journey-rail-glow,
+    .journey-rail-head,
+    .journey-node-live {
+      animation: none !important;
+    }
   }
 
   @keyframes blink {

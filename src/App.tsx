@@ -86,6 +86,7 @@ import EmissionResultsEpaIpcc from "./pages/EmissionResultsEpaIpcc";
 import EmissionHistory from "./pages/EmissionHistory";
 import ESGFinancialInstitutions from "./pages/solutions/esg-financial-institutions";  
 import CorporateSolutions from "./pages/solutions/corporate";
+import ModuleSolutionPage from "./pages/solutions/module-solution-page";
 import Dashboard2 from "./pages/Dashboard2";
 // Removed ESGWizard import - now handled through IntegratedFinanceEmission
 import IntegratedFinanceEmission from "@/features/finance-emissions/screens/FinanceEmissionScreen";
@@ -118,6 +119,8 @@ const AppRoutes = () => {
         <Route path="/solutions/corporate" element={<CorporateSolutions />} />
         <Route path="/solutions/financial-institutions" element={<ESGFinancialInstitutions />} />
         <Route path="/solutions/esg-financial-institutions" element={<Navigate to="/solutions/financial-institutions" replace />} />
+        <Route path="/solutions/modules" element={<Navigate to="/solutions/modules/ai" replace />} />
+        <Route path="/solutions/modules/:moduleKey" element={<ModuleSolutionPage />} />
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
