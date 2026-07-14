@@ -1,6 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import MainHeader from "@/components/layout/MainHeader";
 import { Link } from "react-router-dom";
 import {
@@ -15,7 +13,7 @@ import {
   Target,
   Globe,
   ArrowRight,
-  CheckCircle,
+  ChevronDown,
   Clock,
   Brain,
   Calculator,
@@ -23,14 +21,119 @@ import {
   BarChart3,
   FileText,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 const AboutUs = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [expandedBios, setExpandedBios] = useState<{ [key: string]: boolean }>(
-    {}
-  );
-  const [api, setApi] = useState<any>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const [expandedBios, setExpandedBios] = useState<Record<string, boolean>>({});
+  const [api, setApi] = useState<{ scrollNext: () => void } | null>(null);
+  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Soft expanding rings + linked constellation — atmospheric, distinct from homepage waves.
+  useEffect(() => {
+    const canvas = heroCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let width = 0;
+    let height = 0;
+    let frameId = 0;
+    let t = 0;
+
+    type Node = { baseAngle: number; baseDist: number; speed: number; size: number };
+    const nodes: Node[] = Array.from({ length: 22 }, (_, i) => ({
+      baseAngle: (i / 22) * Math.PI * 2,
+      baseDist: 0.1 + (i % 6) * 0.048,
+      speed: 0.08 + (i % 5) * 0.02,
+      size: 1.4 + (i % 4) * 0.35,
+    }));
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      width = canvas.offsetWidth;
+      height = canvas.offsetHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height);
+      const cx = width * 0.5;
+      const cy = height * 0.42;
+      const maxR = Math.max(width, height) * 0.62;
+
+      for (let i = 0; i < 6; i++) {
+        const phase = (t * 0.16 + i * 0.48) % 1;
+        const radius = maxR * (0.16 + phase * 0.84);
+        const alpha = (1 - phase) * 0.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(93,202,165,${alpha})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+
+      const points = nodes.map((node, i) => {
+        const angle = node.baseAngle + t * node.speed;
+        const breathe = 1 + 0.08 * Math.sin(t * 1.1 + i);
+        const dist = height * node.baseDist * breathe;
+        return {
+          x: cx + Math.cos(angle) * dist * 1.4,
+          y: cy + Math.sin(angle) * dist,
+          pulse: 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 1.5 + i)),
+          size: node.size,
+        };
+      });
+
+      const linkDist = Math.min(width, height) * 0.16;
+      for (let i = 0; i < points.length; i++) {
+        for (let j = i + 1; j < points.length; j++) {
+          const dx = points[i].x - points[j].x;
+          const dy = points[i].y - points[j].y;
+          const d = Math.hypot(dx, dy);
+          if (d < linkDist) {
+            const alpha = (1 - d / linkDist) * 0.22;
+            ctx.beginPath();
+            ctx.moveTo(points[i].x, points[i].y);
+            ctx.lineTo(points[j].x, points[j].y);
+            ctx.strokeStyle = `rgba(51,192,138,${alpha})`;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const p of points) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size + p.pulse, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(29,158,117,${0.2 + p.pulse * 0.28})`;
+        ctx.fill();
+      }
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    if (reduceMotion) {
+      draw();
+    } else {
+      const loop = () => {
+        t += 0.008;
+        draw();
+        frameId = window.requestAnimationFrame(loop);
+      };
+      loop();
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
 
   const toggleBio = (memberName: string) => {
     setExpandedBios((prev) => ({
@@ -38,60 +141,6 @@ const AboutUs = () => {
       [memberName]: !prev[memberName],
     }));
   };
-
-  // Handle scroll to change header background
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setIsScrolled(scrollTop > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Auto-rotate carousel with uniform cycle
-  useEffect(() => {
-    if (!api) return;
-
-    let interval: NodeJS.Timeout;
-
-    const startRotation = () => {
-      const totalItems = values.length;
-      const cycleTime = 15000;
-      const intervalTime = cycleTime / totalItems;
-
-      interval = setInterval(() => {
-        api.scrollNext();
-      }, intervalTime);
-    };
-
-    const stopRotation = () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-
-    startRotation();
-
-    const carouselContainer = document.querySelector(
-      "[data-carousel-container]"
-    );
-    if (carouselContainer) {
-      carouselContainer.addEventListener("mouseenter", stopRotation);
-      carouselContainer.addEventListener("mouseleave", startRotation);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-      if (carouselContainer) {
-        carouselContainer.removeEventListener("mouseenter", stopRotation);
-        carouselContainer.removeEventListener("mouseleave", startRotation);
-      }
-    };
-  }, [api]);
 
   const values = [
     {
@@ -110,7 +159,7 @@ const AboutUs = () => {
       icon: Calculator,
       title: "Emissions Modeling",
       description:
-        "Providing accurate precise estimates for overall business value and carbon credit potential.",
+        "Providing accurate precise estimates for overall business value and carbon credit potential.",
     },
     {
       icon: Database,
@@ -129,6 +178,17 @@ const AboutUs = () => {
       description: "Converting insights to reports for executive decisions.",
     },
   ];
+
+  useEffect(() => {
+    if (!api || prefersReducedMotion) return;
+
+    const intervalTime = 36000 / values.length;
+    const interval = window.setInterval(() => {
+      api.scrollNext();
+    }, intervalTime);
+
+    return () => window.clearInterval(interval);
+  }, [api, prefersReducedMotion, values.length]);
 
   const milestones = [
     {
@@ -172,255 +232,289 @@ const AboutUs = () => {
     },
     {
       name: "Kamal Rahim",
-      role: " Co-Founder and Head of Strategy ",
+      role: "Co-Founder and Head of Strategy",
       bio: "Accomplished business development professional with engineering background and over a decade in energy sector and industrial digitization. Successfully established 1320 MW power plant, bulk handling sea terminal, and implemented digital twin solutions. Expert in industrial SaaS development and mergers & acquisitions.",
       image: "/team/Kamal PP.jpg",
     },
     {
       name: "Umair Hussian Farooqi",
-      role: "Manager of Finance and buisness analysis",
+      role: "Manager of Finance and Business Analysis",
       bio: "Finance graduate with seven years of extensive experience in banking, audit, and accounts. Expert in financial analysis, planning, and strategic recommendations. Skilled in managing comprehensive audits, optimizing financial operations, and ensuring regulatory compliance. Known for analytical prowess and attention to detail.",
       image: "/team/umair.webp",
     },
     {
       name: "Farhan Hassan Rizvi",
-      role: "FinTech Engineer",
+      role: "Product Engineer",
       bio: "Farhan is a Climate Tech expert focused on building the core product experience. With a degree in Financial Technology and combining a deep interest in climate-tech, software engineering, and financial systems, he translates complex carbon and ESG data into simple and user-friendly experiences.",
       image: "/team/farhan (2).jpeg",
     },
   ];
 
+  const headlineLead = "Building climate intelligence".split(" ");
+  const headlineAccent = "for real-world decarbonization".split(" ");
+  const wordContainer = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+    },
+  };
+  const wordReveal = {
+    hidden: { opacity: 0, y: 18, filter: "blur(10px)" },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
+    },
+  };
+
+  const fadeUp = {
+    initial: prefersReducedMotion ? undefined : { opacity: 0, y: 22 },
+    whileInView: prefersReducedMotion ? undefined : { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.25 },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+  };
+
   return (
-    <div className="font-sans min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-      {/* Header */}
+    <div
+      className="min-h-screen overflow-x-hidden bg-[#F8FCFA]"
+      style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+    >
       <MainHeader />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-28 sm:pt-32 pb-14 sm:pb-20 bg-[radial-gradient(900px_400px_at_15%_0%,rgba(45,212,191,0.35),transparent_55%),radial-gradient(700px_350px_at_88%_10%,rgba(34,197,94,0.28),transparent_60%),linear-gradient(135deg,#0f766e_0%,#0e7490_48%,#155e75_100%)] text-white">
-        <div aria-hidden className="absolute -top-12 left-10 h-48 w-48 rounded-full bg-teal-300/20 blur-3xl" />
-        <div aria-hidden className="absolute top-12 right-8 h-56 w-56 rounded-full bg-cyan-200/20 blur-3xl" />
-        <div className="container mx-auto px-4 sm:px-6 text-center relative z-10">
-          <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
-            Building climate intelligence
-            <span className="block text-teal-100">for real-world decarbonization</span>
-          </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-teal-50/90 mb-8 sm:mb-10 max-w-4xl mx-auto leading-relaxed px-4">
+      {/* Hero */}
+      <section className="relative flex min-h-[88vh] items-center overflow-hidden bg-[#0a1a1d] pt-28 pb-16 sm:min-h-screen sm:pt-32 sm:pb-20">
+        <canvas
+          ref={heroCanvasRef}
+          aria-hidden
+          className="absolute inset-0 h-full w-full"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 z-[1]"
+          style={{
+            background:
+              "radial-gradient(95% 75% at 50% 40%, rgba(29,158,117,0.14) 0%, rgba(10,26,29,0) 55%), linear-gradient(to bottom, rgba(10,26,29,0.25) 0%, rgba(10,26,29,0) 40%, rgba(10,26,29,0.7) 100%)",
+          }}
+        />
+
+        {!prefersReducedMotion && (
+          <>
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute left-[8%] top-[28%] h-40 w-40 rounded-full border border-white/10"
+              animate={{ y: [0, -18, 0], opacity: [0.25, 0.5, 0.25], scale: [1, 1.06, 1] }}
+              transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute right-[10%] top-[22%] h-56 w-56 rounded-full border border-[#33C08A]/15"
+              animate={{ y: [0, 20, 0], opacity: [0.2, 0.42, 0.2], rotate: [0, 12, 0] }}
+              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute bottom-[18%] left-[18%] h-24 w-24 rotate-45 border border-white/10"
+              animate={{ y: [0, -12, 0], opacity: [0.18, 0.38, 0.18] }}
+              transition={{ duration: 8.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </>
+        )}
+
+        <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
+          <motion.p
+            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 10 }}
+            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.45 }}
+            className="mb-5 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#9FE1CB] sm:text-xs"
+          >
+            About ReThink Carbon
+          </motion.p>
+
+          <motion.h1
+            variants={prefersReducedMotion ? undefined : wordContainer}
+            initial={prefersReducedMotion ? undefined : "hidden"}
+            animate={prefersReducedMotion ? undefined : "show"}
+            className="mx-auto max-w-4xl text-3xl font-semibold leading-[1.12] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl"
+          >
+            {headlineLead.map((word, i) => (
+              <motion.span
+                key={`lead-${i}`}
+                variants={prefersReducedMotion ? undefined : wordReveal}
+                className="inline-block whitespace-pre"
+              >
+                {word}{" "}
+              </motion.span>
+            ))}
+            {headlineAccent.map((word, i) => (
+              <motion.span
+                key={`accent-${i}`}
+                variants={prefersReducedMotion ? undefined : wordReveal}
+                className="hero-shimmer inline-block whitespace-pre bg-gradient-to-r from-[#33C08A] via-[#DFFBEF] to-[#33C08A] bg-clip-text text-transparent"
+              >
+                {word}
+                {i < headlineAccent.length - 1 ? " " : ""}
+              </motion.span>
+            ))}
+          </motion.h1>
+
+          <motion.p
+            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16 }}
+            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.55, ease: "easeOut" }}
+            className="mx-auto mt-6 max-w-3xl text-base leading-relaxed text-white/70 sm:text-lg md:text-xl"
+          >
             We help organizations move from climate ambition to measurable action with AI-powered market insights, emissions intelligence, and ESG workflows.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+          </motion.p>
+
+          <motion.div
+            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 16, scale: 0.96 }}
+            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.72, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-9 flex justify-center"
+          >
             <Button
               size="lg"
-              className="bg-white text-teal-800 hover:bg-teal-50 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 w-full sm:w-auto"
+              className="group rounded-full bg-[#1D9E75] px-7 py-6 font-semibold text-[#04342C] shadow-[0_14px_40px_-12px_rgba(29,158,117,0.6)] hover:bg-[#22B87E]"
               asChild
             >
               <Link to="/contact">
                 Get in Touch
-                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-200 ease-out group-hover:translate-x-1" />
               </Link>
             </Button>
-          </div>
-          <div className="mx-auto max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            {[
-              { label: "AI-led evaluations", value: "Minutes, not months" },
-              { label: "Market intelligence", value: "Global project coverage" },
-              { label: "Reporting readiness", value: "Audit-friendly outputs" },
-            ].map((item) => (
-              <div key={item.label} className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm px-4 py-3">
-                <p className="text-xs uppercase tracking-wider text-teal-100/90">{item.label}</p>
-                <p className="text-sm sm:text-base font-semibold text-white">{item.value}</p>
-              </div>
-            ))}
-          </div>
+          </motion.div>
         </div>
+
+        {!prefersReducedMotion && (
+          <motion.div
+            aria-hidden
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-white/40"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </motion.div>
+        )}
       </section>
 
       {/* Mission & Vision */}
-      <section className="py-8 sm:py-10 md:py-12 bg-white">
+      <section className="bg-[#F8FCFA] py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 items-center px-4 sm:px-8 md:px-12">
-            <div>
-              <Badge className="mb-4 bg-teal-100 text-teal-800">
-                Our Mission
-              </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-14">
+            <motion.div {...fadeUp}>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">Our Mission</p>
+              <h2 className="mb-5 text-3xl font-semibold tracking-tight text-[#0A4D3E] sm:text-4xl">
                 Democratizing Carbon Markets
               </h2>
-              <p className="text-base sm:text-lg text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-                We believe that effective carbon management should be accessible
-                to organizations of all sizes. Our platform combines
-                cutting-edge technology with deep industry expertise to provide
-                comprehensive carbon credit solutions.
+              <p className="mb-6 text-base leading-relaxed text-[#4E6C63] sm:text-lg">
+                We believe that effective carbon management should be accessible to organizations of all sizes. Our platform combines cutting-edge technology with deep industry expertise to provide comprehensive carbon credit solutions.
               </p>
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      AI-Powered Insights
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Advanced analytics to optimize your carbon strategy
-                    </p>
+              <div className="space-y-4">
+                {[
+                  { title: "AI-Powered Insights", body: "Advanced analytics to optimize your carbon strategy" },
+                  { title: "Global Network", body: "Access to projects and partners worldwide" },
+                  { title: "Transparent Tracking", body: "Real-time monitoring of your carbon impact" },
+                ].map((item) => (
+                  <div key={item.title} className="border-l-2 border-[#1D9E75]/50 pl-4">
+                    <h3 className="font-semibold text-[#0A4D3E]">{item.title}</h3>
+                    <p className="text-sm text-[#4E6C63] sm:text-base">{item.body}</p>
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      Global Network
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Access to projects and partners worldwide
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      Transparent Tracking
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Real-time monitoring of your carbon impact
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
-            </div>
-            <div className="relative">
-              <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 sm:p-8 text-white">
-                <Target className="h-10 w-10 sm:h-12 sm:w-12 mb-3 sm:mb-4" />
-                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
-                  Our Vision
-                </h3>
-                <p className="text-base sm:text-lg leading-relaxed">
-                  To create a world where every organization can easily measure,
-                  manage, and monetize their carbon footprint, driving
-                  meaningful climate action at scale.
-                </p>
-              </div>
-            </div>
+            </motion.div>
+
+            <motion.div
+              {...fadeUp}
+              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(145deg,#0A4D3E_0%,#11684E_50%,#1D9E75_100%)] p-8 text-white shadow-[0_24px_60px_-28px_rgba(10,77,62,0.55)] sm:p-10"
+            >
+              <Target className="mb-4 h-10 w-10 text-[#9FE1CB]" />
+              <h3 className="mb-3 text-2xl font-semibold">Our Vision</h3>
+              <p className="text-base leading-relaxed text-white/85 sm:text-lg">
+                To create a world where every organization can easily measure, manage, and monetize their carbon footprint, driving meaningful climate action at scale.
+              </p>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Global Presence */}
-      <section className="py-8 sm:py-10 md:py-12 bg-gray-50">
-        <div className="container mx-auto px-4 sm:px-8 md:px-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 items-center">
-            <div>
-              <Badge className="mb-3 sm:mb-4 bg-teal-100 text-teal-800">
-                Features
-              </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
+      <section className="bg-[#F7F4EE] py-16 sm:py-20">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-14">
+            <motion.div {...fadeUp}>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">Features</p>
+              <h2 className="mb-5 text-3xl font-semibold tracking-tight text-[#0A4D3E] sm:text-4xl">
                 Our Global Reach
               </h2>
-              <p className="text-base sm:text-lg text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-                With strategic offices in the United Arab Emirates and Pakistan,
-                ReThink Carbon has established a strong global presence to serve
-                our diverse client base.
+              <p className="mb-6 text-base leading-relaxed text-[#4E6C63] sm:text-lg">
+                With strategic offices in the United Arab Emirates and Pakistan, ReThink Carbon has established a strong global presence to serve our diverse client base.
               </p>
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      Middle East Hub
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Strategic presence in UAE for regional market access
-                    </p>
+              <div className="space-y-4">
+                {[
+                  { title: "Middle East Hub", body: "Strategic presence in UAE for regional market access" },
+                  { title: "South Asia Operations", body: "Innovation center in Pakistan for emerging market solutions" },
+                  { title: "Global Network", body: "Connecting projects and partners across 50+ countries" },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF3ED] text-[#1D9E75]">
+                      <Globe className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-[#0A4D3E]">{item.title}</h3>
+                      <p className="text-sm text-[#4E6C63] sm:text-base">{item.body}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      South Asia Operations
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Innovation center in Pakistan for emerging market
-                      solutions
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mt-1 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                      Global Network
-                    </h3>
-                    <p className="text-gray-600 text-sm sm:text-base">
-                      Connecting projects and partners across 50+ countries
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="relative flex justify-center items-center">
-              <div className="bg-white rounded-3xl p-2 sm:p-3 md:p-4 shadow-2xl transform hover:scale-105 transition-transform duration-300 w-full max-w-xs sm:max-w-sm md:max-w-md">
-                <div
-                  className="overflow-hidden rounded-2xl"
-                  style={{
-                    height: window.innerWidth > 1000 ? "300px" : "200px",
-                    minHeight: "180px",
-                  }}
-                >
+            <motion.div {...fadeUp} className="flex justify-center">
+              <div className="w-full max-w-md overflow-hidden rounded-[1.5rem] border border-[#DCEAE2] bg-white p-2 shadow-[0_20px_50px_-28px_rgba(12,77,62,0.4)] sm:p-3">
+                <div className="h-[200px] overflow-hidden rounded-2xl sm:h-[280px] md:h-[300px]">
                   <img
                     src="/global_presence.jpg"
                     alt="Global Presence Map showing Planetive offices in UAE and Pakistan"
-                    className="w-full h-full object-cover object-top"
+                    className="h-full w-full object-cover object-top"
                     onError={(e) => {
-                      console.log("Image failed to load:", e);
                       e.currentTarget.style.display = "none";
-                      e.currentTarget.nextElementSibling?.classList.remove(
-                        "hidden"
-                      );
+                      e.currentTarget.nextElementSibling?.classList.remove("hidden");
                     }}
                   />
-                </div>
-                <div
-                  className="hidden bg-gradient-to-br from-teal-100 to-cyan-100 rounded-2xl p-4 sm:p-6 md:p-8 text-center"
-                  style={{ minHeight: "180px", maxHeight: "300px" }}
-                >
-                  <Globe className="h-8 w-8 sm:h-12 sm:w-12 md:h-16 md:w-16 text-teal-600 mx-auto mb-2 sm:mb-3 md:mb-4" />
-                  <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-2">
-                    Global Presence
-                  </h3>
-                  <p className="text-xs sm:text-sm md:text-base text-gray-600">
-                    Strategic offices in UAE and Pakistan serving clients across
-                    50+ countries worldwide.
-                  </p>
+                  <div className="hidden flex h-full min-h-[180px] flex-col items-center justify-center bg-[#EAF3ED] p-6 text-center">
+                    <Globe className="mb-3 h-12 w-12 text-[#1D9E75]" />
+                    <h3 className="mb-2 text-lg font-semibold text-[#0A4D3E]">Global Presence</h3>
+                    <p className="text-sm text-[#4E6C63]">
+                      Strategic offices in UAE and Pakistan serving clients across 50+ countries worldwide.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-8 sm:py-10 md:py-12 bg-white">
+      {/* How it works */}
+      <section className="bg-[#0a1a1d] py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 sm:mb-16">
-            <Badge className="mb-4 bg-teal-100 text-teal-800 border-teal-200">
-              Features
-            </Badge>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
+          <motion.div {...fadeUp} className="mb-12 text-center sm:mb-14">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#9FE1CB]">Features</p>
+            <h2 className="mb-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               How does ReThink Carbon work?
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-              Our core values guide everything we do, from product development
-              to client relationships.
+            <p className="mx-auto max-w-3xl text-base text-white/65 sm:text-lg">
+              Our core values guide everything we do, from product development to client relationships.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="relative" data-carousel-container>
+          <div className="relative">
             <Carousel
               opts={{
                 align: "start",
                 loop: true,
-                duration: 2500,
+                duration: 4000,
                 skipSnaps: false,
                 dragFree: true,
                 containScroll: false,
@@ -428,286 +522,207 @@ const AboutUs = () => {
               setApi={setApi}
               className="w-full"
             >
-              <CarouselContent className="-ml-2">
-                {values.map((value, index) => (
-                  <CarouselItem
-                    key={index}
-                    className="pl-2 basis-full md:basis-1/2 lg:basis-1/3"
-                  >
-                    <Card className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105 h-full">
-                      <CardHeader className="pb-4">
-                        <div className="mx-auto mb-4 w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center shadow-lg hover:bg-white/30 transition-colors">
-                          <value.icon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-                        </div>
-                        <CardTitle className="text-lg sm:text-xl text-white font-semibold">
-                          {value.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-white/90 leading-relaxed text-sm sm:text-base">
-                          {value.description}
-                        </p>
-                      </CardContent>
-                    </Card>
+              <CarouselContent className="-ml-3">
+                {values.map((value) => (
+                  <CarouselItem key={value.title} className="basis-full pl-3 md:basis-1/2 lg:basis-1/3">
+                    <div className="h-full rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm transition-colors duration-200 hover:border-[#1D9E75]/40 hover:bg-white/[0.07]">
+                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#1D9E75]/20 text-[#9FE1CB]">
+                        <value.icon className="h-6 w-6" />
+                      </div>
+                      <h3 className="mb-3 text-lg font-semibold text-white">{value.title}</h3>
+                      <p className="text-sm leading-relaxed text-white/65">{value.description}</p>
+                    </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="hidden md:flex -left-12 bg-white/80 hover:bg-white border-2 border-teal-200 hover:border-teal-300 shadow-lg" />
-              <CarouselNext className="hidden md:flex -right-12 bg-white/80 hover:bg-white border-2 border-teal-200 hover:border-teal-300 shadow-lg" />
+              <CarouselPrevious className="hidden border-white/20 bg-white/10 text-white hover:bg-white/20 md:flex" />
+              <CarouselNext className="hidden border-white/20 bg-white/10 text-white hover:bg-white/20 md:flex" />
             </Carousel>
           </div>
         </div>
       </section>
 
       {/* Milestones */}
-      <section className="py-8 sm:py-10 md:py-12 bg-gray-100">
+      <section className="bg-[#F8FCFA] py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 sm:mb-16">
-            <Badge className="mb-4 bg-teal-100 text-teal-800">
-              Our Journey
-            </Badge>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
+          <motion.div {...fadeUp} className="mb-12 text-center sm:mb-14">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">Our Journey</p>
+            <h2 className="mb-4 text-3xl font-semibold tracking-tight text-[#0A4D3E] sm:text-4xl">
               Key Milestones
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-              From startup to industry leader, here are the moments that shaped
-              our growth.
+            <p className="mx-auto max-w-3xl text-base text-[#4E6C63] sm:text-lg">
+              From startup to industry leader, here are the moments that shaped our growth.
             </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto">
+          </motion.div>
+
+          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {milestones.map((milestone, index) => (
-              <Card
-                key={index}
-                className="text-center hover:shadow-lg transition-shadow"
+              <motion.article
+                key={milestone.year}
+                initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
+                whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.4, delay: index * 0.08 }}
+                className="rounded-2xl border border-[#DCEAE2] bg-white p-6 shadow-[0_14px_32px_-24px_rgba(12,77,62,0.4)]"
               >
-                <CardHeader>
-                  <div className="text-2xl sm:text-3xl font-bold text-teal-600 mb-2">
-                    {milestone.year}
-                  </div>
-                  <CardTitle className="text-base sm:text-lg">
-                    {milestone.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm sm:text-base text-gray-600">
-                    {milestone.description}
-                  </p>
-                </CardContent>
-              </Card>
+                <div className="mb-2 text-2xl font-semibold text-[#1D9E75] sm:text-3xl">{milestone.year}</div>
+                <h3 className="mb-2 text-lg font-semibold text-[#0A4D3E]">{milestone.title}</h3>
+                <p className="text-sm leading-relaxed text-[#4E6C63]">{milestone.description}</p>
+              </motion.article>
             ))}
           </div>
         </div>
       </section>
 
       {/* Team */}
-      <section className="py-8 sm:py-10 md:py-12 bg-white">
+      <section className="bg-[#F7F4EE] py-16 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 sm:mb-16">
-            <Badge className="mb-4 bg-teal-100 text-teal-800">Our Team</Badge>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-gray-900">
+          <motion.div {...fadeUp} className="mb-12 text-center sm:mb-14">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">Our Team</p>
+            <h2 className="mb-4 text-3xl font-semibold tracking-tight text-[#0A4D3E] sm:text-4xl">
               Meet the Experts
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-              Our leadership team brings together decades of experience in
-              climate science, technology, and business.
+            <p className="mx-auto max-w-3xl text-base text-[#4E6C63] sm:text-lg">
+              Our leadership team brings together decades of experience in climate science, technology, and business.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="space-y-8 sm:space-y-12">
-            {/* Ayla - Featured at top */}
+          <div className="space-y-8 sm:space-y-10">
             <div className="flex justify-center">
-              <Card className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105 max-w-sm sm:max-w-md">
-                <CardHeader>
-                  <div className="mx-auto mb-4 w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
-                    <img
-                      src={team[0].image}
-                      alt={team[0].name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                        e.currentTarget.nextElementSibling?.classList.remove(
-                          "hidden"
-                        );
-                      }}
-                    />
-                    <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
-                      <Users className="h-12 w-12 text-white" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-xl sm:text-2xl text-white">
-                    {team[0].name}
-                  </CardTitle>
-                  <p className="text-white/90 font-semibold text-sm sm:text-base">
-                    {team[0].role}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-white/90 text-sm">
-                    <p
-                      className={`${
-                        expandedBios[team[0].name] ? "" : "line-clamp-2"
-                      }`}
-                    >
-                      {team[0].bio}
-                    </p>
-                    <button
-                      onClick={() => toggleBio(team[0].name)}
-                      className="text-white hover:text-white/80 text-sm font-medium mt-2 transition-colors"
-                    >
-                      {expandedBios[team[0].name] ? "Read Less" : "Read More"}
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
+              <TeamCard
+                member={team[0]}
+                featured
+                expanded={!!expandedBios[team[0].name]}
+                onToggle={() => toggleBio(team[0].name)}
+              />
             </div>
 
-            {/* Other team members */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {team.slice(1, 4).map((member, index) => (
-                <Card
-                  key={index + 1}
-                  className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105"
-                >
-                  <CardHeader>
-                    <div className="mx-auto mb-4 w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
-                      <img
-                        src={member.image}
-                        alt={member.name}
-                        className={`w-full h-full object-cover ${
-                          member.name === "Kamal Rahim"
-                            ? "object-[center_60%]"
-                            : member.name === "Farhan Hassan Rizvi"
-                            ? "object-[center_65%]"
-                            : ""
-                        }`}
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          e.currentTarget.nextElementSibling?.classList.remove(
-                            "hidden"
-                          );
-                        }}
-                      />
-                      <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
-                        <Users className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg sm:text-xl text-white">
-                      {member.name}
-                    </CardTitle>
-                    <p className="text-white/90 font-semibold text-sm sm:text-base">
-                      {member.role}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-white/90 text-sm">
-                      <p
-                        className={`${
-                          expandedBios[member.name] ? "" : "line-clamp-2"
-                        }`}
-                      >
-                        {member.bio}
-                      </p>
-                      <button
-                        onClick={() => toggleBio(member.name)}
-                        className="text-white hover:text-white/80 text-sm font-medium mt-2 transition-colors"
-                      >
-                        {expandedBios[member.name] ? "Read Less" : "Read More"}
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {team.slice(1, 4).map((member) => (
+                <TeamCard
+                  key={member.name}
+                  member={member}
+                  expanded={!!expandedBios[member.name]}
+                  onToggle={() => toggleBio(member.name)}
+                />
               ))}
             </div>
 
-            {/* Last two members centered with same card width */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 justify-items-center">
-              {team.slice(4).map((member, index) => (
-                <Card
-                  key={`last-${index}`}
-                  className="text-center hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-teal-700 to-cyan-800 border-teal-700 hover:from-teal-600 hover:to-cyan-700 hover:scale-105"
-                >
-                  <CardHeader>
-                    <div className="mx-auto mb-4 w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
-                      <img
-                        src={member.image}
-                        alt={member.name}
-                        className={`w-full h-full object-cover ${
-                          member.name === "Kamal Rahim"
-                            ? "object-[center_60%]"
-                            : member.name === "Farhan Hassan Rizvi"
-                            ? "object-[center_65%]"
-                            : ""
-                        }`}
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          e.currentTarget.nextElementSibling?.classList.remove(
-                            "hidden"
-                          );
-                        }}
-                      />
-                      <div className="hidden w-full h-full bg-white/20 flex items-center justify-center">
-                        <Users className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg sm:text-xl text-white">
-                      {member.name}
-                    </CardTitle>
-                    <p className="text-white/90 font-semibold text-sm sm:text-base">
-                      {member.role}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-white/90 text-sm">
-                      <p
-                        className={`${
-                          expandedBios[member.name] ? "" : "line-clamp-2"
-                        }`}
-                      >
-                        {member.bio}
-                      </p>
-                      <button
-                        onClick={() => toggleBio(member.name)}
-                        className="text-white hover:text-white/80 text-sm font-medium mt-2 transition-colors"
-                      >
-                        {expandedBios[member.name] ? "Read Less" : "Read More"}
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {team.slice(4).map((member) => (
+                <TeamCard
+                  key={member.name}
+                  member={member}
+                  expanded={!!expandedBios[member.name]}
+                  onToggle={() => toggleBio(member.name)}
+                />
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-8 sm:py-10 md:py-12 bg-gradient-to-br from-teal-600 to-cyan-700 text-white">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-            Ready to Transform Your Carbon Strategy?
-          </h2>
-          <p className="text-lg sm:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto opacity-90 px-4">
-            Join thousands of organizations already using ReThink Carbon to
-            accelerate their sustainability journey.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-6 w-full sm:w-auto"
-              asChild
-            >
-              <Link to="/contact">
-                Contact Us
-                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-              </Link>
-            </Button>
-          </div>
+      {/* CTA */}
+      <section className="bg-[#EEF4F1] py-16 sm:py-20">
+        <div className="container mx-auto px-4 sm:px-6">
+          <motion.div
+            {...fadeUp}
+            className="relative overflow-hidden rounded-[30px] border border-[#2F8F6D]/30 bg-[linear-gradient(140deg,#0A4D3E_0%,#11684E_52%,#22B87E_100%)] px-6 py-14 text-center text-white shadow-[0_18px_45px_rgba(10,77,62,0.30)] sm:px-10 md:py-16"
+          >
+            <div aria-hidden className="pointer-events-none absolute -bottom-8 -left-8 h-36 w-36 rounded-full border border-white/20" />
+            <div aria-hidden className="pointer-events-none absolute top-8 right-10 h-20 w-20 rotate-45 border border-white/18" />
+            <h2 className="relative z-10 mb-4 text-2xl font-semibold sm:text-3xl md:text-4xl">
+              Ready to Transform Your Carbon Strategy?
+            </h2>
+            <p className="relative z-10 mx-auto mb-8 max-w-3xl text-base text-[#E6F6EF] sm:text-lg">
+              Join thousands of organizations already using ReThink Carbon to accelerate their sustainability journey.
+            </p>
+            <div className="relative z-10 flex justify-center">
+              <Button
+                size="lg"
+                className="rounded-full bg-[#124740] px-8 py-6 font-semibold text-white hover:bg-[#0F3B35]"
+                asChild
+              >
+                <Link to="/contact">
+                  Contact Us
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>
   );
 };
 
-export default AboutUs;
+type TeamMember = {
+  name: string;
+  role: string;
+  bio: string;
+  image: string;
+};
 
+const TeamCard = ({
+  member,
+  featured = false,
+  expanded,
+  onToggle,
+}: {
+  member: TeamMember;
+  featured?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) => (
+  <article
+    className={[
+      "w-full overflow-hidden rounded-2xl border border-[#DCEAE2] bg-white text-center shadow-[0_16px_36px_-24px_rgba(12,77,62,0.4)]",
+      featured ? "max-w-md" : "",
+    ].join(" ")}
+  >
+    <div className="bg-[linear-gradient(145deg,#0A4D3E_0%,#11684E_60%,#1D9E75_100%)] px-6 pb-8 pt-8 text-white">
+      <div
+        className={[
+          "mx-auto mb-4 overflow-hidden rounded-full border-2 border-white/25 shadow-lg",
+          featured ? "h-24 w-24" : "h-20 w-20",
+        ].join(" ")}
+      >
+        <img
+          src={member.image}
+          alt={member.name}
+          className={[
+            "h-full w-full object-cover",
+            member.name === "Kamal Rahim"
+              ? "object-[center_60%]"
+              : member.name === "Farhan Hassan Rizvi"
+                ? "object-[center_65%]"
+                : "",
+          ].join(" ")}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            e.currentTarget.nextElementSibling?.classList.remove("hidden");
+          }}
+        />
+        <div className="hidden h-full w-full items-center justify-center bg-white/20">
+          <Users className={featured ? "h-12 w-12 text-white" : "h-10 w-10 text-white"} />
+        </div>
+      </div>
+      <h3 className={featured ? "text-2xl font-semibold" : "text-xl font-semibold"}>{member.name}</h3>
+      <p className="mt-1 text-sm font-medium text-[#9FE1CB]">{member.role}</p>
+    </div>
+    <div className="px-6 py-5 text-left">
+      <p className={["text-sm leading-relaxed text-[#4E6C63]", expanded ? "" : "line-clamp-2"].join(" ")}>
+        {member.bio}
+      </p>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mt-2 text-sm font-semibold text-[#1D9E75] transition-colors hover:text-[#0A4D3E]"
+      >
+        {expanded ? "Read Less" : "Read More"}
+      </button>
+    </div>
+  </article>
+);
+
+export default AboutUs;
