@@ -155,7 +155,7 @@ const AppHeader = () => {
       <Link to={logoLink} className="h-12 md:h-14 lg:h-16 w-36 md:w-44 lg:w-56 flex items-center justify-start ml-0 hover:opacity-80 transition-opacity overflow-hidden">
         <img 
           src="/new_logo.png"
-          alt="ReThink Carbon Logo"
+          alt="Rethink Carbon Logo"
           className="h-full w-auto object-contain origin-left scale-[3.0] -translate-x-5 md:scale-[3.2] md:-translate-x-6 lg:scale-[3.4] lg:-translate-x-8"
         />
       </Link>

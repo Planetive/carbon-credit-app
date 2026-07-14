@@ -16,11 +16,11 @@ const Footer = () => {
               <div className="h-12 w-20 md:h-16 md:w-28 overflow-hidden relative mr-3">
                 <img
                   src="/new_logo.png"
-                  alt="ReThink Carbon Logo"
+                  alt="Rethink Carbon Logo"
                   className="absolute inset-0 w-full h-full object-contain scale-[3.0] origin-left -translate-x-7 md:-translate-x-9"
                 />
               </div>
-              <h3 className="text-xl font-bold text-white">ReThink Carbon</h3>
+              <h3 className="text-xl font-bold text-white">Rethink Carbon</h3>
             </div>
             <p className="text-gray-300 text-[18px] mb-4 max-w-md">
               Empowering organizations to make a positive impact through carbon credit projects. 
@@ -98,7 +98,7 @@ const Footer = () => {
               </li>
               <li className="flex items-start text-gray-300 text-[18px]">
                 <MapPin className="h-4 w-4 mr-2 mt-0.5 text-teal-400" />
-                <span>ReThink Carbon<br />Al Hamra Industrial Zone-FZ<br />United Arab Emirates</span>
+                <span>Rethink Carbon<br />Al Hamra Industrial Zone-FZ<br />United Arab Emirates</span>
               </li>
             </ul>
           </div>
@@ -108,7 +108,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-[15px]">
-              © {currentYear} ReThink Carbon. All rights reserved.
+              © {currentYear} Rethink Carbon. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link to="/privacy-policy" className="text-gray-400 hover:text-teal-400 text-[15px] transition-colors">Privacy Policy</Link>

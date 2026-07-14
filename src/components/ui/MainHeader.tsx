@@ -126,7 +126,7 @@ const MainHeader = () => {
             <div className="h-10 md:h-12 lg:h-14 w-28 md:w-36 lg:w-44 flex items-center justify-start ml-0 md:-ml-2 lg:-ml-8 overflow-hidden md:overflow-visible">
               <img
                 src="/new_logo.png"
-                alt="ReThink Carbon Logo"
+                alt="Rethink Carbon Logo"
                 className="h-full w-auto object-contain origin-left scale-[3.55] -translate-x-8 md:scale-[4.05] md:-translate-x-10 lg:scale-[4.55] lg:-translate-x-13"
               />
             </div>
@@ -263,7 +263,7 @@ const MainHeader = () => {
                       <div className="rounded-xl bg-[#062D26] p-5 text-white">
                         <p className="text-xl font-semibold leading-tight">Book a product demo</p>
                         <p className="mt-2 text-sm text-white/75">
-                          See ReThink Carbon on your own data with a guided walkthrough.
+                          See Rethink Carbon on your own data with a guided walkthrough.
                         </p>
                         <Button
                           className="mt-4 w-full bg-[#1D9E75] text-white hover:bg-[#168661]"
