@@ -222,13 +222,13 @@ const AboutUs = () => {
       name: "Ayla Majid",
       role: "Founder & CEO",
       bio: "Founder of Planetive with a dynamic vision for a fairer world through advocacy that enhances UN Sustainable Development Goals. Creates space for women through economic empowerment and shapes policy through public and private board roles. Expert in energy transition, sustainable finance, and writes regularly on future of energy, digital transformation, and diversity.",
-      image: "/team/ayla.webp",
+      image: "/team/ayla-majid.jpg",
     },
     {
       name: "Zainab Ahmed",
       role: "Product Owner",
       bio: "A Product & Finance professional with experience in data analytics and climate innovation. Zainab’s work spans research, product development, market analysis, and data-driven decision support, particularly within climate-tech and development-focused projects. She brings hands-on experience in building MVPs and conducting in-depth analysis across emerging climate technologies, policy environments, and decarbonization pathways.",
-      image: "/team/zainab.png",
+      image: "/team/zainab-ahmed.jpg",
     },
     {
       name: "Kamal Rahim",
@@ -240,13 +240,31 @@ const AboutUs = () => {
       name: "Umair Hussian Farooqi",
       role: "Manager of Finance and Business Analysis",
       bio: "Finance graduate with seven years of extensive experience in banking, audit, and accounts. Expert in financial analysis, planning, and strategic recommendations. Skilled in managing comprehensive audits, optimizing financial operations, and ensuring regulatory compliance. Known for analytical prowess and attention to detail.",
-      image: "/team/umair.webp",
+      image: "/team/umair.jpeg",
+    },
+    {
+      name: "Shahid Jamal",
+      role: "Carbon Credit and Sustainable Agriculture Specialist",
+      bio: "Shahid Jamal specializes in carbon credits and sustainable agriculture. He works on regenerative practices and carbon sequestration initiatives.",
+      image: "/team/shahid.jpeg",
     },
     {
       name: "Farhan Hassan Rizvi",
       role: "Product Engineer",
       bio: "Farhan is a Climate Tech expert focused on building the core product experience. With a degree in Financial Technology and combining a deep interest in climate-tech, software engineering, and financial systems, he translates complex carbon and ESG data into simple and user-friendly experiences.",
-      image: "/team/farhan (2).jpeg",
+      image: "/team/farhan-hassan-rizvi.jpeg",
+    },
+    {
+      name: "Haram Saad",
+      role: "Business Analyst",
+      bio: "Haram is a Business Analyst who turns climate and sustainability data into clear, practical insights. She supports product decisions, client workflows, and market analysis that help organizations move from ambition to measurable results.",
+      image: "/team/haram-saad.jpeg",
+    },
+    {
+      name: "Sanam Gul",
+      role: "Business Support and Communication Lead",
+      bio: "Sanam Gul leads business support and communications at Planetive. She coordinates stakeholder engagement, internal operations, and external messaging to ensure clarity and consistency across the firm's advisory and project work.",
+      image: "/team/sanam.jpeg",
     },
   ];
 
@@ -598,18 +616,7 @@ const AboutUs = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {team.slice(1, 4).map((member) => (
-                <TeamCard
-                  key={member.name}
-                  member={member}
-                  expanded={!!expandedBios[member.name]}
-                  onToggle={() => toggleBio(member.name)}
-                />
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {team.slice(4).map((member) => (
+              {team.slice(1).map((member) => (
                 <TeamCard
                   key={member.name}
                   member={member}
@@ -676,7 +683,7 @@ const TeamCard = ({
 }) => (
   <article
     className={[
-      "w-full overflow-hidden rounded-2xl border border-[#DCEAE2] bg-white text-center shadow-[0_16px_36px_-24px_rgba(12,77,62,0.4)]",
+      "group/card flex w-full flex-col overflow-hidden rounded-2xl border border-[#DCEAE2] bg-white text-center shadow-[0_16px_36px_-24px_rgba(12,77,62,0.4)] transition-shadow duration-300 hover:shadow-[0_22px_48px_-22px_rgba(12,77,62,0.45)]",
       featured ? "max-w-md" : "",
     ].join(" ")}
   >
@@ -696,7 +703,11 @@ const TeamCard = ({
               ? "object-[center_60%]"
               : member.name === "Farhan Hassan Rizvi"
                 ? "object-[center_65%]"
-                : "",
+                : member.name === "Shahid Jamal"
+                  ? "origin-top scale-[1.55] object-top"
+                  : member.name === "Umair Hussian Farooqi"
+                    ? "object-[center_42%]"
+                    : "",
           ].join(" ")}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -710,16 +721,40 @@ const TeamCard = ({
       <h3 className={featured ? "text-2xl font-semibold" : "text-xl font-semibold"}>{member.name}</h3>
       <p className="mt-1 text-sm font-medium text-[#9FE1CB]">{member.role}</p>
     </div>
-    <div className="px-6 py-5 text-left">
-      <p className={["text-sm leading-relaxed text-[#4E6C63]", expanded ? "" : "line-clamp-2"].join(" ")}>
-        {member.bio}
-      </p>
+
+    <div className="flex flex-1 flex-col px-6 pb-6 pt-5 text-left">
+      <div
+        className={[
+          "relative overflow-hidden transition-[max-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          expanded ? "max-h-80" : "max-h-[2.9rem]",
+        ].join(" ")}
+      >
+        <p className="text-sm leading-relaxed text-[#4E6C63]">{member.bio}</p>
+        <span
+          aria-hidden
+          className={[
+            "pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-white to-transparent transition-opacity duration-500",
+            expanded ? "opacity-0" : "opacity-100",
+          ].join(" ")}
+        />
+      </div>
+
       <button
         type="button"
         onClick={onToggle}
-        className="mt-2 text-sm font-semibold text-[#1D9E75] transition-colors hover:text-[#0A4D3E]"
+        aria-expanded={expanded}
+        aria-label={expanded ? `Hide bio for ${member.name}` : `Show more about ${member.name}`}
+        className="mt-3 inline-flex items-center gap-1 self-start text-[#1D9E75]/70 transition-colors duration-300 hover:text-[#1D9E75]"
       >
-        {expanded ? "Read Less" : "Read More"}
+        <span className="text-[11px] font-medium tracking-[0.14em]">
+          {expanded ? "less" : "more"}
+        </span>
+        <ChevronDown
+          className={[
+            "h-3.5 w-3.5 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            expanded ? "rotate-180" : "",
+          ].join(" ")}
+        />
       </button>
     </div>
   </article>
