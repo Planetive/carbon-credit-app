@@ -88,9 +88,9 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     icon: Calculator,
     navLabel: "Carbon Accounting",
     kicker: "SCOPE 1, 2 AND 3 ACCOUNTING",
-    headline: "A carbon number your auditors will not question",
+    headline: "Carbon accounting that behaves like enterprise software, not a spreadsheet.",
     subhead:
-      "Scope 1, 2 and 3 emissions calculated with full data lineage, from source to total.",
+      "From raw activity data to an audit-ready inventory — mapping, emission factors, scope classification, calculation and disclosure in one connected system.",
     preview: ["Emissions total", "12,400 tCO2e"],
     previewNote: "Every figure traceable to source",
     challenges: [

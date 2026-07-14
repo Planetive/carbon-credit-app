@@ -10,12 +10,39 @@ const MainHeader = () => {
   const [mobileSolutionsOpen, setMobileSolutionsOpen] = useState(false);
   const [solutionsOpenedByClick, setSolutionsOpenedByClick] = useState(false);
   const [isInHero, setIsInHero] = useState(true);
+  const [sectorPanel, setSectorPanel] = useState<"corporate" | "financial" | null>(null);
   const solutionsRef = useRef<HTMLDivElement | null>(null);
   const hoverCloseTimer = useRef<number | null>(null);
+  const sectorPanelTimer = useRef<number | null>(null);
   const location = useLocation();
   const isHome = location.pathname === "/";
   const { user } = useAuth();
   const logoTarget = user ? "/dashboard" : "/";
+
+  const clearSectorPanelSoon = () => {
+    if (sectorPanelTimer.current) window.clearTimeout(sectorPanelTimer.current);
+    sectorPanelTimer.current = window.setTimeout(() => setSectorPanel(null), 120);
+  };
+
+  const keepSectorPanel = (panel: "corporate" | "financial") => {
+    if (sectorPanelTimer.current) window.clearTimeout(sectorPanelTimer.current);
+    setSectorPanel(panel);
+  };
+
+  const corporateIndustries = [
+    "Energy and extractives",
+    "Manufacturing and textiles",
+    "Construction and real estate",
+    "Agriculture and food",
+  ] as const;
+
+  const financialIndustries = [
+    "Development institutions",
+    "Banks",
+    "Insurance",
+    "Asset managers",
+    "Capital markets",
+  ] as const;
 
   // Close Solutions dropdown on outside click when opened by click
   useEffect(() => {
@@ -25,6 +52,7 @@ const MainHeader = () => {
       if (solutionsRef.current && !solutionsRef.current.contains(target)) {
         setSolutionsOpen(false);
         setSolutionsOpenedByClick(false);
+        setSectorPanel(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -128,6 +156,7 @@ const MainHeader = () => {
               if (solutionsOpenedByClick) return;
               hoverCloseTimer.current = window.setTimeout(() => {
                 setSolutionsOpen(false);
+                setSectorPanel(null);
               }, 200);
             }}
           >
@@ -170,26 +199,80 @@ const MainHeader = () => {
 
                     <div>
                       <p className={megaMenuHeadingClass}>Solutions by Sector</p>
-                      <Link to="/solutions/corporate" className={megaMenuLinkClass}>Corporates</Link>
-                      <Link to="/solutions/financial-institutions" className={megaMenuLinkClass}>Financial institutions</Link>
-                      <Link to="/contact" className={megaMenuLinkClass}>Energy and extractives</Link>
-                      <Link to="/contact" className={megaMenuLinkClass}>Manufacturing and textiles</Link>
+                      <Link
+                        to="/solutions/corporate"
+                        className={megaMenuLinkClass}
+                        onMouseEnter={() => keepSectorPanel("corporate")}
+                        onMouseLeave={clearSectorPanelSoon}
+                      >
+                        Corporates
+                      </Link>
+                      <Link
+                        to="/solutions/financial-institutions"
+                        className={megaMenuLinkClass}
+                        onMouseEnter={() => keepSectorPanel("financial")}
+                        onMouseLeave={clearSectorPanelSoon}
+                      >
+                        Financial institutions
+                      </Link>
                     </div>
                   </div>
 
-                  <div className="col-span-3">
-                    <div className="rounded-xl bg-[#062D26] p-5 text-white">
-                      <p className="text-xl font-semibold leading-tight">Not sure where to start?</p>
-                      <p className="mt-2 text-sm text-white/75">
-                        Get a free ESG health check and see where you stand.
-                      </p>
-                      <Button
-                        className="mt-4 w-full bg-[#1D9E75] text-white hover:bg-[#168661]"
-                        asChild
-                      >
-                        <Link to="/contact">Get started</Link>
-                      </Button>
-                    </div>
+                  <div
+                    className="col-span-3"
+                    onMouseEnter={() => {
+                      if (sectorPanel) {
+                        if (sectorPanelTimer.current) window.clearTimeout(sectorPanelTimer.current);
+                      }
+                    }}
+                    onMouseLeave={clearSectorPanelSoon}
+                  >
+                    {sectorPanel === "corporate" ? (
+                      <div className="rounded-xl bg-[#062D26] p-5 text-white">
+                        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#9FE1CB]">
+                          Corporate industries
+                        </p>
+                        <ul className="mt-4 space-y-2.5">
+                          {corporateIndustries.map((item) => (
+                            <li
+                              key={item}
+                              className="cursor-default border-b border-white/10 py-2 text-[15px] text-white/85 last:border-b-0"
+                            >
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : sectorPanel === "financial" ? (
+                      <div className="rounded-xl bg-[#062D26] p-5 text-white">
+                        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#9FE1CB]">
+                          Financial segments
+                        </p>
+                        <ul className="mt-4 space-y-2.5">
+                          {financialIndustries.map((item) => (
+                            <li
+                              key={item}
+                              className="cursor-default border-b border-white/10 py-2 text-[15px] text-white/85 last:border-b-0"
+                            >
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-[#062D26] p-5 text-white">
+                        <p className="text-xl font-semibold leading-tight">Book a product demo</p>
+                        <p className="mt-2 text-sm text-white/75">
+                          See ReThink Carbon on your own data with a guided walkthrough.
+                        </p>
+                        <Button
+                          className="mt-4 w-full bg-[#1D9E75] text-white hover:bg-[#168661]"
+                          asChild
+                        >
+                          <Link to="/contact">Book a demo</Link>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
