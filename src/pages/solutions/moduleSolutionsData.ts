@@ -58,9 +58,9 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     icon: CheckCheck,
     navLabel: "ESG Management",
     kicker: "ESG MANAGEMENT",
-    headline: "Know exactly where your organisation stands",
+    headline: "Built for every stage of your sustainability journey.",
     subhead:
-      "A live, benchmarked view of ESG maturity, not a once-a-year questionnaire.",
+      "Understand what is financially and environmentally material, automate ESG data collection, align with IFRS S1, IFRS S2, SASB, GRI and TCFD, and generate decision-ready insights, not just reports.",
     preview: ["ESG maturity", "Developing"],
     previewNote: "Governance gap identified across 2 pillars",
     challenges: [
@@ -118,9 +118,9 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     icon: CheckCheck,
     navLabel: "Digital MRV",
     kicker: "DIGITAL MRV",
-    headline: "Evidence your verifier will not push back on",
+    headline: "Digital MRV that transforms climate data into trusted evidence",
     subhead:
-      "Continuous monitoring and reporting, built for the scrutiny of third-party verification.",
+      "Continuously capture, validate and secure climate data across the project lifecycle for auditors, investors and registries.",
     preview: ["Verification status", "12 of 14 sites"],
     previewNote: "Verified this reporting cycle",
     challenges: [

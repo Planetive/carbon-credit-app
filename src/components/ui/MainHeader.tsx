@@ -61,11 +61,11 @@ const MainHeader = () => {
     : "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm";
 
   const navLinkClass = isHome && isInHero
-    ? "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-gray-800 hover:text-[#0A4D3E]"
-    : "transition-colors duration-300 text-[14px] lg:text-[16px] font-medium tracking-wide text-gray-800 hover:text-[#0A4D3E]";
+    ? "transition-colors duration-300 text-[14px] lg:text-[16px] font-normal tracking-wide text-gray-800 hover:text-[#0A4D3E]"
+    : "transition-colors duration-300 text-[14px] lg:text-[16px] font-normal tracking-wide text-gray-800 hover:text-[#0A4D3E]";
   const buttonTextClass = isHome && isInHero
-    ? "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-medium"
-    : "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-medium";
+    ? "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-normal"
+    : "text-gray-900 hover:text-[#0A4D3E] text-base lg:text-[17px] font-normal";
   const mobileMenuButtonClass = isHome && isInHero
     ? "md:hidden p-2 text-gray-800 hover:text-[#0A4D3E] transition-colors"
     : "md:hidden p-2 text-gray-800 hover:text-[#0A4D3E] transition-colors";
@@ -264,14 +264,14 @@ const MainHeader = () => {
             <div className="space-y-2">
               <a
                 href="/"
-                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Home
               </a>
               <Link
                 to="/about"
-                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 About
@@ -279,7 +279,7 @@ const MainHeader = () => {
               {/* Mobile Solutions accordion */}
               <div className="border rounded-lg">
                 <button
-                  className="w-full flex items-center justify-between p-3 text-left text-base font-medium text-gray-700 hover:bg-gray-100"
+                  className="w-full flex items-center justify-between p-3 text-left text-base font-normal text-gray-700 hover:bg-gray-100"
                   onClick={() => setMobileSolutionsOpen(v => !v)}
                 >
                   <span>Solutions</span>
@@ -326,7 +326,7 @@ const MainHeader = () => {
               </div>
               <Link
                 to="/pricing"
-                className="flex items-center p-3 rounded-lg text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Pricing
