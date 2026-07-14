@@ -625,7 +625,7 @@ const EcosystemSection = () => {
 
           {MODULE_KEYS.map((key) => {
             const routePaths: Record<string, string> = {
-              scope: "M640 545 L660 141",
+              scope: "M640 545 L660 278",
               supplier: "M640 545 L300 259",
               risk: "M640 545 L1000 230",
               accounting: "M640 545 L860 370",

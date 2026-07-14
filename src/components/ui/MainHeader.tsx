@@ -99,7 +99,7 @@ const MainHeader = () => {
               <img
                 src="/new_logo.png"
                 alt="ReThink Carbon Logo"
-                className="h-full w-auto object-contain origin-left scale-[3.02] -translate-x-8 md:scale-[3.4] md:-translate-x-10 lg:scale-[3.83] lg:-translate-x-13"
+                className="h-full w-auto object-contain origin-left scale-[3.55] -translate-x-8 md:scale-[4.05] md:-translate-x-10 lg:scale-[4.55] lg:-translate-x-13"
               />
             </div>
           </Link>
