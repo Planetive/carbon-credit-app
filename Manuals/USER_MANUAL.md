@@ -1,6 +1,6 @@
 # Carbon Credit App - User Manual & Knowledge Base
 
-## 🚀 Welcome to ReThink Carbon App
+## 🚀 Welcome to Rethink Carbon App
 
 **Your comprehensive platform for exploring carbon projects, starting new initiatives, and assessing your organization's ESG readiness.**
 
@@ -26,7 +26,7 @@ This guide will help you navigate all the features and get the most out of your 
 ### First Time Users
 
 1. **Visit the Website**
-   - Navigate to the ReThink Carbon App homepage
+   - Navigate to the Rethink Carbon App homepage
    - Click "Get Started" or "Sign Up"
 
 2. **Create Your Account**
@@ -460,7 +460,7 @@ A: Yes, but you'll need to verify the new address.
 
 ---
 
-**Thank you for using ReThink Carbon App!**
+**Thank you for using Rethink Carbon App!**
 
 This manual is regularly updated. Check back often for new features and improvements.
 

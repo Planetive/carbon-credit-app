@@ -235,7 +235,7 @@ const ESGFinancialInstitutions = () => {
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-8">
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 leading-tight">
-                    A complete <span className="text-teal-600">climate risk</span> & portfolio decarbonisation suite
+                    A complete <span className="text-teal-600">climate risk</span> & portfolio decarbonization suite
                   </h2>
                   <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
                     Rethink Carbon brings together emissions accounting, climate risk assessment, and scenario analysis to help financial institutions move from disclosure-driven reporting to decision-useful insights.
@@ -352,7 +352,7 @@ const ESGFinancialInstitutions = () => {
                 </motion.div>
               </motion.div>
 
-              {/* Module 4: Portfolio Decarbonisation & Transition Planning - Full Width 2-Column */}
+              {/* Module 4: Portfolio Decarbonization & Transition Planning - Full Width 2-Column */}
               <motion.div
                 ref={(el) => (cardRefs.current[3] = el)}
                 initial={{ opacity: 0, y: 50, scale: 0.95 }}

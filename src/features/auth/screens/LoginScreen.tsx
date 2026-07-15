@@ -236,7 +236,7 @@ const LoginScreen = () => {
           <h1 className="max-w-md text-4xl font-semibold leading-[1.15] tracking-tight lg:text-5xl">
             Welcome back to{" "}
             <span className="hero-shimmer inline-block bg-gradient-to-r from-[#33C08A] via-[#DFFBEF] to-[#33C08A] bg-clip-text pb-[0.12em] text-transparent">
-              ReThink Carbon
+              Rethink Carbon
             </span>
           </h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-white/65 lg:text-lg">
@@ -254,7 +254,7 @@ const LoginScreen = () => {
             <div className="mx-auto mb-4 flex h-16 w-40 items-center justify-center sm:h-20 sm:w-48">
               <img
                 src="/new_logo.png"
-                alt="ReThink Carbon Logo"
+                alt="Rethink Carbon Logo"
                 className="h-full w-auto scale-[2.4] object-contain sm:scale-[2.6]"
               />
             </div>
@@ -263,7 +263,7 @@ const LoginScreen = () => {
             </p>
             <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E]">Welcome Back</h2>
             <p className="mt-2 text-sm text-[#4E6C63] sm:text-base">
-              Sign in to your ReThink Carbon account
+              Sign in to your Rethink Carbon account
             </p>
           </div>
 

@@ -154,7 +154,7 @@ const HeroInventoryMock = ({ prefersReducedMotion }: { prefersReducedMotion: boo
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[#0A4D3E]">Plato Corp.</p>
+            <p className="text-sm font-semibold text-[#0A4D3E]">Planetive</p>
             <p className="mt-0.5 text-[11px] text-[#7A958B]">Climate inventory · FY2025</p>
           </div>
           <span className="rounded-full bg-[#E7F3ED] px-2.5 py-1 font-mono text-[10px] text-[#1D9E75]">Live</span>
@@ -795,7 +795,7 @@ const CarbonAccountingPage = ({ prefersReducedMotion: prefersReducedMotionProp }
               transition={{ duration: 0.65, delay: 0.85 }}
               className="mt-6 max-w-lg text-base leading-relaxed text-white/70 sm:text-lg"
             >
-              From raw activity data to an audit-ready inventory, ReThink Carbon handles mapping, emission factors,
+              From raw activity data to an audit-ready inventory, Rethink Carbon handles mapping, emission factors,
               scope classification, calculation and disclosure inside one connected system your finance team can trust.
             </motion.p>
 

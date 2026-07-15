@@ -1,4 +1,4 @@
-# SEO Strategy for ReThink Carbon Website
+# SEO Strategy for Rethink Carbon Website
 
 ## 🎯 Goal: Rank for "rethink carbon" searches on Google
 
@@ -26,10 +26,10 @@
 4. Once verified, submit your sitemap URL: `https://www.rethinkcarbon.io/sitemap.xml`
 
 #### 2. **Content Optimization** (HIGH PRIORITY)
-- **Add more "ReThink Carbon" mentions** throughout your website
+- **Add more "Rethink Carbon" mentions** throughout your website
 - **Create blog content** about carbon management, sustainability, etc.
-- **Add FAQ section** with "ReThink Carbon" related questions
-- **Optimize page titles** to include "ReThink Carbon" where relevant
+- **Add FAQ section** with "Rethink Carbon" related questions
+- **Optimize page titles** to include "Rethink Carbon" where relevant
 
 #### 3. **Technical SEO** (HIGH PRIORITY)
 - **Page Speed**: Ensure your website loads quickly (under 3 seconds)
@@ -87,11 +87,11 @@
 
 ### 📝 Content Ideas for Blog
 
-1. "How ReThink Carbon is Revolutionizing Carbon Management"
-2. "5 Ways ReThink Carbon Helps Businesses Reduce Their Carbon Footprint"
-3. "The Future of Carbon Markets: Insights from ReThink Carbon"
-4. "Why Choose ReThink Carbon for Your Sustainability Journey"
-5. "Carbon Management Made Simple with ReThink Carbon"
+1. "How Rethink Carbon is Revolutionizing Carbon Management"
+2. "5 Ways Rethink Carbon Helps Businesses Reduce Their Carbon Footprint"
+3. "The Future of Carbon Markets: Insights from Rethink Carbon"
+4. "Why Choose Rethink Carbon for Your Sustainability Journey"
+5. "Carbon Management Made Simple with Rethink Carbon"
 
 ### 🔗 Backlink Opportunities
 
@@ -111,10 +111,10 @@
 
 1. **Add Google Search Console verification** to your HTML
 2. **Submit sitemap** to Google Search Console
-3. **Add more "ReThink Carbon" mentions** to your homepage
+3. **Add more "Rethink Carbon" mentions** to your homepage
 4. **Create social media profiles** (LinkedIn, Twitter, Facebook)
-5. **Add customer testimonials** mentioning "ReThink Carbon"
-6. **Create an "About ReThink Carbon" page**
+5. **Add customer testimonials** mentioning "Rethink Carbon"
+6. **Create an "About Rethink Carbon" page**
 
 ### 📈 Expected Timeline
 
@@ -134,7 +134,7 @@
 ### 📞 Next Actions
 
 1. **Immediate**: Set up Google Search Console
-2. **This week**: Add more "ReThink Carbon" content
+2. **This week**: Add more "Rethink Carbon" content
 3. **This month**: Start content marketing and backlink building
 4. **Ongoing**: Monitor and optimize based on performance
 

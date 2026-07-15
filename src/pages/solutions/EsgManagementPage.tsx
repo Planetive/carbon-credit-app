@@ -85,52 +85,24 @@ const capabilities = [
 
 const journeyStages = [
   {
-    title: "Sector selection",
-    text: "Tell us your industry. Everything downstream calibrates to it automatically.",
+    title: "Assess",
+    text: "Select your sector, run an AI materiality assessment, surface priority ESG topics, and map stakeholders so the programme starts from what actually matters.",
   },
   {
-    title: "AI materiality assessment",
-    text: "AI cross-references SASB and IFRS S1/S2 guidance against your sector.",
+    title: "Collect & Validate",
+    text: "Gather operational and supplier data in one place, then validate it for gaps, anomalies, and consistency before it enters your metrics and disclosures.",
   },
   {
-    title: "Priority ESG topics",
-    text: "A ranked shortlist of what actually matters for your business.",
+    title: "Measure & Analyze",
+    text: "Turn validated inputs into carbon calculations, ESG metrics, and scenario analysis that show where you stand and how performance could shift.",
   },
   {
-    title: "Stakeholder mapping",
-    text: "Identify who needs to be consulted and who owns each topic.",
+    title: "Plan & Improve",
+    text: "Set targets, build a decarbonization roadmap, and keep continuous monitoring in place so progress stays visible between reporting cycles.",
   },
   {
-    title: "Data collection",
-    text: "Pull data from ERP, utilities, suppliers, IoT and manual workflows.",
-  },
-  {
-    title: "Validation",
-    text: "AI checks incoming data for gaps, anomalies and inconsistencies.",
-  },
-  {
-    title: "Calculations",
-    text: "Emissions, social metrics and governance KPIs calculated with built-in methodologies.",
-  },
-  {
-    title: "Targets",
-    text: "Set science-based or custom targets against your calculated baseline.",
-  },
-  {
-    title: "Scenario analysis",
-    text: "Stress-test performance against different climate and market pathways.",
-  },
-  {
-    title: "Monitoring",
-    text: "Continuous tracking against target, not a once-a-year check-in.",
-  },
-  {
-    title: "Disclosure",
-    text: "Generate audit-ready reports aligned to your chosen frameworks.",
-  },
-  {
-    title: "Continuous improvement",
-    text: "Findings feed back into materiality and targets for the next cycle.",
+    title: "Report & Disclose",
+    text: "Disclose against IFRS S2, CSRD, GRI, and CDP, then export audit-ready reports without rebuilding the evidence trail from scratch.",
   },
 ];
 
@@ -369,7 +341,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
               transition={{ duration: 0.7, delay: 0.75, ease: [0.22, 1, 0.36, 1] }}
               className="mt-6 max-w-lg text-base leading-relaxed text-white/70 sm:text-lg"
             >
-              ReThink Carbon helps organisations understand what is financially and environmentally material, automate
+              Rethink Carbon helps organisations understand what is financially and environmentally material, automate
               ESG data collection across operations and suppliers, align with IFRS S1, IFRS S2, SASB, GRI and TCFD, and
               generate decision-ready insights, not just reports.
             </motion.p>
@@ -496,7 +468,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#9FE1CB]">Lifecycle</p>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">The sustainability journey</h2>
             <p className="mt-4 text-base text-white/60 sm:text-lg">
-              One continuous workflow, from sector selection to disclosure. Select a stage to see how it works.
+              One continuous workflow from assessment to disclosure. Select a stage to see what sits inside it.
             </p>
           </motion.div>
 
@@ -523,7 +495,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
               />
             )}
 
-            <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:grid-cols-4 md:grid-cols-6 xl:flex xl:items-start xl:justify-between xl:gap-0">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-6 sm:grid-cols-3 md:grid-cols-5 xl:flex xl:items-start xl:justify-between xl:gap-0">
               {journeyStages.map((stage, index) => {
                 const active = index === journeyIndex;
                 const completed = index < journeyIndex;
@@ -532,7 +504,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
                     key={stage.title}
                     type="button"
                     onClick={() => selectJourney(index)}
-                    className="group relative z-[1] flex flex-col items-center bg-transparent text-center xl:w-[8%]"
+                    className="group relative z-[1] flex flex-col items-center bg-transparent text-center xl:w-[18%]"
                   >
                     <span className="relative mb-3 flex h-10 w-10 items-center justify-center">
                       {active && !prefersReducedMotion && (
@@ -570,7 +542,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
                     </span>
                     <span
                       className={[
-                        "max-w-[5.5rem] text-[11px] leading-snug transition-colors duration-300",
+                        "max-w-[7.5rem] text-[11px] leading-snug transition-colors duration-300 sm:max-w-[8.5rem]",
                         active
                           ? "font-semibold text-white"
                           : completed

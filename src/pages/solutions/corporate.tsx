@@ -186,7 +186,7 @@ const CorporateSolutions = () => {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 leading-tight mb-6 tracking-tight"
             >
-              Your end-to-end decarbonisation partner
+              Your end-to-end decarbonization partner
               <br />
               <motion.span 
                 initial={{ opacity: 0, y: 20 }}
@@ -203,7 +203,7 @@ const CorporateSolutions = () => {
               transition={{ duration: 0.7, delay: 0.5 }}
               className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed"
             >
-              Measure emissions, assess ESG performance, and build credible decarbonisation and energy transition roadmaps — powered by data, standards, and AI.
+              Measure emissions, assess ESG performance, and build credible decarbonization and energy transition roadmaps — powered by data, standards, and AI.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -246,7 +246,7 @@ const CorporateSolutions = () => {
                 transition={{ duration: 0.7, delay: 0.1 }}
                 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight text-gray-900"
               >
-                The Corporate Decarbonisation Suite
+                The Corporate Decarbonization Suite
               </motion.h2>
               
               {/* Subtitle */}
@@ -420,7 +420,7 @@ const CorporateSolutions = () => {
                 <ul className="text-teal-50 space-y-2 mb-6 text-sm leading-relaxed">
                   <li className="flex items-start gap-2">
                     <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                    <span>Decarbonisation pathways</span>
+                    <span>Decarbonization pathways</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-teal-300 font-semibold mt-0.5">•</span>
@@ -471,7 +471,7 @@ const CorporateSolutions = () => {
               >
                 <div>
                   <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
-                    Decarbonisation & Energy Transition Roadmaps
+                    Decarbonization & Energy Transition Roadmaps
                   </h3>
                   <p className="text-teal-100 mb-2 font-medium">Plan what to reduce, when, and how</p>
                 </div>
@@ -513,7 +513,7 @@ const CorporateSolutions = () => {
         <div className="container mx-auto px-6 relative z-10 fade-in">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-12 text-center">
-              Why choose ReThink Carbon
+              Why choose Rethink Carbon
             </h2>
             <div className="grid md:grid-cols-2 gap-6 md:ml-12">
               <div

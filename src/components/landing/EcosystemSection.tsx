@@ -932,7 +932,7 @@ const EcosystemSection = () => {
                 </div>
                 <div className="statusDot" />
               </div>
-              <div className="moduleTitle">Decarbonisation Planner</div>
+              <div className="moduleTitle">Decarbonization Planner</div>
               <div className="headline">Target setting, forecasting and action tracking.</div>
               <div className="miniLabel">Reduction target progress</div>
               <div className="progressTrack">

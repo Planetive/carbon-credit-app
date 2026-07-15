@@ -1,4 +1,4 @@
-# SEO Checklist for ReThink Carbon
+# SEO Checklist for Rethink Carbon
 
 ## ✅ IMMEDIATE ACTIONS (Do These Today)
 
@@ -15,7 +15,7 @@
 - [ ] Deploy the updated robots.txt
 
 ### 3. Social Media Profiles
-- [ ] Create LinkedIn company page for "ReThink Carbon"
+- [ ] Create LinkedIn company page for "Rethink Carbon"
 - [ ] Create Twitter account @rethinkcarbon
 - [ ] Create Facebook business page
 - [ ] Add website link to all social profiles
@@ -23,10 +23,10 @@
 ## ✅ THIS WEEK
 
 ### 4. Content Optimization
-- [ ] Add more "ReThink Carbon" mentions to homepage
-- [ ] Create "About ReThink Carbon" page
-- [ ] Add customer testimonials mentioning "ReThink Carbon"
-- [ ] Create FAQ section with "ReThink Carbon" questions
+- [ ] Add more "Rethink Carbon" mentions to homepage
+- [ ] Create "About Rethink Carbon" page
+- [ ] Add customer testimonials mentioning "Rethink Carbon"
+- [ ] Create FAQ section with "Rethink Carbon" questions
 
 ### 5. Technical SEO
 - [ ] Test website speed on PageSpeed Insights

@@ -27,7 +27,7 @@ const Landing = () => {
   }, []);
 
   // Animated emissions/data curves behind the hero. Motion here is meaningful:
-  // slow, layered sine waves reading as live decarbonisation trend lines.
+  // slow, layered sine waves reading as live decarbonization trend lines.
   useEffect(() => {
     const canvas = heroCanvasRef.current;
     if (!canvas) return;
@@ -158,7 +158,7 @@ const Landing = () => {
       id: 0,
       title: "Discover",
       description:
-          "Access a global repository of decarbonisation and energy transition insights.",
+          "Access a global repository of decarbonization and energy transition insights.",
     },
     {
       id: 1,
@@ -213,7 +213,7 @@ const Landing = () => {
   ];
 
   // Headline split for a word-by-word blur-in reveal
-  const headlineLead = "The future of enterprise decarbonisation".split(" ");
+  const headlineLead = "The future of enterprise decarbonization".split(" ");
   const headlineAccent = ["starts", "here."];
   const wordContainer = {
     hidden: {},
@@ -506,13 +506,13 @@ const Landing = () => {
                   className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
                   style={{ background: "linear-gradient(to bottom right, #1C7A53, #124740)" }}
                 >
-                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-lg sm:text-xl md:text-2xl lg:text-3xl shadow-lg border-2 border-[#BFE3D3]">
                     {item.id}
                   </div>
-                  <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
+                  <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
                     {item.title}
                   </h2>
-                  <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
+                  <p className="text-[10px] sm:text-xs md:text-sm lg:text-base leading-relaxed opacity-90">
                     {item.description}
                   </p>
                 </motion.div>
@@ -530,13 +530,13 @@ const Landing = () => {
                   className="group relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-full p-4 sm:p-6 md:p-8 shadow-2xl transition-all duration-250 hover:scale-105 flex flex-col justify-center text-center text-white border border-white/20"
                   style={{ background: "linear-gradient(to bottom right, #1C7A53, #124740)" }}
                 >
-                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl shadow-lg border-2 border-[#BFE3D3]">
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4 md:top-5 md:left-5 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center text-[#0A4D3E] font-bold text-lg sm:text-xl md:text-2xl lg:text-3xl shadow-lg border-2 border-[#BFE3D3]">
                     {item.id}
                   </div>
-                  <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
+                  <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-bold mb-2 sm:mb-3 md:mb-4 mt-4 sm:mt-6 md:mt-8">
                     {item.title}
                   </h2>
-                  <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed opacity-90">
+                  <p className="text-[10px] sm:text-xs md:text-sm lg:text-base leading-relaxed opacity-90">
                     {item.description}
                   </p>
                 </motion.div>

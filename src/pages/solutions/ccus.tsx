@@ -98,7 +98,7 @@ const CCUSPage = () => {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-100 text-sky-800 text-sm font-semibold mb-6">
             <span className="h-2 w-2 rounded-full bg-sky-500" />
-            Why CCUS with ReThink Carbon
+            Why CCUS with Rethink Carbon
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
             Make CCUS bankable, measurable, and verifiable

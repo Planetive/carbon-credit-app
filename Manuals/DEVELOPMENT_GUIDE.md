@@ -2,7 +2,7 @@
 
 ## 🚀 Project Overview
 
-**Project Name**: ReThink Carbon App  
+**Project Name**: Rethink Carbon App  
 **Version**: 1.0.0  
 **Description**: A comprehensive carbon credit management and ESG assessment platform built with modern web technologies.
 

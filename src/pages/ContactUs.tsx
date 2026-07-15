@@ -583,7 +583,7 @@ const ContactUs = () => {
               Ready to Start Your Carbon Journey?
             </h2>
             <p className="relative z-10 mx-auto mb-8 max-w-3xl text-base text-[#E6F6EF] sm:text-lg">
-              Join thousands of organizations already using ReThink Carbon to accelerate their sustainability goals.
+              Join thousands of organizations already using Rethink Carbon to accelerate their sustainability goals.
             </p>
             <div className="relative z-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
               <Button

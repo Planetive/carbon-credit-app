@@ -30,10 +30,12 @@ const MainHeader = () => {
   };
 
   const corporateIndustries = [
-    "Energy and extractives",
-    "Manufacturing and textiles",
-    "Construction and real estate",
-    "Agriculture and food",
+    "Oil & Gas",
+    "Textile & Manufacturing",
+    "Agriculture",
+    "Power & Utilities",
+    "Mining & Metals",
+    "Transport & Logistics",
   ] as const;
 
   const financialIndustries = [
@@ -198,7 +200,7 @@ const MainHeader = () => {
                     </div>
 
                     <div>
-                      <p className={megaMenuHeadingClass}>Solutions by Sector</p>
+                      <p className={megaMenuHeadingClass}>Solutions by Industries</p>
                       <Link
                         to="/solutions/corporate"
                         className={megaMenuLinkClass}

@@ -195,7 +195,7 @@ const AboutUs = () => {
       year: "2023",
       title: "Idea Conceived",
       description:
-        "ReThink Carbon was created to close the gap between complex carbon markets and businesses that want simple, practical climate solutions.",
+        "Rethink Carbon was created to close the gap between complex carbon markets and businesses that want simple, practical climate solutions.",
     },
     {
       year: "2024",
@@ -213,7 +213,7 @@ const AboutUs = () => {
       year: "2026",
       title: "Scaling Beyond MVP",
       description:
-        "Moving from MVP to full production, expanding features, and scaling our customer base as ReThink Carbon becomes a core part of how organizations manage carbon and ESG.",
+        "Moving from MVP to full production, expanding features, and scaling our customer base as Rethink Carbon becomes a core part of how organizations manage carbon and ESG.",
     },
   ];
 
@@ -346,7 +346,7 @@ const AboutUs = () => {
             transition={{ duration: 0.45 }}
             className="mb-5 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#9FE1CB] sm:text-xs"
           >
-            About ReThink Carbon
+            About Rethink Carbon
           </motion.p>
 
           <motion.h1
@@ -467,7 +467,7 @@ const AboutUs = () => {
                 Our Global Reach
               </h2>
               <p className="mb-6 text-base leading-relaxed text-[#4E6C63] sm:text-lg">
-                With strategic offices in the United Arab Emirates and Pakistan, ReThink Carbon has established a strong global presence to serve our diverse client base.
+                With strategic offices in the United Arab Emirates and Pakistan, Rethink Carbon has established a strong global presence to serve our diverse client base.
               </p>
               <div className="space-y-4">
                 {[
@@ -520,7 +520,7 @@ const AboutUs = () => {
           <motion.div {...fadeUp} className="mb-12 text-center sm:mb-14">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#9FE1CB]">Features</p>
             <h2 className="mb-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              How does ReThink Carbon work?
+              How does Rethink Carbon work?
             </h2>
             <p className="mx-auto max-w-3xl text-base text-white/65 sm:text-lg">
               Our core values guide everything we do, from product development to client relationships.
@@ -642,7 +642,7 @@ const AboutUs = () => {
               Ready to Transform Your Carbon Strategy?
             </h2>
             <p className="relative z-10 mx-auto mb-8 max-w-3xl text-base text-[#E6F6EF] sm:text-lg">
-              Join thousands of organizations already using ReThink Carbon to accelerate their sustainability journey.
+              Join thousands of organizations already using Rethink Carbon to accelerate their sustainability journey.
             </p>
             <div className="relative z-10 flex justify-center">
               <Button

@@ -149,7 +149,7 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     navLabel: "Carbon Management",
     kicker: "CARBON MANAGEMENT",
     headline: "Turn a footprint into a programme",
-    subhead: "Targets, budgets and tracking that keep decarbonisation on schedule.",
+    subhead: "Targets, budgets and tracking that keep decarbonization on schedule.",
     preview: ["Target progress", "58%"],
     previewNote: "On track for 2030 target",
     challenges: [

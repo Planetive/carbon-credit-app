@@ -177,14 +177,14 @@ const Register = () => {
               <div className="h-20 w-44 md:h-24 md:w-56 flex items-center justify-center mx-auto">
                 <img
                   src="/new_logo.png"
-                  alt="ReThink Carbon Logo"
+                  alt="Rethink Carbon Logo"
                   className="h-full w-auto object-contain scale-[2.6] md:scale-[2.8]"
                 />
               </div>
             </div>
             <CardTitle className="text-2xl">Create Account</CardTitle>
             <CardDescription>
-              Join ReThink Carbon to start evaluating carbon credit projects
+              Join Rethink Carbon to start evaluating carbon credit projects
             </CardDescription>
           </CardHeader>
           <CardContent>
