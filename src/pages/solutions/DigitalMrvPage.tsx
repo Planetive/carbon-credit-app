@@ -86,38 +86,33 @@ const stages = [
     text: "Define project boundaries, methodology and monitoring plan before a single data point is collected.",
   },
   {
-    title: "Baseline",
+    title: "Baseline & data collection",
     tag: "STAGE 02",
-    text: "Establish the counterfactual scenario every future measurement will be checked against.",
-  },
-  {
-    title: "Data collection",
-    tag: "STAGE 03",
-    text: "Continuous capture from IoT, satellite, ERP and manual field evidence.",
+    text: "Establish the counterfactual scenario every measurement is checked against, while continuously capturing evidence from IoT, satellite, ERP and field sources.",
   },
   {
     title: "Monitoring",
-    tag: "STAGE 04",
+    tag: "STAGE 03",
     text: "Ongoing tracking of project performance against the approved methodology.",
   },
   {
     title: "Verification",
-    tag: "STAGE 05",
+    tag: "STAGE 04",
     text: "Independent, evidence-backed review against ISO, Verra, Gold Standard and Article 6 criteria.",
   },
   {
     title: "Credit issuance",
-    tag: "STAGE 06",
+    tag: "STAGE 05",
     text: "Verified reductions are converted into registry-issued carbon credits.",
   },
   {
     title: "Trading",
-    tag: "STAGE 07",
+    tag: "STAGE 06",
     text: "Credits move through markets with full chain-of-custody intact.",
   },
   {
     title: "Retirement",
-    tag: "STAGE 08",
+    tag: "STAGE 07",
     text: "Credits are retired against a claim, permanently removed from circulation.",
   },
 ];
@@ -125,7 +120,7 @@ const stages = [
 const heroLead = "Digital MRV that transforms climate data into".split(" ");
 const heroAccent = ["trusted", "evidence"];
 const heroTrail =
-  "for carbon markets, carbon credits, CCUS, nature-based projects, and corporate decarbonisation.".split(" ");
+  "for carbon markets, carbon credits, CCUS, nature-based projects, and corporate decarbonization.".split(" ");
 
 const heroWordContainer = {
   hidden: {},
@@ -481,7 +476,7 @@ const DigitalMrvPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Digi
               transition={{ duration: 0.7, delay: 0.85, ease: [0.22, 1, 0.36, 1] }}
               className="mt-6 max-w-lg text-base leading-relaxed text-white/70 sm:text-lg"
             >
-              ReThink Carbon's Digital MRV continuously captures, validates and secures climate data across every stage of
+              Rethink Carbon's Digital MRV continuously captures, validates and secures climate data across every stage of
               the project lifecycle, creating an immutable evidence trail trusted by auditors, investors and carbon market
               registries.
             </motion.p>
