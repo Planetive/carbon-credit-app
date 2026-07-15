@@ -177,8 +177,9 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     icon: CloudLightning,
     navLabel: "Climate Risk Analysis",
     kicker: "CLIMATE RISK ANALYSIS",
-    headline: "Physical and transition risk, modelled properly",
-    subhead: "Scenario analysis your board can actually use for decisions.",
+    headline: "Physical and transition risk, modelled properly.",
+    subhead:
+      "Scenario analysis your board can actually use for decisions, moving beyond compliance to strategic financial resilience.",
     preview: ["Overall exposure", "Elevated"],
     previewNote: "Transition risk drives the rating",
     challenges: [

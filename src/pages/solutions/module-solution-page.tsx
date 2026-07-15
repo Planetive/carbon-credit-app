@@ -12,6 +12,7 @@ import {
 import DigitalMrvPage from "./DigitalMrvPage";
 import EsgManagementPage from "./EsgManagementPage";
 import CarbonAccountingPage from "./CarbonAccountingPage";
+import ClimateRiskPage from "./ClimateRiskPage";
 
 const isModuleKey = (value?: string): value is SolutionModuleKey =>
   !!value && solutionModuleOrder.includes(value as SolutionModuleKey);
@@ -59,6 +60,18 @@ const ModuleSolutionPage = () => {
       >
         <MainHeader />
         <CarbonAccountingPage prefersReducedMotion={!!prefersReducedMotion} />
+      </div>
+    );
+  }
+
+  if (current.key === "risk") {
+    return (
+      <div
+        className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]"
+        style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+      >
+        <MainHeader />
+        <ClimateRiskPage prefersReducedMotion={!!prefersReducedMotion} />
       </div>
     );
   }

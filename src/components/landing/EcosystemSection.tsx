@@ -97,6 +97,11 @@ const EcosystemSection = () => {
       "(prefers-reduced-motion: reduce)"
     ).matches;
     const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    const compactQuery = window.matchMedia("(max-width: 900px)");
+    let isCompactLayout = compactQuery.matches;
+    if (isCompactLayout) {
+      container.classList.add("is-compact-layout");
+    }
 
     let isVisible = true;
     let mainRaf = 0;
@@ -107,8 +112,20 @@ const EcosystemSection = () => {
     let activeTiltCard: HTMLElement | null = null;
     let entrancePlayed = false;
     let particleBoost = 1;
+    let lastLoopAt = 0;
+    let energyTick = 0;
+    let activePulses = 0;
     const timers: number[] = [];
     const cleanups: (() => void)[] = [];
+
+    const isMobile =
+      coarsePointer ||
+      isCompactLayout ||
+      window.matchMedia("(max-width: 768px)").matches;
+    const particleCount = prefersReducedMotion ? 0 : isMobile ? 12 : 26;
+    /** Ambient loop targets ~30fps desktop / ~20fps mobile */
+    const frameIntervalMs = isMobile ? 50 : 33;
+    const maxConcurrentPulses = isMobile ? 1 : 2;
 
     const schedule = (fn: () => void, ms: number) => {
       const id = window.setTimeout(fn, ms);
@@ -145,15 +162,15 @@ const EcosystemSection = () => {
 
     const resizeCanvas = () => {
       if (!canvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.25);
       canvasW = canvas.offsetWidth;
       canvasH = canvas.offsetHeight;
       canvas.width = Math.floor(canvasW * dpr);
       canvas.height = Math.floor(canvasH * dpr);
       ctx = canvas.getContext("2d", { alpha: true });
       ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (particles.length === 0) {
-        for (let i = 0; i < 52; i++) {
+      if (particles.length === 0 && particleCount > 0) {
+        for (let i = 0; i < particleCount; i++) {
           particles.push({
             x: Math.random() * canvasW,
             y: Math.random() * canvasH,
@@ -181,8 +198,9 @@ const EcosystemSection = () => {
     }[] = [];
 
     if (svg && !prefersReducedMotion) {
+      const connectionStep = isMobile ? 3 : 2;
       paths.forEach((path, index) => {
-        if (index % 2 !== 0) return;
+        if (index % connectionStep !== 0) return;
         const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         circle.setAttribute("r", "2");
         circle.setAttribute("fill", "#1D9E75");
@@ -204,11 +222,20 @@ const EcosystemSection = () => {
     };
     window.addEventListener("resize", recachePathLengths, { passive: true });
 
+    let particleFill = "rgba(15,110,86,0.16)";
+    let lastBoostBand = 1;
+
     const drawParticles = () => {
-      if (!ctx || !canvasW || !canvasH) return;
-      const alpha = 0.16 * (particleBoost > 1 ? 1 + (particleBoost - 1) * 0.8 : 1);
+      if (!ctx || !canvasW || !canvasH || particles.length === 0) return;
+      const boostBand = particleBoost > 1.05 ? 1.2 : 1;
+      if (boostBand !== lastBoostBand) {
+        lastBoostBand = boostBand;
+        const alpha = 0.16 * (particleBoost > 1 ? 1 + (particleBoost - 1) * 0.8 : 1);
+        particleFill = `rgba(15,110,86,${alpha})`;
+      }
       ctx.clearRect(0, 0, canvasW, canvasH);
-      ctx.fillStyle = `rgba(15,110,86,${alpha})`;
+      ctx.fillStyle = particleFill;
+      ctx.beginPath();
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         p.x += p.vx * particleBoost;
@@ -217,30 +244,38 @@ const EcosystemSection = () => {
         else if (p.x > canvasW) p.x = 0;
         if (p.y < 0) p.y = canvasH;
         else if (p.y > canvasH) p.y = 0;
-        ctx.beginPath();
+        ctx.moveTo(p.x + p.r, p.y);
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
       }
+      ctx.fill();
     };
 
     const drawEnergy = () => {
       for (let i = 0; i < energyDots.length; i++) {
         const dot = energyDots[i];
-        dot.offset += 0.0014 * particleBoost;
+        dot.offset += 0.0014 * particleBoost * (frameIntervalMs / 16.67);
         if (dot.offset > 1) dot.offset = 0;
         const point = dot.path.getPointAtLength(dot.length * dot.offset);
-        dot.circle.setAttribute("cx", String(point.x));
-        dot.circle.setAttribute("cy", String(point.y));
+        // Use SVG transform instead of cx/cy when possible for cheaper updates
+        dot.circle.setAttribute(
+          "transform",
+          `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`
+        );
       }
     };
 
-    const mainLoop = () => {
+    const mainLoop = (now: number) => {
       if (!isVisible) {
         mainRaf = 0;
         return;
       }
-      drawParticles();
-      drawEnergy();
+      if (now - lastLoopAt >= frameIntervalMs) {
+        lastLoopAt = now;
+        drawParticles();
+        energyTick += 1;
+        // getPointAtLength is costly — update energy markers every other ambient frame
+        if (energyTick % 2 === 0) drawEnergy();
+      }
       mainRaf = requestAnimationFrame(mainLoop);
     };
 
@@ -248,8 +283,7 @@ const EcosystemSection = () => {
 
     const applyGlow = () => {
       if (!glow) return;
-      glow.style.left = `${pendingGlowX}px`;
-      glow.style.top = `${pendingGlowY}px`;
+      glow.style.transform = `translate3d(${pendingGlowX}px, ${pendingGlowY}px, 0) translate(-50%, -50%)`;
       glowRaf = 0;
     };
 
@@ -269,6 +303,8 @@ const EcosystemSection = () => {
       opts?: { trail?: boolean; duration?: number }
     ) => {
       if (!svg || prefersReducedMotion) return;
+      if (activePulses >= maxConcurrentPulses) return;
+      activePulses += 1;
       const length = path.getTotalLength();
       const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
       pulse.setAttribute("r", opts?.trail ? "3.2" : "2.8");
@@ -276,9 +312,10 @@ const EcosystemSection = () => {
       pulse.setAttribute("class", "entrance-energy");
       svg.appendChild(pulse);
 
+      const useTrail = Boolean(opts?.trail) && !isMobile;
       const trailDots: SVGCircleElement[] = [];
-      if (opts?.trail) {
-        for (let i = 0; i < 4; i++) {
+      if (useTrail) {
+        for (let i = 0; i < 3; i++) {
           const t = document.createElementNS("http://www.w3.org/2000/svg", "circle");
           t.setAttribute("r", String(2.2 - i * 0.35));
           t.setAttribute("fill", "#22C58B");
@@ -288,32 +325,45 @@ const EcosystemSection = () => {
         }
       }
 
-      const durationFactor = opts?.duration ?? 0.035;
+      const durationFactor = (opts?.duration ?? 0.035) * (isMobile ? 1.25 : 1);
       let t = 0;
       const history: { x: number; y: number }[] = [];
+      let pulseRaf = 0;
+      const finish = () => {
+        if (pulseRaf) cancelAnimationFrame(pulseRaf);
+        pulse.remove();
+        trailDots.forEach((d) => d.remove());
+        activePulses = Math.max(0, activePulses - 1);
+      };
       const step = () => {
+        if (!isVisible) {
+          finish();
+          return;
+        }
         t += durationFactor;
         if (t > 1) {
-          pulse.remove();
-          trailDots.forEach((d) => d.remove());
+          finish();
           return;
         }
         const pt = path.getPointAtLength(length * t);
-        pulse.setAttribute("cx", String(pt.x));
-        pulse.setAttribute("cy", String(pt.y));
+        pulse.setAttribute("transform", `translate(${pt.x} ${pt.y})`);
         pulse.setAttribute("opacity", String(0.95 - t * 0.55));
-        history.unshift({ x: pt.x, y: pt.y });
-        if (history.length > 8) history.pop();
-        trailDots.forEach((dot, i) => {
-          const sample = history[Math.min(history.length - 1, (i + 1) * 2)];
-          if (!sample) return;
-          dot.setAttribute("cx", String(sample.x));
-          dot.setAttribute("cy", String(sample.y));
-          dot.setAttribute("opacity", String(Math.max(0, 0.45 - i * 0.1 - t * 0.25)));
-        });
-        requestAnimationFrame(step);
+        if (useTrail) {
+          history.unshift({ x: pt.x, y: pt.y });
+          if (history.length > 6) history.pop();
+          trailDots.forEach((dot, i) => {
+            const sample = history[Math.min(history.length - 1, (i + 1) * 2)];
+            if (!sample) return;
+            dot.setAttribute("transform", `translate(${sample.x} ${sample.y})`);
+            dot.setAttribute("opacity", String(Math.max(0, 0.45 - i * 0.1 - t * 0.25)));
+          });
+        }
+        pulseRaf = requestAnimationFrame(step);
       };
-      step();
+      pulseRaf = requestAnimationFrame(step);
+      cleanups.push(() => {
+        if (pulseRaf) cancelAnimationFrame(pulseRaf);
+      });
     };
 
     modules.forEach((mod) => {
@@ -429,18 +479,15 @@ const EcosystemSection = () => {
               [
                 {
                   opacity: 0,
-                  filter: "blur(10px)",
                   transform: `translate3d(${lx}, ${ly}, 0) scale(0.25)`,
                 },
                 {
                   opacity: 1,
-                  filter: "blur(0px)",
                   transform: "translate3d(0, 0, 0) scale(1.05)",
                   offset: 0.78,
                 },
                 {
                   opacity: 1,
-                  filter: "blur(0px)",
                   transform: "translate3d(0, 0, 0) scale(1)",
                 },
               ],
@@ -456,7 +503,6 @@ const EcosystemSection = () => {
                 mod.classList.remove("is-launching");
                 mod.classList.add("is-settled");
                 card.style.opacity = "1";
-                card.style.filter = "none";
                 card.style.transform = "";
                 card.style.willChange = "auto";
                 anim.cancel();
@@ -491,15 +537,14 @@ const EcosystemSection = () => {
 
     const entranceObserver = new IntersectionObserver(
       ([entry]) => {
-        if (
-          !entrancePlayed &&
-          entry.isIntersecting &&
-          entry.intersectionRatio >= 0.35
-        ) {
-          playEntrance();
+        if (!entrancePlayed && entry.isIntersecting) {
+          const threshold = isCompactLayout ? 0.08 : 0.35;
+          if (entry.intersectionRatio >= threshold || isCompactLayout) {
+            playEntrance();
+          }
         }
       },
-      { threshold: [0, 0.2, 0.35, 0.4, 0.5] }
+      { threshold: [0, 0.08, 0.2, 0.35, 0.4, 0.5] }
     );
 
     const playEntrance = () => {
@@ -507,14 +552,19 @@ const EcosystemSection = () => {
       entrancePlayed = true;
       entranceObserver.disconnect();
 
-      if (prefersReducedMotion) {
-        container.classList.add("prefers-reduced-entrance");
+      // Compact layout is a simple stacked grid — skip orbital assemble.
+      if (isCompactLayout || prefersReducedMotion) {
+        container.classList.remove(
+          "is-entrance-pending",
+          "is-booting",
+          "is-assembling"
+        );
+        if (prefersReducedMotion) {
+          container.classList.add("prefers-reduced-entrance");
+        }
         schedule(() => {
           container.classList.add("is-ready");
-          container.classList.remove(
-            "is-entrance-pending",
-            "prefers-reduced-entrance"
-          );
+          container.classList.remove("prefers-reduced-entrance");
           paths.forEach((p) => p.classList.add("is-revealed"));
         }, 40);
         return;
@@ -530,8 +580,11 @@ const EcosystemSection = () => {
       }, BOOT_MS);
     };
 
-    if (prefersReducedMotion) {
-      container.classList.add("prefers-reduced-entrance", "is-entrance-pending");
+    if (prefersReducedMotion || isCompactLayout) {
+      container.classList.add("is-entrance-pending");
+      if (prefersReducedMotion) {
+        container.classList.add("prefers-reduced-entrance");
+      }
     } else {
       container.classList.add("is-entrance-pending");
       computeLaunchOffsets();
@@ -540,6 +593,17 @@ const EcosystemSection = () => {
     }
 
     entranceObserver.observe(container);
+
+    const onCompactChange = (event: MediaQueryListEvent) => {
+      isCompactLayout = event.matches;
+      container.classList.toggle("is-compact-layout", isCompactLayout);
+      if (isCompactLayout) {
+        stopMainLoop();
+        container.classList.remove("is-booting", "is-assembling", "is-entrance-pending");
+        container.classList.add("is-ready");
+      }
+    };
+    compactQuery.addEventListener("change", onCompactChange);
 
     const onResizeOffsets = () => {
       if (
@@ -573,6 +637,7 @@ const EcosystemSection = () => {
       window.removeEventListener("resize", resizeCanvas);
       window.removeEventListener("resize", recachePathLengths);
       window.removeEventListener("resize", onResizeOffsets);
+      compactQuery.removeEventListener("change", onCompactChange);
       if (glowRaf) cancelAnimationFrame(glowRaf);
       if (tiltRaf) cancelAnimationFrame(tiltRaf);
       if (sparkInterval) clearInterval(sparkInterval);
