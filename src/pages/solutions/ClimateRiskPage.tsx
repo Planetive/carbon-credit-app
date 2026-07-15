@@ -13,7 +13,7 @@ type ClimateRiskPageProps = {
   prefersReducedMotion?: boolean;
 };
 
-type RiskLevel = "High" | "Medium" | "Low";
+type RiskLevel = "High" | "Medium" | "Low" | "Minimal";
 type ScenarioKey = "nz" | "delayed" | "hothouse";
 type HorizonKey = "2030" | "2040" | "2050";
 
@@ -34,68 +34,33 @@ const riskRows = [
   { id: "market", label: "Market & reputation", kind: "Transition risk" as const },
 ] as const;
 
-/** Illustrative demo levels only — not modelled on a live portfolio. */
-const demoMatrix: Record<
-  ScenarioKey,
-  Record<HorizonKey, { levels: RiskLevel[]; exposure: number; note: string }>
-> = {
+const AGGREGATE_NOTE =
+  "Physical risk rises with warming; transition risk falls as the world decarbonizes faster. Rethink Carbon quantifies both so you can plan under any scenario.";
+
+/** Demo scenario snapshot values mirrored from the product preview. */
+const demoMatrix: Record<ScenarioKey, Record<HorizonKey, { levels: RiskLevel[]; exposure: number }>> = {
   nz: {
-    "2030": {
-      levels: ["Medium", "Medium", "Low", "High", "High", "Medium"],
-      exposure: 42,
-      note: "Transition pressure rises early under an orderly pathway; physical signals stay quieter near-term.",
-    },
-    "2040": {
-      levels: ["Medium", "Medium", "Medium", "Medium", "High", "Medium"],
-      exposure: 38,
-      note: "Policy and pricing ease as markets adapt; residual physical risk stays moderate.",
-    },
-    "2050": {
-      levels: ["Low", "Medium", "Low", "Low", "Medium", "Low"],
-      exposure: 28,
-      note: "Illustrative net-zero path: transition fades, physical exposure stays contained.",
-    },
+    "2030": { levels: ["Minimal", "Minimal", "Minimal", "Medium", "Medium", "Low"], exposure: 37 },
+    "2040": { levels: ["Low", "Low", "Low", "High", "High", "Medium"], exposure: 52 },
+    "2050": { levels: ["Low", "Low", "Low", "Medium", "Medium", "Low"], exposure: 40 },
   },
   delayed: {
-    "2030": {
-      levels: ["Medium", "Medium", "Medium", "Medium", "Medium", "Medium"],
-      exposure: 48,
-      note: "A delayed transition keeps both physical and transition signals mid-range.",
-    },
-    "2040": {
-      levels: ["High", "Medium", "Medium", "High", "High", "Medium"],
-      exposure: 56,
-      note: "Catch-up policy and pricing arrive mid-horizon while physical stress builds.",
-    },
-    "2050": {
-      levels: ["High", "High", "Medium", "Medium", "Medium", "Low"],
-      exposure: 52,
-      note: "Physical risk climbs; transition intensity cools once late policy lands.",
-    },
+    "2030": { levels: ["Low", "Low", "Low", "Low", "Low", "Low"], exposure: 40 },
+    "2040": { levels: ["Medium", "Medium", "Medium", "Medium", "Medium", "Medium"], exposure: 57 },
+    "2050": { levels: ["Medium", "Medium", "Medium", "Medium", "Medium", "Medium"], exposure: 73 },
   },
   hothouse: {
-    "2030": {
-      levels: ["Medium", "High", "Medium", "Low", "Low", "Low"],
-      exposure: 54,
-      note: "Warming builds first; transition signals stay muted without strong policy.",
-    },
-    "2040": {
-      levels: ["High", "High", "Medium", "Low", "Low", "Low"],
-      exposure: 61,
-      note: "Physical hazards intensify across assets while transition friction remains light.",
-    },
-    "2050": {
-      levels: ["High", "High", "Medium", "Low", "Low", "Low"],
-      exposure: 64,
-      note: "Physical risk rises with warming; transition risk falls as delayed decarbonization stays weak. Illustrative demo only.",
-    },
+    "2030": { levels: ["Medium", "Medium", "Low", "Minimal", "Minimal", "Minimal"], exposure: 37 },
+    "2040": { levels: ["High", "High", "Medium", "Low", "Low", "Low"], exposure: 52 },
+    "2050": { levels: ["High", "High", "Medium", "Low", "Low", "Low"], exposure: 64 },
   },
 };
 
-const levelStyles: Record<RiskLevel, { bar: string; pill: string }> = {
-  High: { bar: "bg-[#E24B4A]", pill: "bg-[#FCECEC] text-[#B42318]" },
-  Medium: { bar: "bg-[#E8A317]", pill: "bg-[#FFF6E5] text-[#9A6700]" },
-  Low: { bar: "bg-[#33C08A]", pill: "bg-[#E7F3ED] text-[#0A4D3E]" },
+const levelMeta: Record<RiskLevel, { bar: string; pill: string; fill: number }> = {
+  High: { bar: "bg-[#E24B4A]", pill: "bg-[#FCECEC] text-[#B42318]", fill: 92 },
+  Medium: { bar: "bg-[#E8A317]", pill: "bg-[#FFF6E5] text-[#9A6700]", fill: 58 },
+  Low: { bar: "bg-[#33C08A]", pill: "bg-[#E7F3ED] text-[#0A4D3E]", fill: 34 },
+  Minimal: { bar: "bg-[#7BC9A8]", pill: "bg-[#EAF7F1] text-[#1D6B55]", fill: 18 },
 };
 
 const problems = [
@@ -280,19 +245,17 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
         </div>
       </section>
 
-      {/* Illustrative scenario tool */}
+      {/* Scenario tool */}
       <section className="bg-[#F8FCFA] py-16 sm:py-20">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mx-auto mb-10 max-w-3xl text-center sm:mb-12">
-            <p className="mb-3 text-[13px] font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
-              Interactive preview
-            </p>
             <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem] md:text-[2.75rem]">
               See how exposure shifts across warming scenarios
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#5B6B63] sm:text-lg">
               Switch between warming pathways and time horizons to watch physical and transition risk
-              trade places. Illustrative demo only — not live portfolio modelling.
+              trade places. This mirrors the scenario analysis regulators now expect under TCFD and
+              ISSB.
             </p>
           </motion.div>
 
@@ -301,11 +264,7 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
             className="overflow-hidden rounded-[1.75rem] border border-[#DCEAE2] bg-white p-5 shadow-[0_24px_60px_-36px_rgba(12,77,62,0.35)] sm:p-7 lg:p-8"
           >
             <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div
-                className="flex flex-wrap gap-2"
-                role="tablist"
-                aria-label="Illustrative warming pathway"
-              >
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Warming pathway">
                 {scenarios.map((item) => {
                   const active = item.key === scenario;
                   return (
@@ -327,11 +286,7 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
                   );
                 })}
               </div>
-              <div
-                className="flex flex-wrap gap-2"
-                role="tablist"
-                aria-label="Illustrative time horizon"
-              >
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Time horizon">
                 {horizons.map((year) => {
                   const active = year === horizon;
                   return (
@@ -355,29 +310,36 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] lg:gap-8">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(240px,0.75fr)] lg:gap-8">
               <ul className="divide-y divide-[#E8EEEA]">
                 {riskRows.map((row, index) => {
                   const level = demo.levels[index];
-                  const styles = levelStyles[level];
+                  const styles = levelMeta[level];
                   return (
                     <motion.li
                       key={`${row.id}-${scenario}-${horizon}`}
                       initial={prefersReducedMotion ? undefined : { opacity: 0, x: -8 }}
                       animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.03 }}
-                      className="flex items-center justify-between gap-4 py-3.5 first:pt-0 last:pb-0 sm:py-4"
+                      className="flex items-center justify-between gap-5 py-3.5 first:pt-0 last:pb-0 sm:gap-6 sm:py-4"
                     >
-                      <div className="min-w-0 text-left">
-                        <p className="text-[15px] font-semibold text-[#0A4D3E] sm:text-base">
+                      <div className="min-w-[11.5rem] shrink-0 text-left sm:min-w-[14rem]">
+                        <p className="whitespace-nowrap text-[15px] font-semibold text-[#0A4D3E] sm:text-base">
                           {row.label}
                         </p>
                         <p className="mt-0.5 text-[13px] text-[#7A958B] sm:text-sm">{row.kind}</p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2.5">
-                        <span className={`h-1.5 w-8 rounded-full sm:w-10 ${styles.bar}`} />
+                      <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                        <div className="h-1.5 w-full max-w-[7.5rem] overflow-hidden rounded-full bg-[#E8EEEA] sm:max-w-[9rem]">
+                          <motion.div
+                            className={`h-full rounded-full ${styles.bar}`}
+                            initial={prefersReducedMotion ? false : { width: 0 }}
+                            animate={{ width: `${styles.fill}%` }}
+                            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                          />
+                        </div>
                         <span
-                          className={`rounded-full px-2.5 py-1 text-[12px] font-semibold sm:text-[13px] ${styles.pill}`}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold sm:text-[13px] ${styles.pill}`}
                         >
                           {level}
                         </span>
@@ -412,12 +374,9 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
                         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                       />
                     </div>
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-[#9FE1CB]/80">
-                      Illustrative sample
-                    </p>
                   </div>
                   <p className="mt-8 text-[14px] leading-relaxed text-white/70 sm:text-[15px]">
-                    {demo.note}
+                    {AGGREGATE_NOTE}
                   </p>
                 </motion.aside>
               </AnimatePresence>
