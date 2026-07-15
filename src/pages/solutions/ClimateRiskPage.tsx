@@ -218,21 +218,21 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
             initial={prefersReducedMotion ? undefined : { opacity: 0, y: 14 }}
             animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-10 w-full max-w-xl sm:mt-12"
+            className="mt-10 w-full max-w-3xl sm:mt-12"
           >
-            <div className="flex flex-col items-stretch gap-3 rounded-2xl border border-white/15 bg-[#0a1a1d]/55 px-4 py-3.5 backdrop-blur-md sm:flex-row sm:items-center sm:justify-center sm:gap-0 sm:rounded-full sm:px-5 sm:py-2.5">
-              <div className="flex items-center justify-center gap-2 text-[14px] sm:text-[15px]">
+            <div className="flex flex-col items-stretch gap-3 rounded-2xl border border-white/15 bg-[#0a1a1d]/55 px-4 py-3.5 backdrop-blur-md sm:flex-row sm:items-center sm:justify-center sm:gap-0 sm:rounded-full sm:px-7 sm:py-3">
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap text-[14px] sm:text-[15px]">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-[#FFB800]" aria-hidden />
                 <span className="text-white/70">Overall Exposure:</span>
                 <span className="font-semibold text-[#FFB800]">Elevated</span>
               </div>
-              <span aria-hidden className="mx-4 hidden h-4 w-px bg-white/20 sm:block" />
-              <div className="flex items-center justify-center gap-1.5 text-[14px] sm:text-[15px]">
+              <span aria-hidden className="mx-4 hidden h-4 w-px shrink-0 bg-white/20 sm:block" />
+              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap text-[14px] sm:text-[15px]">
                 <span className="text-white/70">Physical:</span>
                 <span className="font-semibold text-white">Moderate</span>
               </div>
-              <span aria-hidden className="mx-4 hidden h-4 w-px bg-white/20 sm:block" />
-              <div className="flex items-center justify-center gap-1.5 text-[14px] sm:text-[15px]">
+              <span aria-hidden className="mx-4 hidden h-4 w-px shrink-0 bg-white/20 sm:block" />
+              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap text-[14px] sm:text-[15px]">
                 <span className="text-white/70">Transition:</span>
                 <span className="font-semibold text-[#FFB800]">Elevated</span>
               </div>
