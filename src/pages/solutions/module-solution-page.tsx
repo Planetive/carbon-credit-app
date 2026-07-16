@@ -13,6 +13,10 @@ import DigitalMrvPage from "./DigitalMrvPage";
 import EsgManagementPage from "./EsgManagementPage";
 import CarbonAccountingPage from "./CarbonAccountingPage";
 import CarbonManagementPage from "./CarbonManagementPage";
+import PortfolioManagementPage from "./PortfolioManagementPage";
+import AiCarbonConsultantPage from "./AiCarbonConsultantPage";
+import CarbonMarketsPage from "./CarbonMarketsPage";
+import SupplyChainIntelligencePage from "./SupplyChainIntelligencePage";
 import ClimateRiskPage from "./ClimateRiskPage";
 
 const isModuleKey = (value?: string): value is SolutionModuleKey =>
@@ -85,6 +89,54 @@ const ModuleSolutionPage = () => {
       >
         <MainHeader />
         <CarbonManagementPage prefersReducedMotion={!!prefersReducedMotion} />
+      </div>
+    );
+  }
+
+  if (current.key === "portfolio") {
+    return (
+      <div
+        className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]"
+        style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+      >
+        <MainHeader />
+        <PortfolioManagementPage prefersReducedMotion={!!prefersReducedMotion} />
+      </div>
+    );
+  }
+
+  if (current.key === "ai") {
+    return (
+      <div
+        className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]"
+        style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+      >
+        <MainHeader />
+        <AiCarbonConsultantPage prefersReducedMotion={!!prefersReducedMotion} />
+      </div>
+    );
+  }
+
+  if (current.key === "markets") {
+    return (
+      <div
+        className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]"
+        style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+      >
+        <MainHeader />
+        <CarbonMarketsPage prefersReducedMotion={!!prefersReducedMotion} />
+      </div>
+    );
+  }
+
+  if (current.key === "supplychain") {
+    return (
+      <div
+        className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]"
+        style={{ fontFamily: "'Manrope', 'Inter', sans-serif" }}
+      >
+        <MainHeader />
+        <SupplyChainIntelligencePage prefersReducedMotion={!!prefersReducedMotion} />
       </div>
     );
   }
