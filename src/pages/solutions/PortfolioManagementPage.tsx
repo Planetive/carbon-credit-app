@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, PieChart } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type PortfolioManagementPageProps = {
@@ -191,16 +191,6 @@ const PortfolioManagementPage = ({
         />
         <div className="relative z-10 mx-auto grid w-full max-w-[1280px] items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-14 lg:px-10">
           <div>
-            <motion.div
-              initial={prefersReducedMotion ? undefined : { opacity: 0, x: -18, filter: "blur(8px)" }}
-              animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.55 }}
-              className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#1D9E75]/35 bg-[#1D9E75]/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9FE1CB]"
-            >
-              <PieChart className="h-3.5 w-3.5" />
-              Portfolio Management
-            </motion.div>
-
             <motion.h1
               initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}

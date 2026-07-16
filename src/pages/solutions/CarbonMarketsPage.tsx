@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, CircleDollarSign } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type CarbonMarketsPageProps = {
@@ -450,16 +450,6 @@ const CarbonMarketsPage = ({ prefersReducedMotion: prefersReducedMotionProp }: C
 
         <div className="relative z-10 mx-auto grid w-full max-w-[1280px] items-center gap-8 px-4 py-6 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-10">
           <div>
-            <motion.div
-              initial={prefersReducedMotion ? undefined : { opacity: 0, x: -14 }}
-              animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              className="mb-4 inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.22em] text-[#7ECFB8] sm:mb-5 sm:text-sm"
-            >
-              <CircleDollarSign className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-              Carbon Markets
-            </motion.div>
-
             <motion.h1
               initial={prefersReducedMotion ? undefined : { opacity: 0, y: 18 }}
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}

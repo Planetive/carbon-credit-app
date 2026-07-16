@@ -1,12 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, Bot, Check, X } from "lucide-react";
+import { ArrowRight, Plug, Sparkles, Truck, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type AiCarbonConsultantPageProps = {
   prefersReducedMotion?: boolean;
 };
+
+const AI_STRATEGIST_QUERY =
+  "How can I reduce emissions by 30% before 2030 while staying under a $5M budget?";
+
+const aiStrategistStats = [
+  { label: "Projected reduction", value: "31%" },
+  { label: "Estimated investment", value: "$4.7M" },
+  { label: "Annual savings", value: "$1.2M" },
+  { label: "Payback period", value: "4.3 yrs" },
+];
+
+const aiStrategistInitiatives = [
+  { icon: Zap, label: "Fleet electrification" },
+  { icon: Plug, label: "Renewable PPAs" },
+  { icon: Truck, label: "Supplier optimisation" },
+];
 
 const recommendations = [
   {
@@ -62,13 +78,6 @@ const recommendations = [
   },
 ];
 
-const compareRows = [
-  { without: "Browse catalogues manually", with: "Criteria scored against global library" },
-  { without: "No link between budget and options", with: "Investment tier filters every match" },
-  { without: "Recommendations you cannot defend", with: "Match % and reasons on every card" },
-  { without: "Restart in the wizard from scratch", with: "One-click handoff pre-filled" },
-];
-
 const featureRows = [
   {
     title: "Structured goal intake",
@@ -99,7 +108,57 @@ const AiCarbonConsultantPage = ({
   const prefersReducedMotion = prefersReducedMotionProp ?? !!hookReduced;
   const heroCanvasRef = useRef<HTMLCanvasElement>(null);
   const [activeRec, setActiveRec] = useState(0);
+  const [typedLen, setTypedLen] = useState(0);
+  const [showInits, setShowInits] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showCta, setShowCta] = useState(false);
   const selected = recommendations[activeRec];
+
+  // AI strategist card — typing loop from carbon-management-landing.html
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setTypedLen(AI_STRATEGIST_QUERY.length);
+      setShowInits(true);
+      setShowStats(true);
+      setShowCta(true);
+      return;
+    }
+
+    let typeInterval: number | undefined;
+    let resetTimeout: number | undefined;
+    const timeouts: number[] = [];
+
+    const reset = () => {
+      setTypedLen(0);
+      setShowInits(false);
+      setShowStats(false);
+      setShowCta(false);
+    };
+
+    const runLoop = () => {
+      reset();
+      let i = 0;
+      typeInterval = window.setInterval(() => {
+        i += 1;
+        setTypedLen(i);
+        if (i >= AI_STRATEGIST_QUERY.length) {
+          window.clearInterval(typeInterval);
+          timeouts.push(window.setTimeout(() => setShowInits(true), 300));
+          timeouts.push(window.setTimeout(() => setShowStats(true), 600));
+          timeouts.push(window.setTimeout(() => setShowCta(true), 1800));
+          resetTimeout = window.setTimeout(runLoop, 9000);
+        }
+      }, 28);
+    };
+
+    runLoop();
+
+    return () => {
+      if (typeInterval) window.clearInterval(typeInterval);
+      if (resetTimeout) window.clearTimeout(resetTimeout);
+      timeouts.forEach((id) => window.clearTimeout(id));
+    };
+  }, [prefersReducedMotion]);
 
   // Drifting node network — distinct from home page sine-wave curves
   useEffect(() => {
@@ -247,16 +306,6 @@ const AiCarbonConsultantPage = ({
         )}
 
         <div className="relative z-10 mx-auto max-w-[920px] px-4 text-center sm:px-6">
-          <motion.div
-            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 12 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-6 inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.22em] text-[#7ECFB8] sm:text-sm"
-          >
-            <Bot className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-            AI Carbon Consultant
-          </motion.div>
-
           <motion.h1
             initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
@@ -282,43 +331,85 @@ const AiCarbonConsultantPage = ({
         </div>
       </section>
 
-      {/* Before / after — not audience cards */}
+      {/* AI Carbon Strategist */}
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-10">
-          <motion.div {...fadeUp} className="mb-12 text-center">
+          <motion.div {...fadeUp} className="mx-auto mb-12 max-w-2xl text-center">
             <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
-              Stop guessing which project to pursue
+              Ask a direct question. Get a ranked answer.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#5B6B63] sm:text-lg">
-              Teams spend weeks comparing catalogues. The consultant shortlists against your criteria
-              in one session.
+            <p className="mt-4 text-base leading-relaxed text-[#5B6B63] sm:text-lg">
+              Share your target, timeline and budget — the strategist surfaces initiatives,
+              projected reduction and estimated investment in one view.
             </p>
           </motion.div>
 
-          <div className="grid gap-0 overflow-hidden rounded-[1.5rem] border border-[#DCEAE2] sm:grid-cols-2">
-            <div className="bg-[#FAFAFA] p-6 sm:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9CA3AF]">Without</p>
-              <ul className="mt-5 space-y-4">
-                {compareRows.map((row) => (
-                  <li key={row.without} className="flex items-start gap-3 text-sm text-[#6B7280]">
-                    <X className="mt-0.5 h-4 w-4 shrink-0 text-[#D1D5DB]" strokeWidth={2} />
-                    <span>{row.without}</span>
-                  </li>
-                ))}
-              </ul>
+          <motion.div
+            {...fadeUp}
+            className="mx-auto flex min-h-[460px] max-w-[520px] flex-col rounded-[18px] border border-[#DCEAE2] bg-white p-5 shadow-[0_24px_60px_-36px_rgba(12,77,62,0.28)] sm:p-6"
+          >
+            <div className="mb-4 flex items-center gap-2 font-mono text-[11px] uppercase tracking-wide text-[#5B6B63]">
+              <Sparkles className="h-3.5 w-3.5 text-[#1D9E75]" strokeWidth={2} />
+              AI Carbon Strategist
             </div>
-            <div className="border-t border-[#DCEAE2] bg-[#F0FAF6] p-6 sm:border-l sm:border-t-0 sm:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1D9E75]">With consultant</p>
-              <ul className="mt-5 space-y-4">
-                {compareRows.map((row) => (
-                  <li key={row.with} className="flex items-start gap-3 text-sm font-medium text-[#0A4D3E]">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#1D9E75]" strokeWidth={2.5} />
-                    <span>{row.with}</span>
-                  </li>
-                ))}
-              </ul>
+
+            <div className="mb-4 min-h-[52px] rounded-xl bg-[#F0F1EC] px-4 py-3 text-[13px] font-medium leading-relaxed text-[#0A4D3E]">
+              {AI_STRATEGIST_QUERY.slice(0, typedLen)}
+              {!prefersReducedMotion && typedLen < AI_STRATEGIST_QUERY.length && (
+                <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-[#1D9E75] align-middle" />
+              )}
             </div>
-          </div>
+
+            <ul
+              className={[
+                "mb-4 space-y-1 transition-all duration-300",
+                showInits ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+              ].join(" ")}
+            >
+              {aiStrategistInitiatives.map(({ icon: Icon, label }) => (
+                <li key={label} className="flex items-center gap-2 py-1.5 text-[12.5px] text-[#5B6B63]">
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-[#1D9E75]" strokeWidth={2} />
+                  {label}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mb-4 grid grid-cols-2 gap-2.5">
+              {aiStrategistStats.map((stat, idx) => (
+                <div
+                  key={stat.label}
+                  className={[
+                    "rounded-[10px] bg-[#E7F3ED] px-3.5 py-3 transition-all duration-300",
+                    showStats ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+                  ].join(" ")}
+                  style={{ transitionDelay: showStats ? `${idx * 100}ms` : "0ms" }}
+                >
+                  <p className="font-mono text-[10px] uppercase tracking-wide text-[#0A4D3E]">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-[#0A4D3E]">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className={[
+                "mt-auto transition-opacity duration-300",
+                showCta ? "opacity-100" : "opacity-0",
+              ].join(" ")}
+            >
+              <Button
+                size="sm"
+                className="rounded-full bg-[#0A4D3E] px-5 py-2 text-sm font-semibold text-white hover:bg-[#11684E]"
+                asChild
+              >
+                <Link to="/login">
+                  Create action plan
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </motion.div>
         </div>
       </section>
 

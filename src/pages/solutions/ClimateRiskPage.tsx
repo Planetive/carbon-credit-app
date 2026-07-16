@@ -5,7 +5,6 @@ import {
   CloudLightning,
   FileText,
   LineChart,
-  Shield,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -150,16 +149,6 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
         )}
 
         <div className="relative z-10 mx-auto flex w-full max-w-[920px] flex-col items-center px-4 text-center sm:px-6">
-          <motion.div
-            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 14 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-6 inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.22em] text-[#7ECFB8] sm:text-sm"
-          >
-            <Shield className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-            Climate Risk Analysis
-          </motion.div>
-
           <motion.h1
             initial={prefersReducedMotion ? undefined : { opacity: 0, y: 20 }}
             animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}

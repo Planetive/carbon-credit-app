@@ -141,8 +141,6 @@ const ModuleSolutionPage = () => {
     );
   }
 
-  const ModuleIcon = current.icon;
-
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#F8FCFA] text-[#0B2B24]">
       <MainHeader />
@@ -165,10 +163,6 @@ const ModuleSolutionPage = () => {
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="lg:col-span-7"
             >
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#A8EAD2]">
-                <ModuleIcon className="h-3.5 w-3.5" />
-                {current.kicker}
-              </div>
               <h1 className="max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
                 {current.headline}
               </h1>

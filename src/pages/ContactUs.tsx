@@ -232,6 +232,9 @@ const ContactUs = () => {
   const fieldClass =
     "h-11 rounded-xl border-[#D5E5DD] bg-white text-[#0A4D3E] placeholder:text-[#7A958B] focus-visible:ring-[#1D9E75]/35 sm:h-12";
 
+  const googleCalendarEmbedUrl =
+    "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0KYY_N9Siwm7bagx_WOYaGMHvMNeobHmtL2DmmfyUbNaaVwZG43Xs7BrSNltwlKxnwOGBfjf_p?gv=true";
+
   const officeHours = [
     {
       icon: Clock,
@@ -294,15 +297,6 @@ const ContactUs = () => {
         )}
 
         <div className="container relative z-10 mx-auto px-4 sm:px-6 text-center">
-          <motion.p
-            initial={prefersReducedMotion ? undefined : { opacity: 0, y: 10 }}
-            animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-            className="mb-5 text-[11px] font-semibold uppercase tracking-[0.35em] text-[#9FE1CB] sm:text-xs"
-          >
-            Get in Touch
-          </motion.p>
-
           <motion.h1
             variants={prefersReducedMotion ? undefined : wordContainer}
             initial={prefersReducedMotion ? undefined : "hidden"}
@@ -337,26 +331,27 @@ const ContactUs = () => {
         </div>
       </section>
 
-      {/* Contact form */}
+      {/* Contact form + calendar */}
       <section className="relative z-10 -mt-10 pb-16 sm:-mt-14 sm:pb-20">
         <div className="container mx-auto px-4 sm:px-6">
-          <motion.div
-            {...fadeUp}
-            className="mx-auto max-w-2xl overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
-          >
-            <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
-                Contact form
-              </p>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E] sm:text-3xl">
-                Get Started Today
-              </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#4E6C63] sm:text-base">
-                Tell us about your carbon management needs and we'll help you find the perfect solution.
-              </p>
-            </div>
+          <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-2 lg:gap-10">
+            <motion.div
+              {...fadeUp}
+              className="overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
+            >
+              <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
+                  Contact form
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E] sm:text-3xl">
+                  Get Started Today
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#4E6C63] sm:text-base">
+                  Tell us about your carbon management needs and we'll help you find the perfect solution.
+                </p>
+              </div>
 
-            <div className="p-6 sm:p-8 md:p-10">
+              <div className="p-6 sm:p-8 md:p-10">
               {submitStatus === "success" && (
                 <div className="mb-6 rounded-2xl border border-[#B7E4D1] bg-[#EEF9F3] p-4">
                   <div className="flex items-start gap-3">
@@ -507,8 +502,36 @@ const ContactUs = () => {
                   )}
                 </Button>
               </form>
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              {...fadeUp}
+              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
+            >
+              <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
+                  Book a call
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E] sm:text-3xl">
+                  Schedule a Meeting
+                </h2>
+                <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#4E6C63] sm:text-base">
+                  Pick a time that works for you and we'll connect to discuss your sustainability goals.
+                </p>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                <iframe
+                  src={googleCalendarEmbedUrl}
+                  title="Schedule a meeting with Rethink Carbon"
+                  className="min-h-[600px] w-full rounded-xl border-0"
+                  height={600}
+                />
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
