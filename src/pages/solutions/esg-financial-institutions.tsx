@@ -56,18 +56,6 @@ const ESGFinancialInstitutions = () => {
         <section className="relative overflow-hidden bg-white">
           <div className="container mx-auto px-6 py-20 md:py-32">
             <div className="max-w-5xl mx-auto text-center">
-              {/* Badge */}
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="flex flex-wrap items-center justify-center gap-3 mb-12"
-              >
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded bg-gray-900 text-white text-sm font-medium">
-                  <span>Carbon Intelligence for Financial Institutions</span>
-                </div>
-              </motion.div>
-
               {/* Main Heading */}
               <motion.h1
                 initial={{ opacity: 0, y: 30 }}

@@ -263,7 +263,7 @@ const Landing = () => {
               transition={{ duration: 0.5, ease: "easeOut" }}
               className="mb-5 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.35em] text-[#9FE1CB]"
             >
-              Measure. Decarbonise. Transform.
+              Measure. Decarbonize. Transform.
             </motion.div>
 
             <motion.h1

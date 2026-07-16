@@ -331,14 +331,40 @@ const ContactUs = () => {
         </div>
       </section>
 
-      {/* Contact form + calendar */}
+      {/* Calendar + contact form */}
       <section className="relative z-10 -mt-10 pb-16 sm:-mt-14 sm:pb-20">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-2 lg:gap-10">
-            <motion.div
-              {...fadeUp}
-              className="overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
-            >
+        <div className="container mx-auto flex flex-col gap-12 px-4 sm:px-6">
+          <motion.div
+            {...fadeUp}
+            className="mx-auto w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
+          >
+            <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
+                Book a call
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E] sm:text-3xl">
+                Schedule a Meeting
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#4E6C63] sm:text-base">
+                Pick a time that works for you and we'll connect to discuss your sustainability goals.
+              </p>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              <iframe
+                src={googleCalendarEmbedUrl}
+                title="Schedule a meeting with Rethink Carbon"
+                className="min-h-[640px] w-full rounded-xl border-0 sm:min-h-[700px]"
+                height={700}
+              />
+            </div>
+          </motion.div>
+
+          <motion.div
+            {...fadeUp}
+            transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            className="mx-auto w-full max-w-2xl overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
+          >
               <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
                   Contact form
@@ -504,34 +530,6 @@ const ContactUs = () => {
               </form>
               </div>
             </motion.div>
-
-            <motion.div
-              {...fadeUp}
-              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden rounded-[28px] border border-[#DCEAE2] bg-white shadow-[0_24px_60px_-28px_rgba(12,77,62,0.35)]"
-            >
-              <div className="border-b border-[#E6F0EB] bg-[#F7F4EE]/60 px-6 py-8 text-center sm:px-10 sm:py-10">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
-                  Book a call
-                </p>
-                <h2 className="text-2xl font-semibold tracking-tight text-[#0A4D3E] sm:text-3xl">
-                  Schedule a Meeting
-                </h2>
-                <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#4E6C63] sm:text-base">
-                  Pick a time that works for you and we'll connect to discuss your sustainability goals.
-                </p>
-              </div>
-
-              <div className="p-4 sm:p-6">
-                <iframe
-                  src={googleCalendarEmbedUrl}
-                  title="Schedule a meeting with Rethink Carbon"
-                  className="min-h-[600px] w-full rounded-xl border-0"
-                  height={600}
-                />
-              </div>
-            </motion.div>
-          </div>
         </div>
       </section>
 
