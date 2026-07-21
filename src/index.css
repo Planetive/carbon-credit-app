@@ -1,4 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
 
 @tailwind base;
 @tailwind components;
@@ -55,6 +57,14 @@ All colors MUST be HSL.
     --sidebar-border: 173 58% 91%;
 
     --sidebar-ring: 172 66% 50%;
+
+    /* Geist type scale */
+    --type-hero: 38px;
+    --type-subtitle: 16px;
+    --type-kpi-value: 20px;
+    --type-kpi-label: 11px;
+    --type-sidebar: 14px;
+    --type-body: 14px;
   }
 
   .dark {
@@ -102,7 +112,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans text-sm font-normal antialiased;
   }
 }
 
@@ -137,6 +147,32 @@ All colors MUST be HSL.
 
   @media (prefers-reduced-motion: reduce) {
     .hero-shimmer {
+      animation: none;
+    }
+  }
+
+  @keyframes mrvShimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .mrv-shimmer {
+    background-image: linear-gradient(
+      100deg,
+      rgba(226, 232, 240, 0.7) 8%,
+      rgba(248, 250, 252, 0.95) 18%,
+      rgba(226, 232, 240, 0.7) 33%
+    );
+    background-size: 220% 100%;
+    animation: mrvShimmer 2.8s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mrv-shimmer {
       animation: none;
     }
   }

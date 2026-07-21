@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus, Grid3X3, Factory, Layers } from "lucide-react";
+import { Home, Compass, BarChart3, User, Settings as SettingsIcon, LogOut, FileText, Menu, X, Lock, ChevronDown, Building2, Check, Plus, Grid3X3, Factory, Layers, Activity, Globe2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
@@ -382,6 +382,22 @@ const AppHeader = () => {
                   <Factory className="mr-2 h-4 w-4" />
                   <span>Emission Calculator</span>
                 </DropdownMenuItem>
+                {userType === "corporate" && (
+                  <DropdownMenuItem
+                    onClick={() => navigate("/asset-monitoring")}
+                    className="cursor-pointer"
+                  >
+                    <Activity className="mr-2 h-4 w-4" />
+                    <span>Asset Monitoring</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => navigate("/supply-chain-intelligence")}
+                  className="cursor-pointer"
+                >
+                  <Globe2 className="mr-2 h-4 w-4" />
+                  <span>Supply Chain intelligence</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/reports")}
                   className="cursor-pointer"
@@ -463,7 +479,9 @@ const AppHeader = () => {
                       location.pathname === "/esg-health-check" ||
                       location.pathname === "/emission-calculator" ||
                       location.pathname === "/emission-calculator-uk" ||
-                      location.pathname === "/emission-calculator-epa";
+                      location.pathname === "/emission-calculator-epa" ||
+                      location.pathname.startsWith("/asset-monitoring") ||
+                      location.pathname === "/supply-chain-intelligence";
 
                     const isOverviewActive =
                       location.pathname === "/dashboard" &&
@@ -484,6 +502,10 @@ const AppHeader = () => {
                       location.pathname === "/emission-calculator" ||
                       location.pathname === "/emission-calculator-uk" ||
                       location.pathname === "/emission-calculator-epa";
+                    const isAssetMonitoringActive =
+                      location.pathname.startsWith("/asset-monitoring");
+                    const isSupplyChainActive =
+                      location.pathname === "/supply-chain-intelligence";
 
                     return (
                       <div key={to} className="space-y-1">
@@ -644,6 +666,38 @@ const AppHeader = () => {
                             >
                               <Factory className="h-4 w-4" />
                               <span>Emission Calculator</span>
+                            </button>
+                            {userType === "corporate" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigate("/asset-monitoring");
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                  isAssetMonitoringActive
+                                    ? "bg-primary text-white"
+                                    : "text-gray-700 hover:bg-gray-100"
+                                }`}
+                              >
+                                <Activity className="h-4 w-4" />
+                                <span>Asset Monitoring</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate("/supply-chain-intelligence");
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
+                                isSupplyChainActive
+                                  ? "bg-primary text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              }`}
+                            >
+                              <Globe2 className="h-4 w-4" />
+                              <span>Supply Chain intelligence</span>
                             </button>
                             <button
                               type="button"

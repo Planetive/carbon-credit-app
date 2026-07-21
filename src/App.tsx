@@ -98,6 +98,7 @@ import UserManagement from "./pages/UserManagement";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Settings from "./pages/Settings";
 import SupplyChainIntelligence from "./pages/SupplyChainIntelligence";
+import AssetMonitoring from "./pages/AssetMonitoring";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DataConsent from "./pages/DataConsent";
@@ -458,6 +459,11 @@ const AppRoutes = () => {
           <Route path="/settings" element={
             <CompanyProtectedRoute>
               <Settings />
+            </CompanyProtectedRoute>
+          } />
+          <Route path="/asset-monitoring" element={
+            <CompanyProtectedRoute>
+              <AssetMonitoring />
             </CompanyProtectedRoute>
           } />
           <Route path="/supply-chain-intelligence" element={

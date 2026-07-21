@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { exportPortfolioPdfReport, formatDataQualityScoresFromStoredResults } from "@/utils/portfolioPdfExport";
+import CompanyOverviewScreen from "@/features/dashboard/CompanyOverviewScreen";
 // Onboarding wizard gate removed; users go straight to dashboard
 
 const Dashboard2 = () => {
@@ -214,7 +215,7 @@ const Dashboard2 = () => {
         // Fetch admin scores if assessment exists
         const { data: scoresData, error: scoresError } = await supabase
           .from("esg_scores")
-          .select("readiness_overall_score, readiness_maturity_band, scored_at")
+          .select("readiness_overall_score, readiness_maturity_band, readiness_results, scored_at")
           .eq("assessment_id", esgData.id)
           .maybeSingle();
           
@@ -845,573 +846,65 @@ const Dashboard2 = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="w-full">
       <AnimatePresence mode="wait">
             {activeSection === 'overview' ? (
               <motion.div
                 key="overview"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
-                className="max-w-7xl mx-auto"
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.35 }}
               >
-                {/* Welcome Section - Enhanced */}
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="mb-8 relative"
-                >
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-600 p-8 text-white shadow-2xl">
-                    {/* Animated Background Pattern */}
-                    <div className="absolute inset-0 opacity-10">
-                      <div className="absolute inset-0" style={{
-                        backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
-                        backgroundSize: '40px 40px'
-                      }} />
-                    </div>
-                    
-                    <div className="relative z-10">
-                      <motion.div
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.3, type: "spring", bounce: 0.4 }}
-                        className="flex items-center space-x-4 mb-4"
-                      >
-                        <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-lg">
-                          <Sparkles className="h-8 w-8 text-white" />
-                        </div>
-                        <div>
-                          <h2 className="text-3xl md:text-4xl font-bold mb-1">
-                            {displayName ? `Welcome back, ${displayName}! 👋` : "Welcome to your Dashboard! 👋"}
-                          </h2>
-                          <p className="text-teal-100 text-lg">
-                            Track your organization's sustainability progress and carbon footprint
-                          </p>
-                        </div>
-                      </motion.div>
-                    </div>
-                    
-                    {/* Floating Elements */}
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                      className="absolute top-4 right-4 w-20 h-20 bg-white/10 rounded-full blur-xl"
-                    />
-                    <motion.div
-                      animate={{ y: [0, 10, 0] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                      className="absolute bottom-4 left-4 w-32 h-32 bg-cyan-400/20 rounded-full blur-2xl"
-                    />
-                  </div>
-                </motion.div>
-
-
-              {/* Top Row - Main Metrics - Beautiful Animated Cards (Financial Institution Only) */}
-              {userTypeResolved && userType === 'financial_institution' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
-                  {/* Finance Emission Card */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    whileHover={{ y: -5, scale: 1.02 }}
-                    className="group"
-                  >
-                    <Card 
-                      className="bg-white border border-gray-200/80 shadow-md hover:border-teal-300/60 hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 cursor-pointer overflow-hidden relative h-full flex flex-col"
-                      onClick={() => navigate('/bank-portfolio')}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                        <div className="flex items-center justify-between flex-1">
-                          <div className="flex-1 flex flex-col justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-500 mb-1">Finance Emission</p>
-                              <motion.p 
-                                key={financeEmissionData?.financed_emissions}
-                                initial={{ scale: 1.2, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent"
-                              >
-                                {financeEmissionData ? `${financeEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : '0.0 tCO2e'}
-                              </motion.p>
-                            </div>
-                            <div className="mt-2 min-h-[20px]">
-                              {financeEmissionData && financeEmissionData.total_companies > 0 ? (
-                                <p className="text-xs text-gray-500 flex items-center space-x-1">
-                                  <Activity className="h-3 w-3" />
-                                  <span>{financeEmissionData.total_companies} {financeEmissionData.total_companies === 1 ? 'company' : 'companies'}</span>
-                                </p>
-                              ) : (
-                                <div className="h-5"></div>
-                              )}
-                            </div>
-                          </div>
-                          <motion.div 
-                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                            transition={{ duration: 0.5 }}
-                            className="w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/30"
-                          >
-                            <Factory className="h-7 w-7 text-white" />
-                          </motion.div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  {/* Facilitated Emission Card */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    whileHover={{ y: -5, scale: 1.02 }}
-                    className="group"
-                  >
-                    <Card className="bg-white border border-gray-200/80 shadow-md hover:border-emerald-300/60 hover:shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                        <div className="flex items-center justify-between flex-1">
-                          <div className="flex-1 flex flex-col justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-500 mb-1">Facilitated Emission</p>
-                              <motion.p 
-                                key={facilitatedEmissionData?.financed_emissions}
-                                initial={{ scale: 1.2, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"
-                              >
-                                {facilitatedEmissionData ? `${facilitatedEmissionData.financed_emissions?.toFixed(1) || '0.0'} tCO2e` : (
-                                  <span className="text-gray-400 text-xl">—</span>
-                                )}
-                              </motion.p>
-                            </div>
-                            <div className="mt-2 min-h-[20px]">
-                              <div className="h-5"></div>
-                            </div>
-                          </div>
-                          <motion.div 
-                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                            transition={{ duration: 0.5 }}
-                            className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30"
-                          >
-                            <BarChart3 className="h-7 w-7 text-white" />
-                          </motion.div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  {/* Risk Assessment Card */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    whileHover={{ y: -5, scale: 1.02 }}
-                    className="group"
-                  >
-                    <Card className="bg-white border border-gray-200/80 shadow-md hover:border-orange-300/60 hover:shadow-xl hover:shadow-orange-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col">
-                      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
-                        <div className="flex items-center justify-between flex-1">
-                          <div className="flex-1 flex flex-col justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-500 mb-1">Risk Assessment</p>
-                              <motion.p 
-                                key={riskAssessmentData?.risk_score}
-                                initial={{ scale: 1.2, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent"
-                              >
-                                {riskAssessmentData ? `${riskAssessmentData.risk_score || '—'}` : (
-                                  <span className="text-gray-400 text-xl flex items-center gap-2">
-                                    <Sparkles className="h-5 w-5" />
-                                    Ready
-                                  </span>
-                                )}
-                              </motion.p>
-                            </div>
-                            <div className="mt-2 min-h-[20px]">
-                              <div className="h-5"></div>
-                            </div>
-                          </div>
-                          <motion.div 
-                            whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                            transition={{ duration: 0.5 }}
-                            className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30"
-                          >
-                            <Shield className="h-7 w-7 text-white" />
-                          </motion.div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </div>
-              )}
-
-              {/* Bottom Row - Secondary Metrics - Beautiful Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {/* Total Projects Card */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.6 }}
-                  whileHover={{ y: -3, scale: 1.03 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-blue-300/60 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardContent className="p-6 relative z-10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500 mb-2">Total Projects</p>
-                          <motion.p 
-                            key={projects.length}
-                            initial={{ scale: 1.3, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-3xl font-bold text-gray-900"
-                          >
-                            {projects.length}
-                          </motion.p>
-                        </div>
-                        <motion.div 
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.6 }}
-                          className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md"
-                        >
-                          <FileText className="h-6 w-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* ESG Score Card */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.7 }}
-                  whileHover={{ y: -3, scale: 1.03 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-purple-300/60 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardContent className="p-6 relative z-10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500 mb-2">ESG Score</p>
-                          <motion.p 
-                            key={esgScores?.readiness_overall_score}
-                            initial={{ scale: 1.3, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
-                          >
-                            {esgScores?.readiness_overall_score != null ? `${Math.round(esgScores.readiness_overall_score)}%` : (
-                              <span className="text-gray-400 text-xl">—</span>
-                            )}
-                          </motion.p>
-                        </div>
-                        <motion.div 
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.6 }}
-                          className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md"
-                        >
-                          <TrendingUp className="h-6 w-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Emissions Tracked Card */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.8 }}
-                  whileHover={{ y: -3, scale: 1.03 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-green-300/60 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardContent className="p-6 relative z-10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500 mb-2">Emissions Tracked</p>
-                          <motion.div
-                            key={hasAnyEmissions ? 'yes' : 'no'}
-                            initial={{ scale: 1.3, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="flex items-center space-x-2"
-                          >
-                            <span className="text-3xl font-bold text-gray-900">
-                              {hasAnyEmissions ? 'Yes' : 'No'}
-                            </span>
-                            {hasAnyEmissions && (
-                              <motion.div
-                                animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                              >
-                                <Zap className="h-5 w-5 text-green-500" />
-                              </motion.div>
-                            )}
-                          </motion.div>
-                        </div>
-                        <motion.div 
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.6 }}
-                          className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md"
-                        >
-                          <Factory className="h-6 w-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                {/* Assessment Status Card */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.9 }}
-                  whileHover={{ y: -3, scale: 1.03 }}
-                  className="group"
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:border-cyan-300/60 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardContent className="p-6 relative z-10">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500 mb-2">Assessment Status</p>
-                          <motion.p 
-                            key={esgAssessment?.status}
-                            initial={{ scale: 1.3, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-3xl font-bold text-gray-900"
-                          >
-                            {esgAssessment ? (esgAssessment.status === 'submitted' ? 'Complete' : 'Draft') : (
-                              <span className="text-gray-400 text-xl flex items-center gap-2">
-                                <Plus className="h-5 w-5" />
-                                Begin
-                              </span>
-                            )}
-                          </motion.p>
-                        </div>
-                        <motion.div 
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.6 }}
-                          className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md"
-                        >
-                          <BarChart3 className="h-6 w-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
-
-              {/* Emissions Footprint Section - Enhanced */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 1 }}
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 overflow-hidden relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardHeader className="relative z-10">
-                      <CardTitle className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <Factory className="h-5 w-5 text-white" />
-                        </div>
-                        <span className="text-xl font-bold text-gray-900">Emissions Overview</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                      <div className="space-y-4">
-                        <motion.div 
-                          whileHover={{ scale: 1.02, x: 4 }}
-                          className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-100/50 hover:border-red-200 transition-all"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <motion.div 
-                              animate={{ scale: [1, 1.2, 1] }}
-                              transition={{ duration: 2, repeat: Infinity }}
-                              className="w-4 h-4 bg-red-500 rounded-full shadow-lg shadow-red-500/50"
-                            />
-                            <span className="text-sm font-semibold text-gray-700">Scope 1 Emissions</span>
-                          </div>
-                          <span className="text-sm font-bold text-gray-900">
-                            {scope1Total > 0 
-                              ? `${scope1Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
-                              : <span className="text-gray-400">—</span>}
-                          </span>
-                        </motion.div>
-                        <motion.div 
-                          whileHover={{ scale: 1.02, x: 4 }}
-                          className="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-100/50 hover:border-yellow-200 transition-all"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <motion.div 
-                              animate={{ scale: [1, 1.2, 1] }}
-                              transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-                              className="w-4 h-4 bg-yellow-500 rounded-full shadow-lg shadow-yellow-500/50"
-                            />
-                            <span className="text-sm font-semibold text-gray-700">Scope 2 Emissions</span>
-                          </div>
-                          <span className="text-sm font-bold text-gray-900">
-                            {scope2Total > 0 
-                              ? `${scope2Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
-                              : <span className="text-gray-400">—</span>}
-                          </span>
-                        </motion.div>
-                        <motion.div 
-                          whileHover={{ scale: 1.02, x: 4 }}
-                          className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100/50 hover:border-blue-200 transition-all"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <motion.div 
-                              animate={{ scale: [1, 1.2, 1] }}
-                              transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
-                              className="w-4 h-4 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"
-                            />
-                            <span className="text-sm font-semibold text-gray-700">Scope 3 Emissions</span>
-                          </div>
-                          <span className="text-sm font-bold text-gray-900">
-                            {scope3Total > 0 
-                              ? `${scope3Total.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO2e`
-                              : <span className="text-gray-400">—</span>}
-                          </span>
-                        </motion.div>
-                      </div>
-                      <motion.div className="mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <Button 
-                          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
-                          onClick={() => navigate('/emission-results-calculator')}
-                        >
-                          {hasAnyEmissions ? 'View Emission Results' : 'Start Emission Calculation'}
-                        </Button>
-                      </motion.div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 1.1 }}
-                >
-                  <Card className="bg-white border border-gray-200/80 shadow-md hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 overflow-hidden relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <CardHeader className="relative z-10">
-                      <CardTitle className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <BarChart3 className="h-5 w-5 text-white" />
-                        </div>
-                        <span className="text-xl font-bold text-gray-900">ESG Progress</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                      {esgAssessment ? (
-                        <div className="space-y-6">
-                          <div className="space-y-3">
-                            <div className="flex justify-between text-sm font-medium">
-                              <span className="text-gray-700">Assessment progress</span>
-                              <span className="text-gray-900 font-bold">{esgAssessment.total_completion ?? 0}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${esgAssessment.total_completion ?? 0}%` }}
-                                transition={{ duration: 1, ease: "easeOut" }}
-                                className="bg-gradient-to-r from-teal-500 to-cyan-600 h-3 rounded-full shadow-lg"
-                              />
-                            </div>
-                          </div>
-                          {esgScores?.readiness_overall_score != null && (
-                            <p className="text-sm text-gray-600">
-                              Readiness score:{" "}
-                              <span className="font-semibold text-gray-900">
-                                {Math.round(esgScores.readiness_overall_score)}%
-                              </span>
-                              {esgScores.readiness_maturity_band ? ` · ${esgScores.readiness_maturity_band}` : ""}
-                            </p>
-                          )}
-                          <motion.div className="mt-6" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button 
-                              className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
-                              onClick={() => navigate('/esg-health-check')}
-                            >
-                              {esgAssessment.status === 'submitted' ? 'View Results' : 'Continue Assessment'}
-                            </Button>
-                          </motion.div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <motion.div
-                            animate={{ rotate: [0, 10, -10, 0] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          >
-                            <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                          </motion.div>
-                          <p className="text-gray-600 mb-6 font-medium">Ready to begin your ESG journey</p>
-                          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button 
-                              className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
-                              onClick={() => navigate('/esg-health-check')}
-                            >
-                              Start ESG Assessment
-                            </Button>
-                          </motion.div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </div>
-
-              {/* Quick Actions - show once resolved, or immediately (same card for both types) */}
-              {(userTypeResolved ? (userType === 'corporate' || userType === 'financial_institution') : true) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.2 }}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                >
-                  <motion.div
-                    whileHover={{ y: -8, scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Link to="/project-wizard">
-                      <Card className="bg-white border border-gray-200/80 shadow-md hover:border-green-300/60 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 cursor-pointer h-full overflow-hidden relative group">
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <CardContent className="p-6 relative z-10">
-                          <div className="flex items-center space-x-4">
-                            <motion.div 
-                              whileHover={{ rotate: [0, -10, 10, 0] }}
-                              transition={{ duration: 0.5 }}
-                              className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30"
-                            >
-                              <Plus className="h-7 w-7 text-white" />
-                            </motion.div>
-                            <div className="flex-1">
-                              <h3 className="font-bold text-gray-900 text-lg mb-1">Start New Project</h3>
-                              <p className="text-sm text-gray-600">Begin your project wizard</p>
-                            </div>
-                            <motion.div
-                              animate={{ x: [0, 4, 0] }}
-                              transition={{ duration: 1.5, repeat: Infinity }}
-                            >
-                              <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition-colors" />
-                            </motion.div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                </motion.div>
-              )}
-            </motion.div>
+                <CompanyOverviewScreen
+                  displayName={displayName || profileForm.displayName || "Farhan"}
+                  organizationName={organizationName || profileForm.organizationName || "Rethink Carbon"}
+                  projectsCount={projects.length}
+                  esgScorePercent={
+                    esgScores?.readiness_overall_score != null
+                      ? Math.round(Number(esgScores.readiness_overall_score))
+                      : null
+                  }
+                  esgMaturityLabel={esgScores?.readiness_maturity_band || (esgAssessment ? "In progress" : "Not scored")}
+                  assessmentStatusLabel={
+                    esgAssessment?.status === "submitted"
+                      ? "Complete"
+                      : esgAssessment
+                        ? "Draft"
+                        : "Not started"
+                  }
+                  assessmentProgressPercent={
+                    typeof esgAssessment?.total_completion === "number"
+                      ? Math.round(esgAssessment.total_completion)
+                      : 0
+                  }
+                  impactEnvironmentPercent={
+                    Number(
+                      (esgScores?.readiness_results as any)?.pillarSummary?.find(
+                        (p: any) => p.pillarId === "climate_metrics"
+                      )?.pillarPercent
+                    ) || 0
+                  }
+                  impactSocialPercent={
+                    Number(
+                      (esgScores?.readiness_results as any)?.pillarSummary?.find(
+                        (p: any) => p.pillarId === "strategy"
+                      )?.pillarPercent
+                    ) || 0
+                  }
+                  impactGovernancePercent={
+                    Number(
+                      (esgScores?.readiness_results as any)?.pillarSummary?.find(
+                        (p: any) => p.pillarId === "governance"
+                      )?.pillarPercent
+                    ) || 0
+                  }
+                  emissionsTracked={hasAnyEmissions}
+                  scope1Kg={scope1Total}
+                  scope2Kg={scope2Total}
+                  scope3Kg={scope3Total}
+                />
+              </motion.div>
           ) : activeSection === 'portfolio' && userType === 'financial_institution' ? (
             <motion.div
               key="portfolio"

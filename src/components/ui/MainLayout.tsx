@@ -23,10 +23,12 @@ const MainLayout = () => {
     '/esg-health-check',
     '/project-wizard',
     '/reports',
+    '/asset-monitoring',
     '/supply-chain-intelligence',
   ];
 
   const shouldShowSidebar = sidebarRoutes.some(route => location.pathname.startsWith(route));
+  const isAssetMonitoringRoute = location.pathname.startsWith("/asset-monitoring");
 
   // Check if navigation state has activeSection and set it
   useEffect(() => {
@@ -99,19 +101,22 @@ const MainLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-teal-50/40 to-cyan-50/60 flex flex-col">
-      <AppHeader />
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar: visible on large screens and up */}
-        <div className="hidden lg:flex">
-          <DashboardSidebar 
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-          />
+    <div className="min-h-screen bg-[#F3F5F4] flex flex-col lg:h-screen lg:max-h-screen lg:overflow-hidden">
+      <div className="lg:hidden flex-shrink-0">
+        <AppHeader />
+      </div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="hidden lg:flex flex-shrink-0 sticky top-0 self-start h-full lg:h-screen lg:max-h-screen">
+          <DashboardSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
         </div>
-        {/* Main content: full-width on mobile, alongside sidebar on desktop */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-          <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 lg:p-10 bg-slate-50">
+        <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
+          <main
+            className={
+              isAssetMonitoringRoute
+                ? "flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-[#F8FAF8] p-0"
+                : "flex-1 min-h-0 overflow-y-auto custom-scrollbar pt-4 px-[18px] pb-5"
+            }
+          >
             <Outlet context={{ activeSection, setActiveSection }} />
           </main>
         </div>
