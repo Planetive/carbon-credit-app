@@ -16,7 +16,7 @@ const SECTION_SHELL =
   "rounded-[22px] border border-[#EEF2F2] bg-white/75 p-6 backdrop-blur-sm";
 
 const CARD_SHELL =
-  "group relative flex h-full min-h-[248px] flex-col rounded-[18px] border border-[#E8EEF0] bg-white p-5 shadow-[0_6px_20px_rgba(15,23,42,0.05)] outline-none transition-[transform,box-shadow,border-color] duration-[220ms] ease-in-out will-change-transform hover:-translate-y-1 hover:border-[#B8DCCF] hover:shadow-[0_14px_34px_rgba(15,23,42,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+  "group relative flex h-full min-h-[248px] flex-col rounded-[18px] border border-[#E8EEF0] bg-white p-5 shadow-[0_6px_20px_rgba(15,23,42,0.05)] outline-none transition-[transform,box-shadow,border-color] duration-200 ease-in-out will-change-transform hover:-translate-y-1 hover:border-[#B8DCCF] hover:shadow-[0_14px_34px_rgba(15,23,42,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
 const sectionIcons = {
   agriculture: Sprout,
@@ -105,10 +105,10 @@ function MrvLauncherCard({
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] transition-[transform,background-color] duration-[220ms] ease-in-out group-hover:scale-[1.03] ${iconContainerBg[sectionIconKey]}`}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] transition-[transform,background-color] duration-200 ease-in-out group-hover:scale-[1.03] ${iconContainerBg[sectionIconKey]}`}
           >
             <ModIcon
-              className={`h-6 w-6 ${tone.icon} transition-transform duration-[220ms] ease-in-out group-hover:-translate-y-px motion-reduce:group-hover:translate-y-0`}
+              className={`h-6 w-6 ${tone.icon} transition-transform duration-200 ease-in-out group-hover:-translate-y-px motion-reduce:group-hover:translate-y-0`}
               strokeWidth={2}
               aria-hidden
             />
@@ -144,7 +144,7 @@ function MrvLauncherCard({
         <span className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[#0F766E] bg-white px-4 text-[13px] font-medium text-[#0F766E] transition-colors duration-200 ease-in-out group-hover:bg-[#0F766E] group-hover:text-white">
           {cta}
           <ArrowRight
-            className="h-3.5 w-3.5 transition-transform duration-[190ms] ease-in-out group-hover:translate-x-1 motion-reduce:group-hover:translate-x-0"
+            className="h-3.5 w-3.5 transition-transform duration-200 ease-in-out group-hover:translate-x-1 motion-reduce:group-hover:translate-x-0"
             aria-hidden
           />
         </span>

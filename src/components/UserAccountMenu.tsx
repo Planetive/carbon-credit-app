@@ -33,6 +33,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 
+/** Matches logged-in sidebar / overview forest accents (not teal). */
+const FOREST = "#0B3D2E";
+const FOREST_MID = "#0F3D32";
+const FOREST_SOFT_BG = "#E8F3EF";
+
 interface UserAccountMenuProps {
   trigger: ReactNode;
   side?: "top" | "bottom" | "left" | "right";
@@ -133,16 +138,16 @@ const UserAccountMenu = ({
       <DropdownMenuContent side={side} align={align} sideOffset={8} className={contentClassName}>
         <DropdownMenuLabel className="font-normal px-3 py-2.5">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
+            <p className="text-sm font-medium leading-none text-[#0F172A]">
               {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
             </p>
-            <p className="text-xs leading-none text-teal-700">{user?.email}</p>
+            <p className="text-xs leading-none text-[#64748B]">{user?.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         <div className="px-1">
-          <DropdownMenuLabel className="text-xs font-semibold text-teal-700 px-2 py-2">
+          <DropdownMenuLabel className="text-xs font-semibold px-2 py-2" style={{ color: FOREST_MID }}>
             Organizations
           </DropdownMenuLabel>
 
@@ -160,23 +165,43 @@ const UserAccountMenu = ({
                       if (!isCurrent) handleSwitchOrganization(org.id);
                     }}
                     disabled={isCurrent || isSwitching}
-                    className={`mx-1 my-0.5 rounded-md ${
+                    className={`mx-1 my-0.5 rounded-md data-[disabled]:opacity-100 ${
                       isCurrent
-                        ? "bg-primary/10 text-primary font-medium cursor-default opacity-100"
-                        : "cursor-pointer hover:bg-accent"
+                        ? "font-medium cursor-default"
+                        : "cursor-pointer text-[#0F172A] hover:bg-[#F8FAF8]"
                     } ${isSwitching ? "opacity-50 cursor-wait" : ""}`}
+                    style={
+                      isCurrent
+                        ? { backgroundColor: FOREST_SOFT_BG, color: FOREST }
+                        : undefined
+                    }
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Building2 className={`h-4 w-4 flex-shrink-0 ${isCurrent ? "text-primary" : ""}`} />
-                        <span className="truncate text-sm font-medium">{org.name}</span>
+                        <Building2
+                          className="h-4 w-4 flex-shrink-0"
+                          style={{ color: isCurrent ? FOREST : "#64748B" }}
+                        />
+                        <span
+                          className="truncate text-sm font-medium"
+                          style={{ color: isCurrent ? FOREST : "#0F172A" }}
+                        >
+                          {org.name}
+                        </span>
                         {isCurrent && (
-                          <span className="text-xs text-primary/70 ml-1 font-normal">(Current)</span>
+                          <span className="text-xs ml-1 font-normal" style={{ color: FOREST_MID }}>
+                            (Current)
+                          </span>
                         )}
                       </div>
-                      {isCurrent && <Check className="h-4 w-4 flex-shrink-0 text-primary" />}
+                      {isCurrent && (
+                        <Check className="h-4 w-4 flex-shrink-0" style={{ color: FOREST }} />
+                      )}
                       {isSwitching && (
-                        <div className="h-4 w-4 flex-shrink-0 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <div
+                          className="h-4 w-4 flex-shrink-0 border-2 border-t-transparent rounded-full animate-spin"
+                          style={{ borderColor: FOREST, borderTopColor: "transparent" }}
+                        />
                       )}
                     </div>
                   </DropdownMenuItem>
@@ -191,7 +216,7 @@ const UserAccountMenu = ({
 
           <DropdownMenuItem
             onClick={handleCreateOrganization}
-            className="cursor-pointer mx-1 mt-1 text-primary hover:bg-primary/10 rounded-md"
+            className="cursor-pointer mx-1 mt-1 rounded-md text-[#0B3D2E] hover:bg-[#E8F3EF] hover:text-[#0B3D2E]"
           >
             <Plus className="mr-2 h-4 w-4" />
             <span className="text-sm font-medium">Create Organization</span>

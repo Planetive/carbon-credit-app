@@ -122,16 +122,18 @@ const MainHeader = () => {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${headerClass}`}
     >
       <div className="container mx-auto px-4 py-2.5 flex justify-between items-center">
-        {/* Logo */}
-        <div className="flex items-center space-x-3">
-          <Link to={logoTarget} aria-label="Go to home or dashboard" className="focus:outline-none focus-visible:outline-none">
-            <div className="h-10 md:h-12 lg:h-14 w-28 md:w-36 lg:w-44 flex items-center justify-start ml-0 md:-ml-2 lg:-ml-8 overflow-hidden md:overflow-visible">
-              <img
-                src="/new_logo.png"
-                alt="Rethink Carbon Logo"
-                className="h-full w-auto object-contain origin-left scale-[3.55] -translate-x-8 md:scale-[4.05] md:-translate-x-10 lg:scale-[4.55] lg:-translate-x-13"
-              />
-            </div>
+        {/* Logo — same visual size, clipped so it stays inside the rounded nav */}
+        <div className="flex items-center shrink-0">
+          <Link
+            to={logoTarget}
+            aria-label="Go to home or dashboard"
+            className="flex h-10 w-28 items-center justify-start overflow-hidden focus:outline-none focus-visible:outline-none md:h-12 md:w-36 lg:h-14 lg:w-44"
+          >
+            <img
+              src="/new_logo.png"
+              alt="Rethink Carbon Logo"
+              className="h-full w-auto max-w-none object-contain origin-left scale-[3.55] -translate-x-8 md:scale-[4.05] md:-translate-x-10 lg:scale-[4.55] lg:-translate-x-13"
+            />
           </Link>
         </div>
 

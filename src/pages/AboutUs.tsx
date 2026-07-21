@@ -725,7 +725,7 @@ const TeamCard = ({
     <div className="flex flex-1 flex-col px-6 pb-6 pt-5 text-left">
       <div
         className={[
-          "relative overflow-hidden transition-[max-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "relative overflow-hidden transition-[max-height] duration-700 ease-out",
           expanded ? "max-h-80" : "max-h-[2.9rem]",
         ].join(" ")}
       >
@@ -751,7 +751,7 @@ const TeamCard = ({
         </span>
         <ChevronDown
           className={[
-            "h-3.5 w-3.5 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "h-3.5 w-3.5 transition-transform duration-500 ease-out",
             expanded ? "rotate-180" : "",
           ].join(" ")}
         />
