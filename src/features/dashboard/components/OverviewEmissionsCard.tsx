@@ -2,7 +2,7 @@ import { ArrowRight, Flame, Leaf, TrendingDown, TrendingUp, Zap } from "lucide-r
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 
 const CARD =
-  "rounded-[16px] bg-white border border-[rgba(15,23,42,0.06)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_22px_rgba(15,23,42,0.025)] h-full min-h-[268px] grid grid-rows-[auto_1fr_auto] px-5 py-[18px]";
+  "rounded-[16px] bg-white border border-[rgba(15,23,42,0.06)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_22px_rgba(15,23,42,0.025)] h-full min-h-[268px] grid grid-rows-[auto_1fr] px-5 py-[18px]";
 
 export interface EmissionsScopeRow {
   label: string;
@@ -63,10 +63,18 @@ const OverviewEmissionsCard = ({
 
   return (
     <article className={CARD}>
-      <header className="mb-2.5">
+      <header className="mb-2.5 flex items-baseline justify-between gap-3">
         <h2 className="text-[20px] font-semibold text-slate-900 leading-tight tracking-[-0.02em]">
           Emissions Overview
         </h2>
+        <button
+          type="button"
+          onClick={onViewFullResults}
+          className="text-[13px] font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 shrink-0 group"
+        >
+          View full emission results
+          <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       </header>
 
       <div className="grid grid-cols-[minmax(0,28%)_minmax(0,32%)_minmax(0,40%)] grid-rows-3 gap-x-4 min-h-0 items-stretch">
@@ -166,17 +174,6 @@ const OverviewEmissionsCard = ({
           </div>
         </div>
       </div>
-
-      <footer className="mt-2 pt-2.5 flex justify-center border-t border-slate-100/80">
-        <button
-          type="button"
-          onClick={onViewFullResults}
-          className="text-[13px] font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 group"
-        >
-          View full emission results
-          <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
-      </footer>
     </article>
   );
 };

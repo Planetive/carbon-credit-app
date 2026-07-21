@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import UserAccountMenu from "@/components/UserAccountMenu";
 
 interface SidebarItem {
   id: string;
@@ -171,7 +172,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
           <img
             src="/new_logo.png"
             alt="Rethink Carbon Logo"
-            className="h-full w-auto object-contain origin-left scale-[3.4] -translate-x-2"
+            className="h-full w-auto object-contain origin-left scale-[4.1] -translate-x-2"
           />
         </Link>
       </div>
@@ -218,20 +219,25 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
           <ArrowRight className="h-3.5 w-3.5 text-gray-400" strokeWidth={1.75} />
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigate("/settings")}
-          className="w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-gray-50/90 transition-colors"
-        >
-          <div className="h-8 w-8 rounded-full bg-[#0B3D2E] text-white flex items-center justify-center text-xs font-medium">
-            {userInitial}
-          </div>
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-medium text-gray-900 truncate">{displayName || "User"}</p>
-            <p className="text-sm font-normal text-gray-500 capitalize">{roleLabel}</p>
-          </div>
-          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-        </button>
+        <UserAccountMenu
+          side="top"
+          align="start"
+          trigger={
+            <button
+              type="button"
+              className="w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-gray-50/90 transition-colors focus:outline-none"
+            >
+              <div className="h-8 w-8 rounded-full bg-[#0B3D2E] text-white flex items-center justify-center text-xs font-medium">
+                {userInitial}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-gray-900 truncate">{displayName || "User"}</p>
+                <p className="text-sm font-normal text-gray-500 capitalize">{roleLabel}</p>
+              </div>
+              <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            </button>
+          }
+        />
       </div>
     </div>
   );
