@@ -446,7 +446,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                     onSwitchToManual();
                   }
                 }}
-                className="data-[state=checked]:bg-teal-600"
+                className="data-[state=checked]:bg-[#1D9E75]"
               />
               <span className="text-sm font-medium text-gray-600">Manual Mode</span>
             </div>
@@ -461,7 +461,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
               <div className="absolute inset-0 w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full opacity-20 animate-ping"></div>
               <div className="absolute inset-0 w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full opacity-30 animate-pulse"></div>
               {/* Main icon */}
-              <div className="relative w-24 h-24 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-full flex items-center justify-center shadow-2xl transform transition-all duration-500 hover:scale-110 hover:rotate-12 animate-in fade-in duration-500" style={{ animationDelay: '0.2s' }}>
+              <div className="relative w-24 h-24 bg-gradient-to-br from-green-500 via-emerald-500 to-[#1D9E75] rounded-full flex items-center justify-center shadow-2xl transform transition-all duration-500 hover:scale-110 hover:rotate-12 animate-in fade-in duration-500" style={{ animationDelay: '0.2s' }}>
                 <CheckCircle2 className="h-12 w-12 text-white" />
               </div>
             </div>
@@ -489,7 +489,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                 className="animate-in fade-in slide-in-from-bottom duration-500"
                 style={{ animationDelay: `${0.5 + index * 0.1}s` }}
               >
-                <Card className="group relative overflow-hidden bg-white/90 backdrop-blur-sm border-2 border-gray-200/50 hover:border-teal-300/70 transition-all duration-500 hover:shadow-2xl hover:scale-[1.02] hover:-translate-y-1 h-full">
+                <Card className="group relative overflow-hidden bg-white/90 backdrop-blur-sm border-2 border-gray-200/50 hover:border-[#BFE3D3]/70 transition-all duration-500 hover:shadow-2xl hover:scale-[1.02] hover:-translate-y-1 h-full">
                   {/* Progress bar at top */}
                   <div className="absolute top-0 left-0 right-0 h-1.5 bg-gray-100 overflow-hidden">
                     <div 
@@ -507,13 +507,13 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(step.id)}
-                        className="flex items-center gap-1 text-gray-600 hover:text-teal-600 hover:bg-teal-50 transition-all duration-300 rounded-lg p-2"
+                        className="flex items-center gap-1 text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1] transition-all duration-300 rounded-lg p-2"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
                     </div>
                     <div>
-                      <CardTitle className="text-base font-bold text-gray-900 group-hover:text-teal-700 transition-colors mb-1">
+                      <CardTitle className="text-base font-bold text-gray-900 group-hover:text-[#0F6E56] transition-colors mb-1">
                         {step.question.replace('Enter ', '')}
                       </CardTitle>
                       <CardDescription className="text-xs font-medium text-gray-500">
@@ -541,11 +541,11 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
           className="animate-in fade-in slide-in-from-bottom duration-700"
           style={{ animationDelay: '0.9s' }}
         >
-          <Card className="relative overflow-hidden bg-gradient-to-r from-gray-50 to-teal-50/30 border-2 border-teal-200/50 shadow-lg hover:shadow-xl transition-all duration-500">
+          <Card className="relative overflow-hidden bg-gradient-to-r from-gray-50 to-teal-50/30 border-2 border-[#BFE3D3]/50 shadow-lg hover:shadow-xl transition-all duration-500">
             <div className="flex items-center justify-between p-6">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>
+                  <div className="w-2 h-2 rounded-full bg-[#1D9E75] animate-pulse"></div>
                   <CardTitle className="text-lg font-semibold text-gray-700">
                     Total Emissions
                   </CardTitle>
@@ -558,7 +558,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                 <div className="text-3xl md:text-4xl font-extrabold bg-gradient-to-br from-teal-700 to-emerald-700 bg-clip-text text-transparent mb-1">
                   {totalEmissions.toLocaleString('en-US', { maximumFractionDigits: 2 })}
                 </div>
-                <p className="text-xs font-medium text-teal-600 uppercase tracking-wide">kg CO₂e</p>
+                <p className="text-xs font-medium text-[#1D9E75] uppercase tracking-wide">kg CO₂e</p>
               </div>
             </div>
           </Card>
@@ -584,7 +584,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
             onClick={() => {
               navigate('/dashboard');
             }}
-            className="px-8 py-6 text-lg font-semibold rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 hover:from-teal-700 hover:via-emerald-700 hover:to-teal-700 text-white shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 relative overflow-hidden group"
+            className="px-8 py-6 text-lg font-semibold rounded-xl bg-gradient-to-r from-[#1D9E75] via-emerald-600 to-[#1D9E75] hover:from-teal-700 hover:via-emerald-700 hover:to-teal-700 text-white shadow-xl hover:shadow-2xl transform transition-all duration-300 hover:scale-105 relative overflow-hidden group"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
             <div className="relative flex items-center gap-3">
@@ -628,16 +628,16 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
           {/* Progress Bar */}
           <div className="max-w-2xl mx-auto mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-teal-600">Step 1 of 5</span>
+              <span className="text-xs font-medium text-[#1D9E75]">Step 1 of 5</span>
               <span className="text-xs font-medium text-gray-500">20%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all duration-500" style={{ width: '20%' }}></div>
+              <div className="bg-gradient-to-r from-[#1D9E75] to-[#EDF8F3]0 h-2 rounded-full transition-all duration-500" style={{ width: '20%' }}></div>
             </div>
           </div>
           
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
+            <div className="w-20 h-20 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
               <span className="text-3xl font-bold text-white">?</span>
             </div>
           </div>
@@ -653,7 +653,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
           <div className="flex gap-4 justify-center mt-8">
             <Button
               onClick={() => handleInitialAnswer(true)}
-              className="group relative overflow-hidden bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
+              className="group relative overflow-hidden bg-gradient-to-r from-[#1D9E75] to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
             >
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5" />
@@ -700,7 +700,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
                   onSwitchToManual();
                 }
               }}
-              className="data-[state=checked]:bg-teal-600"
+              className="data-[state=checked]:bg-[#1D9E75]"
             />
             <span className="text-sm font-medium text-gray-600">Manual Mode</span>
           </div>
@@ -747,7 +747,7 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
             placeholder="0.00"
             value={currentStepData.value}
             onChange={(e) => currentStepData.setValue(e.target.value === '' ? '' : parseFloat(e.target.value))}
-            className="text-lg py-6 border-2 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
+            className="text-lg py-6 border-2 focus:border-[#1D9E75] focus:ring-2 focus:ring-teal-200"
             autoFocus
           />
           <p className="text-sm text-gray-500">

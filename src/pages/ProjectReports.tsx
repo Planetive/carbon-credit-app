@@ -81,8 +81,8 @@ const ProjectReports = () => {
     return (
       <Card className="border border-teal-100 dark:border-teal-900/30 shadow-md bg-gradient-to-br from-white to-teal-50/30 dark:from-slate-900/50 dark:to-teal-950/20 overflow-hidden">
         <CardContent className="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <div className="rounded-2xl bg-teal-100/80 dark:bg-teal-900/30 p-7 mb-6 ring-4 ring-teal-50 dark:ring-teal-900/20">
-            <Icon className="h-14 w-14 text-teal-600 dark:text-teal-400" strokeWidth={1.25} />
+          <div className="rounded-2xl bg-[#EAF7F1]/80 dark:bg-teal-900/30 p-7 mb-6 ring-4 ring-teal-50 dark:ring-teal-900/20">
+            <Icon className="h-14 w-14 text-[#1D9E75] dark:text-teal-400" strokeWidth={1.25} />
           </div>
           <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
           <p className="text-muted-foreground max-w-md leading-relaxed">{description}</p>
@@ -126,7 +126,7 @@ const ProjectReports = () => {
           </div>
           <Button
             onClick={() => navigate("/project-wizard")}
-            className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-shadow shrink-0"
+            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-md hover:shadow-lg transition-shadow shrink-0"
           >
             <Plus className="h-4 w-4 mr-2" />
             Generate New Report
@@ -137,9 +137,9 @@ const ProjectReports = () => {
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="reports" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 h-11 bg-muted/60 p-1 rounded-lg">
-            <TabsTrigger value="reports" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-teal-700 data-[state=active]:font-medium">Reports</TabsTrigger>
-            <TabsTrigger value="analytics" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-teal-700 data-[state=active]:font-medium">Analytics</TabsTrigger>
-            <TabsTrigger value="insights" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-teal-700 data-[state=active]:font-medium">Insights</TabsTrigger>
+            <TabsTrigger value="reports" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0F6E56] data-[state=active]:font-medium">Reports</TabsTrigger>
+            <TabsTrigger value="analytics" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0F6E56] data-[state=active]:font-medium">Analytics</TabsTrigger>
+            <TabsTrigger value="insights" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#0F6E56] data-[state=active]:font-medium">Insights</TabsTrigger>
           </TabsList>
 
           <TabsContent value="reports" className="space-y-6">
@@ -192,7 +192,7 @@ const ProjectReports = () => {
               {loading ? (
                 <Card className="border border-teal-100 dark:border-teal-900/30 shadow-sm">
                   <CardContent className="flex items-center justify-center py-16 text-muted-foreground">
-                    <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent mr-2" />
+                    <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#1D9E75] border-t-transparent mr-2" />
                     Loading reports…
                   </CardContent>
                 </Card>

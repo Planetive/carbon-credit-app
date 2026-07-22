@@ -215,7 +215,7 @@ const BoundarySettingScreen = () => {
         <div>
           <Link
             to="/dashboard"
-            className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+            className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Back to dashboard
@@ -229,7 +229,7 @@ const BoundarySettingScreen = () => {
           <p className="text-sm mt-2">
             <Link
               to="/esg-management/topics"
-              className="font-medium text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline"
+              className="font-medium text-[#0A4D3E] hover:text-[#0F6E56] underline-offset-2 hover:underline"
             >
               ESG topics
             </Link>
@@ -247,8 +247,8 @@ const BoundarySettingScreen = () => {
             className={cn(
               "rounded-full px-3 sm:px-4 py-2 border-2 transition-all duration-300",
               step === s.id
-                ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white border-transparent shadow-md shadow-teal-500/25"
-                : "bg-white text-slate-600 border-slate-200 hover:border-teal-300/80 hover:bg-slate-50/90"
+                ? "bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white border-transparent shadow-md shadow-[0_10px_24px_-8px_rgba(11,77,61,0.30)]"
+                : "bg-white text-slate-600 border-slate-200 hover:border-[#BFE3D3]/90 hover:bg-slate-50/90"
             )}
           >
             {s.label}
@@ -300,7 +300,7 @@ const BoundarySettingScreen = () => {
             </CardContent>
           </Card>
           <Button
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             disabled={!canProceedReporting}
             onClick={() => goStep("sectorSegment")}
           >
@@ -338,11 +338,11 @@ const BoundarySettingScreen = () => {
                   className={cn(
                     "text-left rounded-xl border-2 p-4 sm:p-5 flex gap-3 transition-all",
                     selected
-                      ? "border-teal-500 bg-gradient-to-br from-teal-50 to-cyan-50 shadow-md"
+                      ? "border-[#1C7A53] bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] shadow-md"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   )}
                 >
-                  <div className={cn("shrink-0 h-10 w-10 rounded-lg flex items-center justify-center", selected ? "bg-gradient-to-br from-teal-500 to-cyan-500 text-white" : "bg-slate-100 text-slate-600")}>
+                  <div className={cn("shrink-0 h-10 w-10 rounded-lg flex items-center justify-center", selected ? "bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] text-white" : "bg-slate-100 text-slate-600")}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
@@ -364,11 +364,11 @@ const BoundarySettingScreen = () => {
                   className={cn(
                     "text-left rounded-xl border-2 p-5 transition-all",
                     draft.business_segment === "upstream"
-                      ? "border-teal-500 bg-gradient-to-br from-teal-50 to-cyan-50 ring-1 ring-teal-500/20"
+                      ? "border-[#1C7A53] bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] ring-1 ring-[#1C7A53]/20"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   )}
                 >
-                  <div className="flex items-center gap-2 font-semibold text-teal-800">
+                  <div className="flex items-center gap-2 font-semibold text-[#0F6E56]">
                     <Tractor className="h-5 w-5" />
                     Upstream
                   </div>
@@ -403,7 +403,7 @@ const BoundarySettingScreen = () => {
           )}
 
           <Button
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             disabled={!canProceedSector || (draft.sector === OIL_GAS_SECTOR_ID && !draft.business_segment)}
             onClick={() => goStep("organisationalBoundary")}
           >
@@ -453,12 +453,12 @@ const BoundarySettingScreen = () => {
                   className={cn(
                     "text-left rounded-xl border-2 p-5 flex flex-col gap-2 h-full transition-all",
                     selected
-                      ? "border-teal-500 bg-gradient-to-br from-teal-50 to-cyan-50 shadow-md ring-1 ring-teal-500/20"
+                      ? "border-[#1C7A53] bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] shadow-md ring-1 ring-[#1C7A53]/20"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", selected ? "bg-gradient-to-br from-teal-500 to-cyan-500 text-white" : "bg-slate-100 text-slate-600")}>
+                    <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", selected ? "bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] text-white" : "bg-slate-100 text-slate-600")}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <span className="font-semibold">{m.label}</span>
@@ -487,7 +487,7 @@ const BoundarySettingScreen = () => {
             </div>
           )}
           <Button
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             disabled={!canProceedOrg}
             onClick={() => goStep("assetRegister")}
           >
@@ -689,7 +689,7 @@ const BoundarySettingScreen = () => {
             </Alert>
           )}
           <Button
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             disabled={!globalSetupComplete}
             onClick={() => {
               if (!isGlobalEsgSetupComplete(draft)) {

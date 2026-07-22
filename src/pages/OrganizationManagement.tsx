@@ -149,8 +149,8 @@ export default function OrganizationManagement() {
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="p-2 rounded-lg bg-teal-100">
-                              <Building2 className="h-5 w-5 text-teal-600" />
+                            <div className="p-2 rounded-lg bg-[#EAF7F1]">
+                              <Building2 className="h-5 w-5 text-[#1D9E75]" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <CardTitle className="text-lg truncate">{org.name}</CardTitle>

@@ -144,7 +144,7 @@ const MarketsMechanisms: React.FC = () => {
   const getStatusBadge = (status: string) => {
     const statusLower = String(status || '').toLowerCase();
     if (statusLower.includes('active')) {
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>;
+      return <Badge className="bg-[#EAF7F1] text-[#0F6E56] hover:bg-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Active</Badge>;
     } else if (statusLower.includes('pending') || statusLower.includes('planned')) {
       return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
     } else if (statusLower.includes('inactive') || statusLower.includes('closed')) {
@@ -162,11 +162,11 @@ const MarketsMechanisms: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       {/* Main Content */}
@@ -175,7 +175,7 @@ const MarketsMechanisms: React.FC = () => {
         <div className="mb-8 animate-in fade-in duration-500">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
             <div className="flex-1">
-              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#1D9E75] via-emerald-600 to-[#1D9E75] bg-clip-text text-transparent mb-2">
                 Markets & Mechanisms
               </h1>
               <p className="text-gray-600 text-lg">Explore compliance mechanisms and carbon credit markets worldwide</p>
@@ -183,7 +183,7 @@ const MarketsMechanisms: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => navigate('/explore')}
-              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+              className="border-[#1D9E75] text-[#0F6E56] hover:bg-[#EAF7F1] hover:text-[#0F6E56] hover:border-[#0F6E56] transition-all duration-300"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -193,15 +193,15 @@ const MarketsMechanisms: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total {tab === 'compliance' ? 'Mechanisms' : 'Markets'}</p>
-                  <p className="text-3xl font-bold text-teal-600 transition-all duration-300">{stats.total}</p>
+                  <p className="text-3xl font-bold text-[#0F6E56] transition-all duration-300">{stats.total}</p>
                 </div>
-                <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                  <Building2 className="w-6 h-6 text-teal-600" />
+                <div className="w-12 h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Building2 className="w-6 h-6 text-[#0F6E56]" />
                 </div>
               </div>
             </CardContent>
@@ -221,15 +221,15 @@ const MarketsMechanisms: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.2s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.2s' }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Countries</p>
-                  <p className="text-3xl font-bold text-cyan-600 transition-all duration-300">{stats.countries}</p>
+                  <p className="text-3xl font-bold text-[#1C7A53] transition-all duration-300">{stats.countries}</p>
                 </div>
-                <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                  <Globe className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-[#EDF8F3] rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Globe className="w-6 h-6 text-[#1C7A53]" />
                 </div>
               </div>
             </CardContent>
@@ -251,7 +251,7 @@ const MarketsMechanisms: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
+        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
           <CardContent className="p-4">
             <div className="flex gap-4">
                 <button
@@ -264,8 +264,8 @@ const MarketsMechanisms: React.FC = () => {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out ${
                     tab === 'compliance'
-                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md'
-                      : 'bg-white text-teal-600 border border-teal-200 hover:border-teal-300 hover:bg-teal-50'
+                      ? 'bg-gradient-to-r from-[#1C7A53] to-emerald-500 text-white shadow-md'
+                      : 'bg-white text-[#0F6E56] border border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ const MarketsMechanisms: React.FC = () => {
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out ${
                     tab === 'market'
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md'
+                      ? 'bg-gradient-to-r from-blue-500 to-[#1C7A53] text-white shadow-md'
                       : 'bg-white text-blue-600 border border-blue-200 hover:border-blue-300 hover:bg-blue-50'
                   }`}
                 >
@@ -297,7 +297,7 @@ const MarketsMechanisms: React.FC = () => {
         </Card>
 
         {/* Filters and Search */}
-        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
+        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
           <CardContent className="p-4">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1 relative">
@@ -306,17 +306,17 @@ const MarketsMechanisms: React.FC = () => {
                   placeholder={`Search ${tab === 'compliance' ? 'compliance mechanisms' : 'carbon credit markets'}...`}
                   value={currentFilter}
                   onChange={(e) => setCurrentFilter(e.target.value)}
-                  className="pl-10 border-teal-200 focus:border-teal-400 transition-all duration-300 focus:ring-2 focus:ring-teal-200"
+                  className="pl-10 border-[#BFE3D3] focus:border-[#9ECFB8] transition-all duration-300 focus:ring-2 focus:ring-[#BFE3D3]"
                 />
               </div>
 
               <Popover open={showFilters} onOpenChange={setShowFilters}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="border-teal-200 hover:bg-teal-50 transition-all duration-300 hover:scale-105">
+                  <Button variant="outline" className="border-[#BFE3D3] hover:bg-[#EAF7F1] transition-all duration-300 hover:scale-105">
                     <Filter className="w-4 h-4 mr-2 transition-transform duration-300" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                     Filters
                     {(selectedStatuses.length > 0 || selectedCountries.length > 0 || selectedRegions.length > 0) && (
-                      <Badge className="ml-2 bg-teal-500 animate-in fade-in duration-300">{selectedStatuses.length + selectedCountries.length + selectedRegions.length}</Badge>
+                      <Badge className="ml-2 bg-[#1D9E75] animate-in fade-in duration-300">{selectedStatuses.length + selectedCountries.length + selectedRegions.length}</Badge>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -407,7 +407,7 @@ const MarketsMechanisms: React.FC = () => {
         </Card>
 
         {/* Data Display */}
-        <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.5s' }}>
+        <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.5s' }}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl transition-all duration-300">
@@ -422,12 +422,12 @@ const MarketsMechanisms: React.FC = () => {
             <div className="overflow-x-auto custom-scrollbar">
               <table className="min-w-full">
                 <thead>
-                  <tr className="border-b border-teal-200">
+                  <tr className="border-b border-[#BFE3D3]">
                     {currentColumns.map((col, colIndex) => (
                       <th
                         key={col.key}
                         className={`px-4 py-3 text-left text-sm font-semibold text-gray-700 transition-all duration-300 ${
-                          col.sortable ? 'cursor-pointer hover:bg-teal-50 hover:shadow-sm' : ''
+                          col.sortable ? 'cursor-pointer hover:bg-[#EAF7F1] hover:shadow-sm' : ''
                         }`}
                         onClick={() => col.sortable && handleSort(col.key)}
                         style={{ animationDelay: `${0.6 + colIndex * 0.05}s` }}
@@ -435,7 +435,7 @@ const MarketsMechanisms: React.FC = () => {
                         <div className="flex items-center gap-2">
                           {col.label}
                           {col.sortable && sortColumn === col.key && (
-                            <span className="text-teal-600 animate-in fade-in duration-300">
+                            <span className="text-[#0F6E56] animate-in fade-in duration-300">
                               {sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </span>
                           )}
@@ -455,7 +455,7 @@ const MarketsMechanisms: React.FC = () => {
                     processedData.map((row, index) => (
                       <tr
                         key={index}
-                        className="border-b border-gray-100 hover:bg-teal-50/50 transition-all duration-300 hover:shadow-sm animate-in fade-in slide-in"
+                        className="border-b border-gray-100 hover:bg-[#EAF7F1]/50 transition-all duration-300 hover:shadow-sm animate-in fade-in slide-in"
                         style={{ 
                           animationDelay: `${0.7 + index * 0.02}s`,
                           animationDuration: '0.3s'
@@ -469,16 +469,16 @@ const MarketsMechanisms: React.FC = () => {
                               </div>
                             ) : col.key === 'Country' || col.key === 'Region' ? (
                               <div className="flex items-center gap-1 group">
-                                <MapPin className="w-3 h-3 text-gray-400 transition-transform duration-300 group-hover:scale-110 group-hover:text-teal-500" />
-                                <span className="transition-colors duration-300 group-hover:text-teal-600">{row[col.key] || '-'}</span>
+                                <MapPin className="w-3 h-3 text-gray-400 transition-transform duration-300 group-hover:scale-110 group-hover:text-[#1C7A53]" />
+                                <span className="transition-colors duration-300 group-hover:text-[#0F6E56]">{row[col.key] || '-'}</span>
                               </div>
                             ) : col.key === 'Year of implementation' ? (
                               <div className="flex items-center gap-1 group">
-                                <Calendar className="w-3 h-3 text-gray-400 transition-transform duration-300 group-hover:scale-110 group-hover:text-teal-500" />
-                                <span className="transition-colors duration-300 group-hover:text-teal-600">{row[col.key] || '-'}</span>
+                                <Calendar className="w-3 h-3 text-gray-400 transition-transform duration-300 group-hover:scale-110 group-hover:text-[#1C7A53]" />
+                                <span className="transition-colors duration-300 group-hover:text-[#0F6E56]">{row[col.key] || '-'}</span>
                               </div>
                             ) : (
-                              <span className={`transition-all duration-300 ${col.key === 'Price Rate' || col.key === 'Price range' ? 'font-semibold text-teal-600 hover:text-teal-700' : 'hover:text-teal-600'}`}>
+                              <span className={`transition-all duration-300 ${col.key === 'Price Rate' || col.key === 'Price range' ? 'font-semibold text-[#0F6E56] hover:text-[#0F6E56]' : 'hover:text-[#0F6E56]'}`}>
                                 {row[col.key] || '-'}
                               </span>
                             )}

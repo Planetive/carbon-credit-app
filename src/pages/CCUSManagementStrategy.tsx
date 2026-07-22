@@ -163,11 +163,11 @@ const CCUSManagementStrategy = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       {/* Main Content */}
@@ -177,7 +177,7 @@ const CCUSManagementStrategy = () => {
           <Button
             variant="ghost"
             onClick={() => navigate(-1)}
-            className="mb-6 text-teal-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-300"
+            className="mb-6 text-[#0F6E56] hover:text-[#0F6E56] hover:bg-[#EAF7F1] transition-all duration-300"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -185,7 +185,7 @@ const CCUSManagementStrategy = () => {
           
           <div className="flex items-center gap-4 mb-2">
             {countryCode && (
-              <div className="w-16 h-16 rounded-lg bg-white shadow-md flex items-center justify-center border border-teal-200">
+              <div className="w-16 h-16 rounded-lg bg-white shadow-md flex items-center justify-center border border-[#BFE3D3]">
                 <ReactCountryFlag countryCode={countryCode} svg style={{ width: '48px', height: '48px' }} />
               </div>
             )}
@@ -199,7 +199,7 @@ const CCUSManagementStrategy = () => {
         </div>
 
         {policies.length === 0 && !strategy ? (
-          <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-lg">
+          <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg">
             <CardContent className="p-12 text-center">
               <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-700 mb-2">No Data Available</h3>
@@ -212,7 +212,7 @@ const CCUSManagementStrategy = () => {
             {policies.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-6">
-                  <FileText className="w-6 h-6 text-teal-600" />
+                  <FileText className="w-6 h-6 text-[#0F6E56]" />
                   <h2 className="text-2xl font-bold text-gray-900">Basic CCUS Policies</h2>
                   <Badge variant="outline" className="ml-2">{policies.length}</Badge>
                 </div>
@@ -223,7 +223,7 @@ const CCUSManagementStrategy = () => {
                     return (
                       <Card
                         key={policy.id || idx}
-                        className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-md hover:shadow-lg transition-shadow duration-300"
+                        className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-md hover:shadow-lg transition-shadow duration-300"
                       >
                         <CardHeader>
                           <div className="flex items-start justify-between gap-4">
@@ -246,7 +246,7 @@ const CCUSManagementStrategy = () => {
                           {policy["Mechanism"] && (
                             <div>
                               <span className="font-semibold text-gray-700 text-sm flex items-center gap-2 mb-2">
-                                <Building2 className="w-4 h-4 text-teal-600" />
+                                <Building2 className="w-4 h-4 text-[#0F6E56]" />
                                 Mechanism
                               </span>
                               <div className="flex flex-wrap gap-2">
@@ -305,10 +305,10 @@ const CCUSManagementStrategy = () => {
 
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-cyan-600" />
+                      <Building2 className="w-5 h-5 text-[#1C7A53]" />
                       Deployment Policies & Programs
                     </h3>
-                    <Card className="bg-white/90 backdrop-blur-sm border-cyan-200/50 shadow-md">
+                    <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/50 shadow-md">
                       <CardContent className="p-6">
                         <div className="prose max-w-none">
                           {renderTextAsListOrParagraph(strategy.deployment_policies_and_programs)}

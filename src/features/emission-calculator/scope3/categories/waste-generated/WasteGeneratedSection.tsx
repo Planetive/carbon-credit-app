@@ -59,7 +59,7 @@ export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
         </div>
         <Button
           onClick={onAddRow}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add New Entry
@@ -201,13 +201,13 @@ export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
           <Button
             onClick={onSave}
             disabled={saving || totalPending === 0}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
           >
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving..." : `Save (${totalPending})`}
           </Button>
           {onSaveAndNext && (
-            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+            <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}

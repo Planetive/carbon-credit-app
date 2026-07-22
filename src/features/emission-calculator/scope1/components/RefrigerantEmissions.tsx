@@ -510,7 +510,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         <div>
           <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
           {sectionDescription ? <p className="text-sm text-gray-600 mt-1">{sectionDescription}</p> : null}
-          {ukInputsLocked && <p className="text-sm text-teal-700 mt-1">Loading UK refrigerant factors…</p>}
+          {ukInputsLocked && <p className="text-sm text-[#0F6E56] mt-1">Loading UK refrigerant factors…</p>}
           {ukReferenceReady && !isUkActive && (
             <p className="text-sm text-amber-700 mt-2">
               No rows found in UK_refrigerant_factors (or columns did not match). Check the table, RLS, and column
@@ -520,7 +520,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         </div>
         <Button
           onClick={addRow}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
           disabled={ukInputsLocked || (ukReferenceReady && !isUkActive)}
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -703,7 +703,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
               <Button
                 onClick={saveRefrigerantEntries}
                 disabled={saving || totalPending === 0 || ukInputsLocked}
-                className="bg-teal-600 hover:bg-teal-700 text-white"
+                className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? "Saving..." : `Save (${totalPending})`}
@@ -712,7 +712,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
                 <Button
                   variant="outline"
                   onClick={onSaveAndNext}
-                  className="border-teal-600 text-teal-600 hover:bg-teal-50"
+                  className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]"
                 >
                   Next <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>

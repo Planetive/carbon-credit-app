@@ -146,7 +146,7 @@ const IndigenousRightsScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -218,7 +218,7 @@ const IndigenousRightsScreen = () => {
                 className={cn(
                   "rounded-full px-4 py-2 text-sm font-medium border-2 transition-all",
                   data.proximityToIndigenousLands === opt
-                    ? "bg-teal-600 border-teal-600 text-white"
+                    ? "bg-[#1D9E75] border-[#1D9E75] text-white"
                     : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                 )}
               >
@@ -232,7 +232,7 @@ const IndigenousRightsScreen = () => {
         </CardContent>
       </Card>
 
-      <Card className={sectionShell("border-l-4 border-l-teal-500")}>
+      <Card className={sectionShell("border-l-4 border-l-[#1C7A53]")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">Free, Prior and Informed Consent (FPIC)</CardTitle>
           <CardDescription className="text-slate-600">FPIC status and consultation activity for the reporting period.</CardDescription>
@@ -497,7 +497,7 @@ const IndigenousRightsScreen = () => {
         <div className="flex justify-end">
           <Button
             type="button"
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             onClick={() => {
               saveIndigenousRightsStore(store);
               toast({
@@ -520,7 +520,7 @@ const IndigenousRightsScreen = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
           </CardContent>

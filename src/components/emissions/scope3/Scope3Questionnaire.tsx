@@ -146,16 +146,16 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
           {/* Progress Bar */}
           <div className="max-w-2xl mx-auto mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-teal-600">Step 1 of 3</span>
+              <span className="text-xs font-medium text-[#1D9E75]">Step 1 of 3</span>
               <span className="text-xs font-medium text-gray-500">33%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all duration-500" style={{ width: '33%' }}></div>
+              <div className="bg-gradient-to-r from-[#1D9E75] to-[#EDF8F3]0 h-2 rounded-full transition-all duration-500" style={{ width: '33%' }}></div>
             </div>
           </div>
           
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
+            <div className="w-20 h-20 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
               <span className="text-3xl font-bold text-white">1</span>
             </div>
           </div>
@@ -170,7 +170,7 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
         <div className="flex gap-4 justify-center mt-8">
           <Button
             onClick={() => handleYesNoAnswer(true)}
-            className="group relative overflow-hidden bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
+            className="group relative overflow-hidden bg-gradient-to-r from-[#1D9E75] to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
           >
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5" />
@@ -236,7 +236,7 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
               placeholder="0.00"
               value={upstreamEmissions}
               onChange={(e) => setUpstreamEmissions(e.target.value === '' ? '' : parseFloat(e.target.value))}
-              className="text-lg py-6 border-2 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
+              className="text-lg py-6 border-2 focus:border-[#1D9E75] focus:ring-2 focus:ring-teal-200"
             />
             <p className="text-sm text-gray-500">
               Enter total upstream Scope 3 emissions from your LCA data
@@ -264,7 +264,7 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
             <Button
               onClick={handleUpstreamSubmit}
               disabled={upstreamEmissions === '' || parseFloat(String(upstreamEmissions)) <= 0}
-              className="flex-1 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 bg-gradient-to-r from-[#1D9E75] to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <div className="flex items-center justify-center gap-3">
                 <span>Continue</span>
@@ -319,17 +319,17 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
               placeholder="0.00"
               value={downstreamEmissions}
               onChange={(e) => setDownstreamEmissions(e.target.value === '' ? '' : parseFloat(e.target.value))}
-              className="text-lg py-6 border-2 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
+              className="text-lg py-6 border-2 focus:border-[#1D9E75] focus:ring-2 focus:ring-teal-200"
             />
             <p className="text-sm text-gray-500">
               Enter total downstream Scope 3 emissions from your LCA data
             </p>
           </div>
 
-          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+          <div className="bg-[#EAF7F1] border border-[#BFE3D3] rounded-lg p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-teal-900">Upstream Emissions:</span>
-              <span className="text-sm font-semibold text-teal-700">{parseFloat(String(upstreamEmissions)) || 0} kg CO2e</span>
+              <span className="text-sm font-medium text-[#0A4D3E]">Upstream Emissions:</span>
+              <span className="text-sm font-semibold text-[#0F6E56]">{parseFloat(String(upstreamEmissions)) || 0} kg CO2e</span>
             </div>
           </div>
 
@@ -354,7 +354,7 @@ const Scope3Questionnaire: React.FC<Scope3QuestionnaireProps> = ({
             <Button
               onClick={handleDownstreamSubmit}
               disabled={downstreamEmissions === '' || parseFloat(String(downstreamEmissions)) < 0}
-              className="flex-1 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 bg-gradient-to-r from-[#1D9E75] to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <div className="flex items-center justify-center gap-3">
                 <span>Complete & Save</span>

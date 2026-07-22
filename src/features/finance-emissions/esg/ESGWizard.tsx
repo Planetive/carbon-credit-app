@@ -1227,7 +1227,7 @@ export const ESGWizard: React.FC = () => {
                 onValueChange={(value) => updateFormData('corporateStructure', value)}
               >
                 <SelectTrigger 
-                  className={`h-12 text-base border-2 ${validationErrors.corporateStructure ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-teal-500'}`}
+                  className={`h-12 text-base border-2 ${validationErrors.corporateStructure ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-[#1D9E75]'}`}
                 >
                   <SelectValue placeholder="Select corporate structure" />
                 </SelectTrigger>
@@ -1771,7 +1771,7 @@ export const ESGWizard: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
                   >
-                    <Card className="h-full bg-gradient-to-br from-blue-50 via-blue-100 to-cyan-50 border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
+                    <Card className="h-full bg-gradient-to-br from-blue-50 via-blue-100 to-[#EDF8F3] border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
                       <CardContent className="p-6 min-h-[136px] h-full flex items-center">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
@@ -1857,7 +1857,7 @@ export const ESGWizard: React.FC = () => {
                     <Card className="border-gray-200 shadow-lg">
                       <CardHeader>
                         <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <BarChart3 className="w-5 h-5 text-teal-600" />
+                          <BarChart3 className="w-5 h-5 text-[#1D9E75]" />
                           Detailed Results by Loan Type
                         </CardTitle>
                         <CardDescription className="text-base">
@@ -1888,7 +1888,7 @@ export const ESGWizard: React.FC = () => {
                                     <div className="font-semibold text-gray-900">{result.label}</div>
                                   </td>
                                   <td className="py-4 px-4 text-right">
-                                    <span className="font-semibold text-teal-700">
+                                    <span className="font-semibold text-[#0F6E56]">
                                       {formatWithSeparators(result.attributionFactor * 100, 2)}%
                                     </span>
                                   </td>
@@ -1925,7 +1925,7 @@ export const ESGWizard: React.FC = () => {
                   <Button 
                     onClick={() => setCurrentStep(steps.findIndex(s => s.id === 'emission-calculation'))}
                     variant="outline" 
-                    className="w-full sm:w-auto min-w-[160px] h-11 text-base font-semibold border-2 border-gray-300 hover:border-teal-400 hover:bg-teal-50"
+                    className="w-full sm:w-auto min-w-[160px] h-11 text-base font-semibold border-2 border-gray-300 hover:border-[#9ECFB8] hover:bg-[#EAF7F1]"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Recalculate
@@ -1940,7 +1940,7 @@ export const ESGWizard: React.FC = () => {
                           returnUrl
                         } 
                       })}
-                      className="w-full sm:w-auto min-w-[220px] h-11 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                      className="w-full sm:w-auto min-w-[220px] h-11 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Next: Facilitated Emission
@@ -1955,7 +1955,7 @@ export const ESGWizard: React.FC = () => {
                           navigate(target);
                         }
                       }}
-                      className="w-full sm:w-auto min-w-[200px] h-11 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                      className="w-full sm:w-auto min-w-[200px] h-11 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Complete & Return
@@ -2037,7 +2037,7 @@ export const ESGWizard: React.FC = () => {
             {/* Progress bar background */}
             <div className="absolute top-8 left-0 right-0 h-1 bg-gray-200 rounded-full -z-10 hidden sm:block">
               <div 
-                className="h-full bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] rounded-full transition-all duration-500"
                 style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
               />
             </div>
@@ -2057,9 +2057,9 @@ export const ESGWizard: React.FC = () => {
                       className={`
                         group relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center transition-all duration-300 touch-manipulation
                         ${isCompleted || isPast
-                          ? 'bg-gradient-to-br from-teal-500 to-cyan-600 border-teal-600 text-white shadow-lg shadow-teal-500/30'
+                          ? 'bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] border-[#1D9E75] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]'
                           : isCurrent
-                          ? 'bg-white border-teal-500 text-teal-600 shadow-lg border-[3px]'
+                          ? 'bg-white border-[#1D9E75] text-[#1D9E75] shadow-lg border-[3px]'
                           : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
                         }
                         ${index <= currentStep || canProceed() ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-not-allowed opacity-50'}
@@ -2072,7 +2072,7 @@ export const ESGWizard: React.FC = () => {
                         <StepIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                       )}
                       {isCurrent && (
-                        <span className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-teal-500 rounded-full border-2 border-white animate-pulse" />
+                        <span className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-[#1D9E75] rounded-full border-2 border-white animate-pulse" />
                       )}
                     </button>
                   </div>
@@ -2081,7 +2081,7 @@ export const ESGWizard: React.FC = () => {
                   <div className="mt-2 text-center w-full px-1">
                     <div className={`
                       text-[10px] sm:text-xs font-medium break-words leading-tight
-                      ${isCurrent ? 'text-teal-600 font-semibold' : isPast || isCompleted ? 'text-gray-600' : 'text-gray-400'}
+                      ${isCurrent ? 'text-[#1D9E75] font-semibold' : isPast || isCompleted ? 'text-gray-600' : 'text-gray-400'}
                     `}>
                       {step.title}
                     </div>
@@ -2096,7 +2096,7 @@ export const ESGWizard: React.FC = () => {
             <div className="flex items-center justify-center gap-2 mt-4 text-sm">
               {autoSaveStatus === 'saving' && (
                 <>
-                  <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-3 h-3 border-2 border-[#1D9E75] border-t-transparent rounded-full animate-spin" />
                   <span className="text-gray-600">Saving...</span>
                 </>
               )}

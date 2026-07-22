@@ -600,7 +600,7 @@ const CountryEmissions: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6 p-6 md:p-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Country Emissions</h1>
-          <Button variant="outline" onClick={() => navigate("/explore")} className="border-teal-600 text-teal-700">
+          <Button variant="outline" onClick={() => navigate("/explore")} className="border-[#1D9E75] text-[#0F6E56]">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
           </Button>
         </div>
@@ -629,7 +629,7 @@ const CountryEmissions: React.FC = () => {
                           setSectorPickerOpen(false);
                         }}
                         className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 ${
-                          sectorFilter === "all" ? "bg-teal-50 text-teal-800" : "text-gray-700"
+                          sectorFilter === "all" ? "bg-[#EAF7F1] text-[#0F6E56]" : "text-gray-700"
                         }`}
                       >
                         All sectors
@@ -672,7 +672,7 @@ const CountryEmissions: React.FC = () => {
                                   setSectorPickerOpen(false);
                                 }}
                                 className={`w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 ${
-                                  active ? "bg-teal-50 text-teal-800" : "text-gray-700"
+                                  active ? "bg-[#EAF7F1] text-[#0F6E56]" : "text-gray-700"
                                 }`}
                               >
                                 {humanizeToken(sub)}
@@ -872,7 +872,7 @@ const CountryEmissions: React.FC = () => {
                     {aggregatedByCountry.map((r, i) => {
                       const emission = formatEmissionWithUnit(r.emissions);
                       return (
-                      <tr key={i} className="border-b hover:bg-teal-50/40">
+                      <tr key={i} className="border-b hover:bg-[#EAF7F1]/40">
                         <td className="py-3 font-medium">
                           <div className="flex items-center gap-2.5">
                             <span className="text-gray-500 w-10 text-right text-lg">{String(i + 1).padStart(2, "0")}.</span>

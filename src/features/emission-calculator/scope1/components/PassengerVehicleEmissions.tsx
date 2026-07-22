@@ -431,7 +431,7 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
           <h4 className="text-lg font-semibold text-gray-900">Passenger Vehicle Entries</h4>
           <p className="text-sm text-gray-600">Add your organization's passenger vehicle usage data</p>
         </div>
-        <Button onClick={addRow} disabled={ukInputsLocked} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={addRow} disabled={ukInputsLocked} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
           <Plus className="h-4 w-4 mr-2" />Add New Entry
         </Button>
       </div>
@@ -703,13 +703,13 @@ const PassengerVehicleEmissions: React.FC<PassengerVehicleEmissionsProps> = ({ o
               <Button
                 onClick={saveVehicleEntries}
                 disabled={saving || totalPending === 0 || ukInputsLocked}
-                className="bg-teal-600 hover:bg-teal-700 text-white"
+                className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? "Saving..." : `Save (${totalPending})`}
               </Button>
               {onSaveAndNext && (
-                <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
                   Next <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               )}

@@ -7,7 +7,9 @@ from .models import (
 )
 from .calculation_engine import CalculationEngine
 from .scenario_engine import ScenarioEngine
+from .auth_routes import router as auth_router
 from .database import test_connection, get_supabase_client
+from .db import test_postgres_connection
 from .finance_models import (
     CompanyType,
     FinanceEmissionRequest,
@@ -24,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 app = FastAPI(title="Finance Emission Service", version="0.1.0")
+
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 # CORS configuration - allow frontend domain and local development
 # When allow_credentials=True, you cannot use allow_origins=["*"]
@@ -102,8 +106,11 @@ def get_scenario_engine():
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    # Test database connection
-    db_status = "connected" if test_connection() else "disconnected"
+    # Prefer self-hosted Postgres when DATABASE_URL is set; else legacy Supabase probe
+    if test_postgres_connection():
+        db_status = "connected"
+    else:
+        db_status = "connected" if test_connection() else "disconnected"
     return HealthResponse(
         status="ok", 
         engine_version="1.0.0",

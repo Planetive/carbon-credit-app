@@ -29,7 +29,7 @@ const scopeIcons = [Flame, Zap, Leaf] as const;
 
 /** Scope colors aligned with Emissions Overview donut (image comp). */
 export const OVERVIEW_EMISSIONS_SCOPE_COLORS = [
-  { chart: "#0F8A70", chip: "bg-[#E8F5F1] text-[#0F8A70]" },
+  { chart: "#1D9E75", chip: "bg-[#EAF7F1] text-[#1D9E75]" },
   { chart: "#E8C89A", chip: "bg-[#FAF0E4] text-[#E8C89A]" },
   { chart: "#4F7FD3", chip: "bg-[#EBF1FA] text-[#4F7FD3]" },
 ] as const;
@@ -70,7 +70,7 @@ const OverviewEmissionsCard = ({
         <button
           type="button"
           onClick={onViewFullResults}
-          className="text-[13px] font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 shrink-0 group"
+          className="text-[13px] font-medium text-[#1D9E75] hover:text-[#0F6E56] inline-flex items-center gap-1 shrink-0 group"
         >
           View full emission results
           <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -119,7 +119,7 @@ const OverviewEmissionsCard = ({
                   <>
                     <p
                       className={`text-[12px] font-semibold flex items-center justify-end gap-0.5 tabular-nums whitespace-nowrap ${
-                        row.up ? "text-red-500" : "text-emerald-600"
+                        row.up ? "text-red-500" : "text-[#1D9E75]"
                       }`}
                     >
                       {row.up ? (

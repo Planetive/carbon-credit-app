@@ -3425,14 +3425,14 @@ const EmissionCalculatorIPCC = ({
             <Button
               variant="ghost"
               onClick={() => navigate(`/emission-calculator${query}`)}
-              className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
+              className="text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1]/50 rounded-lg px-3 py-2 transition-all duration-200"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="text-sm font-medium">Back</span>
             </Button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl shadow-lg">
+            <div className="p-3 bg-gradient-to-br from-emerald-500 to-[#1D9E75] rounded-2xl shadow-lg">
               <Globe2 className="h-7 w-7 text-white" />
             </div>
             <div>
@@ -3455,7 +3455,7 @@ const EmissionCalculatorIPCC = ({
                   }}
                   className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${
                     activeScope === scope.id
-                      ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/30"
+                      ? "bg-gradient-to-r from-[#1D9E75] to-emerald-500 text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                       : "text-gray-700 hover:bg-gray-100/80 hover:shadow-sm"
                   }`}
                 >
@@ -3477,14 +3477,14 @@ const EmissionCalculatorIPCC = ({
                         }}
                         className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                           activeScope === scope.id && activeCategory === category.id
-                            ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                            ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium"
                             : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                         }`}
                       >
                         <category.icon
                           className={`h-4 w-4 ${
                             activeScope === scope.id && activeCategory === category.id
-                              ? "text-teal-600"
+                              ? "text-[#1D9E75]"
                               : "text-gray-500"
                           }`}
                         />
@@ -3504,7 +3504,7 @@ const EmissionCalculatorIPCC = ({
         {!embedded && (
           <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 sm:px-8 py-4 sm:py-6 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl shadow-lg">
+            <div className="p-3 bg-gradient-to-br from-emerald-500 to-[#1D9E75] rounded-2xl shadow-lg">
               <Globe2 className="h-7 w-7 text-white" />
             </div>
             <div>
@@ -3542,7 +3542,7 @@ const EmissionCalculatorIPCC = ({
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">Stationary Fuel Combustion</h3>
                     </div>
-                    <Button onClick={addCalculatorRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addCalculatorRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
                     </Button>
@@ -3663,9 +3663,9 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">Total Stationary Fuel Emissions:</span>
-                    <span className="text-lg font-bold text-teal-900">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">Total Stationary Fuel Emissions:</span>
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalStationaryEmissions, 2)}
                     </span>
                   </div>
@@ -3679,7 +3679,7 @@ const EmissionCalculatorIPCC = ({
                         Enter flare gas volume and add gas components (formula + %) to calculate CO2 emissions.
                       </p>
                     </div>
-                    <Button onClick={addFlaringComponent} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addFlaringComponent} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Gas
                     </Button>
@@ -3841,7 +3841,7 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSaveFlaringMonth}
                         disabled={flaringSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {flaringSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
@@ -3865,9 +3865,9 @@ const EmissionCalculatorIPCC = ({
                             {formatNumber(flaringCalculated.CO2_tonnes, 2)}
                           </div>
                         </div>
-                        <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                          <div className="text-sm text-teal-800">CO2e Emissions (kg)</div>
-                          <div className="text-2xl font-extrabold text-teal-900">
+                        <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                          <div className="text-sm text-[#0A4D3E]">CO2e Emissions (kg)</div>
+                          <div className="text-2xl font-extrabold text-[#0A4D3E]">
                             {formatNumber(flaringCalculated.CO2_kg, 2)}
                           </div>
                         </div>
@@ -4037,7 +4037,7 @@ const EmissionCalculatorIPCC = ({
                     <div>
                       <h4 className="text-base font-semibold text-gray-900">Gas Composition</h4>
                     </div>
-                    <Button onClick={addVentingComponent} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addVentingComponent} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Gas
                     </Button>
@@ -4134,7 +4134,7 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSaveVentingMonth}
                         disabled={ventingSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {ventingSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
@@ -4149,11 +4149,11 @@ const EmissionCalculatorIPCC = ({
 
                   {ventingCalculated && (
                     <>
-                      <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                        <div className="text-sm text-teal-800">
+                      <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                        <div className="text-sm text-[#0A4D3E]">
                           Total CO2e Emissions (MeT)
                         </div>
-                        <div className="text-2xl font-extrabold text-teal-900">
+                        <div className="text-2xl font-extrabold text-[#0A4D3E]">
                           Scope 1 Venting Emissions: {formatNumber(ventingCalculated.totalCO2e_tonnes, 2)}{" "}
                           MeT CO2e
                         </div>
@@ -4323,16 +4323,16 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSaveVehicularMonth}
                         disabled={vehicularSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {vehicularSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
-                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1VehicularCo2eMeT, 2)}</div>
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                    <div className="text-sm text-[#0A4D3E]">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-[#0A4D3E]">{formatNumber(scope1VehicularCo2eMeT, 2)}</div>
                   </div>
 
                   {(scope1VehicularLoading || scope1VehicularError) && (
@@ -4478,16 +4478,16 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSaveKitchenMonth}
                         disabled={kitchenSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {kitchenSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
-                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1KitchenCo2eMeT, 2)}</div>
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                    <div className="text-sm text-[#0A4D3E]">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-[#0A4D3E]">{formatNumber(scope1KitchenCo2eMeT, 2)}</div>
                   </div>
 
                   {(scope1KitchenLoading || scope1KitchenError) && (
@@ -4633,16 +4633,16 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSavePowerMonth}
                         disabled={powerSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {powerSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
-                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1PowerCo2eMeT, 2)}</div>
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                    <div className="text-sm text-[#0A4D3E]">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-[#0A4D3E]">{formatNumber(scope1PowerCo2eMeT, 2)}</div>
                   </div>
 
                   {(scope1PowerLoading || scope1PowerError) && (
@@ -4767,16 +4767,16 @@ const EmissionCalculatorIPCC = ({
                         onClick={handleSaveHeatingMonth}
                         disabled={heatingSaving}
                         variant="outline"
-                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        className="border-[#BFE3D3] text-[#0F6E56] hover:bg-[#EAF7F1]"
                       >
                         {heatingSaving ? "Saving..." : "Save Monthly Entry"}
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                    <div className="text-sm text-teal-800">Total CO2 Emissions (MeT)</div>
-                    <div className="text-2xl font-extrabold text-teal-900">{formatNumber(scope1HeatingCo2eMeT, 2)}</div>
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3">
+                    <div className="text-sm text-[#0A4D3E]">Total CO2 Emissions (MeT)</div>
+                    <div className="text-2xl font-extrabold text-[#0A4D3E]">{formatNumber(scope1HeatingCo2eMeT, 2)}</div>
                   </div>
 
                   {(scope1PowerLoading || scope1PowerError) && (
@@ -4841,7 +4841,7 @@ const EmissionCalculatorIPCC = ({
                       <h3 className="text-xl font-semibold text-gray-900">Road Transport</h3>
                       <p className="text-sm text-gray-600 mt-1">Emissions = Quantity x Emission Factor</p>
                     </div>
-                    <Button onClick={addRoadTransportCalculatorRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addRoadTransportCalculatorRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
                     </Button>
@@ -4932,9 +4932,9 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">Total Road Transport Emissions:</span>
-                    <span className="text-lg font-bold text-teal-900">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">Total Road Transport Emissions:</span>
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalRoadTransportEmissions, 2)}
                     </span>
                   </div>
@@ -4959,7 +4959,7 @@ const EmissionCalculatorIPCC = ({
                     </div>
                     <Button
                       onClick={addRoadTransportVehicleCalculatorRow}
-                      className="bg-teal-600 hover:bg-teal-700 text-white"
+                      className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
@@ -5077,11 +5077,11 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">
                       Total Road Transport (Vehicle Type) Emissions:
                     </span>
-                    <span className="text-lg font-bold text-teal-900">
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalRoadTransportVehicleEmissions, 2)}
                     </span>
                   </div>
@@ -5104,7 +5104,7 @@ const EmissionCalculatorIPCC = ({
                       <h3 className="text-xl font-semibold text-gray-900">USA Gasoline and Diesel Vehicles</h3>
                       <p className="text-sm text-gray-600 mt-1">Emissions = Quantity x selected factor</p>
                     </div>
-                    <Button onClick={addUsaGasDieselCalculatorRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addUsaGasDieselCalculatorRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
                     </Button>
@@ -5266,11 +5266,11 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">
                       Total USA Gasoline and Diesel Vehicles Emissions:
                     </span>
-                    <span className="text-lg font-bold text-teal-900">
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalUsaGasDieselEmissions, 2)}
                     </span>
                   </div>
@@ -5293,7 +5293,7 @@ const EmissionCalculatorIPCC = ({
                       <h3 className="text-xl font-semibold text-gray-900">Alternative Fuel Vehicles</h3>
                       <p className="text-sm text-gray-600 mt-1">Emissions = Quantity x selected factor</p>
                     </div>
-                    <Button onClick={addAlternativeFuelRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    <Button onClick={addAlternativeFuelRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Row
                     </Button>
@@ -5430,9 +5430,9 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">Total Alternative Fuel Vehicles Emissions:</span>
-                    <span className="text-lg font-bold text-teal-900">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">Total Alternative Fuel Vehicles Emissions:</span>
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalAlternativeFuelEmissions, 2)}
                     </span>
                   </div>
@@ -5485,14 +5485,14 @@ const EmissionCalculatorIPCC = ({
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button onClick={addEnergyCalculatorRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                      <Button onClick={addEnergyCalculatorRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Row
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50/40 to-emerald-50/30 px-4 py-3 text-xs text-teal-900">
+                  <div className="rounded-xl border border-[#BFE3D3] bg-gradient-to-r from-teal-50/40 to-emerald-50/30 px-4 py-3 text-xs text-[#0A4D3E]">
                     Row emissions = Quantity x selected emission factor (CO2 / CH4 / NO2)
                   </div>
 
@@ -5637,9 +5637,9 @@ const EmissionCalculatorIPCC = ({
                     </table>
                   </div>
 
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-right">
-                    <span className="text-sm text-teal-800 mr-2">Total Industry Emissions:</span>
-                    <span className="text-lg font-bold text-teal-900">
+                  <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] px-4 py-3 text-right">
+                    <span className="text-sm text-[#0A4D3E] mr-2">Total Industry Emissions:</span>
+                    <span className="text-lg font-bold text-[#0A4D3E]">
                       {formatNumber(totalEnergyIndustryEmissions, 2)}
                     </span>
                   </div>

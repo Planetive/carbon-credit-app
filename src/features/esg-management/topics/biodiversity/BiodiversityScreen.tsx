@@ -105,7 +105,7 @@ const BiodiversityScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -181,7 +181,7 @@ const BiodiversityScreen = () => {
         </CardContent>
       </Card>
 
-      <Card className={sectionShell("border-l-4 border-l-teal-500")}>
+      <Card className={sectionShell("border-l-4 border-l-[#1C7A53]")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">Biodiversity incidents</CardTitle>
           <CardDescription className="text-slate-600">Count and short narrative for the reporting period.</CardDescription>
@@ -210,7 +210,7 @@ const BiodiversityScreen = () => {
         </CardContent>
       </Card>
 
-      <Card className={sectionShell("border-l-4 border-l-cyan-600")}>
+      <Card className={sectionShell("border-l-4 border-l-[#1D9E75]")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">Environmental management plan (EMP)</CardTitle>
           <CardDescription className="text-slate-600">Whether an EMP is in place and document references (metadata only).</CardDescription>
@@ -330,7 +330,7 @@ const BiodiversityScreen = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
           </CardContent>

@@ -5,10 +5,10 @@ const CARD =
   "rounded-[16px] bg-white border border-[rgba(15,23,42,0.06)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_22px_rgba(15,23,42,0.025)] h-full min-h-[268px] grid grid-rows-[auto_1fr] px-4 py-[15px]";
 
 const TRACK = "#E9EEF2";
-const EMERALD = "#0F8A70";
+const EMERALD = "#1D9E75";
 
 const IMPACT_FILL: Record<string, string> = {
-  Environment: "#2E8B73",
+  Environment: "#1D9E75",
   Social: "#8B5CF6",
   Governance: "#1D9BF0",
 };
@@ -48,7 +48,7 @@ const OverviewEsgProgressCard = ({
         <button
           type="button"
           onClick={onViewAssessment}
-          className="text-[13px] font-medium text-[#0F8A70] hover:text-[#0c7560] transition-colors shrink-0"
+          className="text-[13px] font-medium text-[#1D9E75] hover:text-[#0F6E56] transition-colors shrink-0"
         >
           View assessment →
         </button>

@@ -373,7 +373,7 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
     const displayValue = typeof value === 'number' ? value : 0;
 
     return (
-      <Card className={`border-2 ${isEditing ? 'border-teal-500 shadow-lg' : 'border-gray-200'} transition-all`}>
+      <Card className={`border-2 ${isEditing ? 'border-[#1D9E75] shadow-lg' : 'border-gray-200'} transition-all`}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -424,7 +424,7 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
                     const numValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
                     handleSave(scope, numValue);
                   }}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700"
+                  className="flex-1 bg-[#1D9E75] hover:bg-[#22B87E]"
                   disabled={saving}
                 >
                   <Save className="h-4 w-4 mr-2" />
@@ -530,7 +530,7 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
       </div>
 
       {/* Summary Card */}
-      <Card className="bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-200">
+      <Card className="bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] border-2 border-[#BFE3D3]">
         <CardHeader>
           <CardTitle className="text-xl">Emission Summary</CardTitle>
           <CardDescription>Total emissions across all scopes</CardDescription>
@@ -558,9 +558,9 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
               </p>
               <p className="text-xs text-gray-500">kg CO₂e</p>
             </div>
-            <div className="text-center p-4 bg-white rounded-lg border-2 border-teal-500">
+            <div className="text-center p-4 bg-white rounded-lg border-2 border-[#1D9E75]">
               <p className="text-sm text-gray-600 mb-1">Total</p>
-              <p className="text-2xl font-bold text-teal-600">
+              <p className="text-2xl font-bold text-[#1D9E75]">
                 {totalEmissions.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-gray-500">kg CO₂e</p>

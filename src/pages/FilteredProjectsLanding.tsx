@@ -86,7 +86,7 @@ const FilteredProjectsLanding = () => {
   return (
     <>
       <AppHeader />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-white flex flex-col lg:flex-row">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1] to-white flex flex-col lg:flex-row">
         {/* Main content: left side (2/3) */}
         <div className="flex-1 flex flex-col">
           {/* Header Section */}
@@ -103,17 +103,17 @@ const FilteredProjectsLanding = () => {
           <div className="flex-1 flex flex-col justify-center items-start px-4 md:px-8 lg:px-12 py-4">
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4 md:p-6 lg:p-8 mb-8 w-full max-w-6xl">
                               <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <div className="w-10 h-10 md:w-12 md:h-12 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-teal-600" />
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-[#EAF7F1] rounded-xl flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-[#1D9E75]" />
                   </div>
                   <h2 className="text-xl md:text-2xl lg:text-3xl font-semibold text-gray-900">Analysis Results</h2>
                 </div>
 
               {noProjectsFound === null ? (
-                <div className="bg-teal-50 border border-teal-200 rounded-lg p-8">
+                <div className="bg-[#EAF7F1] border border-[#BFE3D3] rounded-lg p-8">
                   <div className="flex items-center gap-4 mb-4">
-                    <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
-                    <span className="text-teal-800 font-semibold text-lg">Processing your requirements...</span>
+                    <Loader2 className="w-6 h-6 text-[#1D9E75] animate-spin" />
+                    <span className="text-[#0A4D3E] font-semibold text-lg">Processing your requirements...</span>
                   </div>
                   <p className="text-gray-600 text-lg">Our AI is analyzing your criteria to find the most suitable carbon credit opportunities.</p>
                 </div>
@@ -158,7 +158,7 @@ const FilteredProjectsLanding = () => {
                       </p>
                       <Button
                         size="lg"
-                        className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-8 py-4 rounded-lg text-lg"
+                        className="bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold px-8 py-4 rounded-lg text-lg"
                         onClick={() => navigate("/project-wizard")}
                       >
                         Revise Criteria
@@ -169,10 +169,10 @@ const FilteredProjectsLanding = () => {
               ) : (
                 <div className="space-y-8">
                   {/* Analysis Status */}
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-6">
+                  <div className="bg-[#EAF7F1] border border-[#BFE3D3] rounded-lg p-6">
                     <div className="flex items-center gap-4 mb-4">
-                      <CheckCircle className="w-6 h-6 text-teal-600" />
-                      <span className="text-teal-800 font-semibold text-lg">Analysis Complete</span>
+                      <CheckCircle className="w-6 h-6 text-[#1D9E75]" />
+                      <span className="text-[#0A4D3E] font-semibold text-lg">Analysis Complete</span>
                     </div>
                     
                     {/* Criteria Summary */}
@@ -197,12 +197,12 @@ const FilteredProjectsLanding = () => {
                     {/* Success Message */}
                     <div className="bg-white rounded-lg p-4 md:p-6 border border-gray-200">
                       <div className="flex items-center gap-3 md:gap-4 mb-4">
-                        <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-teal-600" />
+                        <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-[#1D9E75]" />
                         <h3 className="text-xl md:text-2xl font-semibold text-gray-900">Matches Found</h3>
                       </div>
                       <p className="text-gray-700 leading-relaxed text-base md:text-lg">
-                        Our AI has identified <span className="font-semibold text-teal-700">relevant carbon credit projects</span> and 
-                        <span className="font-semibold text-teal-700"> optimized methodologies</span> that align with your requirements. 
+                        Our AI has identified <span className="font-semibold text-[#0F6E56]">relevant carbon credit projects</span> and 
+                        <span className="font-semibold text-[#0F6E56]"> optimized methodologies</span> that align with your requirements. 
                         These opportunities have been carefully selected based on your specified criteria and market conditions.
                       </p>
                     </div>
@@ -219,13 +219,13 @@ const FilteredProjectsLanding = () => {
                         <div className="flex flex-col lg:flex-row justify-center items-center gap-8 md:gap-16">
                           {/* Global Projects */}
                           <div className="flex flex-col items-center gap-3">
-                            <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-                              <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-teal-600" />
+                            <div className="w-16 h-16 md:w-20 md:h-20 bg-[#EAF7F1] rounded-full flex items-center justify-center mb-4">
+                              <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-[#1D9E75]" />
                             </div>
                             <h4 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 text-center">Global Projects</h4>
                             <Button
                               size="lg"
-                              className="w-56 md:w-64 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+                              className="w-56 md:w-64 bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
                               onClick={() => {
                                 const typeToPass =
                                   typeof state.type === "string" && state.type.trim()
@@ -257,13 +257,13 @@ const FilteredProjectsLanding = () => {
                            
                            {/* CCUS Projects */}
                            <div className="flex flex-col items-center gap-3">
-                             <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-                               <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-teal-600" />
+                             <div className="w-16 h-16 md:w-20 md:h-20 bg-[#EAF7F1] rounded-full flex items-center justify-center mb-4">
+                               <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-[#1D9E75]" />
                              </div>
                              <h4 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 text-center">CCUS Projects</h4>
                              <Button
                                size="lg"
-                               className="w-56 md:w-64 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+                               className="w-56 md:w-64 bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
                               onClick={() => {
                                 const typeToPass =
                                   typeof state.type === "string" && state.type.trim()
@@ -294,13 +294,13 @@ const FilteredProjectsLanding = () => {
                                                  {/* Second Row: Methodologies */}
                          <div className="flex flex-row justify-center items-center">
                            <div className="flex flex-col items-center gap-3">
-                             <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-                               <BookOpen className="w-8 h-8 md:w-10 md:h-10 text-teal-600" />
+                             <div className="w-16 h-16 md:w-20 md:h-20 bg-[#EAF7F1] rounded-full flex items-center justify-center mb-4">
+                               <BookOpen className="w-8 h-8 md:w-10 md:h-10 text-[#1D9E75]" />
                              </div>
                              <h4 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 text-center">Methodologies</h4>
                              <Button
                                size="lg"
-                               className="w-56 md:w-64 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+                               className="w-56 md:w-64 bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
                               onClick={() => navigate("/filtered-methodologies", { state })}
                             >
                               View Methodologies
@@ -313,13 +313,13 @@ const FilteredProjectsLanding = () => {
                        <div className="flex flex-col lg:flex-row justify-center items-center gap-8 md:gap-16">
                          {/* Global Projects */}
                          <div className="flex flex-col items-center gap-3">
-                           <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-                             <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-teal-600" />
+                           <div className="w-16 h-16 md:w-20 md:h-20 bg-[#EAF7F1] rounded-full flex items-center justify-center mb-4">
+                             <Briefcase className="w-8 h-8 md:w-10 md:h-10 text-[#1D9E75]" />
                            </div>
                            <h4 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 text-center">Global Projects</h4>
                            <Button
                              size="lg"
-                             className="w-56 md:w-64 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+                             className="w-56 md:w-64 bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
                             onClick={() => {
                               const typeToPass =
                                 typeof state.type === "string" && state.type.trim()
@@ -351,13 +351,13 @@ const FilteredProjectsLanding = () => {
                          
                          {/* Methodologies */}
                          <div className="flex flex-col items-center gap-3">
-                           <div className="w-16 h-16 md:w-20 md:h-20 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-                             <BookOpen className="w-8 h-8 md:w-10 md:h-10 text-teal-600" />
+                           <div className="w-16 h-16 md:w-20 md:h-20 bg-[#EAF7F1] rounded-full flex items-center justify-center mb-4">
+                             <BookOpen className="w-8 h-8 md:w-10 md:h-10 text-[#1D9E75]" />
                            </div>
                            <h4 className="text-lg md:text-xl font-semibold text-gray-900 mb-3 text-center">Methodologies</h4>
                            <Button
                              size="lg"
-                             className="w-56 md:w-64 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+                             className="w-56 md:w-64 bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
                             onClick={() => navigate("/filtered-methodologies", { state })}
                           >
                             View Methodologies
@@ -373,10 +373,10 @@ const FilteredProjectsLanding = () => {
         </div>
 
                  {/* Finance section: right side (1/3) */}
-         <div className="w-full lg:w-1/3 flex flex-col justify-between py-8 md:py-16 px-4 md:px-8 bg-gradient-to-b from-white/60 to-teal-50 border-t lg:border-l border-teal-200 min-h-screen order-last">
+         <div className="w-full lg:w-1/3 flex flex-col justify-between py-8 md:py-16 px-4 md:px-8 bg-gradient-to-b from-white/60 to-teal-50 border-t lg:border-l border-[#BFE3D3] min-h-screen order-last">
            <div>
-             <h3 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-teal-700 flex items-center gap-2">
-               <DollarSign className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
+             <h3 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-[#0F6E56] flex items-center gap-2">
+               <DollarSign className="w-6 h-6 md:w-8 md:h-8 text-[#1D9E75]" />
                Finance
              </h3>
              <p className="text-base md:text-lg text-gray-700 mb-6 md:mb-8 leading-relaxed">
@@ -388,19 +388,19 @@ const FilteredProjectsLanding = () => {
                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-3">Key Financial Insights</h4>
                <ul className="space-y-2 text-sm md:text-base text-gray-600">
                  <li className="flex items-center gap-2">
-                   <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                   <div className="w-2 h-2 bg-[#1D9E75] rounded-full"></div>
                    Market price analysis and trends
                  </li>
                  <li className="flex items-center gap-2">
-                   <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                   <div className="w-2 h-2 bg-[#1D9E75] rounded-full"></div>
                    Risk assessment and mitigation strategies
                  </li>
                  <li className="flex items-center gap-2">
-                   <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                   <div className="w-2 h-2 bg-[#1D9E75] rounded-full"></div>
                    Investment portfolio optimization
                  </li>
                  <li className="flex items-center gap-2">
-                   <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                   <div className="w-2 h-2 bg-[#1D9E75] rounded-full"></div>
                    Regulatory compliance guidance
                  </li>
                </ul>
@@ -408,7 +408,7 @@ const FilteredProjectsLanding = () => {
            </div>
            <Button
              size="lg"
-             className="w-full mt-auto bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3"
+             className="w-full mt-auto bg-[#1D9E75] hover:bg-[#22B87E] text-white font-semibold py-3"
              onClick={() => navigate("/project-wizard")}
            >
              Explore Financial Options

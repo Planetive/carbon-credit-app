@@ -114,7 +114,7 @@ const ClimateRiskResultsScreen: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] rounded-2xl shadow-lg">
                 <BarChart3 className="h-8 w-8 text-white" />
               </div>
               <div>
@@ -139,7 +139,7 @@ const ClimateRiskResultsScreen: React.FC = () => {
               <Button
                 onClick={handleExportReport}
                 disabled={isExporting}
-                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Download className="h-4 w-4" />
                 <span>{isExporting ? 'Generating...' : 'Export Report'}</span>
@@ -545,7 +545,7 @@ const ClimateRiskResultsScreen: React.FC = () => {
                 <Button 
                   onClick={handleExportTCFDReport}
                   disabled={isExportingTCFD}
-                  className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white"
+                  className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white"
                 >
                   <FileText className="h-4 w-4" />
                   <span>{isExportingTCFD ? 'Generating...' : 'Export TCFD Report'}</span>

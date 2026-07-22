@@ -446,12 +446,12 @@ const BankPortfolio: React.FC = () => {
         transition={{ duration: 0.4 }}
       >
         <Card className="bg-white border border-gray-200/80 shadow-lg overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-teal-500/10 border-b border-gray-200/80">
+          <CardHeader className="bg-gradient-to-r from-[#EAF7F1] via-[#EDF8F3] to-[#EAF7F1] border-b border-gray-200/80">
             <div className="flex items-center gap-3">
               <motion.div
                 whileHover={{ rotate: [0, -10, 10, 0] }}
                 transition={{ duration: 0.5 }}
-                className="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/30"
+                className="w-12 h-12 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center shadow-lg shadow-[0_10px_24px_-8px_rgba(11,77,61,0.35)]"
               >
                 <Building2 className="h-6 w-6 text-white" />
               </motion.div>
@@ -468,10 +468,10 @@ const BankPortfolio: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4 flex items-start gap-2"
+              className="bg-[#EAF7F1] border border-[#BFE3D3] rounded-lg p-3 mt-4 flex items-start gap-2"
             >
-              <Sparkles className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-blue-800">
+              <Sparkles className="h-4 w-4 text-[#1A5C4A] mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-[#0A4D3E]">
                 <strong className="font-semibold">Note:</strong> Loan amounts are automatically retrieved from your Finance Emission calculations. 
                 Once added, you can view and manage all companies in the "My Portfolio" section.
               </p>
@@ -481,7 +481,7 @@ const BankPortfolio: React.FC = () => {
             {/* Company Information Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                <Building2 className="h-5 w-5 text-teal-600" />
+                <Building2 className="h-5 w-5 text-[#0A4D3E]" />
                 <h3 className="text-lg font-semibold text-gray-900">Company Information</h3>
               </div>
               
@@ -495,7 +495,7 @@ const BankPortfolio: React.FC = () => {
                   placeholder="e.g., Sunrise Textiles Ltd."
                   value={newCompany}
                   onChange={(e) => setNewCompany(e.target.value)}
-                  className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                  className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]"
                 />
               </div>
               
@@ -506,7 +506,7 @@ const BankPortfolio: React.FC = () => {
                     Counterparty Type *
                   </Label>
                   <Select value={newCounterpartyType} onValueChange={setNewCounterpartyType}>
-                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
+                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]">
                       <SelectValue placeholder="Select counterparty type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -528,7 +528,7 @@ const BankPortfolio: React.FC = () => {
                     Sector *
                   </Label>
                   <Select value={newSector} onValueChange={setNewSector}>
-                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
+                    <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]">
                       <SelectValue placeholder="Select sector" />
                     </SelectTrigger>
                     <SelectContent>
@@ -581,7 +581,7 @@ const BankPortfolio: React.FC = () => {
                   Geography *
                 </Label>
                 <Select value={newGeography} onValueChange={setNewGeography}>
-                  <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500">
+                  <SelectTrigger className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]">
                     <SelectValue placeholder="Select Pakistan or district" />
                   </SelectTrigger>
                     <SelectContent>
@@ -793,7 +793,7 @@ const BankPortfolio: React.FC = () => {
                     placeholder="2.5"
                     value={newPD || ''}
                     onChange={(e) => setNewPD(Number(e.target.value))}
-                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                    className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]"
                   />
                 </div>
                 <div>
@@ -810,7 +810,7 @@ const BankPortfolio: React.FC = () => {
                     placeholder="45"
                     value={newLGD || ''}
                     onChange={(e) => setNewLGD(Number(e.target.value))}
-                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                    className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]"
                   />
                 </div>
                 <div>
@@ -825,7 +825,7 @@ const BankPortfolio: React.FC = () => {
                     placeholder="36"
                     value={newTenor || ''}
                     onChange={(e) => setNewTenor(Number(e.target.value))}
-                    className="mt-2 h-11 border-gray-300 focus:border-teal-500 focus:ring-teal-500"
+                    className="mt-2 h-11 border-gray-300 focus:border-[#1C7A53] focus:ring-[#1C7A53]"
                   />
                 </div>
               </div>
@@ -835,7 +835,7 @@ const BankPortfolio: React.FC = () => {
             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
               <Button 
                 onClick={addEntry} 
-                className="w-full h-12 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30 font-semibold text-base" 
+                className="w-full h-12 bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(11,77,61,0.35)] font-semibold text-base" 
                 disabled={saving}
               >
                 {saving ? (
@@ -864,7 +864,7 @@ const BankPortfolio: React.FC = () => {
                 <motion.div
                   whileHover={{ rotate: [0, -5, 5, 0] }}
                   transition={{ duration: 0.5 }}
-                  className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center shadow-md shadow-teal-500/30"
+                  className="w-10 h-10 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-lg flex items-center justify-center shadow-md shadow-[0_8px_18px_-6px_rgba(11,77,61,0.28)]"
                 >
                   <FileSpreadsheet className="h-5 w-5 text-white" />
                 </motion.div>
@@ -874,11 +874,11 @@ const BankPortfolio: React.FC = () => {
                 </div>
               </div>
               
-              <Card className="bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 border-2 border-teal-200/60 shadow-md overflow-hidden">
+              <Card className="bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#EAF7F1] border-2 border-[#BFE3D3]/80 shadow-md overflow-hidden">
                 <CardContent className="p-6 space-y-5">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-white/80 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Sparkles className="h-4 w-4 text-teal-600" />
+                      <Sparkles className="h-4 w-4 text-[#0A4D3E]" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800 mb-1">
@@ -898,15 +898,15 @@ const BankPortfolio: React.FC = () => {
                     >
                       <Button
                         onClick={downloadTemplate}
-                        className="w-full h-14 bg-white border-2 border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400 hover:shadow-lg transition-all duration-200 font-medium"
+                        className="w-full h-14 bg-white border-2 border-[#BFE3D3] text-[#0A4D3E] hover:bg-[#EAF7F1] hover:border-[#9ECFB8] hover:shadow-lg transition-all duration-200 font-medium"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                          <div className="w-8 h-8 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-lg flex items-center justify-center">
                             <Download className="h-4 w-4 text-white" />
                           </div>
                           <div className="text-left">
                             <div className="text-sm font-semibold">Download Template</div>
-                            <div className="text-xs text-teal-600 font-normal">Get the CSV format</div>
+                            <div className="text-xs text-[#0A4D3E] font-normal">Get the CSV format</div>
                           </div>
                         </div>
                       </Button>
@@ -925,7 +925,7 @@ const BankPortfolio: React.FC = () => {
                         whileTap={{ scale: 0.98 }}
                       >
                         <Button
-                          className="w-full h-14 bg-white border-2 border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400 hover:shadow-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full h-14 bg-white border-2 border-[#BFE3D3] text-[#0A4D3E] hover:bg-[#EAF7F1] hover:border-[#9ECFB8] hover:shadow-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={isUploading}
                         >
                           <div className="flex items-center gap-3">
@@ -934,21 +934,21 @@ const BankPortfolio: React.FC = () => {
                                 <motion.div
                                   animate={{ rotate: 360 }}
                                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                  className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full"
+                                  className="w-8 h-8 border-3 border-[#1D9E75] border-t-transparent rounded-full"
                                 />
                                 <div className="text-left">
                                   <div className="text-sm font-semibold">Uploading...</div>
-                                  <div className="text-xs text-teal-600 font-normal">Processing your file</div>
+                                  <div className="text-xs text-[#0A4D3E] font-normal">Processing your file</div>
                                 </div>
                               </>
                             ) : (
                               <>
-                                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg flex items-center justify-center">
+                                <div className="w-8 h-8 bg-gradient-to-br from-[#1D9E75] to-[#1C7A53] rounded-lg flex items-center justify-center">
                                   <Upload className="h-4 w-4 text-white" />
                                 </div>
                                 <div className="text-left">
                                   <div className="text-sm font-semibold">Upload CSV/Excel</div>
-                                  <div className="text-xs text-teal-600 font-normal">Select your file</div>
+                                  <div className="text-xs text-[#0A4D3E] font-normal">Select your file</div>
                                 </div>
                               </>
                             )}
@@ -974,9 +974,9 @@ const BankPortfolio: React.FC = () => {
                     </motion.div>
                   )}
                   
-                  <div className="pt-3 border-t border-teal-200/60">
+                  <div className="pt-3 border-t border-[#BFE3D3]/80">
                     <div className="flex items-start gap-2 text-xs text-gray-600">
-                      <div className="w-1 h-1 bg-teal-400 rounded-full mt-1.5 flex-shrink-0" />
+                      <div className="w-1 h-1 bg-[#1D9E75] rounded-full mt-1.5 flex-shrink-0" />
                       <p>
                         <strong className="font-semibold text-gray-700">Tip:</strong> Ensure your file includes all required fields: Company Name, Counterparty Type, Sector, Geography, PD, LGD, and Tenor.
                       </p>

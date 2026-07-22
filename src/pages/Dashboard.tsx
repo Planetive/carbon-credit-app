@@ -155,11 +155,11 @@ const Dashboard = () => {
 
   if (profileMissing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-cyan-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] p-4">
         <Card className="w-full max-w-md shadow-xl border-0 bg-white/90 backdrop-blur-sm">
           <CardHeader className="text-center pb-4 sm:pb-6">
-            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-teal-500/10 rounded-full flex items-center justify-center mb-3 sm:mb-4">
-              <User className="h-6 w-6 sm:h-8 sm:w-8 text-teal-600" />
+            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-[#1D9E75]/10 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+              <User className="h-6 w-6 sm:h-8 sm:w-8 text-[#1D9E75]" />
             </div>
             <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">Complete Your Profile</CardTitle>
             <CardDescription className="text-sm sm:text-base text-gray-600">To continue, please provide your organization and display name.</CardDescription>
@@ -169,7 +169,7 @@ const Dashboard = () => {
               <div>
                 <label className="block font-semibold text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">Organization Name</label>
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm sm:text-base"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-[#1D9E75]/20 focus:border-[#1D9E75] transition-all text-sm sm:text-base"
                   name="organizationName"
                   type="text"
                   value={profileForm.organizationName}
@@ -181,7 +181,7 @@ const Dashboard = () => {
               <div>
                 <label className="block font-semibold text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">Designation</label>
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm sm:text-base"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-[#1D9E75]/20 focus:border-[#1D9E75] transition-all text-sm sm:text-base"
                   name="displayName"
                   type="text"
                   value={profileForm.displayName}
@@ -193,7 +193,7 @@ const Dashboard = () => {
               <div>
                 <label className="block font-semibold text-gray-700 mb-1 sm:mb-2 text-sm sm:text-base">Phone Number</label>
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-sm sm:text-base"
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-[#1D9E75]/20 focus:border-[#1D9E75] transition-all text-sm sm:text-base"
                   name="phone"
                   type="tel"
                   value={profileForm.phone}
@@ -201,7 +201,7 @@ const Dashboard = () => {
                   placeholder="03XX-XXXXXXX"
                 />
               </div>
-              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg font-semibold bg-teal-600 hover:bg-teal-700" disabled={profileSubmitting}>
+              <Button type="submit" className="w-full py-2 sm:py-3 text-base sm:text-lg font-semibold bg-[#1D9E75] hover:bg-[#22B87E]" disabled={profileSubmitting}>
                 {profileSubmitting ? "Saving..." : "Complete Profile"}
               </Button>
             </form>
@@ -231,7 +231,7 @@ const Dashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 md:py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div className="mb-4 md:mb-0">
-              <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-teal-800">
+              <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-[#0A4D3E]">
                 {organizationName ? `Welcome back, ${organizationName} ! 👋` : "Hello"}
               </h1>
               <p className="mt-2 text-sm sm:text-base md:text-xl text-gray-700">
@@ -243,10 +243,10 @@ const Dashboard = () => {
       </section>
 
       {/* Main Explore Section - Full Width Hero */}
-      <section className="bg-gradient-to-r from-green-50 via-teal-50 to-cyan-50 py-12 sm:py-16">
+      <section className="bg-gradient-to-r from-green-50 via-[#EAF7F1] to-[#EDF8F3] py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-teal-800 mb-3 sm:mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#0A4D3E] mb-3 sm:mb-4">
               Explore Global Carbon Projects
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-gray-700 max-w-3xl mx-auto px-4">
@@ -257,31 +257,31 @@ const Dashboard = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-8 sm:mb-12">
             <div className="text-center">
-              <div className="bg-teal-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-teal-600" />
+              <div className="bg-[#EAF7F1] rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-[#1D9E75]" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-teal-800 mb-2">10,000+ Projects</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-[#0A4D3E] mb-2">10,000+ Projects</h3>
               <p className="text-sm sm:text-base text-gray-600 px-2">Verified carbon projects across 50+ countries</p>
             </div>
             <div className="text-center">
               <div className="bg-cyan-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-600" />
+                <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-[#1D9E75]" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-teal-800 mb-2">Real-time Data</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-[#0A4D3E] mb-2">Real-time Data</h3>
               <p className="text-sm sm:text-base text-gray-600 px-2">Live project updates and performance metrics</p>
             </div>
             <div className="text-center sm:col-span-2 md:col-span-1">
               <div className="bg-green-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3 sm:mb-4">
                 <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-teal-800 mb-2">Detailed Analytics</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-[#0A4D3E] mb-2">Detailed Analytics</h3>
               <p className="text-sm sm:text-base text-gray-600 px-2">Comprehensive project analysis and insights</p>
             </div>
           </div>
 
           <div className="text-center">
             <Link to="/explore">
-              <Button size="lg" className="bg-teal-600 text-white hover:bg-teal-700 px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold w-full sm:w-auto">
+              <Button size="lg" className="bg-[#1D9E75] text-white hover:bg-[#22B87E] px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold w-full sm:w-auto">
                 <Globe className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 Start Exploring Projects
               </Button>
@@ -294,7 +294,7 @@ const Dashboard = () => {
        <section className="bg-white py-12 sm:py-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-8 sm:mb-12">
-             <h2 className="text-2xl sm:text-3xl font-bold text-teal-800 mb-3 sm:mb-4">
+             <h2 className="text-2xl sm:text-3xl font-bold text-[#0A4D3E] mb-3 sm:mb-4">
                Create Your Own Carbon Project
              </h2>
              <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4">
@@ -305,7 +305,7 @@ const Dashboard = () => {
 
            <div className="max-w-4xl mx-auto">
              <Link to="/project-wizard">
-               <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer bg-gradient-to-r from-teal-500 to-cyan-600 text-white border-0 group overflow-hidden relative">
+               <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white border-0 group overflow-hidden relative">
                  <div className="absolute inset-0 bg-gradient-to-r from-teal-600/20 to-cyan-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                  <CardContent className="p-4 sm:p-6 md:p-8 relative z-10">
                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
@@ -334,11 +334,11 @@ const Dashboard = () => {
        </section>
 
              {/* Management Tools Section */}
-       <section className="bg-gradient-to-r from-green-50 via-teal-50 to-cyan-50 py-12 sm:py-16">
+       <section className="bg-gradient-to-r from-green-50 via-[#EAF7F1] to-[#EDF8F3] py-12 sm:py-16">
 
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-8 sm:mb-12">
-             <h2 className="text-2xl sm:text-3xl font-bold text-teal-800 mb-3 sm:mb-4">
+             <h2 className="text-2xl sm:text-3xl font-bold text-[#0A4D3E] mb-3 sm:mb-4">
                Project Management Tools
              </h2>
              <p className="text-base sm:text-lg text-gray-700 max-w-2xl mx-auto px-4">
@@ -351,8 +351,8 @@ const Dashboard = () => {
               <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer bg-white border-0 group h-full">
                 <CardContent className="p-4 sm:p-6 md:p-8">
                   <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-6">
-                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-teal-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform mx-auto sm:mx-0">
-                      <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-teal-600" />
+                    <div className="h-12 w-12 sm:h-16 sm:w-16 bg-[#EAF7F1] rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform mx-auto sm:mx-0">
+                      <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-[#1D9E75]" />
                     </div>
                     <div className="flex-1 text-center sm:text-left">
                       <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Project Drafts</h3>
@@ -360,7 +360,7 @@ const Dashboard = () => {
                         Continue working on saved project drafts and incomplete evaluations. 
                         Pick up where you left off with all your progress preserved.
                       </p>
-                      <div className="flex items-center justify-center sm:justify-start text-teal-600 font-semibold group-hover:text-teal-700 transition-colors">
+                      <div className="flex items-center justify-center sm:justify-start text-[#1D9E75] font-semibold group-hover:text-[#0F6E56] transition-colors">
                         <span>View Drafts</span>
                         <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
                       </div>
@@ -375,7 +375,7 @@ const Dashboard = () => {
                 <CardContent className="p-4 sm:p-6 md:p-8">
                   <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-6">
                     <div className="h-12 w-12 sm:h-16 sm:w-16 bg-cyan-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform mx-auto sm:mx-0">
-                      <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-600" />
+                      <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-[#1D9E75]" />
                     </div>
                     <div className="flex-1 text-center sm:text-left">
                       <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Reports & Analytics</h3>
@@ -383,7 +383,7 @@ const Dashboard = () => {
                         Generate comprehensive reports and analytics. Track performance, 
                         measure impact, and make data-driven decisions.
                       </p>
-                      <div className="flex items-center text-cyan-600 font-semibold group-hover:text-cyan-700 transition-colors">
+                      <div className="flex items-center text-[#1D9E75] font-semibold group-hover:text-[#0F6E56] transition-colors">
                         <span>View Reports</span>
                         <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
                       </div>
@@ -407,7 +407,7 @@ const Dashboard = () => {
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">Recent Projects</h2>
                 <p className="text-gray-600">Your latest project activities and updates</p>
               </div>
-              <Button variant="outline" size="lg" className="hover:bg-teal-600 hover:text-white transition-colors">
+              <Button variant="outline" size="lg" className="hover:bg-[#1D9E75] hover:text-white transition-colors">
                 View All Projects
               </Button>
             </div>
@@ -418,8 +418,8 @@ const Dashboard = () => {
                   <CardContent className="p-6">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-4">
-                        <div className="h-12 w-12 bg-teal-500/10 rounded-xl flex items-center justify-center">
-                          <FileText className="h-6 w-6 text-teal-600" />
+                        <div className="h-12 w-12 bg-[#1D9E75]/10 rounded-xl flex items-center justify-center">
+                          <FileText className="h-6 w-6 text-[#1D9E75]" />
                         </div>
                         <div>
                           <h4 className="font-semibold text-gray-900 text-lg">{project.project_name}</h4>
@@ -455,11 +455,11 @@ const Dashboard = () => {
       )} */}
 
              {/* ESG Health Check Section */}
-       {/* <section className="bg-gradient-to-r from-green-50 via-teal-50 to-cyan-50 py-16"> */}
+       {/* <section className="bg-gradient-to-r from-green-50 via-[#EAF7F1] to-[#EDF8F3] py-16"> */}
        <section className="bg-white py-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-12">
-             <h2 className="text-3xl font-bold text-teal-800 mb-4">
+             <h2 className="text-3xl font-bold text-[#0A4D3E] mb-4">
                ESG Health Check
              </h2>
              <p className="text-lg text-gray-700 max-w-2xl mx-auto">
@@ -567,10 +567,10 @@ const Dashboard = () => {
        </section>
 
              {/* Emission Calculator Section */}
-       <section className="bg-gradient-to-r from-green-50 via-teal-50 to-cyan-50 py-16">
+       <section className="bg-gradient-to-r from-green-50 via-[#EAF7F1] to-[#EDF8F3] py-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-12">
-             <h2 className="text-3xl font-bold text-teal-800 mb-4">
+             <h2 className="text-3xl font-bold text-[#0A4D3E] mb-4">
                Emission Calculator
              </h2>
              <p className="text-lg text-gray-700 max-w-2xl mx-auto">
@@ -631,7 +631,7 @@ const Dashboard = () => {
        <section className="bg-white py-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-12">
-             <h2 className="text-3xl font-bold text-teal-800 mb-4">
+             <h2 className="text-3xl font-bold text-[#0A4D3E] mb-4">
                Emission History Assessment
              </h2>
              <p className="text-lg text-gray-700 max-w-2xl mx-auto">
@@ -689,7 +689,7 @@ const Dashboard = () => {
        <section className="bg-white py-16">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
            <div className="text-center mb-12">
-             <h2 className="text-3xl font-bold text-teal-800 mb-4">
+             <h2 className="text-3xl font-bold text-[#0A4D3E] mb-4">
                Platform Overview
              </h2>
              <p className="text-gray-600 text-lg">
@@ -699,15 +699,15 @@ const Dashboard = () => {
 
            <div className="grid md:grid-cols-4 gap-8">
              <div className="text-center">
-               <div className="text-4xl font-bold text-teal-600 mb-2">2,500+</div>
+               <div className="text-4xl font-bold text-[#1D9E75] mb-2">2,500+</div>
                <div className="text-gray-600">Active Projects</div>
              </div>
              <div className="text-center">
-               <div className="text-4xl font-bold text-cyan-600 mb-2">50+</div>
+               <div className="text-4xl font-bold text-[#1D9E75] mb-2">50+</div>
                <div className="text-gray-600">Countries</div>
              </div>
              <div className="text-center">
-               <div className="text-4xl font-bold text-teal-500 mb-2">1.2M</div>
+               <div className="text-4xl font-bold text-[#1D9E75] mb-2">1.2M</div>
                <div className="text-gray-600">tCO2e Reduced</div>
              </div>
              <div className="text-center">

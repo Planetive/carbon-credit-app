@@ -261,7 +261,7 @@ const UKResultsScreen = () => {
           { key: 'epa_mobile', label: 'Mobile fuel (EPA)', value: epaMobileEmissions, color: 'bg-amber-500' },
           { key: 'epa_on_road_gas', label: 'On-road gasoline (EPA)', value: epaOnRoadGasEmissions, color: 'bg-sky-500' },
           { key: 'epa_on_road_diesel', label: 'On-road diesel & alt fuel (EPA)', value: epaOnRoadDieselEmissions, color: 'bg-emerald-500' },
-          { key: 'epa_non_road', label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-teal-500' },
+          { key: 'epa_non_road', label: 'Non-road vehicle (EPA)', value: epaNonRoadEmissions, color: 'bg-[#1D9E75]' },
           { key: 'epa_scope1_heat_steam', label: 'Heat and Steam', value: epaScope1HeatSteamEmissions, color: 'bg-amber-600' },
         ]
       : [
@@ -340,8 +340,8 @@ const UKResultsScreen = () => {
       { key: 'scope3_capital_goods', label: 'Capital Goods', value: scope3CapitalGoods, color: 'bg-indigo-500', category: 'upstream' },
       { key: 'scope3_fuel_energy', label: 'Fuel & Energy Activities', value: scope3FuelEnergy, color: 'bg-violet-500', category: 'upstream' },
       { key: 'scope3_upstream_transport', label: 'Upstream Transportation', value: scope3UpstreamTransport, color: 'bg-blue-500', category: 'upstream' },
-      { key: 'scope3_waste_generated', label: 'Waste Generated', value: scope3WasteGenerated, color: 'bg-cyan-500', category: 'upstream' },
-      { key: 'scope3_business_travel', label: 'Business Travel', value: scope3BusinessTravel, color: 'bg-teal-500', category: 'upstream' },
+      { key: 'scope3_waste_generated', label: 'Waste Generated', value: scope3WasteGenerated, color: 'bg-[#EDF8F3]0', category: 'upstream' },
+      { key: 'scope3_business_travel', label: 'Business Travel', value: scope3BusinessTravel, color: 'bg-[#1D9E75]', category: 'upstream' },
       { key: 'scope3_employee_commuting', label: 'Employee Commuting', value: scope3EmployeeCommuting, color: 'bg-green-500', category: 'upstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3UpstreamTotal > 0 ? (d.value / scope3UpstreamTotal) * 100 : 0 }));
@@ -355,7 +355,7 @@ const UKResultsScreen = () => {
       { key: 'scope3_use_of_sold', label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
       { key: 'scope3_end_of_life', label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
       { key: 'scope3_investments', label: 'Category 15 — Investments & finance', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
-      { key: 'scope3_facilitated', label: 'Category 16 — Facilitated emissions', value: scope3Facilitated, color: 'bg-teal-600', category: 'downstream' },
+      { key: 'scope3_facilitated', label: 'Category 16 — Facilitated emissions', value: scope3Facilitated, color: 'bg-[#1D9E75]', category: 'downstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
@@ -686,15 +686,15 @@ const UKResultsScreen = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center relative overflow-hidden">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
         </div>
         <div className="text-center relative z-10">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-200 border-t-teal-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#BFE3D3] border-t-[#1D9E75] mx-auto mb-4"></div>
           <p className="text-gray-700 font-medium text-lg">Loading emission results...</p>
         </div>
       </div>
@@ -703,15 +703,15 @@ const UKResultsScreen = () => {
 
   if (!results) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center relative overflow-hidden">
         {/* Animated background */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
         </div>
         <div className="text-center relative z-10">
           <p className="text-gray-700 mb-4 text-lg">No emission results found</p>
-          <Button onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')} className="bg-[#1D9E75] hover:bg-[#22B87E]">
             Go to {isEPA ? 'EPA' : 'Emission Calculator'}
           </Button>
         </div>
@@ -811,18 +811,18 @@ const UKResultsScreen = () => {
         }
       `}</style>
 
-      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50">
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6]">
         {/* Animated Background with Blobs */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
           
           {/* Floating particles */}
           {[...Array(20)].map((_, i) => (
             <div
               key={i}
-              className="absolute rounded-full bg-teal-300/20 animate-float"
+              className="absolute rounded-full bg-[#33C08A]/20 animate-float"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
@@ -852,10 +852,10 @@ const UKResultsScreen = () => {
               <div className="flex flex-col items-center mb-6">
                 <div className="flex items-center justify-center gap-4 mb-4">
                   <div className="relative">
-                    <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-teal-600 relative z-10" />
-                    <Sparkles className="h-6 w-6 text-teal-400 absolute -top-1 -right-1 animate-pulse" />
+                    <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-[#1D9E75] relative z-10" />
+                    <Sparkles className="h-6 w-6 text-[#33C08A] absolute -top-1 -right-1 animate-pulse" />
                   </div>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#1C7A53] via-[#1D9E75] to-[#33C08A] bg-clip-text text-transparent">
           Emission Results
         </h1>
       </div>
@@ -884,13 +884,13 @@ const UKResultsScreen = () => {
         variant="outline"
                   size="lg"
         onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
-                  className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 transition-all duration-300 hover:scale-105"
+                  className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50 transition-all duration-300 hover:scale-105"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Change your emissions
       </Button>
       <Button
-                  className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
                   size="lg"
         onClick={exportCsv}
       >
@@ -898,7 +898,7 @@ const UKResultsScreen = () => {
         Export CSV
       </Button>
       <Button
-                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
                   size="lg"
         onClick={exportPdf}
         disabled={isGeneratingPdf}
@@ -1156,32 +1156,32 @@ const UKResultsScreen = () => {
               <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
             <CardHeader>
                   <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-teal-600" />
+                    <Sparkles className="h-5 w-5 text-[#1D9E75]" />
                     Insights
                   </CardTitle>
             </CardHeader>
             <CardContent>
                   <ul className="space-y-4 text-sm">
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">
                         Largest contributor: <span className="font-bold text-gray-900">{topContributor.label}</span> ({(topContributor.pct || 0).toFixed(1)}%)
                   </span>
                 </li>
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">
                         Total Scope 1: <span className="font-bold text-gray-900">{formatTonnes(scope1Total)} t CO2e</span>
                       </span>
                 </li>
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
                 </li>
               </ul>
                   <div className="mt-6">
                     <Button 
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
                       onClick={exportCsv}
                     >
                   <Download className="h-4 w-4 mr-2" /> Download CSV
@@ -1335,32 +1335,32 @@ const UKResultsScreen = () => {
               <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
                 <CardHeader>
                   <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-teal-600" />
+                    <Sparkles className="h-5 w-5 text-[#1D9E75]" />
                     Insights
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 text-sm">
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">
                         Largest contributor: <span className="font-bold text-gray-900">{topContributorS2.label}</span> ({(topContributorS2.pct || 0).toFixed(1)}%)
                       </span>
                     </li>
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">
                         Total Scope 2: <span className="font-bold text-gray-900">{formatKg(scope2Total)} kg CO2e</span>
                       </span>
                     </li>
                     <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                       <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
                     </li>
                   </ul>
                   <div className="mt-6">
                     <Button 
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
                       onClick={exportCsvScope2}
                     >
                       <Download className="h-4 w-4 mr-2" /> Download CSV
@@ -1479,7 +1479,7 @@ const UKResultsScreen = () => {
                 <Card className="glass-effect shadow-xl rounded-2xl border border-white/50 self-start">
             <CardHeader>
                     <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-teal-600" />
+                      <Sparkles className="h-5 w-5 text-[#1D9E75]" />
                       Insights
                     </CardTitle>
             </CardHeader>
@@ -1499,26 +1499,26 @@ const UKResultsScreen = () => {
                       </li>
                       {topContributorS3.label && (
                         <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                          <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                          <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                           <span className="text-gray-700">
                             Largest contributor: <span className="font-bold text-gray-900">{topContributorS3.label}</span> ({(topContributorS3.pct || 0).toFixed(1)}%)
                   </span>
                 </li>
                       )}
                       <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                        <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                         <span className="text-gray-700">
                           Total Scope 3: <span className="font-bold text-gray-900">{formatKg(scope3Total)} kg CO2e</span>
                         </span>
                 </li>
                       <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-teal-600 mt-2 animate-pulse"></span>
+                        <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
                         <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
                 </li>
               </ul>
                     <div className="mt-6">
                       <Button 
-                        className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 w-full shadow-lg transition-all duration-300 hover:scale-105" 
+                        className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
                         onClick={exportCsv}
                       >
                   <Download className="h-4 w-4 mr-2" /> Download CSV
@@ -1537,7 +1537,7 @@ const UKResultsScreen = () => {
             >
       <Button 
         onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
-                className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
                 size="lg"
           >
             Edit Assessment
@@ -1545,7 +1545,7 @@ const UKResultsScreen = () => {
           <Button 
             variant="outline"
             onClick={() => navigate('/dashboard')}
-                className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
+                className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
                 size="lg"
           >
             Back to Dashboard

@@ -89,7 +89,7 @@ const EsgTopicsScreen = () => {
       <div>
         <Link
           to="/dashboard"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to dashboard
@@ -114,7 +114,7 @@ const EsgTopicsScreen = () => {
           return (
             <div
               key={t.id}
-              className="rounded-xl border-2 border-slate-200 bg-white p-4 sm:p-5 transition-all duration-300 flex flex-col gap-3 h-full hover:border-slate-300"
+              className="rounded-xl border-2 border-slate-200 bg-white p-4 sm:p-5 transition-all duration-300 flex flex-col gap-3 h-full hover:border-[#BFE3D3] hover:shadow-[0_10px_28px_-12px_rgba(11,77,61,0.18)]"
             >
               <button
                 type="button"
@@ -125,9 +125,9 @@ const EsgTopicsScreen = () => {
                   }
                   openTopic(t.id);
                 }}
-                className="text-left flex gap-3 sm:gap-4 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 cursor-pointer"
+                className="text-left flex gap-3 sm:gap-4 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#1C7A53]/40 cursor-pointer"
               >
-                <div className="shrink-0 h-10 w-10 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600">
+                <div className="shrink-0 h-10 w-10 rounded-lg flex items-center justify-center bg-[#EAF7F1] text-[#0A4D3E] border border-[#BFE3D3]/50">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -145,7 +145,7 @@ const EsgTopicsScreen = () => {
               {isGhg && isLive && (
                 <Link
                   to="/esg-management/ghg/inventory-boundary"
-                  className="text-xs font-medium text-slate-600 hover:text-teal-800 underline-offset-2 hover:underline pl-[3.25rem] sm:pl-[3.5rem]"
+                  className="text-xs font-medium text-slate-600 hover:text-[#0F6E56] underline-offset-2 hover:underline pl-[3.25rem] sm:pl-[3.5rem]"
                 >
                   GHG: emission sources & review →
                 </Link>

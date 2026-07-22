@@ -8,9 +8,9 @@ import React, { useState } from "react";
 
 const statusColors: Record<string, string> = {
   "Cancelled": "bg-green-400",
-  "Planned": "bg-teal-400",
+  "Planned": "bg-[#1D9E75]",
   "Operational": "bg-emerald-400",
-  "Under construction": "bg-cyan-400",
+  "Under construction": "bg-[#1D9E75]",
 };
 
 const CCUSProjectDetails = () => {
@@ -45,7 +45,7 @@ const CCUSProjectDetails = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
-              className="pl-10 pr-10 rounded-full shadow-sm focus:ring-2 focus:ring-teal-500"
+              className="pl-10 pr-10 rounded-full shadow-sm focus:ring-2 focus:ring-[#1C7A53]"
               placeholder="Search by project name..."
               value={query} 
               onChange={(e) => setQuery(e.target.value)}
@@ -72,7 +72,7 @@ const CCUSProjectDetails = () => {
                 <div className="flex items-center gap-2">
                   <CardTitle>{project["Project name"]}</CardTitle>
                   {project["Project Status"] && (
-                    <Badge className={`ml-2 ${statusColors[project["Project Status"]] || "bg-teal-400"} text-white`}>{project["Project Status"]}</Badge>
+                    <Badge className={`ml-2 ${statusColors[project["Project Status"]] || "bg-[#1D9E75]"} text-white`}>{project["Project Status"]}</Badge>
                   )}
                 </div>
                 <CardDescription>

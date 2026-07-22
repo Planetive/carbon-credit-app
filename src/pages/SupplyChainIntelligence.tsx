@@ -24,7 +24,7 @@ const SupplyChainIntelligence = () => {
               Please contact your administrator if you believe you should have access to this part of the platform.
             </p>
             <Button
-              className="mt-2 bg-teal-600 hover:bg-teal-700 text-white shadow-lg"
+              className="mt-2 bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg"
               onClick={() => navigate("/dashboard")}
             >
               Back to Dashboard

@@ -180,7 +180,7 @@ const CorporateSolutions = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.4 }}
-                className="text-teal-600 inline-block"
+                className="text-[#1D9E75] inline-block"
               >
                 from measurement to action
               </motion.span>
@@ -245,7 +245,7 @@ const CorporateSolutions = () => {
                 transition={{ duration: 0.7, delay: 0.2 }}
                 className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed"
               >
-                Not just reporting. <span className="text-teal-600 font-semibold">Real transformation.</span>
+                Not just reporting. <span className="text-[#1D9E75] font-semibold">Real transformation.</span>
               </motion.p>
             </div>
           </div>
@@ -301,7 +301,7 @@ const CorporateSolutions = () => {
                   </ul>
                   <Link
                     to="/emission-calculator"
-                    className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-teal-800 font-medium text-sm rounded-lg hover:bg-teal-50 transition-all duration-200 hover:shadow-md"
+                    className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-[#0A4D3E] font-medium text-sm rounded-lg hover:bg-[#EAF7F1] transition-all duration-200 hover:shadow-md"
                   >
                     Start measuring
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -366,7 +366,7 @@ const CorporateSolutions = () => {
                 </ul>
                 <Link
                   to="/esg-health-check"
-                  className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-teal-800 font-medium text-sm rounded-lg hover:bg-teal-50 transition-all duration-200 hover:shadow-md"
+                  className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-[#0A4D3E] font-medium text-sm rounded-lg hover:bg-[#EAF7F1] transition-all duration-200 hover:shadow-md"
                 >
                   Assess your readiness
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -425,7 +425,7 @@ const CorporateSolutions = () => {
                 </ul>
                 <Link
                   to="/ai-advisor"
-                  className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-teal-800 font-medium text-sm rounded-lg hover:bg-teal-50 transition-all duration-200 hover:shadow-md"
+                  className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-[#0A4D3E] font-medium text-sm rounded-lg hover:bg-[#EAF7F1] transition-all duration-200 hover:shadow-md"
                 >
                   Explore AI strategist
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -484,7 +484,7 @@ const CorporateSolutions = () => {
                   </ul>
                   <Link
                     to="/project-wizard"
-                    className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-teal-800 font-medium text-sm rounded-lg hover:bg-teal-50 transition-all duration-200 hover:shadow-md mt-6"
+                    className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white text-[#0A4D3E] font-medium text-sm rounded-lg hover:bg-[#EAF7F1] transition-all duration-200 hover:shadow-md mt-6"
                   >
                     Build your roadmap
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -506,7 +506,7 @@ const CorporateSolutions = () => {
             <div className="grid md:grid-cols-2 gap-6 md:ml-12">
               <div
                 ref={(el) => (benefitRefs.current[0] = el)}
-                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-teal-200/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-teal-300 ${
+                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(0)
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-16"
@@ -522,7 +522,7 @@ const CorporateSolutions = () => {
               </div>
               <div
                 ref={(el) => (benefitRefs.current[1] = el)}
-                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-teal-200/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-teal-300 ${
+                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(1)
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 translate-x-16"
@@ -538,7 +538,7 @@ const CorporateSolutions = () => {
               </div>
               <div
                 ref={(el) => (benefitRefs.current[2] = el)}
-                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-teal-200/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-teal-300 ${
+                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(2)
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-16"
@@ -554,7 +554,7 @@ const CorporateSolutions = () => {
               </div>
               <div
                 ref={(el) => (benefitRefs.current[3] = el)}
-                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-teal-200/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-teal-300 ${
+                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(3)
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 translate-x-16"
@@ -570,7 +570,7 @@ const CorporateSolutions = () => {
               </div>
               <div
                 ref={(el) => (benefitRefs.current[4] = el)}
-                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-teal-200/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-teal-300 md:col-span-2 ${
+                className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] md:col-span-2 ${
                   visibleBenefits.has(4)
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-12"

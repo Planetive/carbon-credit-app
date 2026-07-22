@@ -17,7 +17,7 @@ const severityBadgeClass = (severity: string) => {
   if (severity === "Critical") return "bg-red-100 text-red-700";
   if (severity === "High") return "bg-orange-100 text-orange-700";
   if (severity === "Medium") return "bg-amber-100 text-amber-700";
-  return "bg-emerald-100 text-emerald-700";
+  return "bg-[#EAF7F1] text-[#0F6E56]";
 };
 
 const ESGResultsScreen = () => {
@@ -129,7 +129,7 @@ const ESGResultsScreen = () => {
 
   if (!resultData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f3f6fa] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAF8] px-4">
         <Card className="w-full max-w-lg">
           <CardHeader>
             <CardTitle>No readiness assessment submitted yet.</CardTitle>
@@ -144,7 +144,7 @@ const ESGResultsScreen = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f6fa]">
+    <div className="min-h-screen bg-[#F8FAF8]">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -157,7 +157,7 @@ const ESGResultsScreen = () => {
             <Button
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
-              className="bg-teal-600 hover:bg-teal-700"
+              className="bg-[#1D9E75] hover:bg-[#22B87E]"
             >
               <Download className="h-4 w-4 mr-2" />
               {isGeneratingPdf ? "Generating PDF..." : "Download PDF"}
@@ -176,7 +176,7 @@ const ESGResultsScreen = () => {
           </CardHeader>
           <CardContent className="grid lg:grid-cols-2 gap-8 items-center">
             <div className="flex items-center justify-center">
-              <div className="relative h-56 w-56 rounded-full border-[14px] border-teal-500 flex items-center justify-center bg-white">
+              <div className="relative h-56 w-56 rounded-full border-[14px] border-[#1D9E75] flex items-center justify-center bg-white">
                 <div className="text-center">
                   <p className="text-5xl font-bold text-slate-900">{Math.round(resultData.overallReadinessPercent)}%</p>
                   <Badge className="mt-2">{resultData.maturityBand}</Badge>
@@ -261,7 +261,7 @@ const ESGResultsScreen = () => {
           </CardHeader>
           <CardContent className="space-y-2">
             {resultData.redFlags.length === 0 ? (
-              <div className="text-sm text-emerald-700 flex items-center gap-2">
+              <div className="text-sm text-[#0F6E56] flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
                 No red flags triggered.
               </div>
@@ -317,7 +317,7 @@ const ESGResultsScreen = () => {
             <Target className="h-4 w-4 mr-2" />
             Update Assessment
           </Button>
-          <Button onClick={() => navigate("/dashboard")} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => navigate("/dashboard")} className="bg-[#1D9E75] hover:bg-[#22B87E]">
             Back to Dashboard
           </Button>
         </div>

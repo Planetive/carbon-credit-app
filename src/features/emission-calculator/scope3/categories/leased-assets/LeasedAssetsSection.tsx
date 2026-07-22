@@ -751,7 +751,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Other sources</h3>
-              <Button onClick={addOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Button onClick={addOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Plus className="h-4 w-4 mr-2" /> Add Row
               </Button>
             </div>
@@ -849,7 +849,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             <div className="text-gray-900 font-medium">
               Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
             </div>
-            <Button onClick={() => toast({ title: 'Saved', description: 'Buildings & Facilities data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={() => toast({ title: 'Saved', description: 'Buildings & Facilities data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> Save
             </Button>
           </div>
@@ -864,7 +864,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               <h4 className="text-lg font-semibold text-gray-900">Transport & Logistics</h4>
               <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased transport assets</p>
             </div>
-            <Button onClick={addTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addTransportRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Plus className="h-4 w-4 mr-2" />Add Vehicle
             </Button>
           </div>
@@ -1159,7 +1159,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             <div className="text-gray-900 font-medium">
               Total transport emissions: <span className="font-semibold">{formatEmissions(totalTransportEmissions)} kg CO2e</span>
             </div>
-            <Button onClick={() => toast({ title: 'Saved', description: 'Transport & Logistics data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={() => toast({ title: 'Saved', description: 'Transport & Logistics data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> Save
             </Button>
           </div>
@@ -1309,7 +1309,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Other sources</h3>
-                <Button onClick={addEquipmentOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Button onClick={addEquipmentOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                   <Plus className="h-4 w-4 mr-2" /> Add Row
                 </Button>
               </div>
@@ -1417,7 +1417,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                 <h4 className="text-lg font-semibold text-gray-900">Equipment & Machinery - Transport</h4>
                 <p className="text-sm text-gray-600">Passenger and delivery vehicle usage for leased equipment</p>
               </div>
-              <Button onClick={addEquipmentTransportRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Button onClick={addEquipmentTransportRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Plus className="h-4 w-4 mr-2" /> Add Vehicle
               </Button>
             </div>
@@ -1717,11 +1717,11 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           
           {/* Combined Total for Equipment & Machinery */}
           {(equipmentComputedElectricityEmissions > 0 || equipmentTotalTransportEmissions > 0) && (
-            <div className="flex items-center justify-between pt-4 border-t-2 border-teal-600">
+            <div className="flex items-center justify-between pt-4 border-t-2 border-[#1D9E75]">
               <div className="text-lg font-semibold text-gray-900">
-                Total Equipment & Machinery emissions: <span className="text-teal-600">{equipmentTotalEmissions.toFixed(6)} kg CO2e</span>
+                Total Equipment & Machinery emissions: <span className="text-[#1D9E75]">{equipmentTotalEmissions.toFixed(6)} kg CO2e</span>
               </div>
-              <Button onClick={() => toast({ title: 'Saved', description: 'Equipment & Machinery data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Button onClick={() => toast({ title: 'Saved', description: 'Equipment & Machinery data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Save className="h-4 w-4 mr-2" /> Save
               </Button>
             </div>
@@ -1874,7 +1874,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Other sources</h3>
-                <Button onClick={addInfrastructureOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Button onClick={addInfrastructureOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                   <Plus className="h-4 w-4 mr-2" /> Add Row
                 </Button>
               </div>
@@ -1982,7 +1982,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
                 <h4 className="text-lg font-semibold text-gray-900">Infrastructure & Utilities - Refrigerant Usage</h4>
                 <p className="text-sm text-gray-600">Add refrigerant usage data for leased infrastructure</p>
               </div>
-              <Button onClick={addInfrastructureRefrigerantRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Button onClick={addInfrastructureRefrigerantRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Plus className="h-4 w-4 mr-2" /> Add New Entry
               </Button>
             </div>
@@ -2055,11 +2055,11 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           
           {/* Combined Total for Infrastructure & Utilities */}
           {(infrastructureComputedElectricityEmissions > 0 || infrastructureTotalRefrigerantEmissions > 0) && (
-            <div className="flex items-center justify-between pt-4 border-t-2 border-teal-600">
+            <div className="flex items-center justify-between pt-4 border-t-2 border-[#1D9E75]">
               <div className="text-lg font-semibold text-gray-900">
-                Total Infrastructure & Utilities emissions: <span className="text-teal-600">{infrastructureTotalEmissions.toFixed(6)} kg CO2e</span>
+                Total Infrastructure & Utilities emissions: <span className="text-[#1D9E75]">{infrastructureTotalEmissions.toFixed(6)} kg CO2e</span>
               </div>
-              <Button onClick={() => toast({ title: 'Saved', description: 'Infrastructure & Utilities data saved (frontend only for now).' })} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Button onClick={() => toast({ title: 'Saved', description: 'Infrastructure & Utilities data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Save className="h-4 w-4 mr-2" /> Save
               </Button>
             </div>

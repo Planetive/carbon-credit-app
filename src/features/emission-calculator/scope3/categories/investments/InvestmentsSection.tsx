@@ -667,7 +667,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         <TabsContent value="equity" className="mt-6 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600">Investee totals and your ownership share</p>
-            <Button onClick={addInvestmentRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addInvestmentRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Plus className="h-4 w-4 mr-2" />
               Add row
             </Button>
@@ -746,7 +746,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
             <Button
               onClick={saveInvestments}
               disabled={savingInvestments || totalPendingSave === 0}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
             >
               <Save className="h-4 w-4 mr-2" />
               {savingInvestments ? "Saving…" : `Save equity (${totalPendingSave})`}
@@ -773,7 +773,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
                 </div>
                 <Button
                   type="button"
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                   disabled={creatingCorporateJourney}
                   onClick={startCorporateFinanceJourney}
                 >
@@ -784,7 +784,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-gray-600">Attributed emissions from lending / investing (portfolio tool)</p>
-              <Button type="button" variant="outline" className="border-teal-600 text-teal-700" onClick={openImportFinance}>
+              <Button type="button" variant="outline" className="border-[#1D9E75] text-[#0F6E56]" onClick={openImportFinance}>
                 <Link2 className="h-4 w-4 mr-2" />
                 Import from portfolio
               </Button>
@@ -867,7 +867,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           Investments total: <span className="font-semibold">{totalEmissions.toFixed(2)} tCO₂e</span>
         </p>
         {onSaveAndNext && (
-          <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600">
+          <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75]">
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}
@@ -902,7 +902,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
                       {p.formulaName ? ` · ${p.formulaName}` : ""}
                     </div>
                   </div>
-                  <Button type="button" size="sm" className="shrink-0 bg-teal-600 hover:bg-teal-700" onClick={() => importFinanceRow(p)}>
+                  <Button type="button" size="sm" className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => importFinanceRow(p)}>
                     Add
                   </Button>
                 </li>

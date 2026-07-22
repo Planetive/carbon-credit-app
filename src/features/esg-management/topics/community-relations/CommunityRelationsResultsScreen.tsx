@@ -94,7 +94,7 @@ const CommunityRelationsResultsScreen = () => {
   return (
     <div className="min-w-0 max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div>
-        <Button variant="ghost" className="px-0 mb-2 h-auto text-slate-600 hover:text-teal-700" asChild>
+        <Button variant="ghost" className="px-0 mb-2 h-auto text-slate-600 hover:text-[#0A4D3E]" asChild>
           <Link to="/esg-management/community-relations" className="inline-flex items-center text-sm font-medium">
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Back to data entry
@@ -189,7 +189,7 @@ const CommunityRelationsResultsScreen = () => {
             </CardContent>
           </Card>
 
-          <Card className={sectionShell("border-l-4 border-l-teal-500")}>
+          <Card className={sectionShell("border-l-4 border-l-[#1C7A53]")}>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg text-slate-900">Corrective actions</CardTitle>
             </CardHeader>

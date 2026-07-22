@@ -44,7 +44,7 @@ interface Scope3ModeSelectorProps {
 const Scope3ModeSelector = ({ selectedMode, onModeSelect }: Scope3ModeSelectorProps) => {
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-100 p-5 sm:p-6">
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-50 via-[#EAF7F1] to-[#EDF8F3] border border-emerald-100 p-5 sm:p-6">
         <p className="text-sm text-emerald-700 font-medium uppercase tracking-wide">Scope 3 Questionnaire</p>
         <h3 className="mt-2 text-xl sm:text-2xl font-semibold text-gray-900">
           Which assessment mode would you like to use for Scope 3?
@@ -64,14 +64,14 @@ const Scope3ModeSelector = ({ selectedMode, onModeSelect }: Scope3ModeSelectorPr
               key={option.id}
               className={`transition-all duration-200 border ${
                 isSelected
-                  ? "border-teal-400 shadow-lg shadow-teal-100 bg-teal-50/40"
-                  : "border-gray-200 hover:border-teal-300 hover:shadow-md"
+                  ? "border-teal-400 shadow-lg shadow-teal-100 bg-[#EAF7F1]/40"
+                  : "border-gray-200 hover:border-[#BFE3D3] hover:shadow-md"
               }`}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-                    <Icon className="h-5 w-5 text-teal-600" />
+                    <Icon className="h-5 w-5 text-[#1D9E75]" />
                   </div>
                   <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">
                     {option.tierLabel}
@@ -81,7 +81,7 @@ const Scope3ModeSelector = ({ selectedMode, onModeSelect }: Scope3ModeSelectorPr
                 <p className="mt-2 text-sm text-gray-600 min-h-[48px]">{option.description}</p>
                 <Button
                   className={`mt-5 w-full ${
-                    isSelected ? "bg-teal-700 hover:bg-teal-800 text-white" : "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50"
+                    isSelected ? "bg-[#0F6E56] hover:bg-teal-800 text-white" : "bg-white text-gray-900 border border-gray-300 hover:bg-gray-50"
                   }`}
                   onClick={() => onModeSelect(option.id)}
                 >

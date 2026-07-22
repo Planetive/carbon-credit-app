@@ -536,10 +536,10 @@ const ExploreProjects = () => {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-300 bg-teal-50 text-teal-900 font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-teal-300 focus:border-teal-400 hover:bg-teal-100 disabled:opacity-60 disabled:cursor-not-allowed ${isLoadingFilters ? 'opacity-60 cursor-not-allowed' : ''}`}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[#BFE3D3] bg-[#EAF7F1] text-[#0A4D3E] font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#9ECFB8] focus:border-[#9ECFB8] hover:bg-[#EAF7F1] disabled:opacity-60 disabled:cursor-not-allowed ${isLoadingFilters ? 'opacity-60 cursor-not-allowed' : ''}`}
             disabled={isLoadingFilters}
           >
-            <Filter className="w-4 h-4 text-teal-600" />
+            <Filter className="w-4 h-4 text-[#0F6E56]" />
             {isLoadingFilters
               ? loadingLabel
               : selected.length === 0
@@ -553,7 +553,7 @@ const ExploreProjects = () => {
           <div className="flex flex-col gap-1">
             <button
               type="button"
-              className={`px-3 py-1 rounded-lg text-sm font-semibold border ${selected.length === 0 ? 'bg-teal-200 text-teal-900 border-teal-300' : 'bg-white text-teal-700 border-teal-200'} mb-1 transition`}
+              className={`px-3 py-1 rounded-lg text-sm font-semibold border ${selected.length === 0 ? 'bg-[#BFE3D3] text-[#0A4D3E] border-[#BFE3D3]' : 'bg-white text-[#0F6E56] border-[#BFE3D3]'} mb-1 transition`}
               onClick={() => setSelected([])}
             >
               All
@@ -570,7 +570,7 @@ const ExploreProjects = () => {
                 />
                 <label
                   htmlFor={`option-${option}`}
-                  className="cursor-pointer select-none text-teal-900"
+                  className="cursor-pointer select-none text-[#0A4D3E]"
                 >
                   {option}
                 </label>
@@ -617,10 +617,10 @@ const ExploreProjects = () => {
   const renderSelectedProjectsCard = () => {
     if (!selectedCategory) return null;
     return (
-      <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl mb-8">
+      <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl mb-8">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-teal-800">Projects for Selected Category</CardTitle>
+            <CardTitle className="text-[#0F6E56]">Projects for Selected Category</CardTitle>
             <CardDescription>
               Showing projects for{" "}
               <span className="font-semibold text-gray-800">
@@ -631,7 +631,7 @@ const ExploreProjects = () => {
                   : "Voluntary Status"}
               </span>
               :{" "}
-              <span className="font-semibold text-teal-700">{selectedCategory.value}</span>
+              <span className="font-semibold text-[#0F6E56]">{selectedCategory.value}</span>
             </CardDescription>
           </div>
           <Button variant="outline" onClick={() => setSelectedCategory(null)}>
@@ -648,7 +648,7 @@ const ExploreProjects = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {categoryProjects.map((project, idx) => (
-                <Card key={`${project["Project Name"] || "project"}-${idx}`} className="border-teal-100 shadow-sm">
+                <Card key={`${project["Project Name"] || "project"}-${idx}`} className="border-[#DDF3EA] shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base leading-tight text-gray-900">
                       {project["Project Name"] || "Unnamed Project"}
@@ -660,7 +660,7 @@ const ExploreProjects = () => {
                   <CardContent className="space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-gray-500">Status</span>
-                      <Badge className="bg-teal-100 text-teal-700 border-teal-200">
+                      <Badge className="bg-[#EAF7F1] text-[#0F6E56] border-[#BFE3D3]">
                         {project["Voluntary Status"] || "N/A"}
                       </Badge>
                     </div>
@@ -755,12 +755,12 @@ const ExploreProjects = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40 relative overflow-hidden">
       {/* Beautiful Background - visual only */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-cyan-200/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-[#1D9E75]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `
             linear-gradient(to right, rgb(20, 184, 166) 1px, transparent 1px),
@@ -777,7 +777,7 @@ const ExploreProjects = () => {
           <div className="mb-8">
             <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
               <div className="flex-1">
-                <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-gray-900 via-teal-800 to-emerald-800 bg-clip-text text-transparent">
+                <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#0A4D3E] via-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent">
                   Global Carbon Projects
                 </h1>
                 <p className="text-gray-600 mt-2">Explore and analyze verified carbon projects worldwide</p>
@@ -785,7 +785,7 @@ const ExploreProjects = () => {
               <Button
                 variant="outline"
                 onClick={() => navigate('/explore')}
-                className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+                className="border-[#1D9E75] text-[#0F6E56] hover:bg-[#EAF7F1] hover:text-[#0F6E56] hover:border-[#0F6E56] transition-all duration-300"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
@@ -793,7 +793,7 @@ const ExploreProjects = () => {
             </div>
             <div className="flex justify-end">
               <Button
-                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg"
+                className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
                 onClick={async () => {
                   try {
                     setNavigating(true);
@@ -826,64 +826,64 @@ const ExploreProjects = () => {
 
           {/* Stats Summary Cards - using existing data */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+            <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Total Projects</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent">
                       {totalProjects.toLocaleString()}
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] flex items-center justify-center shadow-lg">
                     <Database className="h-6 w-6 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+            <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Countries</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent">
                       {uniqueCountries}
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] flex items-center justify-center shadow-lg">
                     <Globe className="h-6 w-6 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+            <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Regions</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent">
                       {uniqueRegions}
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] flex items-center justify-center shadow-lg">
                     <MapPin className="h-6 w-6 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+            <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Active Projects</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent">
                       {activeProjects.toLocaleString()}
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] flex items-center justify-center shadow-lg">
                     <TrendingUp className="h-6 w-6 text-white" />
                   </div>
                 </div>
@@ -891,9 +891,9 @@ const ExploreProjects = () => {
             </Card>
           </div>
           {/* Filters Section - visual only */}
-          <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl mb-8">
+          <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl mb-8">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-teal-800">
+              <CardTitle className="flex items-center gap-2 text-[#0F6E56]">
                 <Filter className="h-5 w-5" />
                 Filter Projects
               </CardTitle>
@@ -944,18 +944,18 @@ const ExploreProjects = () => {
             {/* First Row: Country and Region Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Projects by Country - same chart config */}
-              <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl transition-all duration-300 hover:shadow-2xl">
+              <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl transition-all duration-300 hover:shadow-2xl">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="flex items-center gap-2 text-teal-800">
+                      <CardTitle className="flex items-center gap-2 text-[#0F6E56]">
                         <Globe className="h-5 w-5" />
                         Projects by Country
                       </CardTitle>
                       <CardDescription>Distribution of projects across countries</CardDescription>
                     </div>
                     <Select value={String(countryLimit)} onValueChange={(v) => setCountryLimit(v === 'all' ? 'all' : Number(v))}>
-                      <SelectTrigger className="w-36 h-9 border-teal-300 bg-white hover:bg-teal-50 transition-colors">
+                      <SelectTrigger className="w-36 h-9 border-[#BFE3D3] bg-white hover:bg-[#EAF7F1] transition-colors">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1046,18 +1046,18 @@ const ExploreProjects = () => {
               </Card>
 
               {/* Projects by Region - same chart config */}
-              <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl transition-all duration-300 hover:shadow-2xl">
+              <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl transition-all duration-300 hover:shadow-2xl">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="flex items-center gap-2 text-teal-800">
+                      <CardTitle className="flex items-center gap-2 text-[#0F6E56]">
                         <MapPin className="h-5 w-5" />
                         Projects by Region
                       </CardTitle>
                       <CardDescription>Geographic distribution by region</CardDescription>
                     </div>
                     <Select value={String(regionLimit)} onValueChange={(v) => setRegionLimit(v === 'all' ? 'all' : Number(v))}>
-                      <SelectTrigger className="w-36 h-9 border-teal-300 bg-white hover:bg-teal-50 transition-colors">
+                      <SelectTrigger className="w-36 h-9 border-[#BFE3D3] bg-white hover:bg-[#EAF7F1] transition-colors">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1152,18 +1152,18 @@ const ExploreProjects = () => {
               renderSelectedProjectsCard()}
 
             {/* Second Row: Status Pie Chart - same chart config */}
-            <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl transition-all duration-300 hover:shadow-2xl">
+            <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl transition-all duration-300 hover:shadow-2xl">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2 text-teal-800">
+                    <CardTitle className="flex items-center gap-2 text-[#0F6E56]">
                       <BarChart3 className="h-5 w-5" />
                       Projects by Voluntary Status
                     </CardTitle>
                     <CardDescription>Breakdown of project statuses</CardDescription>
                   </div>
                   <Select value={String(statusLimit)} onValueChange={(v) => setStatusLimit(v === 'all' ? 'all' : Number(v))}>
-                    <SelectTrigger className="w-36 h-9 border-teal-300 bg-white hover:bg-teal-50 transition-colors">
+                    <SelectTrigger className="w-36 h-9 border-[#BFE3D3] bg-white hover:bg-[#EAF7F1] transition-colors">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1251,8 +1251,8 @@ const ExploreProjects = () => {
                             key={entry.status} 
                             className={`flex items-start gap-3 p-2 rounded-lg transition-colors animate-in fade-in cursor-pointer ${
                               selectedCategory?.type === "status" && selectedCategory?.value === entry.status
-                                ? "bg-teal-100 ring-1 ring-teal-300"
-                                : "hover:bg-teal-50"
+                                ? "bg-[#EAF7F1] ring-1 ring-[#9ECFB8]"
+                                : "hover:bg-[#EAF7F1]"
                             }`}
                             style={{ animationDelay: `${idx * 50}ms` }}
                             onClick={() => handleCategoryClick("status", entry.status)}
@@ -1264,7 +1264,7 @@ const ExploreProjects = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <span className="font-medium text-gray-700 break-words leading-snug text-sm">{entry.status}</span>
-                                <Badge variant="secondary" className="bg-teal-100 text-teal-700 border-teal-200 flex-shrink-0 whitespace-nowrap text-sm font-semibold">
+                                <Badge variant="secondary" className="bg-[#EAF7F1] text-[#0F6E56] border-[#BFE3D3] flex-shrink-0 whitespace-nowrap text-sm font-semibold">
                                   {entry.count.toLocaleString()}
                                 </Badge>
                               </div>
@@ -1284,7 +1284,7 @@ const ExploreProjects = () => {
           <div className="flex justify-center gap-4 mb-8">
             <Button
               size="lg"
-              className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg px-8"
+              className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-8"
               onClick={async () => {
                 setLoadingDetails(true);
                 try {
@@ -1324,9 +1324,9 @@ const ExploreProjects = () => {
             }
           `}</style>
           {/* World Map Section - same map logic */}
-          <Card className="bg-white/90 backdrop-blur-sm border-teal-200/50 shadow-xl">
+          <Card className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 shadow-xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-teal-800">
+              <CardTitle className="flex items-center gap-2 text-[#0F6E56]">
                 <Globe className="h-5 w-5" />
                 Global Project Distribution Map
               </CardTitle>

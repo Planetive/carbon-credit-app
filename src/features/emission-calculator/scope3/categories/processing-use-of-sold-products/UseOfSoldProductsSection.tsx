@@ -87,7 +87,7 @@ export const UseOfSoldProductsSection: React.FC<UseOfSoldProductsSectionProps> =
             </div>
             <Button 
               variant="default" 
-              className="bg-teal-600 hover:bg-teal-700 text-white" 
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white" 
               onClick={onAddRow}
             >
               <Plus className="h-4 w-4 mr-2" /> Add New Entry
@@ -99,7 +99,7 @@ export const UseOfSoldProductsSection: React.FC<UseOfSoldProductsSectionProps> =
             {rows.map((row, index) => (
               <Card 
                 key={row.id} 
-                className="overflow-hidden border-gray-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="overflow-hidden border-gray-200 hover:border-[#BFE3D3] transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <CardContent className="p-6">
                 <div className="mb-4">
@@ -400,7 +400,7 @@ export const UseOfSoldProductsSection: React.FC<UseOfSoldProductsSectionProps> =
                     {row.emissions !== undefined && (
                       <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-300">
                         <div className="text-sm font-semibold text-gray-900">
-                          Total Emissions: <span className="text-teal-600">{row.emissions.toFixed(6)} kg CO2e</span>
+                          Total Emissions: <span className="text-[#1D9E75]">{row.emissions.toFixed(6)} kg CO2e</span>
                         </div>
                       </div>
                     )}
@@ -1950,7 +1950,7 @@ export const UseOfSoldProductsSection: React.FC<UseOfSoldProductsSectionProps> =
                   <span className="text-sm text-gray-600">Total Use Entries:</span> <span className="font-semibold text-lg">{rows.length}</span>
                   {totalEmissions > 0 && (
                     <span className="ml-6">
-                      <span className="text-sm text-gray-600">Total Emissions:</span> <span className="font-semibold text-lg text-teal-700">{totalEmissions.toFixed(6)} kg CO2e</span>
+                      <span className="text-sm text-gray-600">Total Emissions:</span> <span className="font-semibold text-lg text-[#0F6E56]">{totalEmissions.toFixed(6)} kg CO2e</span>
                     </span>
                   )}
                 </div>
@@ -1958,13 +1958,13 @@ export const UseOfSoldProductsSection: React.FC<UseOfSoldProductsSectionProps> =
                   <Button
                     onClick={onSave}
                     disabled={rows.length === 0 || saving}
-                    className="bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all"
+                    className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-md hover:shadow-lg transition-all"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {saving ? "Saving..." : `Save (${rows.length})`}
                   </Button>
                   {onSaveAndNext && (
-                    <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                    <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
                       Next <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   )}

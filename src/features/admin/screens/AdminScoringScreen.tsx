@@ -116,7 +116,7 @@ const AdminScoringScreen = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-teal-600" />
+              <BarChart3 className="h-5 w-5 text-[#1D9E75]" />
               Overall readiness
             </CardTitle>
             <CardDescription>ISSB / IFRS S1–S2 style maturity snapshot</CardDescription>
@@ -124,7 +124,7 @@ const AdminScoringScreen = () => {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <p className="text-4xl font-bold text-teal-700">{results.overallReadinessPercent}%</p>
+                <p className="text-4xl font-bold text-[#0F6E56]">{results.overallReadinessPercent}%</p>
                 <p className="text-sm text-gray-600">Overall readiness</p>
               </div>
               <div>
@@ -168,7 +168,7 @@ const AdminScoringScreen = () => {
                 <div key={i} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
                   <p className="font-medium text-gray-900">{row.finding}</p>
                   <p className="text-sm text-gray-600 mt-1">{row.whyItMatters}</p>
-                  <p className="text-sm text-teal-800 mt-2">{row.recommendedImmediateAction}</p>
+                  <p className="text-sm text-[#0A4D3E] mt-2">{row.recommendedImmediateAction}</p>
                   <Badge className="mt-2" variant="outline">
                     {row.severity}
                   </Badge>

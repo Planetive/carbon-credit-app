@@ -41,7 +41,7 @@ const AppHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [switchingOrg, setSwitchingOrg] = useState<string | null>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
-  const [userType, setUserType] = useState<string>("financial_institution");
+  const [userType, setUserType] = useState<string>("corporate");
   const [isMobileDashboardOpen, setIsMobileDashboardOpen] = useState(false);
 
     const handleLogout = async () => {
@@ -110,6 +110,8 @@ const AppHeader = () => {
           .single()) as { data: { user_type?: string } | null };
         if (data?.user_type) {
           setUserType(data.user_type);
+        } else {
+          setUserType("corporate");
         }
       } catch (e) {
         console.warn("Failed to load user type for AppHeader:", e);
@@ -167,16 +169,17 @@ const AppHeader = () => {
             const isRestricted = isRestrictedRoute(to);
             const hasAccess = isCompanyUser(user);
             const isLocked = isRestricted && !hasAccess;
+            const isActive = !isLocked && location.pathname.startsWith(to);
 
             const linkContent = (
-              <div className={`flex items-center gap-1 transition-colors ${
+              <div className={`flex items-center gap-1.5 transition-colors ${
                 isLocked 
                   ? 'text-gray-400 cursor-not-allowed opacity-60' 
-                  : location.pathname.startsWith(to) 
-                    ? 'text-primary font-semibold' 
-                    : 'hover:text-primary'
+                  : isActive
+                    ? 'text-[#1D9E75] font-semibold'
+                    : 'text-gray-600 hover:text-[#1D9E75]'
               }`}>
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5" strokeWidth={isActive ? 2.25 : 2} />
                 {label}
                 {isLocked && <Lock className="h-4 w-4 ml-1" />}
               </div>
@@ -223,9 +226,9 @@ const AppHeader = () => {
               ref={profileButtonRef}
               className="flex items-center gap-2 p-2 rounded-full hover:bg-gray-100 transition-colors focus:outline-none"
             >
-              <Avatar className="h-9 w-9 border-2 border-teal-500">
+              <Avatar className="h-9 w-9 border-2 border-[#1D9E75]">
                 <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || "User"} />
-                <AvatarFallback className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-semibold">
+                <AvatarFallback className="bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] text-white font-semibold">
                   {user?.email?.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
@@ -272,23 +275,23 @@ const AppHeader = () => {
                         disabled={isCurrent || isSwitching}
                         className={`mx-1 my-0.5 rounded-md ${
                           isCurrent 
-                            ? 'bg-primary/10 text-primary font-medium cursor-default opacity-100' 
+                            ? 'bg-[#EAF7F1] text-[#0F6E56] font-medium cursor-default opacity-100' 
                             : 'cursor-pointer hover:bg-accent'
                         } ${isSwitching ? 'opacity-50 cursor-wait' : ''}`}
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <Building2 className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-primary' : ''}`} />
+                            <Building2 className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-[#1D9E75]' : ''}`} />
                             <span className="truncate text-sm font-medium">{org.name}</span>
                             {isCurrent && (
-                              <span className="text-xs text-primary/70 ml-1 font-normal">(Current)</span>
+                              <span className="text-xs text-[#1D9E75]/80 ml-1 font-normal">(Current)</span>
                             )}
                           </div>
                           {isCurrent && (
-                            <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+                            <Check className="h-4 w-4 flex-shrink-0 text-[#1D9E75]" />
                           )}
                           {isSwitching && (
-                            <div className="h-4 w-4 flex-shrink-0 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <div className="h-4 w-4 flex-shrink-0 border-2 border-[#1D9E75] border-t-transparent rounded-full animate-spin" />
                           )}
                         </div>
                       </DropdownMenuItem>
@@ -303,7 +306,7 @@ const AppHeader = () => {
               
               <DropdownMenuItem
                 onClick={handleCreateOrganization}
-                className="cursor-pointer mx-1 mt-1 text-primary hover:bg-primary/10 rounded-md"
+                className="cursor-pointer mx-1 mt-1 text-[#1D9E75] hover:bg-[#EAF7F1] hover:text-[#0F6E56] rounded-md"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="text-sm font-medium">Create Organization</span>
@@ -353,7 +356,7 @@ const AppHeader = () => {
                 ) : (
                   <>
                     <DropdownMenuItem
-                      onClick={() => navigate("/dashboard", { state: { activeSection: "portfolio" } })}
+                      onClick={() => navigate("/dashboard", { state: { activeSection: "projects" } })}
                       className="cursor-pointer"
                     >
                       <FileText className="mr-2 h-4 w-4" />
@@ -428,7 +431,7 @@ const AppHeader = () => {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="md:hidden p-2 text-gray-600 hover:text-primary transition-colors"
+        className="md:hidden p-2 text-gray-600 hover:text-[#1D9E75] transition-colors"
         aria-label="Toggle mobile menu"
       >
         {isMobileMenuOpen ? (
@@ -453,7 +456,7 @@ const AppHeader = () => {
             <span className="font-semibold text-gray-900">Menu</span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 text-gray-600 hover:text-primary transition-colors"
+              className="p-2 text-gray-600 hover:text-[#1D9E75] transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -512,7 +515,7 @@ const AppHeader = () => {
                         <div
                           className={`w-full flex items-stretch rounded-lg overflow-hidden transition-colors ${
                             isInDashboardGroup
-                              ? "bg-primary text-white"
+                              ? "bg-[#1D9E75] text-white"
                               : "bg-transparent text-gray-600"
                           }`}
                         >
@@ -557,7 +560,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isOverviewActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -576,7 +579,7 @@ const AppHeader = () => {
                                   }}
                                   className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                     isProjectsActive
-                                      ? "bg-primary text-white"
+                                      ? "bg-[#1D9E75] text-white"
                                       : "text-gray-700 hover:bg-gray-100"
                                   }`}
                                 >
@@ -593,7 +596,7 @@ const AppHeader = () => {
                                   }}
                                   className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                     isPortfolioActive
-                                      ? "bg-primary text-white"
+                                      ? "bg-[#1D9E75] text-white"
                                       : "text-gray-700 hover:bg-gray-100"
                                   }`}
                                 >
@@ -607,13 +610,13 @@ const AppHeader = () => {
                                   type="button"
                                   onClick={() => {
                                     navigate("/dashboard", {
-                                      state: { activeSection: "portfolio" },
+                                      state: { activeSection: "projects" },
                                     });
                                     setIsMobileMenuOpen(false);
                                   }}
                                   className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
-                                    isPortfolioActive
-                                      ? "bg-primary text-white"
+                                    isProjectsActive
+                                      ? "bg-[#1D9E75] text-white"
                                       : "text-gray-700 hover:bg-gray-100"
                                   }`}
                                 >
@@ -630,7 +633,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isEsgManagementActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -645,7 +648,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isEsgActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -660,7 +663,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isEmissionsActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -676,7 +679,7 @@ const AppHeader = () => {
                                 }}
                                 className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                   isAssetMonitoringActive
-                                    ? "bg-primary text-white"
+                                    ? "bg-[#1D9E75] text-white"
                                     : "text-gray-700 hover:bg-gray-100"
                                 }`}
                               >
@@ -692,7 +695,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isSupplyChainActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -707,7 +710,7 @@ const AppHeader = () => {
                               }}
                               className={`flex items-center gap-3 w-full p-2 rounded-lg transition-colors text-sm ${
                                 isReportsActive
-                                  ? "bg-primary text-white"
+                                  ? "bg-[#1D9E75] text-white"
                                   : "text-gray-700 hover:bg-gray-100"
                               }`}
                             >
@@ -725,7 +728,7 @@ const AppHeader = () => {
                       isLocked
                         ? 'text-gray-400 cursor-not-allowed opacity-60 bg-gray-50'
                         : location.pathname.startsWith(to) 
-                          ? 'bg-primary text-white' 
+                          ? 'bg-[#1D9E75] text-white' 
                           : 'text-gray-600 hover:bg-gray-100'
                     }`}>
                       <Icon className="h-5 w-5" />
@@ -766,9 +769,9 @@ const AppHeader = () => {
           {/* Mobile Profile Section */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-200">
-              <Avatar className="h-10 w-10 border-2 border-teal-500">
+              <Avatar className="h-10 w-10 border-2 border-[#1D9E75]">
                 <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || "User"} />
-                <AvatarFallback className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-semibold">
+                <AvatarFallback className="bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] text-white font-semibold">
                   {user?.email?.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
@@ -808,7 +811,7 @@ const AppHeader = () => {
                           disabled={isCurrent || isSwitching}
                           className={`flex items-center justify-between w-full p-3 rounded-lg transition-colors mb-1 ${
                             isCurrent
-                              ? 'bg-primary text-white'
+                              ? 'bg-[#1D9E75] text-white'
                               : 'text-gray-700 hover:bg-gray-100'
                           }`}
                         >
@@ -831,7 +834,7 @@ const AppHeader = () => {
                       handleCreateOrganization();
                       setIsMobileMenuOpen(false);
                     }}
-                    className="flex items-center gap-3 w-full p-3 text-primary hover:bg-primary/10 rounded-lg transition-colors mb-2"
+                    className="flex items-center gap-3 w-full p-3 text-[#1D9E75] hover:bg-[#EAF7F1] rounded-lg transition-colors mb-2"
                   >
                     <Plus className="h-5 w-5" />
                     Create Organization
@@ -848,7 +851,7 @@ const AppHeader = () => {
                     navigate('/settings');
                     setIsMobileMenuOpen(false);
                   }}
-                  className="flex items-center gap-3 w-full p-3 text-primary hover:bg-primary/10 rounded-lg transition-colors mb-2"
+                  className="flex items-center gap-3 w-full p-3 text-[#1D9E75] hover:bg-[#EAF7F1] rounded-lg transition-colors mb-2"
                 >
                   <Plus className="h-5 w-5" />
                   Create Organization

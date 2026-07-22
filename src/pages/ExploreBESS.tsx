@@ -136,7 +136,7 @@ const ExploreBESS = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40 flex items-center justify-center">
         <Card className="bg-white/90 backdrop-blur-sm border-red-200 shadow-xl p-8">
           <CardContent>
             <p className="text-red-600 text-lg">{error}</p>
@@ -150,10 +150,10 @@ const ExploreBESS = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-200/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#BFE3D3]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
@@ -163,7 +163,7 @@ const ExploreBESS = () => {
         <div className="mb-8 animate-in fade-in duration-500">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
             <div className="flex-1">
-              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-cyan-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#1C7A53] via-indigo-600 to-[#1D9E75] bg-clip-text text-transparent mb-2">
                 Battery Energy Storage Systems (BESS)
               </h1>
               <p className="text-gray-600 text-lg">Explore Battery Energy Storage Systems projects with detailed power and energy capacity information</p>
@@ -171,7 +171,7 @@ const ExploreBESS = () => {
             <Button
               variant="outline"
               onClick={() => navigate('/explore')}
-              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+              className="border-[#1D9E75] text-[#0F6E56] hover:bg-[#EAF7F1] hover:text-[#0F6E56] hover:border-[#0F6E56] transition-all duration-300"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -181,15 +181,15 @@ const ExploreBESS = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Projects</p>
-                  <p className="text-3xl font-bold text-cyan-600 transition-all duration-300">{stats.total}</p>
+                  <p className="text-3xl font-bold text-[#1C7A53] transition-all duration-300">{stats.total}</p>
                 </div>
-                <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                  <Database className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-[#EDF8F3] rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Database className="w-6 h-6 text-[#1C7A53]" />
                 </div>
               </div>
             </CardContent>
@@ -243,7 +243,7 @@ const ExploreBESS = () => {
         </div>
 
         {/* Search */}
-        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
+        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
           <CardContent className="p-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
@@ -251,7 +251,7 @@ const ExploreBESS = () => {
                 placeholder="Search projects by name or developer..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 border-cyan-200 focus:border-cyan-400 transition-all duration-300 focus:ring-2 focus:ring-cyan-200"
+                className="pl-10 border-[#BFE3D3] focus:border-[#9ECFB8] transition-all duration-300 focus:ring-2 focus:ring-[#BFE3D3]"
               />
             </div>
           </CardContent>
@@ -260,7 +260,7 @@ const ExploreBESS = () => {
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Projects by Developer */}
-          <Card className="bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
             <CardHeader>
               <CardTitle className="text-lg">Top Developers by Project Count</CardTitle>
             </CardHeader>
@@ -311,7 +311,7 @@ const ExploreBESS = () => {
         </div>
 
         {/* Projects Table */}
-        <Card className="mb-8 bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.6s' }}>
+        <Card className="mb-8 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.6s' }}>
           <CardHeader>
             <CardTitle className="text-xl">BESS Projects</CardTitle>
             <Badge variant="outline" className="text-sm w-fit mt-2">
@@ -340,7 +340,7 @@ const ExploreBESS = () => {
                     filteredProjects.map((project, index) => (
                       <tr
                         key={index}
-                        className="border-b border-gray-100 hover:bg-cyan-50/50 transition-colors"
+                        className="border-b border-gray-100 hover:bg-[#EDF8F3]/50 transition-colors"
                       >
                         <td className="p-3 text-gray-900 font-medium">
                           {project["Project Name"] || "N/A"}

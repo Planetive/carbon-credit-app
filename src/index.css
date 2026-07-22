@@ -1,7 +1,3 @@
-@import "@fontsource/geist-sans/400.css";
-@import "@fontsource/geist-sans/500.css";
-@import "@fontsource/geist-sans/600.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,44 +17,44 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 183 25% 15%;
 
-    --primary: 172 66% 50%;
+    --primary: 161 69% 37%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 173 58% 97%;
-    --secondary-foreground: 172 66% 50%;
+    --secondary: 152 40% 96%;
+    --secondary-foreground: 161 69% 32%;
 
-    --muted: 173 58% 97%;
+    --muted: 152 30% 96%;
     --muted-foreground: 183 25% 45%;
 
-    --accent: 173 58% 94%;
-    --accent-foreground: 172 66% 40%;
+    --accent: 152 45% 94%;
+    --accent-foreground: 161 69% 32%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 173 58% 91%;
     --input: 173 58% 91%;
-    --ring: 172 66% 50%;
+    --ring: 161 69% 37%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 173 58% 98%;
+    --sidebar-background: 152 40% 98%;
 
     --sidebar-foreground: 183 25% 25%;
 
-    --sidebar-primary: 172 66% 50%;
+    --sidebar-primary: 161 69% 37%;
 
     --sidebar-primary-foreground: 0 0% 100%;
 
-    --sidebar-accent: 173 58% 94%;
+    --sidebar-accent: 152 45% 94%;
 
-    --sidebar-accent-foreground: 172 66% 40%;
+    --sidebar-accent-foreground: 161 69% 32%;
 
-    --sidebar-border: 173 58% 91%;
+    --sidebar-border: 152 30% 90%;
 
-    --sidebar-ring: 172 66% 50%;
+    --sidebar-ring: 161 69% 37%;
 
-    /* Geist type scale */
+    /* App type scale */
     --type-hero: 38px;
     --type-subtitle: 16px;
     --type-kpi-value: 20px;
@@ -77,27 +73,27 @@ All colors MUST be HSL.
     --popover: 183 25% 10%;
     --popover-foreground: 173 58% 94%;
 
-    --primary: 172 66% 60%;
+    --primary: 161 69% 45%;
     --primary-foreground: 183 25% 8%;
 
     --secondary: 183 25% 15%;
-    --secondary-foreground: 172 66% 60%;
+    --secondary-foreground: 152 55% 55%;
 
     --muted: 183 25% 15%;
     --muted-foreground: 173 58% 70%;
 
     --accent: 183 25% 20%;
-    --accent-foreground: 172 66% 60%;
+    --accent-foreground: 152 55% 55%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 173 58% 94%;
 
     --border: 183 25% 20%;
     --input: 183 25% 20%;
-    --ring: 172 66% 60%;
+    --ring: 161 69% 45%;
     --sidebar-background: 183 25% 10%;
     --sidebar-foreground: 173 58% 90%;
-    --sidebar-primary: 172 66% 60%;
+    --sidebar-primary: 161 69% 45%;
     --sidebar-primary-foreground: 183 25% 8%;
     --sidebar-accent: 183 25% 15%;
     --sidebar-accent-foreground: 172 66% 60%;

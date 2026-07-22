@@ -85,7 +85,7 @@ const AirQualityResultsScreen = () => {
   return (
     <div className="min-w-0 max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div>
-        <Button variant="ghost" className="px-0 mb-2 h-auto text-slate-600 hover:text-teal-700" asChild>
+        <Button variant="ghost" className="px-0 mb-2 h-auto text-slate-600 hover:text-[#0A4D3E]" asChild>
           <Link to="/esg-management/air-quality" className="inline-flex items-center text-sm font-medium">
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Back to data entry
@@ -206,7 +206,7 @@ const AirQualityResultsScreen = () => {
       </Card>
 
       <p className="text-sm text-slate-600">
-        <Link to="/esg-management/topics" className="font-medium text-teal-700 hover:underline underline-offset-2">
+        <Link to="/esg-management/topics" className="font-medium text-[#0A4D3E] hover:underline underline-offset-2">
           Back to ESG topics
         </Link>
       </p>

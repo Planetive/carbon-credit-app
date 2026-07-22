@@ -677,11 +677,11 @@ const UKCalculatorScreen = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
           <p className="text-gray-600 mb-6">Please log in to access the emission calculator.</p>
-          <Button onClick={() => navigate('/login')} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => navigate('/login')} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
             Go to Login
           </Button>
         </div>
@@ -713,7 +713,7 @@ const UKCalculatorScreen = () => {
                 Please contact your administrator if you believe you should have access to this part of the platform.
               </p>
               <Button
-                className="mt-4 bg-teal-600 hover:bg-teal-700 text-white"
+                className="mt-4 bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 onClick={() => navigate("/dashboard")}
               >
                 Back to Dashboard
@@ -730,7 +730,7 @@ const UKCalculatorScreen = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -818,7 +818,7 @@ const UKCalculatorScreen = () => {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/dashboard')} 
-              className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
+              className="text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1]/50 rounded-lg px-3 py-2 transition-all duration-200"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="text-sm font-medium">Back</span>
@@ -826,14 +826,14 @@ const UKCalculatorScreen = () => {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/emission-results')} 
-              className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
+              className="text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1]/50 rounded-lg px-3 py-2 transition-all duration-200"
             >
               <span className="text-sm font-medium">Results</span>
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-2xl shadow-lg">
+            <div className="p-3 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-2xl shadow-lg">
               <Factory className="h-7 w-7 text-white" />
             </div>
             <div>
@@ -905,11 +905,11 @@ const UKCalculatorScreen = () => {
                 <div className="text-xs font-semibold text-blue-700/80 uppercase tracking-wide">Scope 3</div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-2 border-teal-300/50 hover:border-teal-400/70 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <Card className="bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] border-2 border-[#BFE3D3]/50 hover:border-[#9ECFB8]/70 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#1D9E75]/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <CardContent className="p-4 text-center relative z-10">
-                <div className="text-2xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent mb-1 group-hover:scale-110 transition-transform duration-300">{scopeTotals.total.toFixed(1)}</div>
-                <div className="text-xs font-semibold text-teal-700/80 uppercase tracking-wide">Total</div>
+                <div className="text-2xl font-extrabold bg-gradient-to-r from-[#1D9E75] to-emerald-600 bg-clip-text text-transparent mb-1 group-hover:scale-110 transition-transform duration-300">{scopeTotals.total.toFixed(1)}</div>
+                <div className="text-xs font-semibold text-[#0F6E56]/80 uppercase tracking-wide">Total</div>
               </CardContent>
             </Card>
           </div>
@@ -924,7 +924,7 @@ const UKCalculatorScreen = () => {
                   onClick={() => toggleScope(scope.id)}
                   className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${
                     activeScope === scope.id 
-                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/30' 
+                      ? 'bg-gradient-to-r from-[#1D9E75] to-emerald-500 text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]' 
                       : 'text-gray-700 hover:bg-gray-100/80 hover:shadow-sm'
                   }`}
                 >
@@ -949,11 +949,11 @@ const UKCalculatorScreen = () => {
                           onClick={() => handleCategoryClick(scope.id, category.id)}
                           className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                             activeScope === scope.id && activeCategory === category.id
-                              ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
+                              ? 'bg-gradient-to-r from-[#EAF7F1] to-[#EDF8F3] text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium'
                               : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                           }`}
                         >
-                          <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                          <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-[#1D9E75]' : 'text-gray-500'}`} />
                           <span className="text-left">{category.title}</span>
                         </button>
                       ))
@@ -965,7 +965,7 @@ const UKCalculatorScreen = () => {
                           <button
                             type="button"
                             onClick={() => setScope3GroupsExpanded(prev => ({ ...prev, upstream: !prev.upstream }))}
-                            className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider text-teal-700/90 hover:bg-teal-50/50 rounded-lg transition-all duration-200"
+                            className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0F6E56]/90 hover:bg-[#EAF7F1]/50 rounded-lg transition-all duration-200"
                           >
                             <span>Upstream emissions</span>
                             {scope3GroupsExpanded.upstream ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -978,11 +978,11 @@ const UKCalculatorScreen = () => {
                                   onClick={() => handleCategoryClick(scope.id, category.id)}
                                   className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                     activeScope === scope.id && activeCategory === category.id
-                                      ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
+                                      ? 'bg-gradient-to-r from-[#EAF7F1] to-[#EDF8F3] text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium'
                                       : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                                   }`}
                                 >
-                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-[#1D9E75]' : 'text-gray-500'}`} />
                                   <span className="text-left">{category.title}</span>
                                 </button>
                               ))}
@@ -1008,11 +1008,11 @@ const UKCalculatorScreen = () => {
                                   onClick={() => handleCategoryClick(scope.id, category.id)}
                                   className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                     activeScope === scope.id && activeCategory === category.id
-                                      ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium'
+                                      ? 'bg-gradient-to-r from-[#EAF7F1] to-[#EDF8F3] text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium'
                                       : 'text-gray-600 hover:bg-gray-50 hover:translate-x-1'
                                   }`}
                                 >
-                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-teal-600' : 'text-gray-500'}`} />
+                                  <category.icon className={`h-4 w-4 flex-shrink-0 ${activeScope === scope.id && activeCategory === category.id ? 'text-[#1D9E75]' : 'text-gray-500'}`} />
                                   <span className="text-left">{category.title}</span>
                                 </button>
                               ))}
@@ -1077,7 +1077,7 @@ const UKCalculatorScreen = () => {
                     handleSwitchToManual();
                   }
                 }}
-                className="data-[state=checked]:bg-teal-600"
+                className="data-[state=checked]:bg-[#1D9E75]"
               />
               <span className="text-sm font-semibold text-gray-700">LCA</span>
             </div>
@@ -1409,7 +1409,7 @@ const UKCalculatorScreen = () => {
         {(hasWizardContext || companyContext) && (
           <div className="fixed right-6 bottom-6 z-40">
             <Button
-              className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg px-5 py-2 rounded-lg"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg px-5 py-2 rounded-lg"
               onClick={async () => {
                 try {
                   // Prioritize wizard context - if coming from wizard, always return to finance-emission form

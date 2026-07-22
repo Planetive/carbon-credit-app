@@ -63,7 +63,7 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
         </div>
         <Button
           onClick={onAddRow}
-          className="bg-teal-600 hover:bg-teal-700 text-white"
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add New Entry
@@ -132,7 +132,7 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
                             className="flex-shrink-0"
                             aria-label="Vehicle type info"
                           >
-                            <Info className="h-4 w-4 text-teal-600 hover:text-teal-700" />
+                            <Info className="h-4 w-4 text-[#1D9E75] hover:text-[#0F6E56]" />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
@@ -233,13 +233,13 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
           <Button
             onClick={onSave}
             disabled={saving || totalPending === 0}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
           >
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving..." : `Save (${totalPending})`}
           </Button>
           {onSaveAndNext && (
-            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+            <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}

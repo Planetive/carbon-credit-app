@@ -523,11 +523,11 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         </div>
         {!isCorporateUser && (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" className="border-teal-600 text-teal-700" onClick={openImport}>
+            <Button type="button" variant="outline" className="border-[#1D9E75] text-[#0F6E56]" onClick={openImport}>
               <Link2 className="h-4 w-4 mr-2" />
               Import from portfolio
             </Button>
-            <Button type="button" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setRows((p) => [...p, newRow()])}>
+            <Button type="button" className="bg-[#1D9E75] hover:bg-[#22B87E] text-white" onClick={() => setRows((p) => [...p, newRow()])}>
               <Plus className="h-4 w-4 mr-2" />
               Add manual line
             </Button>
@@ -553,7 +553,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
             </div>
             <Button
               type="button"
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
               disabled={creatingCorporateJourney}
               onClick={startCorporateFacilitatedJourney}
             >
@@ -671,7 +671,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
               />
               <div className="flex justify-end gap-2">
                 {linked && (
-                  <span className="text-xs text-teal-700 self-center mr-auto">From portfolio</span>
+                  <span className="text-xs text-[#0F6E56] self-center mr-auto">From portfolio</span>
                 )}
                 <Button
                   type="button"
@@ -697,7 +697,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
           {!isCorporateUser && (
             <Button
               type="button"
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
               disabled={saving}
               onClick={saveManual}
             >
@@ -706,7 +706,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
             </Button>
           )}
           {onSaveAndNext && (
-            <Button type="button" variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600">
+            <Button type="button" variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75]">
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}
@@ -741,7 +741,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
                       {p.financedEmissions.toFixed(2)} tCO₂e · {new Date(p.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  <Button type="button" size="sm" className="shrink-0 bg-teal-600 hover:bg-teal-700" onClick={() => importOne(p)}>
+                  <Button type="button" size="sm" className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => importOne(p)}>
                     Add
                   </Button>
                 </li>

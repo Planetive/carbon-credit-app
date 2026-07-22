@@ -52,16 +52,16 @@ const InitialQuestionnaire: React.FC<InitialQuestionnaireProps> = ({ onComplete 
         {/* Progress Bar */}
         <div className="max-w-2xl mx-auto mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-teal-600">Step 1 of 1</span>
+            <span className="text-xs font-medium text-[#1D9E75]">Step 1 of 1</span>
             <span className="text-xs font-medium text-gray-500">100%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all duration-500" style={{ width: '100%' }}></div>
+            <div className="bg-gradient-to-r from-[#1D9E75] to-[#EDF8F3]0 h-2 rounded-full transition-all duration-500" style={{ width: '100%' }}></div>
           </div>
         </div>
         
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
+          <div className="w-20 h-20 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-full flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110">
             <span className="text-3xl font-bold text-white">?</span>
           </div>
         </div>
@@ -77,7 +77,7 @@ const InitialQuestionnaire: React.FC<InitialQuestionnaireProps> = ({ onComplete 
         <div className="flex gap-4 justify-center mt-8">
           <Button
             onClick={() => handleYesNoAnswer(true)}
-            className="group relative overflow-hidden bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
+            className="group relative overflow-hidden bg-gradient-to-r from-[#1D9E75] to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl"
           >
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5" />

@@ -325,9 +325,9 @@ const EpaIpccResultsScreen = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-3" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-3" />
           <p className="text-gray-700">Loading Emission Calculator results...</p>
         </div>
       </div>
@@ -336,11 +336,11 @@ const EpaIpccResultsScreen = () => {
 
   if (!results) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center px-4">
         <Card className="w-full max-w-lg bg-white/90 border border-gray-200/50 shadow-xl rounded-2xl">
           <CardContent className="p-6 text-center space-y-4">
             <p className="text-gray-700">No results found yet for this emission calculator assessment.</p>
-            <Button onClick={() => navigate("/emission-calculator-epa")} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={() => navigate("/emission-calculator-epa")} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               Back to calculator
             </Button>
           </CardContent>
@@ -383,7 +383,7 @@ const EpaIpccResultsScreen = () => {
                     {detailKey === row.key && !detailLoading && !detailError && detailRows.length > 0 && (
                       <tr>
                         <td colSpan={4} className="bg-white/60 px-4 pb-4">
-                          <div className="mt-3 rounded-xl border border-teal-100 bg-gradient-to-br from-white to-teal-50/30 p-3 sm:p-4">
+                          <div className="mt-3 rounded-xl border border-[#BFE3D3] bg-gradient-to-br from-white to-[#EAF7F1]/40 p-3 sm:p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="text-sm font-semibold text-gray-800">Entry Details</div>
                               <div className="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2.5 py-1">
@@ -424,7 +424,7 @@ const EpaIpccResultsScreen = () => {
                                   {detailRows.map((r: any, idx: number) => (
                                     <tr
                                       key={idx}
-                                      className={`transition-colors hover:bg-teal-50/40 ${
+                                      className={`transition-colors hover:bg-[#EAF7F1]/40 ${
                                         idx % 2 === 0 ? "bg-white" : "bg-slate-50/45"
                                       }`}
                                     >
@@ -512,13 +512,13 @@ const EpaIpccResultsScreen = () => {
         }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           <div className={`relative glass-effect rounded-3xl shadow-2xl overflow-hidden ${mounted ? "animate-fade-in-up" : "opacity-0"}`}>
             <div className="px-4 sm:px-6 lg:px-8 py-8 text-center">
               <div className="flex items-center justify-center gap-3 mb-3">
-                <BarChart3 className="h-10 w-10 text-teal-600" />
-                <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                <BarChart3 className="h-10 w-10 text-[#1D9E75]" />
+                <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#1C7A53] via-[#1D9E75] to-[#33C08A] bg-clip-text text-transparent">
                   Emission Calculator Results
                 </h1>
               </div>
@@ -541,16 +541,16 @@ const EpaIpccResultsScreen = () => {
                 <Button
                   variant="outline"
                   onClick={() => navigate("/emission-calculator-epa")}
-                  className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50"
+                  className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to calculator
                 </Button>
-                <Button onClick={exportCsv} className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg">
+                <Button onClick={exportCsv} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
                 </Button>
-                <Button onClick={exportPdf} disabled={isGeneratingPdf} className="bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg">
+                <Button onClick={exportPdf} disabled={isGeneratingPdf} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg">
                   <Download className="h-4 w-4 mr-2" />
                   {isGeneratingPdf ? "Generating PDF..." : "Download PDF"}
                 </Button>
@@ -634,7 +634,7 @@ const EpaIpccResultsScreen = () => {
           <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 ${mounted ? "animate-fade-in-up" : "opacity-0"}`}>
             <Button
               onClick={() => navigate("/emission-calculator-epa")}
-              className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
+              className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
               size="lg"
             >
               Edit Assessment
@@ -642,7 +642,7 @@ const EpaIpccResultsScreen = () => {
             <Button
               variant="outline"
               onClick={() => navigate("/dashboard")}
-              className="glass-effect border-teal-200 hover:border-teal-400 hover:bg-teal-50/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
+              className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
               size="lg"
             >
               Back to Dashboard

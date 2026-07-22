@@ -193,7 +193,7 @@ const ContactSubmissions = () => {
         <MainHeader />
         <div className="container mx-auto px-4 py-20">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading submissions...</p>
           </div>
         </div>

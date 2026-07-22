@@ -247,7 +247,7 @@ const EmissionHistoryScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading assessment...</p>
         </div>
       </div>
@@ -255,11 +255,11 @@ const EmissionHistoryScreen: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-white to-[#EDF8F3] py-8">
       <div className="max-w-5xl mx-auto px-4">
         {/* Header Section */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-teal-600 rounded-full mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] rounded-full mb-6">
             <Building2 className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Emission History Assessment</h1>
@@ -277,7 +277,7 @@ const EmissionHistoryScreen: React.FC = () => {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-blue-600 to-teal-600 h-2 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] h-2 rounded-full transition-all duration-500"
                 style={{ width: `${(isCompanyInfoComplete ? 50 : 0) + (isEmissionsSectionComplete ? 50 : 0)}%` }}
               ></div>
             </div>
@@ -385,7 +385,7 @@ const EmissionHistoryScreen: React.FC = () => {
 
         {/* Emissions Data Section */}
         <Card className="mb-8 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-t-lg">
+          <CardHeader className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white rounded-t-lg">
             <CardTitle className="flex items-center gap-3 text-xl">
               <div className="p-2 bg-white/20 rounded-lg">
                 <Calculator className="h-6 w-6" />
@@ -548,7 +548,7 @@ const EmissionHistoryScreen: React.FC = () => {
                 size="lg" 
                 disabled={!isCompanyInfoComplete || !isEmissionsSectionComplete || isSubmitting}
                 onClick={handleSubmit}
-                className="bg-gradient-to-r from-teal-600 to-green-600 hover:from-teal-700 hover:to-green-700 text-white px-12 py-4 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white px-12 py-4 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>

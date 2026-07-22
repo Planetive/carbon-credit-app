@@ -219,7 +219,7 @@ const AdminDashboardScreen = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
         </div>
       </div>
@@ -304,8 +304,8 @@ const AdminDashboardScreen = () => {
           <Card className="sm:col-span-2 lg:col-span-1">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center space-x-3">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-teal-600" />
+                <div className="h-8 w-8 sm:h-10 sm:w-10 bg-[#EAF7F1] rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-[#1D9E75]" />
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">Average completion</p>
@@ -402,7 +402,7 @@ const AdminDashboardScreen = () => {
                       {!assessment.needs_update && assessment.scored_at && <Badge className="bg-green-100 text-green-800">Scored</Badge>}
                       {!assessment.scored_at && assessment.admin_status === 'scored' && <Badge className="bg-yellow-100 text-yellow-800">Draft</Badge>}
                       {!assessment.scored_at && assessment.admin_status === 'draft' && <Badge variant="secondary">New</Badge>}
-                      <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => navigate(`/admin/score/${assessment.id}`)}>
+                      <Button size="sm" className="bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => navigate(`/admin/score/${assessment.id}`)}>
                         {assessment.needs_update ? 'Re-score' : assessment.scored_at ? 'View' : assessment.admin_status === 'scored' ? 'Continue' : 'Score'}
                       </Button>
                     </div>

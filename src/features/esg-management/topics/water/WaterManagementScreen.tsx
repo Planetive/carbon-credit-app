@@ -176,7 +176,7 @@ const WaterManagementScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -337,7 +337,7 @@ const WaterManagementScreen = () => {
           </div>
           <p className="text-xs text-slate-500">
             Freshwater period totals are on the{" "}
-            <Link to={summaryHref} className="font-medium text-teal-700 underline underline-offset-2">
+            <Link to={summaryHref} className="font-medium text-[#0A4D3E] underline underline-offset-2">
               summary page
             </Link>
             .
@@ -371,7 +371,7 @@ const WaterManagementScreen = () => {
         </CardContent>
       </Card>
 
-      <Card className={sectionShell("border-l-4 border-l-teal-500")}>
+      <Card className={sectionShell("border-l-4 border-l-[#1C7A53]")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">Produced water</CardTitle>
           <CardDescription className="text-slate-600">
@@ -455,7 +455,7 @@ const WaterManagementScreen = () => {
           </div>
           <p className="text-xs text-slate-500">
             Disposal validation and produced-water period volumes are on the{" "}
-            <Link to={summaryHref} className="font-medium text-teal-700 underline underline-offset-2">
+            <Link to={summaryHref} className="font-medium text-[#0A4D3E] underline underline-offset-2">
               summary page
             </Link>
             .
@@ -626,7 +626,7 @@ const WaterManagementScreen = () => {
           </div>
           <p className="text-xs text-slate-500">
             Disclosure rate for the reporting period is on the{" "}
-            <Link to={summaryHref} className="font-medium text-teal-700 underline underline-offset-2">
+            <Link to={summaryHref} className="font-medium text-[#0A4D3E] underline underline-offset-2">
               summary page
             </Link>
             .
@@ -672,7 +672,7 @@ const WaterManagementScreen = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
           </CardContent>

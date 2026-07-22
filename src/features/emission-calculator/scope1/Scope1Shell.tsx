@@ -990,7 +990,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Fuel</h2>
-            <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Plus className="h-4 w-4 mr-2" />Add New Row
             </Button>
           </div>
@@ -1095,7 +1095,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
                 <Button 
                   onClick={saveFuelEntries} 
                   disabled={saving || totalPending === 0} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving...' : `Save Changes (${totalPending})`}
@@ -1111,7 +1111,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Refrigerant</h2>
-            <Button onClick={addRefrigerantRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addRefrigerantRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Plus className="h-4 w-4 mr-2" />Add New Row
             </Button>
           </div>
@@ -1188,7 +1188,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
                 <Button 
                   onClick={saveRefrigerantEntries} 
                   disabled={saving || totalPending === 0} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving...' : `Save Changes (${totalPending})`}
@@ -1204,7 +1204,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Passenger Vehicle</h2>
-            <Button onClick={addVehicleRow} disabled={ukPassengerInputsLocked} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addVehicleRow} disabled={ukPassengerInputsLocked} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Plus className="h-4 w-4 mr-2" />Add New Row
             </Button>
           </div>
@@ -1415,7 +1415,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
                 <Button 
                   onClick={saveVehicleEntries} 
                   disabled={saving || totalPending === 0 || ukPassengerInputsLocked} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving...' : `Save Changes (${totalPending})`}
@@ -1434,7 +1434,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
             <Button
               onClick={addDeliveryRow}
               disabled={ukDeliveryInputsLocked}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
             >
               <Plus className="h-4 w-4 mr-2" />Add New Row
             </Button>
@@ -1708,7 +1708,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
                 <Button 
                   onClick={saveDeliveryEntries} 
                   disabled={saving || totalPending === 0 || ukDeliveryInputsLocked} 
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Saving...' : `Save Changes (${totalPending})`}

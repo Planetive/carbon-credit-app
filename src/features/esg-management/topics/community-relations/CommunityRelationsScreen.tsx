@@ -96,7 +96,7 @@ const CommunityRelationsScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -273,7 +273,7 @@ const CommunityRelationsScreen = () => {
             <CardDescription className="text-slate-600">Open a dedicated page for read-only disclosure summary.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
             <Button

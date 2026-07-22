@@ -32,16 +32,16 @@ const MainLayout = () => {
 
   // Check if navigation state has activeSection and set it
   useEffect(() => {
-    if (location.state && (location.state as any).activeSection) {
-      setActiveSection((location.state as any).activeSection);
-      // Clear the state to avoid persisting on refresh
-      window.history.replaceState({}, document.title);
-    } else if (location.pathname === '/dashboard') {
-      // Default to overview if on dashboard without state
-      setActiveSection('overview');
-    } else if (location.pathname === '/bank-portfolio') {
-      setActiveSection('portfolio');
+    const sectionFromState = (location.state as { activeSection?: string } | null)?.activeSection;
+    if (sectionFromState) {
+      setActiveSection(sectionFromState);
+      return;
     }
+    if (location.pathname === "/bank-portfolio") {
+      setActiveSection("portfolio");
+    }
+    // Do not force "overview" on every /dashboard visit without state — that
+    // wiped the section after history.replaceState cleared navigation state.
   }, [location.state, location.pathname]);
 
   useEffect(() => {
@@ -67,21 +67,21 @@ const MainLayout = () => {
   };
 
   const legalNoticeCard = showFirstLoginLegal ? (
-    <div className="fixed left-4 bottom-4 z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-teal-200 bg-white/95 shadow-xl backdrop-blur p-4">
+    <div className="fixed left-4 bottom-4 z-[60] w-[calc(100vw-2rem)] max-w-sm rounded-xl border border-[#BFE3D3] bg-white/95 shadow-xl backdrop-blur p-4">
       <p className="text-sm font-semibold text-gray-900">Before you continue</p>
       <p className="mt-1 text-xs text-gray-600">
         To help protect your organization’s data, please review our Terms, Privacy Policy, and Data Consent before continuing.
       </p>
       <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <Link to="/terms-and-conditions" className="text-teal-700 hover:underline">Terms</Link>
+        <Link to="/terms-and-conditions" className="text-[#0F6E56] hover:underline">Terms</Link>
         <span className="text-gray-300">|</span>
-        <Link to="/privacy-policy" className="text-teal-700 hover:underline">Privacy</Link>
+        <Link to="/privacy-policy" className="text-[#0F6E56] hover:underline">Privacy</Link>
         <span className="text-gray-300">|</span>
-        <Link to="/data-consent" className="text-teal-700 hover:underline">Data Consent</Link>
+        <Link to="/data-consent" className="text-[#0F6E56] hover:underline">Data Consent</Link>
       </div>
       <button
         onClick={dismissFirstLoginLegal}
-        className="mt-3 w-full rounded-md bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 transition-colors"
+        className="mt-3 w-full rounded-md bg-[#1D9E75] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#22B87E] transition-colors"
       >
         Got it
       </button>

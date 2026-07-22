@@ -771,7 +771,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
           <h4 className="text-lg font-semibold text-gray-900">Heat & Steam Consumption</h4>
           <p className="text-sm text-gray-600">Enter your organization's heat and steam consumption data</p>
         </div>
-        <Button onClick={addHeatRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={addHeatRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
           <Plus className="h-4 w-4 mr-2" /> Add Row
         </Button>
       </div>
@@ -1013,11 +1013,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={saveHeat} disabled={savingHeat} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> {savingHeat ? "Saving..." : "Save"}
             </Button>
             {onSaveAndNext && (
-              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             )}

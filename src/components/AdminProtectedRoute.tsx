@@ -11,9 +11,9 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) =
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1] to-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-4"></div>
           <p className="text-gray-600">Verifying admin access...</p>
         </div>
       </div>

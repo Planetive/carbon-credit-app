@@ -358,9 +358,9 @@ const CompanyDetail: React.FC = () => {
   const getDataQualityScoreBadgeClass = (score: number) => {
     switch (Math.round(score)) {
       case 1:
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-[#EAF7F1] text-[#0F6E56] border-[#BFE3D3]';
       case 2:
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-[#EDF8F3] text-[#0F6E56] border-[#BFE3D3]';
       case 3:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 4:
@@ -447,7 +447,7 @@ const CompanyDetail: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/20 to-cyan-50/30 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/40 to-[#EDF8F3]/50 relative overflow-hidden">
         {/* Subtle Background Pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `
@@ -465,25 +465,25 @@ const CompanyDetail: React.FC = () => {
           transition={{ duration: 0.4 }}
           className="mb-6"
         >
-          <Card className="border border-teal-100/50 shadow-xl bg-gradient-to-r from-teal-50/50 via-cyan-50/30 to-teal-50/50 backdrop-blur-sm rounded-3xl">
+          <Card className="border border-[#BFE3D3]/50 shadow-xl bg-gradient-to-r from-[#EAF7F1]/80 via-[#EDF8F3]/60 to-[#EAF7F1]/80 backdrop-blur-sm rounded-3xl">
             <CardContent className="px-4 sm:px-6 py-6 sm:py-8">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6">
                 <div className="flex items-start gap-4 sm:gap-5 flex-1">
-                  <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-xl">
+                  <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] flex items-center justify-center shadow-xl">
                     <Building2 className="h-10 w-10 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h1 className="text-3xl md:text-4xl lg:text-4xl leading-normal font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent -mt-1">
+                    <h1 className="text-3xl md:text-4xl lg:text-4xl leading-normal font-bold bg-gradient-to-r from-[#0A4D3E] to-[#1C7A53] bg-clip-text text-transparent -mt-1">
                       {company}
                     </h1>
                     <div className="flex items-center gap-3 mt-3">
-                      <Badge className="bg-teal-100 text-teal-700 border-teal-300 rounded-full px-3 py-1 text-xs">
+                      <Badge className="bg-[#EAF7F1] text-[#0A4D3E] border-[#9ECFB8] rounded-full px-3 py-1 text-xs">
                         {portfolioData.counterpartyType || 'SME'}
                       </Badge>
                       {sector && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200 rounded-full px-3 py-1 text-xs cursor-default max-w-xs truncate">
+                            <Badge className="bg-[#EDF8F3] text-[#0A4D3E] border-[#BFE3D3] rounded-full px-3 py-1 text-xs cursor-default max-w-xs truncate">
                               {sector}
                             </Badge>
                           </TooltipTrigger>
@@ -501,7 +501,7 @@ const CompanyDetail: React.FC = () => {
                   <Button 
                     variant="outline"
                     onClick={() => navigate('/dashboard', { state: { activeSection: 'portfolio' } })}
-                    className="border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300 rounded-xl transition-all duration-200"
+                    className="border-[#BFE3D3] text-[#0A4D3E] hover:bg-[#EAF7F1] hover:border-[#9ECFB8] rounded-xl transition-all duration-200"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" /> Back to Portfolio
                   </Button>
@@ -530,24 +530,24 @@ const CompanyDetail: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.3 }}
                   whileHover={{ scale: 1.02, y: -3 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 to-cyan-50 p-5 border-2 border-teal-100/80 shadow-md hover:shadow-xl hover:border-teal-300 transition-all duration-300"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] p-5 border-2 border-[#BFE3D3]/80 shadow-md hover:shadow-xl hover:border-[#9ECFB8] transition-all duration-300"
                 >
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-teal-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#1D9E75]/15 rounded-full -mr-14 -mt-14"></div>
                   <div className="relative">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-12 w-12 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl flex items-center justify-center shadow-md">
+                      <div className="h-12 w-12 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center shadow-md">
                         <Wallet className="h-6 w-6 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-teal-700">Loan Amount</span>
+                      <span className="text-sm font-semibold text-[#0A4D3E]">Loan Amount</span>
                     </div>
                     <motion.div 
                       animate={{ scale: [1, 1.05, 1] }}
                       transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                      className="text-3xl font-bold text-teal-600 mb-2"
+                      className="text-3xl font-bold text-[#0A4D3E] mb-2"
                     >
                       {currencyFormat(amount)}
                     </motion.div>
-                    <div className="text-xs text-teal-500 font-medium">PKR</div>
+                    <div className="text-xs text-[#1C7A53] font-medium">PKR</div>
                   </div>
                 </motion.div>
 
@@ -556,17 +556,17 @@ const CompanyDetail: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
                   whileHover={{ scale: 1.02, y: -3 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-50 to-blue-50 p-5 border-2 border-cyan-100/80 shadow-md hover:shadow-xl hover:border-cyan-300 transition-all duration-300"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EDF8F3] to-[#EAF7F1] p-5 border-2 border-[#BFE3D3]/80 shadow-md hover:shadow-xl hover:border-[#9ECFB8] transition-all duration-300"
                 >
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#1D9E75]/12 rounded-full -mr-14 -mt-14"></div>
                   <div className="relative">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-12 w-12 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-md">
+                      <div className="h-12 w-12 bg-gradient-to-br from-[#1D9E75] to-[#1C7A53] rounded-xl flex items-center justify-center shadow-md">
                         <TrendingUp className="h-6 w-6 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-cyan-700">Sector</span>
+                      <span className="text-sm font-semibold text-[#0A4D3E]">Sector</span>
                     </div>
-                    <div className="text-2xl font-bold text-cyan-600 mb-2 truncate">{sector}</div>
+                    <div className="text-2xl font-bold text-[#1C7A53] mb-2 truncate">{sector}</div>
                   </div>
                 </motion.div>
 
@@ -575,17 +575,17 @@ const CompanyDetail: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5 }}
                   whileHover={{ scale: 1.02, y: -3 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-5 border-2 border-emerald-100/80 shadow-md hover:shadow-xl hover:border-emerald-300 transition-all duration-300"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] p-5 border-2 border-[#BFE3D3]/80 shadow-md hover:shadow-xl hover:border-[#9ECFB8] transition-all duration-300"
                 >
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#1D9E75]/15 rounded-full -mr-14 -mt-14"></div>
                   <div className="relative">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-12 w-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                      <div className="h-12 w-12 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center shadow-md">
                         <MapPin className="h-6 w-6 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-emerald-700">Geography</span>
+                      <span className="text-sm font-semibold text-[#0A4D3E]">Geography</span>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-600 mb-2 truncate">{geography}</div>
+                    <div className="text-2xl font-bold text-[#0A4D3E] mb-2 truncate">{geography}</div>
                   </div>
                 </motion.div>
 
@@ -594,18 +594,18 @@ const CompanyDetail: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.6 }}
                   whileHover={{ scale: 1.02, y: -3 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-5 border-2 border-blue-100/80 shadow-md hover:shadow-xl hover:border-blue-300 transition-all duration-300"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EDF8F3] to-[#EAF7F1] p-5 border-2 border-[#BFE3D3]/80 shadow-md hover:shadow-xl hover:border-[#9ECFB8] transition-all duration-300"
                 >
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-blue-200/20 rounded-full -mr-14 -mt-14"></div>
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#1C7A53]/12 rounded-full -mr-14 -mt-14"></div>
                   <div className="relative">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                      <div className="h-12 w-12 bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E] rounded-xl flex items-center justify-center shadow-md">
                         <Calendar className="h-6 w-6 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-blue-700">Tenor</span>
+                      <span className="text-sm font-semibold text-[#0A4D3E]">Tenor</span>
                     </div>
-                    <div className="text-3xl font-bold text-blue-600 mb-2">{tenor}</div>
-                    <div className="text-xs text-blue-500 font-medium">months</div>
+                    <div className="text-3xl font-bold text-[#1C7A53] mb-2">{tenor}</div>
+                    <div className="text-xs text-[#1C7A53] font-medium">months</div>
                   </div>
                 </motion.div>
               </div>
@@ -696,18 +696,18 @@ const CompanyDetail: React.FC = () => {
                 {/* Tenor Card */}
                 <motion.div 
                   whileHover={{ scale: 1.02, y: -5 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-6 border-2 border-blue-100/80 shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EDF8F3] to-[#EAF7F1] p-6 border-2 border-[#BFE3D3]/80 shadow-lg hover:shadow-xl hover:border-[#BFE3D3] transition-all duration-300"
                 >
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-[#1C7A53]/12 rounded-full -mr-20 -mt-20"></div>
                   <div className="relative">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+                      <div className="h-14 w-14 bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E] rounded-2xl flex items-center justify-center shadow-md">
                         <Calendar className="h-7 w-7 text-white" />
                       </div>
-                      <span className="text-sm font-semibold text-blue-700">Tenor/Maturity</span>
+                      <span className="text-sm font-semibold text-[#0A4D3E]">Tenor/Maturity</span>
                     </div>
-                    <div className="text-5xl font-bold text-blue-600 mb-3">{tenor}</div>
-                    <div className="text-xs text-blue-500 mt-3 font-medium">months</div>
+                    <div className="text-5xl font-bold text-[#1C7A53] mb-3">{tenor}</div>
+                    <div className="text-xs text-[#1C7A53] mt-3 font-medium">months</div>
                   </div>
                 </motion.div>
               </div>
@@ -723,14 +723,14 @@ const CompanyDetail: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.5 }}
             whileHover={{ scale: 1.02, y: -5 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-6 border-2 border-green-100/80 shadow-lg hover:shadow-xl hover:border-green-200 transition-all duration-300"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] p-6 border-2 border-[#BFE3D3]/80 shadow-lg hover:shadow-xl hover:border-[#BFE3D3] transition-all duration-300"
           >
-            <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/20 rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-[#1D9E75]/15 rounded-full -mr-20 -mt-20"></div>
             {financeBreakdown.length > 0 && (
               <button
                 type="button"
                 onClick={() => setExpandedBreakdown(expandedBreakdown === 'finance' ? null : 'finance')}
-                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-green-200 text-green-700 hover:bg-green-50 shadow-sm flex items-center justify-center"
+                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-[#BFE3D3] text-[#0A4D3E] hover:bg-[#EAF7F1] shadow-sm flex items-center justify-center"
                 aria-label={expandedBreakdown === 'finance' ? 'Hide finance breakdown' : 'Show finance breakdown'}
                 title={expandedBreakdown === 'finance' ? 'Hide breakdown' : 'View breakdown'}
               >
@@ -739,32 +739,32 @@ const CompanyDetail: React.FC = () => {
             )}
             <div className="relative">
               <div className="flex items-center gap-3 mb-5">
-                <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-md">
+                <div className="h-14 w-14 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-2xl flex items-center justify-center shadow-md">
                   <Calculator className="h-7 w-7 text-white" />
                 </div>
-                <span className="text-sm font-semibold text-green-700">Finance Emission</span>
+                <span className="text-sm font-semibold text-[#0A4D3E]">Finance Emission</span>
               </div>
               
               {loading ? (
                 <div className="text-center py-6">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500 border-t-transparent mx-auto mb-3"></div>
-                  <p className="text-xs text-green-500 font-medium">Loading...</p>
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1C7A53] border-t-transparent mx-auto mb-3"></div>
+                  <p className="text-xs text-[#1C7A53] font-medium">Loading...</p>
                 </div>
               ) : financeResult ? (
                 <>
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                    className="text-5xl font-bold text-green-600 mb-3"
+                    className="text-5xl font-bold text-[#0A4D3E] mb-3"
                   >
                     {formatEmissionValue(financeResult?.financed_emissions)}
                   </motion.div>
                   <div className="mb-5 space-y-2">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-green-500 font-medium">tCO₂e</span>
+                      <span className="text-xs text-[#1C7A53] font-medium">tCO₂e</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-green-400 cursor-help" />
+                          <Info className="h-3 w-3 text-[#1D9E75] cursor-help" />
                         </TooltipTrigger>
                         <TooltipPortal>
                           <TooltipContent className="max-w-xs">
@@ -775,10 +775,10 @@ const CompanyDetail: React.FC = () => {
                     </div>
                     {getDistinctDataQualityScores(financeResult).length > 0 && (
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-green-700/90 font-medium">Data quality score</span>
+                        <span className="text-xs text-[#0A4D3E]/90 font-medium">Data quality score</span>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-green-500 cursor-help shrink-0" />
+                            <Info className="h-3 w-3 text-[#1C7A53] cursor-help shrink-0" />
                           </TooltipTrigger>
                           <TooltipPortal>
                             <TooltipContent className="max-w-xs">
@@ -804,8 +804,8 @@ const CompanyDetail: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <div className="text-5xl font-bold text-green-300 mb-3">—</div>
-                  <div className="text-xs text-green-500 mt-2 mb-4 font-medium">Not calculated</div>
+                  <div className="text-5xl font-bold text-[#9ECFB8] mb-3">—</div>
+                  <div className="text-xs text-[#1C7A53] mt-2 mb-4 font-medium">Not calculated</div>
                 </>
               )}
               
@@ -821,7 +821,7 @@ const CompanyDetail: React.FC = () => {
                   mode: 'finance' 
                 }
               })}
-                className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                className="w-full mt-4 bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
                 {financeResult ? (
@@ -845,14 +845,14 @@ const CompanyDetail: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.5 }}
             whileHover={{ scale: 1.02, y: -5 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 p-6 border-2 border-blue-100/80 shadow-lg hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#EDF8F3] to-[#EAF7F1] p-6 border-2 border-[#BFE3D3]/80 shadow-lg hover:shadow-xl hover:border-[#BFE3D3] transition-all duration-300"
           >
-            <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20"></div>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-[#1C7A53]/12 rounded-full -mr-20 -mt-20"></div>
             {facilitatedBreakdown.length > 0 && (
               <button
                 type="button"
                 onClick={() => setExpandedBreakdown(expandedBreakdown === 'facilitated' ? null : 'facilitated')}
-                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-blue-200 text-blue-700 hover:bg-blue-50 shadow-sm flex items-center justify-center"
+                className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/90 border border-[#BFE3D3] text-[#0A4D3E] hover:bg-[#EAF7F1] shadow-sm flex items-center justify-center"
                 aria-label={expandedBreakdown === 'facilitated' ? 'Hide facilitated breakdown' : 'Show facilitated breakdown'}
                 title={expandedBreakdown === 'facilitated' ? 'Hide breakdown' : 'View breakdown'}
               >
@@ -861,32 +861,32 @@ const CompanyDetail: React.FC = () => {
             )}
             <div className="relative">
               <div className="flex items-center gap-3 mb-5">
-                <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+                <div className="h-14 w-14 bg-gradient-to-br from-[#1C7A53] to-[#0A4D3E] rounded-2xl flex items-center justify-center shadow-md">
                   <BarChart3 className="h-7 w-7 text-white" />
                 </div>
-                <span className="text-sm font-semibold text-blue-700">Facilitated Emission</span>
+                <span className="text-sm font-semibold text-[#0A4D3E]">Facilitated Emission</span>
               </div>
               
               {loading ? (
                 <div className="text-center py-6">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
-                  <p className="text-xs text-blue-500 font-medium">Loading...</p>
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1C7A53] border-t-transparent mx-auto mb-3"></div>
+                  <p className="text-xs text-[#1C7A53] font-medium">Loading...</p>
                 </div>
               ) : facilitatedResult ? (
                 <>
                   <motion.div 
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                    className="text-5xl font-bold text-blue-600 mb-3"
+                    className="text-5xl font-bold text-[#1C7A53] mb-3"
                   >
                     {formatEmissionValue(facilitatedResult?.financed_emissions)}
                   </motion.div>
                   <div className="mb-5 space-y-2">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-blue-500 font-medium">tCO₂e</span>
+                      <span className="text-xs text-[#1C7A53] font-medium">tCO₂e</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-blue-400 cursor-help" />
+                          <Info className="h-3 w-3 text-[#1D9E75] cursor-help" />
                         </TooltipTrigger>
                         <TooltipPortal>
                           <TooltipContent className="max-w-xs">
@@ -897,10 +897,10 @@ const CompanyDetail: React.FC = () => {
                     </div>
                     {getDistinctDataQualityScores(facilitatedResult).length > 0 && (
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-blue-700/90 font-medium">Data quality score</span>
+                        <span className="text-xs text-[#0A4D3E]/90 font-medium">Data quality score</span>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-blue-500 cursor-help shrink-0" />
+                            <Info className="h-3 w-3 text-[#1C7A53] cursor-help shrink-0" />
                           </TooltipTrigger>
                           <TooltipPortal>
                             <TooltipContent className="max-w-xs">
@@ -926,8 +926,8 @@ const CompanyDetail: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <div className="text-5xl font-bold text-blue-300 mb-3">—</div>
-                  <div className="text-xs text-blue-500 mt-2 mb-4 font-medium">Not calculated</div>
+                  <div className="text-5xl font-bold text-[#9ECFB8] mb-3">—</div>
+                  <div className="text-xs text-[#1C7A53] mt-2 mb-4 font-medium">Not calculated</div>
                 </>
               )}
               
@@ -943,7 +943,7 @@ const CompanyDetail: React.FC = () => {
                   mode: 'facilitated' 
                 }
               })}
-                className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                className="w-full mt-4 bg-[#1C7A53] hover:bg-[#0A4D3E] text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
                 {facilitatedResult ? (
@@ -971,9 +971,9 @@ const CompanyDetail: React.FC = () => {
               transition={{ duration: 0.25 }}
               className="mb-6 overflow-hidden"
             >
-              <Card className={`border-2 shadow-2xl rounded-2xl overflow-hidden ${expandedBreakdown === 'finance' ? 'border-green-200 bg-gradient-to-br from-green-50/80 to-emerald-50/40' : 'border-blue-200 bg-gradient-to-br from-blue-50/80 to-cyan-50/40'}`}>
-                <CardHeader className={`${expandedBreakdown === 'finance' ? 'bg-gradient-to-r from-green-100/80 to-emerald-100/40' : 'bg-gradient-to-r from-blue-100/80 to-cyan-100/40'} border-b`}>
-                  <CardTitle className={`text-xl font-bold flex items-center gap-2 ${expandedBreakdown === 'finance' ? 'text-green-800' : 'text-blue-800'}`}>
+              <Card className={`border-2 shadow-2xl rounded-2xl overflow-hidden ${expandedBreakdown === 'finance' ? 'border-[#BFE3D3] bg-gradient-to-br from-[#EAF7F1]/90 to-[#EDF8F3]/50' : 'border-[#BFE3D3] bg-gradient-to-br from-[#EDF8F3]/90 to-[#EAF7F1]/50'}`}>
+                <CardHeader className={`${expandedBreakdown === 'finance' ? 'bg-gradient-to-r from-[#EAF7F1] to-[#DDF3EA]/60' : 'bg-gradient-to-r from-[#EDF8F3] to-[#EAF7F1]/60'} border-b`}>
+                  <CardTitle className={`text-xl font-bold flex items-center gap-2 ${expandedBreakdown === 'finance' ? 'text-[#0F6E56]' : 'text-[#0F6E56]'}`}>
                     <Sparkles className="h-5 w-5" />
                     {expandedBreakdown === 'finance' ? 'Finance Emission Breakdown' : 'Facilitated Emission Breakdown'}
                   </CardTitle>
@@ -988,21 +988,21 @@ const CompanyDetail: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setBreakdownTab('context')}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'context' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'context' ? (expandedBreakdown === 'finance' ? 'bg-[#1D9E75] text-white' : 'bg-[#1C7A53] text-white') : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                           Context
                         </button>
                         <button
                           type="button"
                           onClick={() => setBreakdownTab('inputs')}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'inputs' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'inputs' ? (expandedBreakdown === 'finance' ? 'bg-[#1D9E75] text-white' : 'bg-[#1C7A53] text-white') : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                           Inputs
                         </button>
                         <button
                           type="button"
                           onClick={() => setBreakdownTab('results')}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'results' ? (expandedBreakdown === 'finance' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-gray-600 hover:bg-gray-100'}`}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${breakdownTab === 'results' ? (expandedBreakdown === 'finance' ? 'bg-[#1D9E75] text-white' : 'bg-[#1C7A53] text-white') : 'text-gray-600 hover:bg-gray-100'}`}
                         >
                           Results
                         </button>
@@ -1020,7 +1020,7 @@ const CompanyDetail: React.FC = () => {
                                 <>
                                   <div className="rounded-xl border bg-white/95 px-4 py-3 text-sm shadow-sm">
                                     <div className="text-xs text-gray-500 mb-1">Used calculator</div>
-                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.calculatorUsed ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.calculatorUsed ? 'bg-[#EAF7F1] text-[#0A4D3E]' : 'bg-gray-100 text-gray-600'}`}>
                                       {c.calculatorUsed ? 'Yes' : 'No'}
                                     </span>
                                   </div>
@@ -1079,7 +1079,7 @@ const CompanyDetail: React.FC = () => {
                           <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Result Breakdown</h4>
                           <div className="rounded-xl border bg-white/95 overflow-hidden shadow-sm">
                             <table className="w-full text-sm">
-                              <thead className={`${expandedBreakdown === 'finance' ? 'bg-green-50 text-green-800' : 'bg-blue-50 text-blue-800'}`}>
+                              <thead className={`${expandedBreakdown === 'finance' ? 'bg-[#EAF7F1] text-[#0F6E56]' : 'bg-[#EDF8F3] text-[#0F6E56]'}`}>
                                 <tr>
                                   <th className="text-left px-4 py-2.5 font-semibold">Loan Type</th>
                                   <th className="text-center px-4 py-2.5 font-semibold">Data quality score</th>

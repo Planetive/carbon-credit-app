@@ -9,7 +9,6 @@ import {
   Leaf,
   Save,
   Shield,
-  Sparkles,
   Target,
   Users,
 } from "lucide-react";
@@ -207,7 +206,7 @@ const ESGHealthCheckScreen = () => {
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-3">
               <span className="text-xs sm:text-sm font-medium text-slate-600">ESG Score</span>
-              <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-teal-500/30">
+              <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white text-xs sm:text-sm font-semibold shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]">
                 {Math.round(metrics.completionPercent)}%
               </div>
             </div>
@@ -217,7 +216,7 @@ const ESGHealthCheckScreen = () => {
                 const pct = Math.round((answered / pillar.questions.length) * 100);
                 return (
                   <div key={pillar.id} className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-teal-500"></div>
+                    <div className="h-2 w-2 rounded-full bg-[#1D9E75]"></div>
                     <span>{pillar.name.slice(0, 1)}: {pct}%</span>
                   </div>
                 );
@@ -230,13 +229,7 @@ const ESGHealthCheckScreen = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">Health Check Assessment</h1>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100">
-                <Sparkles className="h-3.5 w-3.5 text-teal-600" />
-                <span className="text-xs font-medium text-teal-700">ESG Assessment</span>
-              </div>
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3">Health Check Assessment</h1>
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl">
               Comprehensive evaluation of your organization&apos;s ISSB/IFRS readiness.
             </p>
@@ -257,19 +250,19 @@ const ESGHealthCheckScreen = () => {
                   }}
                   className={`group relative p-5 rounded-xl border-2 transition-all duration-300 text-left ${
                     isActive
-                      ? "border-teal-500 bg-gradient-to-br from-teal-50 to-cyan-50 shadow-md shadow-teal-500/10 scale-[1.02]"
+                      ? "border-[#1D9E75] bg-gradient-to-br from-[#EAF7F1] to-[#EDF8F3] shadow-md shadow-[0_8px_18px_-6px_rgba(29,158,117,0.14)] scale-[1.02]"
                       : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:scale-[1.01]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className={`h-10 w-10 rounded-lg flex items-center justify-center transition-all ${
                       isActive
-                        ? "bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-lg"
+                        ? "bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] text-white shadow-lg"
                         : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
                     }`}>
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div className={`text-2xl font-bold ${isActive ? "text-teal-600" : "text-slate-400"}`}>{pillarPct}%</div>
+                    <div className={`text-2xl font-bold ${isActive ? "text-[#0F6E56]" : "text-slate-400"}`}>{pillarPct}%</div>
                   </div>
                   <h3 className="font-semibold mb-1 mt-3 text-slate-800">{pillar.name}</h3>
                   <p className="text-xs text-slate-500">
@@ -298,13 +291,13 @@ const ESGHealthCheckScreen = () => {
                 const isExpanded = expandedQuestionId === question.id;
                 const selectedScore = answers[question.id];
                 return (
-                  <div key={question.id} className={`rounded-xl border-2 ${isExpanded ? "border-teal-400 bg-teal-50/20" : "border-slate-200 bg-white"}`}>
+                  <div key={question.id} className={`rounded-xl border-2 ${isExpanded ? "border-[#9ECFB8] bg-[#EAF7F1]/40" : "border-slate-200 bg-white"}`}>
                     <button
                       onClick={() => setExpandedQuestionId(isExpanded ? null : question.id)}
                       className="w-full px-4 py-4 flex items-center justify-between text-left"
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold ${isExpanded ? "bg-teal-500 text-white" : "bg-slate-100 text-slate-600"}`}>
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold ${isExpanded ? "bg-[#1D9E75] text-white" : "bg-slate-100 text-slate-600"}`}>
                           {index + 1}
                         </div>
                         <div>
@@ -327,7 +320,7 @@ const ESGHealthCheckScreen = () => {
                               key={score}
                               onClick={() => updateAnswer(question.id, score as ScoreValue)}
                               className={`rounded-lg border px-2 py-2 text-sm transition-all ${
-                                selectedScore === score ? "bg-teal-600 border-teal-600 text-white" : "bg-white border-slate-300 text-slate-700 hover:border-slate-500"
+                                selectedScore === score ? "bg-[#1D9E75] border-[#1D9E75] text-white" : "bg-white border-slate-300 text-slate-700 hover:border-slate-500"
                               }`}
                             >
                               <div className="font-semibold">{score}</div>
@@ -338,7 +331,7 @@ const ESGHealthCheckScreen = () => {
 
                         <button
                           onClick={() => setExpandedRubrics((prev) => ({ ...prev, [question.id]: !prev[question.id] }))}
-                          className="text-sm text-teal-700 inline-flex items-center gap-1"
+                          className="text-sm text-[#0F6E56] inline-flex items-center gap-1"
                         >
                           {expandedRubrics[question.id] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           How to score this
@@ -375,7 +368,7 @@ const ESGHealthCheckScreen = () => {
             <Button
               disabled={saving || !metrics.isSubmissionReady}
               onClick={handleSubmit}
-              className="h-11 bg-teal-600 hover:bg-teal-700"
+              className="h-11 bg-[#1D9E75] hover:bg-[#22B87E]"
             >
               <FileText className="h-4 w-4 mr-2" />
               Submit Assessment

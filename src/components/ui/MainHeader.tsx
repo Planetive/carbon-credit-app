@@ -340,7 +340,7 @@ const MainHeader = () => {
             <span className="font-semibold text-gray-900">Menu</span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 text-gray-600 hover:text-teal-600 transition-colors"
+              className="p-2 text-gray-600 hover:text-[#1D9E75] transition-colors"
             >
               <X className="h-5 w-5" />
             </button>

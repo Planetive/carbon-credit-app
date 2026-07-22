@@ -75,12 +75,11 @@ const Dashboard2 = () => {
   const activeSection = outletContext?.activeSection || 'overview';
   const setActiveSection = outletContext?.setActiveSection || (() => {});
 
-  // Check if navigation state has activeSection and set it
+  // Sync activeSection from navigation state (e.g. sidebar / account menu)
   useEffect(() => {
-    if (location.state && (location.state as any).activeSection && setActiveSection) {
-      setActiveSection((location.state as any).activeSection);
-      // Clear the state to avoid persisting on refresh
-      window.history.replaceState({}, document.title);
+    const sectionFromState = (location.state as { activeSection?: string } | null)?.activeSection;
+    if (sectionFromState && setActiveSection) {
+      setActiveSection(sectionFromState);
     }
   }, [location.state, setActiveSection]);
 
@@ -541,9 +540,9 @@ const Dashboard2 = () => {
     }
   }, [activeSection, userType, user, profileMissing]);
 
-  // Fetch projects when portfolio section is active (corporate users)
+  // Fetch projects when My Projects section is active
   useEffect(() => {
-    if (activeSection === 'portfolio' && userType === 'corporate' && user && !profileMissing) {
+    if (activeSection === 'projects' && user && !profileMissing) {
       const loadProjects = async () => {
         try {
           setLoading(true);
@@ -569,7 +568,7 @@ const Dashboard2 = () => {
       
       loadProjects();
     }
-  }, [activeSection, userType, user, profileMissing]);
+  }, [activeSection, user, profileMissing]);
 
   // Delete company function
   const handleDeleteCompany = async (companyId: string) => {
@@ -713,7 +712,7 @@ const Dashboard2 = () => {
 
   if (profileMissing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-teal-50/30 to-cyan-50/50 p-4 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-[#EAF7F1]/30 to-[#EDF8F3]/50 p-4 relative overflow-hidden">
         {/* Animated Background Elements */}
         <motion.div
           animate={{ 
@@ -748,11 +747,11 @@ const Dashboard2 = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: "spring", bounce: 0.5 }}
-                className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-teal-500/30"
+                className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
               >
                 <User className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
               </motion.div>
-              <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+              <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent mb-2">
                 Complete Your Profile
               </CardTitle>
               <CardDescription className="text-base text-gray-600">
@@ -768,7 +767,7 @@ const Dashboard2 = () => {
                 >
                   <label className="block font-semibold text-gray-700 mb-2 text-sm">Organization Name <span className="text-red-500">*</span></label>
                   <input
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#1D9E75]/30 focus:border-[#1D9E75] transition-all text-base bg-white/50 backdrop-blur-sm"
                     name="organizationName"
                     type="text"
                     value={profileForm.organizationName}
@@ -784,7 +783,7 @@ const Dashboard2 = () => {
                 >
                   <label className="block font-semibold text-gray-700 mb-2 text-sm">Your Name <span className="text-red-500">*</span></label>
                   <input
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#1D9E75]/30 focus:border-[#1D9E75] transition-all text-base bg-white/50 backdrop-blur-sm"
                     name="displayName"
                     type="text"
                     value={profileForm.displayName}
@@ -800,7 +799,7 @@ const Dashboard2 = () => {
                 >
                   <label className="block font-semibold text-gray-700 mb-2 text-sm">Phone Number <span className="text-red-500">*</span></label>
                   <input
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-base bg-white/50 backdrop-blur-sm"
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#1D9E75]/30 focus:border-[#1D9E75] transition-all text-base bg-white/50 backdrop-blur-sm"
                     name="phone"
                     type="tel"
                     value={profileForm.phone}
@@ -818,7 +817,7 @@ const Dashboard2 = () => {
                 >
                   <Button 
                     type="submit" 
-                    className="w-full py-3 text-lg font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30" 
+                    className="w-full py-3 text-lg font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]" 
                     disabled={profileSubmitting}
                   >
                     {profileSubmitting ? "Saving..." : "Complete Profile"}
@@ -837,7 +836,7 @@ const Dashboard2 = () => {
   // Section title mapping
   const sectionTitles: Record<string, string> = {
     'overview': 'Company Overview',
-    'portfolio': userType === 'financial_institution' ? 'My Portfolio' : 'My Projects',
+    'portfolio': 'My Portfolio',
     'projects': 'My Projects',
     'reports': 'Reports & Analytics',
     'esg': 'ESG Assessment',
@@ -905,7 +904,7 @@ const Dashboard2 = () => {
                   scope3Kg={scope3Total}
                 />
               </motion.div>
-          ) : activeSection === 'portfolio' && userType === 'financial_institution' ? (
+          ) : activeSection === 'portfolio' ? (
             <motion.div
               key="portfolio"
               initial={{ opacity: 0, y: 20 }}
@@ -931,7 +930,7 @@ const Dashboard2 = () => {
                       <Button
                         onClick={handleDownloadPortfolioReport}
                         disabled={portfolioLoading || isGeneratingPortfolioPdf}
-                        className="bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-md disabled:opacity-60"
+                        className="bg-white text-[#0F6E56] border border-[#BFE3D3] hover:bg-[#EAF7F1] hover:border-[#9ECFB8] shadow-md disabled:opacity-60"
                       >
                         <Download className="h-4 w-4 mr-2" />
                         {isGeneratingPortfolioPdf ? "Generating PDF..." : "Portfolio Report"}
@@ -960,7 +959,7 @@ const Dashboard2 = () => {
                             },
                           })
                         }
-                        className="bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-md"
+                        className="bg-white text-[#0F6E56] border border-[#BFE3D3] hover:bg-[#EAF7F1] hover:border-[#9ECFB8] shadow-md"
                       >
                         <BarChart3 className="h-4 w-4 mr-2" />
                         Risk Analysis
@@ -969,7 +968,7 @@ const Dashboard2 = () => {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button
                         onClick={() => navigate('/bank-portfolio')}
-                        className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30"
+                        className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Company
@@ -982,7 +981,7 @@ const Dashboard2 = () => {
               {/* Portfolio Companies Grid */}
               {portfolioLoading ? (
                 <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D9E75]"></div>
                   <p className="mt-4 text-gray-600">Loading companies...</p>
                 </div>
               ) : portfolioCompanies.length === 0 ? (
@@ -991,15 +990,15 @@ const Dashboard2 = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   className="text-center py-16"
                 >
-                  <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <FileText className="h-10 w-10 text-gray-400" />
+                  <div className="w-20 h-20 bg-[#EAF7F1] rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#BFE3D3]/60">
+                    <FileText className="h-10 w-10 text-[#1A5C4A]" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No companies yet</h3>
                   <p className="text-gray-600 mb-6">Start building your portfolio by adding companies</p>
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
                       onClick={() => navigate('/bank-portfolio')}
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/30"
+                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Company
@@ -1017,9 +1016,9 @@ const Dashboard2 = () => {
                       whileHover={{ y: -5, scale: 1.02 }}
                     >
                       <Card 
-                        className="bg-white border border-gray-200/80 shadow-md hover:border-teal-300/60 hover:shadow-xl hover:shadow-teal-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col"
+                        className="bg-white border border-gray-200/80 shadow-md hover:border-[#BFE3D3] hover:shadow-xl hover:shadow-[0_14px_34px_rgba(11,77,61,0.12)] transition-all duration-300 overflow-hidden relative h-full flex flex-col"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-cyan-500/5 opacity-0 hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#1D9E75]/8 to-[#33C08A]/8 opacity-0 hover:opacity-100 transition-opacity" />
                         <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
                           <div 
                             className="flex-1 cursor-pointer"
@@ -1030,7 +1029,7 @@ const Dashboard2 = () => {
                                 <h3 className="text-lg font-bold text-gray-900 mb-1">{company.name}</h3>
                                 <p className="text-sm text-gray-500">{company.counterpartyType}</p>
                               </div>
-                              <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-md">
+                              <div className="w-12 h-12 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center shadow-md">
                                 <Building2 className="h-6 w-6 text-white" />
                               </div>
                             </div>
@@ -1046,7 +1045,7 @@ const Dashboard2 = () => {
                               {company.amount > 0 && (
                                 <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
                                   <span className="text-gray-500">Amount</span>
-                                  <span className="font-bold text-teal-600">
+                                  <span className="font-bold text-[#0F6E56]">
                                     {company.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} PKR
                                   </span>
                                 </div>
@@ -1060,7 +1059,7 @@ const Dashboard2 = () => {
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               onClick={() => handleEditCompany(company)}
-                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-[#0F6E56] bg-[#EAF7F1] hover:bg-[#DDF3EA] rounded-lg transition-colors"
                             >
                               <Edit className="h-4 w-4" />
                               Edit
@@ -1130,9 +1129,9 @@ const Dashboard2 = () => {
                 </motion.div>
               )}
             </motion.div>
-          ) : (activeSection === 'portfolio' && userType === 'corporate') || (activeSection === 'projects' && userType === 'financial_institution') ? (
+          ) : activeSection === 'projects' ? (
             <motion.div
-              key={activeSection === 'projects' ? 'fi-projects' : 'projects'}
+              key="projects"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -1160,7 +1159,7 @@ const Dashboard2 = () => {
                   >
                     <Button
                       onClick={() => navigate('/project-wizard')}
-                      className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                      className="w-full sm:w-auto bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Start New Project
@@ -1172,7 +1171,7 @@ const Dashboard2 = () => {
               {/* Projects Grid */}
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#1D9E75]"></div>
                   <p className="mt-4 text-gray-600">Loading projects...</p>
                 </div>
               ) : projects.length === 0 ? (
@@ -1189,7 +1188,7 @@ const Dashboard2 = () => {
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
                       onClick={() => navigate('/project-wizard')}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg shadow-green-500/30"
+                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Start Your First Project
@@ -1207,9 +1206,9 @@ const Dashboard2 = () => {
                       whileHover={{ y: -5, scale: 1.02 }}
                     >
                       <Card 
-                        className="bg-white border border-gray-200/80 shadow-md hover:border-green-300/60 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 overflow-hidden relative h-full flex flex-col"
+                        className="bg-white border border-gray-200/80 shadow-md hover:border-[#BFE3D3] hover:shadow-xl hover:shadow-[0_14px_34px_rgba(29,158,117,0.12)] transition-all duration-300 overflow-hidden relative h-full flex flex-col"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 opacity-0 hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#1D9E75]/5 to-[#33C08A]/5 opacity-0 hover:opacity-100 transition-opacity" />
                         <CardContent className="p-6 relative z-10 flex-1 flex flex-col">
                           <div 
                             className="flex-1 cursor-pointer"
@@ -1219,12 +1218,12 @@ const Dashboard2 = () => {
                               <div className="flex-1">
                                 <h3 className="text-lg font-bold text-gray-900 mb-1">{project.project_name || 'Untitled Project'}</h3>
                                 {project.type && (
-                                  <Badge className="mt-1 bg-green-100 text-green-800">
+                                  <Badge className="mt-1 bg-[#EAF7F1] text-[#0F6E56]">
                                     {project.type}
                                   </Badge>
                                 )}
                               </div>
-                              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                              <div className="w-12 h-12 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center shadow-md">
                                 <Leaf className="h-6 w-6 text-white" />
                               </div>
                             </div>
@@ -1244,7 +1243,7 @@ const Dashboard2 = () => {
                               {project.goal && (
                                 <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100">
                                   <span className="text-gray-500">Goal</span>
-                                  <span className="font-semibold text-green-600 truncate ml-2">{project.goal}</span>
+                                  <span className="font-semibold text-[#1D9E75] truncate ml-2">{project.goal}</span>
                                 </div>
                               )}
                               {project.created_at && (
@@ -1273,7 +1272,7 @@ const Dashboard2 = () => {
                                   }
                                 });
                               }}
-                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-[#0F6E56] bg-[#EAF7F1] hover:bg-[#DDF3EA] rounded-lg transition-colors"
                             >
                               <Edit className="h-4 w-4" />
                               Continue
@@ -1324,7 +1323,7 @@ const Dashboard2 = () => {
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                           <Button
                             onClick={() => setActiveSection("overview")}
-                            className="mt-2 bg-teal-600 hover:bg-teal-700 text-white shadow-lg"
+                            className="mt-2 bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg"
                           >
                             Back to Dashboard
                           </Button>
@@ -1340,7 +1339,7 @@ const Dashboard2 = () => {
                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                     className="w-20 h-20 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg"
                   >
-                    <Grid3X3 className="h-10 w-10 text-teal-600" />
+                    <Grid3X3 className="h-10 w-10 text-[#1D9E75]" />
                   </motion.div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-3">
                     {sectionTitles[activeSection] || 'Dashboard'}
@@ -1351,7 +1350,7 @@ const Dashboard2 = () => {
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button 
                       onClick={() => setActiveSection('overview')}
-                      className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg"
+                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
                     >
                       Back to Overview
                     </Button>

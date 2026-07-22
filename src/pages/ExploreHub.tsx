@@ -75,7 +75,7 @@ const AnimatedCounter: React.FC<{ target: number; suffix?: string; duration?: nu
   };
 
   return (
-    <div ref={elementRef} className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+    <div ref={elementRef} className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent mb-2">
       {formatNumber(count)}{suffix}
     </div>
   );
@@ -92,9 +92,9 @@ const ExploreHub: React.FC = () => {
       icon: Globe,
       stats: '10,000+ Projects',
       features: ['Real-time data', '100+ Countries', 'Verified projects'],
-      gradient: 'from-teal-500 via-emerald-500 to-teal-600',
-      bgGradient: 'from-teal-50/50 via-emerald-50/30 to-teal-50/50',
-      iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600'
+      gradient: 'from-[#1C7A53] via-[#1D9E75] to-[#33C08A]',
+      bgGradient: 'from-[#EAF7F1]/60 via-[#EDF8F3]/40 to-[#EAF7F1]/60',
+      iconBg: 'bg-gradient-to-br from-[#1C7A53] to-[#1D9E75]'
     },
     {
       id: 'markets-mechanisms',
@@ -103,9 +103,9 @@ const ExploreHub: React.FC = () => {
       icon: TrendingUp,
       stats: '50+ Markets',
       features: ['Market analysis', 'Compliance data', 'Regional insights'],
-      gradient: 'from-teal-500 via-cyan-500 to-teal-600',
-      bgGradient: 'from-teal-50/50 via-cyan-50/30 to-teal-50/50',
-      iconBg: 'bg-gradient-to-br from-teal-500 to-cyan-600'
+      gradient: 'from-[#1C7A53] via-[#1D9E75] to-[#33C08A]',
+      bgGradient: 'from-[#EAF7F1]/60 via-[#EDF8F3]/40 to-[#EAF7F1]/60',
+      iconBg: 'bg-gradient-to-br from-[#1C7A53] to-[#1D9E75]'
     },
     {
       id: 'ccus-projects',
@@ -114,9 +114,9 @@ const ExploreHub: React.FC = () => {
       icon: Database,
       stats: '1000+ CCUS Projects',
       features: ['Technical analysis', 'Storage capacity', 'Utilization methods'],
-      gradient: 'from-emerald-500 via-teal-500 to-emerald-600',
-      bgGradient: 'from-emerald-50/50 via-teal-50/30 to-emerald-50/50',
-      iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600'
+      gradient: 'from-[#1D9E75] via-[#1C7A53] to-[#33C08A]',
+      bgGradient: 'from-[#EDF8F3]/60 via-[#EAF7F1]/40 to-[#EDF8F3]/60',
+      iconBg: 'bg-gradient-to-br from-[#1D9E75] to-[#1C7A53]'
     },
     {
       id: 'bess-projects',
@@ -125,9 +125,9 @@ const ExploreHub: React.FC = () => {
       icon: Battery,
       stats: 'BESS Projects',
       features: ['Power capacity', 'Energy storage', 'Developer insights'],
-      gradient: 'from-teal-500 via-emerald-500 to-teal-600',
-      bgGradient: 'from-teal-50/50 via-emerald-50/30 to-teal-50/50',
-      iconBg: 'bg-gradient-to-br from-teal-500 to-emerald-600'
+      gradient: 'from-[#1C7A53] via-[#1D9E75] to-[#33C08A]',
+      bgGradient: 'from-[#EAF7F1]/60 via-[#EDF8F3]/40 to-[#EAF7F1]/60',
+      iconBg: 'bg-gradient-to-br from-[#1C7A53] to-[#1D9E75]'
     },
     {
       id: 'country-emissions',
@@ -136,9 +136,9 @@ const ExploreHub: React.FC = () => {
       icon: Earth,
       stats: 'Country-level dataset',
       features: ['Country ranking', 'Sector and region filters', 'CO2e insights'],
-      gradient: 'from-cyan-500 via-teal-500 to-emerald-600',
-      bgGradient: 'from-cyan-50/50 via-teal-50/30 to-emerald-50/50',
-      iconBg: 'bg-gradient-to-br from-cyan-500 to-teal-600'
+      gradient: 'from-[#1D9E75] via-[#1C7A53] to-[#33C08A]',
+      bgGradient: 'from-[#EDF8F3]/60 via-[#EAF7F1]/40 to-[#EDF8F3]/60',
+      iconBg: 'bg-gradient-to-br from-[#1D9E75] to-[#1C7A53]'
     }
   ];
 
@@ -152,15 +152,15 @@ const ExploreHub: React.FC = () => {
   const renderBackground = () => {
     return (
       <>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-cyan-200/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-[#1D9E75]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40 relative overflow-hidden">
       {/* Background - Gradient Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {renderBackground()}
@@ -178,11 +178,11 @@ const ExploreHub: React.FC = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full blur-xl opacity-30 animate-pulse"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#1D9E75] to-[#1C7A53] rounded-full blur-xl opacity-30 animate-pulse"></div>
               <div 
                 className="relative z-10 hover:scale-110 transition-transform duration-300"
               >
-                <Globe className="h-24 w-24 text-teal-600 relative z-10" style={{
+                <Globe className="h-24 w-24 text-[#0F6E56] relative z-10" style={{
                   filter: 'drop-shadow(0 15px 30px rgba(20, 184, 166, 0.5)) drop-shadow(0 0 50px rgba(16, 185, 129, 0.4))',
                 }} />
               </div>
@@ -202,7 +202,7 @@ const ExploreHub: React.FC = () => {
                   cursorClassName: 'typewriter-cursor',
                   autoStart: true,
                   loop: false,
-                  wrapperClassName: 'bg-gradient-to-r from-gray-900 via-teal-800 to-emerald-800 bg-clip-text text-transparent',
+                  wrapperClassName: 'bg-gradient-to-r from-[#0A4D3E] via-[#1C7A53] to-[#1D9E75] bg-clip-text text-transparent',
                 }}
               />
             </div>
@@ -223,10 +223,10 @@ const ExploreHub: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-100px" }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group relative bg-white/90 backdrop-blur-md rounded-2xl p-6 border border-teal-100/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:border-teal-300"
+                className="group relative bg-white/90 backdrop-blur-md rounded-2xl p-6 border border-[#BFE3D3]/50 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:border-[#9ECFB8]"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${exploreOptions[index]?.iconBg || 'from-teal-500 to-emerald-600'} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
+                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${exploreOptions[index]?.iconBg || 'from-[#1C7A53] to-[#1D9E75]'} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
                     <stat.icon className="h-7 w-7 text-white" />
             </div>
                   <AnimatedCounter target={stat.value} suffix="+" />
@@ -280,12 +280,12 @@ const ExploreHub: React.FC = () => {
                 
                 <CardHeader className="relative pb-4">
                   {/* Icon with Enhanced Design */}
-                  <div className={`relative w-16 h-16 ${option.iconBg} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-teal-500/30`}>
+                  <div className={`relative w-16 h-16 ${option.iconBg} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]`}>
                     <option.icon className="h-8 w-8 text-white" />
                     <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm group-hover:blur-md transition-all"></div>
                   </div>
                   
-                  <CardTitle className="text-2xl font-bold text-gray-900 group-hover:text-teal-700 transition-colors duration-300 mb-3">
+                  <CardTitle className="text-2xl font-bold text-gray-900 group-hover:text-[#0F6E56] transition-colors duration-300 mb-3">
                     {option.title}
                   </CardTitle>
                   <CardDescription className="text-gray-600 leading-relaxed text-base">
@@ -298,12 +298,12 @@ const ExploreHub: React.FC = () => {
                     <div className="flex items-center justify-between">
                     <Badge 
                       variant="secondary" 
-                      className="bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border border-teal-200/50 font-semibold px-4 py-1.5 shadow-sm group-hover:shadow-md transition-all"
+                      className="bg-gradient-to-r from-[#EAF7F1] to-[#EDF8F3] text-[#0F6E56] border border-[#BFE3D3]/60 font-semibold px-4 py-1.5 shadow-sm group-hover:shadow-md transition-all"
                     >
                         {option.stats}
                       </Badge>
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
-                      <ArrowRight className="h-5 w-5 text-teal-600 group-hover:text-teal-700 group-hover:translate-x-1 transition-all duration-300" />
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#EAF7F1] group-hover:bg-[#DDF3EA] transition-colors">
+                      <ArrowRight className="h-5 w-5 text-[#0F6E56] group-hover:text-[#0F6E56] group-hover:translate-x-1 transition-all duration-300" />
                     </div>
                   </div>
                   
@@ -314,8 +314,8 @@ const ExploreHub: React.FC = () => {
                         key={featureIndex} 
                         className="flex items-center text-sm md:text-base text-gray-600 group-hover:text-gray-700 transition-colors"
                       >
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                          <CheckCircle2 className="h-4 w-4 text-teal-600" />
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#EAF7F1] to-[#DDF3EA] flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                          <CheckCircle2 className="h-4 w-4 text-[#0F6E56]" />
                         </div>
                         <span className="font-medium">{feature}</span>
                         </div>

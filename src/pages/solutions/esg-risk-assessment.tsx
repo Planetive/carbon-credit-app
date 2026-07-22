@@ -8,7 +8,7 @@ const ESGRiskAssessment = () => {
       <MainHeader />
   
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
+      <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-[#EAF7F1] to-[#EDF8F3]">
         {/* Enhanced decorative background */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[140%] h-[700px] bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.2),transparent_70%)]" />
@@ -37,7 +37,7 @@ const ESGRiskAssessment = () => {
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link
                 to="/esg-health-check"
-                className="group px-8 py-4 rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 transition-all duration-300 text-white font-bold text-lg shadow-2xl shadow-emerald-200/50 hover:shadow-emerald-300/50 transform hover:-translate-y-1"
+                className="group px-8 py-4 rounded-2xl bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] transition-all duration-300 text-white font-bold text-lg shadow-2xl shadow-emerald-200/50 hover:shadow-emerald-300/50 transform hover:-translate-y-1"
               >
                 <span className="flex items-center gap-2">
                   Start Assessment
@@ -98,7 +98,7 @@ const ESGRiskAssessment = () => {
               t: "Comprehensive Risk Analysis",
               d: "Evaluate environmental, social, and governance risks across all material issues with industry-specific frameworks.",
               icon: "🔍",
-              color: "from-blue-500 to-cyan-500"
+              color: "from-blue-500 to-[#EDF8F3]0"
             },
             {
               t: "Actionable Recommendations",
@@ -157,7 +157,7 @@ const ESGRiskAssessment = () => {
                 title: "Risk Identification & Mapping",
                 body: "Systematically identify and map ESG risks across environmental, social, and governance dimensions using industry-specific materiality matrices.",
                 step: "01",
-                color: "from-blue-500/20 to-cyan-500/20"
+                color: "from-blue-500/20 to-[#EDF8F3]0/20"
               },
               {
                 title: "Risk Assessment & Scoring",
@@ -237,7 +237,7 @@ const ESGRiskAssessment = () => {
       </section>
 
       {/* Enhanced Assessment Areas */}
-      <section className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 py-20">
+      <section className="bg-gradient-to-br from-emerald-50 via-[#EAF7F1] to-[#EDF8F3] py-20">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold mb-6">
@@ -270,7 +270,7 @@ const ESGRiskAssessment = () => {
                   "Diversity, equity, and inclusion",
                 ],
                 icon: "👥",
-                color: "from-blue-500 to-cyan-500"
+                color: "from-blue-500 to-[#EDF8F3]0"
               },
               {
                 t: "Governance Risks",

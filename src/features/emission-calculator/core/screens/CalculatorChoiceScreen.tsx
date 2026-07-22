@@ -20,7 +20,7 @@ const CalculatorChoiceScreen = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         <div className="text-center mb-10">
-          <div className="inline-flex p-4 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 shadow-lg mb-4">
+          <div className="inline-flex p-4 rounded-2xl bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] shadow-lg mb-4">
             <Factory className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
@@ -33,13 +33,13 @@ const CalculatorChoiceScreen = () => {
 
         <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
           <Card
-            className="group cursor-pointer border-2 border-teal-200/60 hover:border-teal-400 hover:shadow-xl transition-all duration-300 overflow-hidden"
+            className="group cursor-pointer border-2 border-[#BFE3D3]/60 hover:border-[#9ECFB8] hover:shadow-xl transition-all duration-300 overflow-hidden"
             onClick={goToEPA}
           >
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-start gap-4">
-                <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors flex-shrink-0">
-                  <Leaf className="h-8 w-8 text-teal-600" />
+                <div className="p-3 rounded-xl bg-[#EAF7F1] group-hover:bg-[#BFE3D3] transition-colors flex-shrink-0">
+                  <Leaf className="h-8 w-8 text-[#1D9E75]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-bold text-gray-900 mb-1">EPA</h2>
@@ -47,7 +47,7 @@ const CalculatorChoiceScreen = () => {
                     US EPA emission factors and methodology. Best for US reporting and EPA-aligned disclosures.
                   </p>
                   <Button
-                    className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white group-hover:shadow-md"
+                    className="w-full sm:w-auto bg-[#1D9E75] hover:bg-[#22B87E] text-white group-hover:shadow-md"
                     onClick={(e) => {
                       e.stopPropagation();
                       goToEPA();

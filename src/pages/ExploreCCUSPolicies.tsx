@@ -283,25 +283,25 @@ const ExploreCCUSPolicies = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20 relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40 relative">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-cyan-200/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-[#1D9E75]/12 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         <Button
           variant="ghost"
           onClick={() => navigate(-1)}
-          className="mb-6 text-teal-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-300"
+          className="mb-6 text-[#0F6E56] hover:text-[#0F6E56] hover:bg-[#EAF7F1] transition-all duration-300"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
         
-        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">Explore CCUS Policies in Different Regions</h1>
+        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-[#1D9E75] via-emerald-600 to-[#1D9E75] bg-clip-text text-transparent mb-2">Explore CCUS Policies in Different Regions</h1>
         <p className="text-gray-600 mb-6">Select a country to view detailed CCUS policies and regulatory landscapes</p>
         
         {/* Search Bar */}
@@ -313,7 +313,7 @@ const ExploreCCUSPolicies = () => {
               placeholder="Search countries..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border-teal-200 focus:border-teal-400 focus:ring-teal-400 rounded-lg"
+              className="pl-10 pr-4 py-2 w-full border-[#BFE3D3] focus:border-[#9ECFB8] focus:ring-[#9ECFB8] rounded-lg"
             />
           </div>
         </div>
@@ -335,7 +335,7 @@ const ExploreCCUSPolicies = () => {
               return (
                 <Card
                   key={country}
-                  className="bg-white/90 backdrop-blur-sm border-teal-200/50 cursor-pointer relative transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-teal-300 shadow-md"
+                  className="bg-white/90 backdrop-blur-sm border-[#BFE3D3]/60 cursor-pointer relative transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-[#9ECFB8] shadow-md"
 
                   onClick={() => navigate(`/ccus-management-strategy/${encodeURIComponent(country)}`)}
                 >
@@ -354,7 +354,7 @@ const ExploreCCUSPolicies = () => {
                   <CardContent>
                     <div className="text-sm text-gray-600">
                       {hasStrategy ? (
-                        <span className="text-green-600 font-medium">✓ Has Regulatory Landscapes</span>
+                        <span className="text-[#1D9E75] font-medium">✓ Has Regulatory Landscapes</span>
                       ) : (
                         <span className="text-gray-500">Basic policies available</span>
                       )}

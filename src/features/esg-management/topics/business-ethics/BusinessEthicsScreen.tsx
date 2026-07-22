@@ -140,7 +140,7 @@ const BusinessEthicsScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -430,7 +430,7 @@ const BusinessEthicsScreen = () => {
                     className={cn(
                       "rounded-full px-4 py-2 text-sm font-medium border-2 transition-all",
                       data.thirdPartyDueDiligenceInPlace === opt
-                        ? "bg-teal-600 border-teal-600 text-white"
+                        ? "bg-[#1D9E75] border-[#1D9E75] text-white"
                         : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                     )}
                   >
@@ -463,7 +463,7 @@ const BusinessEthicsScreen = () => {
                     className={cn(
                       "rounded-full px-4 py-2 text-sm font-medium border-2 transition-all",
                       data.codeOfConductInPlace === opt
-                        ? "bg-teal-600 border-teal-600 text-white"
+                        ? "bg-[#1D9E75] border-[#1D9E75] text-white"
                         : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                     )}
                   >
@@ -499,7 +499,7 @@ const BusinessEthicsScreen = () => {
         <div className="flex justify-end">
           <Button
             type="button"
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             onClick={() => {
               saveBusinessEthicsStore(store);
               toast({
@@ -522,7 +522,7 @@ const BusinessEthicsScreen = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
           </CardContent>

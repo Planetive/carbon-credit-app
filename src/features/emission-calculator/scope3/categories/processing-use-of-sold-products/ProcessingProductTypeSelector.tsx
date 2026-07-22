@@ -23,7 +23,7 @@ export const ProcessingProductTypeSelector: React.FC<ProcessingProductTypeSelect
           <button
             type="button"
             onClick={onSelectIntermediate}
-            className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+            className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-[#1D9E75] bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
           >
             <div className="text-center">
               <div className="text-4xl mb-4">🏭</div>
@@ -36,7 +36,7 @@ export const ProcessingProductTypeSelector: React.FC<ProcessingProductTypeSelect
           <button
             type="button"
             onClick={onSelectFinal}
-            className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-teal-500 bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+            className="group relative p-8 rounded-xl border-2 border-gray-200 hover:border-[#1D9E75] bg-white hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
           >
             <div className="text-center">
               <div className="text-4xl mb-4">📦</div>

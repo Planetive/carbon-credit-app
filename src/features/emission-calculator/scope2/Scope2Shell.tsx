@@ -622,7 +622,7 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Other sources</h3>
-                <Button onClick={addOtherRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Button onClick={addOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                   <Plus className="h-4 w-4 mr-2" /> Add Row
                 </Button>
               </div>
@@ -724,7 +724,7 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
             <div className="text-gray-900 font-medium">
               Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
             </div>
-            <Button onClick={saveAll} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={saveAll} disabled={saving} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save'}
             </Button>
           </div>
@@ -798,7 +798,7 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
             <div className="text-gray-900 font-medium">
               Total heat & steam emissions: <span className="font-semibold">{totalHeatEmissions.toFixed(6)} kg CO2e</span>
             </div>
-            <Button onClick={saveHeat} disabled={savingHeat} className="bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={saveHeat} disabled={savingHeat} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> {savingHeat ? 'Saving...' : 'Save'}
             </Button>
           </div>

@@ -33,7 +33,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
       }}
     >
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-[#EAF7F1]/30 to-emerald-50/20"></div>
       
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -58,7 +58,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
         <div className="relative mb-8">
           {/* Pulsing Outer Ring */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-32 h-32 rounded-full border-4 border-teal-200/50 animate-ping"></div>
+            <div className="w-32 h-32 rounded-full border-4 border-[#BFE3D3]/50 animate-ping"></div>
           </div>
           
           {/* Rotating Middle Ring */}
@@ -88,7 +88,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
             </div>
           </div>
           <div className="absolute top-1/2 -right-4 -translate-y-1/2">
-            <div className="w-8 h-8 bg-teal-500 rounded-full flex items-center justify-center shadow-lg animate-bounce-slow" style={{ animationDelay: '0.9s' }}>
+            <div className="w-8 h-8 bg-[#1D9E75] rounded-full flex items-center justify-center shadow-lg animate-bounce-slow" style={{ animationDelay: '0.9s' }}>
               <Globe className="w-4 h-4 text-white" />
             </div>
           </div>
@@ -106,9 +106,9 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
         {/* Progress Dots */}
         <div className="flex items-center space-x-2 mt-8">
-          <div className="w-3 h-3 bg-teal-500 rounded-full animate-bounce"></div>
+          <div className="w-3 h-3 bg-[#1D9E75] rounded-full animate-bounce"></div>
           <div className="w-3 h-3 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+          <div className="w-3 h-3 bg-[#EDF8F3]0 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
         </div>
 
         {/* Progress Bar */}

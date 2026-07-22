@@ -100,7 +100,7 @@ const DIVERTED_METHOD_GROUPS: DivertedMethodGroup[] = ["Recycling", "Reuse", "Re
 
 const DIVERTED_GROUP_STYLES: Record<DivertedMethodGroup, string> = {
   Recycling: "bg-emerald-50 border-l-4 border-l-emerald-500",
-  Reuse: "bg-teal-50 border-l-4 border-l-teal-500",
+  Reuse: "bg-[#EAF7F1] border-l-4 border-l-[#1C7A53]",
   Recovery: "bg-blue-50 border-l-4 border-l-blue-500",
 };
 
@@ -334,7 +334,7 @@ const WasteManagementScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -414,7 +414,7 @@ const WasteManagementScreen = () => {
                       onClick={() => setPolicyAnswer(q.key, answer)}
                       className={`rounded-lg border px-2 py-2 text-sm transition-all ${
                         selected === answer
-                          ? "bg-teal-600 border-teal-600 text-white"
+                          ? "bg-[#1D9E75] border-[#1D9E75] text-white"
                           : "bg-white border-slate-300 text-slate-700 hover:border-slate-500"
                       }`}
                     >
@@ -461,7 +461,7 @@ const WasteManagementScreen = () => {
                       onClick={() => setPolicyAnswer(q.key, answer)}
                       className={`rounded-lg border px-2 py-2 text-sm transition-all ${
                         selected === answer
-                          ? "bg-teal-600 border-teal-600 text-white"
+                          ? "bg-[#1D9E75] border-[#1D9E75] text-white"
                           : "bg-white border-slate-300 text-slate-700 hover:border-slate-500"
                       }`}
                     >
@@ -500,7 +500,7 @@ const WasteManagementScreen = () => {
                     <CollapsibleTrigger asChild>
                       <button
                         type="button"
-                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#1C7A53]/40"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-slate-900">{GENERATION_GROUP_LABELS[category]}</p>
@@ -616,7 +616,7 @@ const WasteManagementScreen = () => {
                                   <CollapsibleTrigger asChild>
                                     <button
                                       type="button"
-                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-[#0A4D3E]"
                                     >
                                       Details {detailsOpen ? "▴" : "▾"}
                                     </button>
@@ -677,7 +677,7 @@ const WasteManagementScreen = () => {
         </CardContent>
       </Card>
 
-      <Card className={sectionShell("border-l-4 border-l-teal-500")}>
+      <Card className={sectionShell("border-l-4 border-l-[#1C7A53]")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-slate-900">Waste Diverted from Disposal</CardTitle>
           <CardDescription className="text-slate-600">
@@ -702,7 +702,7 @@ const WasteManagementScreen = () => {
                     <CollapsibleTrigger asChild>
                       <button
                         type="button"
-                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#1C7A53]/40"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-slate-900">{method}</p>
@@ -818,7 +818,7 @@ const WasteManagementScreen = () => {
                                   <CollapsibleTrigger asChild>
                                     <button
                                       type="button"
-                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-[#0A4D3E]"
                                     >
                                       Details {detailsOpen ? "▴" : "▾"}
                                     </button>
@@ -897,7 +897,7 @@ const WasteManagementScreen = () => {
                     <CollapsibleTrigger asChild>
                       <button
                         type="button"
-                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
+                        className="flex flex-1 min-w-0 items-center gap-3 text-left rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#1C7A53]/40"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-slate-900">{disposalMethod}</p>
@@ -1013,7 +1013,7 @@ const WasteManagementScreen = () => {
                                   <CollapsibleTrigger asChild>
                                     <button
                                       type="button"
-                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-teal-700"
+                                      className="mt-2 text-xs font-medium text-slate-600 hover:text-[#0A4D3E]"
                                     >
                                       Details {detailsOpen ? "▴" : "▾"}
                                     </button>
@@ -1126,7 +1126,7 @@ const WasteManagementScreen = () => {
             <CardDescription className="text-slate-600">Open a dedicated page for read-only KPI and disclosure summary.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button type="button" className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md" asChild>
+            <Button type="button" className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md" asChild>
               <Link to={summaryHref}>View summary</Link>
             </Button>
           </CardContent>

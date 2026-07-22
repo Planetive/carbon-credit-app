@@ -2215,7 +2215,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               <Button
                 onClick={calculateFinanceEmission}
                 disabled={isDisabled || isCalculating}
-                className="px-8 py-3 h-12 text-base font-semibold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-3 h-12 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCalculating ? (
                   <>
@@ -2248,10 +2248,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <Card className="border-teal-200 shadow-xl bg-gradient-to-br from-teal-50/30 to-white">
+          <Card className="border-[#BFE3D3] shadow-xl bg-gradient-to-br from-teal-50/30 to-white">
             <CardHeader>
               <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-xl flex items-center justify-center">
                   <TrendingUp className="h-5 w-5 text-white" />
                 </div>
                 Calculation Results
@@ -2262,7 +2262,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                <Card className="bg-gradient-to-br from-blue-50 to-[#EDF8F3] border-blue-200">
                   <CardContent className="p-6">
                     <div className="text-sm font-semibold text-blue-700 mb-2">Attribution Factor</div>
                     <div className="text-3xl font-bold text-blue-900">{result.attributionFactor.toFixed(6)}</div>

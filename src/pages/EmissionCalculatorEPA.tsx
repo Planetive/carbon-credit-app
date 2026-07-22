@@ -62,7 +62,7 @@ type EpaSidebarCategory = {
 };
 
 const SCOPE1_NAV_GROUPS: { id: Scope1GroupId; label: string; headerClass: string }[] = [
-  { id: "stationary", label: "Stationary combustion", headerClass: "text-teal-700/90 hover:bg-teal-50/50" },
+  { id: "stationary", label: "Stationary combustion", headerClass: "text-[#0F6E56]/90 hover:bg-[#EAF7F1]/50" },
   { id: "mobile", label: "Mobile combustion & vehicles", headerClass: "text-blue-700/90 hover:bg-blue-50/50" },
   { id: "flaringVenting", label: "Flaring & venting", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
   { id: "fugitive", label: "Fugitive emissions", headerClass: "text-amber-700/90 hover:bg-amber-50/50" },
@@ -916,11 +916,11 @@ const EmissionCalculatorEPA = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
           <p className="text-gray-600 mb-6">Please log in to access the EPA emission calculator.</p>
-          <Button onClick={() => navigate("/login")} className="bg-teal-600 hover:bg-teal-700 text-white">
+          <Button onClick={() => navigate("/login")} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
             Go to Login
           </Button>
         </div>
@@ -932,7 +932,7 @@ const EmissionCalculatorEPA = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-4" />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -1134,7 +1134,7 @@ const EmissionCalculatorEPA = () => {
               <Button
                 variant="ghost"
                 onClick={() => navigate("/dashboard")}
-                className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
+                className="text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1]/50 rounded-lg px-3 py-2 transition-all duration-200"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 <span className="text-sm font-medium">Back</span>
@@ -1142,14 +1142,14 @@ const EmissionCalculatorEPA = () => {
               <Button
                 variant="ghost"
                 onClick={() => navigate("/emission-results-calculator")}
-                className="text-gray-600 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg px-3 py-2 transition-all duration-200"
+                className="text-gray-600 hover:text-[#1D9E75] hover:bg-[#EAF7F1]/50 rounded-lg px-3 py-2 transition-all duration-200"
               >
                 <span className="text-sm font-medium">Results</span>
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-3 sm:p-3.5 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-2xl shadow-lg">
+              <div className="p-3 sm:p-3.5 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-2xl shadow-lg">
                 <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
               </div>
               <div>
@@ -1208,16 +1208,16 @@ const EmissionCalculatorEPA = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-2 border-teal-300/50">
+              <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-2 border-[#BFE3D3]/50">
                 <CardContent className="p-4">
                   <div className="flex items-baseline justify-between gap-2">
-                    <div className="text-2xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    <div className="text-2xl font-extrabold bg-gradient-to-r from-[#1D9E75] to-emerald-600 bg-clip-text text-transparent">
                       {scopeTotals.total.toLocaleString(undefined, {
                         minimumFractionDigits: 3,
                         maximumFractionDigits: 3,
                       })}
                     </div>
-                    <div className="text-xs font-semibold text-teal-700/80 uppercase tracking-wide text-right">
+                    <div className="text-xs font-semibold text-[#0F6E56]/80 uppercase tracking-wide text-right">
                       Total
                     </div>
                   </div>
@@ -1235,7 +1235,7 @@ const EmissionCalculatorEPA = () => {
                     onClick={() => toggleScope(scope.id)}
                     className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${
                       activeScope === scope.id
-                        ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/30"
+                        ? "bg-gradient-to-r from-[#1D9E75] to-emerald-500 text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]"
                         : "text-gray-700 hover:bg-gray-100/80 hover:shadow-sm"
                     }`}
                   >
@@ -1296,14 +1296,14 @@ const EmissionCalculatorEPA = () => {
                                           onClick={() => handleCategoryClick(scope.id, category.id)}
                                           className={`w-full flex items-center justify-start gap-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                             activeScope === scope.id && activeCategory === category.id
-                                              ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                              ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium"
                                               : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                                           }`}
                                         >
                                           <category.icon
                                             className={`h-4 w-4 flex-shrink-0 ${
                                               activeScope === scope.id && activeCategory === category.id
-                                                ? "text-teal-600"
+                                                ? "text-[#1D9E75]"
                                                 : "text-gray-500"
                                             }`}
                                           />
@@ -1329,14 +1329,14 @@ const EmissionCalculatorEPA = () => {
                             onClick={() => handleCategoryClick(scope.id, category.id)}
                             className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                               activeScope === scope.id && activeCategory === category.id
-                                ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium"
                                 : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                             }`}
                           >
                             <category.icon
                               className={`h-4 w-4 flex-shrink-0 ${
                                 activeScope === scope.id && activeCategory === category.id
-                                  ? "text-teal-600"
+                                  ? "text-[#1D9E75]"
                                   : "text-gray-500"
                               }`}
                             />
@@ -1345,7 +1345,7 @@ const EmissionCalculatorEPA = () => {
                               {category.id === "heatSteam" && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Info className="h-3.5 w-3.5 text-gray-400 hover:text-teal-600" />
+                                    <Info className="h-3.5 w-3.5 text-gray-400 hover:text-[#1D9E75]" />
                                   </TooltipTrigger>
                                   <TooltipContent className="text-xs max-w-xs">
                                     Purchased Heat and Steam
@@ -1364,7 +1364,7 @@ const EmissionCalculatorEPA = () => {
                               onClick={() =>
                                 setScope3GroupsExpanded((prev) => ({ ...prev, upstream: !prev.upstream }))
                               }
-                              className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider text-teal-700/90 hover:bg-teal-50/50 rounded-lg transition-all duration-200"
+                              className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#0F6E56]/90 hover:bg-[#EAF7F1]/50 rounded-lg transition-all duration-200"
                             >
                               <span>Upstream emissions</span>
                               {scope3GroupsExpanded.upstream ? (
@@ -1383,14 +1383,14 @@ const EmissionCalculatorEPA = () => {
                                       onClick={() => handleCategoryClick(scope.id, category.id)}
                                       className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                         activeScope === scope.id && activeCategory === category.id
-                                          ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                          ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium"
                                           : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                                       }`}
                                     >
                                       <category.icon
                                         className={`h-4 w-4 flex-shrink-0 ${
                                           activeScope === scope.id && activeCategory === category.id
-                                            ? "text-teal-600"
+                                            ? "text-[#1D9E75]"
                                             : "text-gray-500"
                                         }`}
                                       />
@@ -1430,14 +1430,14 @@ const EmissionCalculatorEPA = () => {
                                       onClick={() => handleCategoryClick(scope.id, category.id)}
                                       className={`w-full flex items-center justify-start space-x-3 px-4 py-2.5 text-sm text-left rounded-lg transition-all duration-200 ${
                                         activeScope === scope.id && activeCategory === category.id
-                                          ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 border-l-4 border-teal-500 shadow-sm font-medium"
+                                          ? "bg-gradient-to-r from-teal-50 to-emerald-50 text-[#0F6E56] border-l-4 border-[#1D9E75] shadow-sm font-medium"
                                           : "text-gray-600 hover:bg-gray-50 hover:translate-x-1"
                                       }`}
                                     >
                                       <category.icon
                                         className={`h-4 w-4 flex-shrink-0 ${
                                           activeScope === scope.id && activeCategory === category.id
-                                            ? "text-teal-600"
+                                            ? "text-[#1D9E75]"
                                             : "text-gray-500"
                                         }`}
                                       />
@@ -1508,7 +1508,7 @@ const EmissionCalculatorEPA = () => {
                       handleSwitchToManual();
                     }
                   }}
-                  className="data-[state=checked]:bg-teal-600"
+                  className="data-[state=checked]:bg-[#1D9E75]"
                 />
                 <span className="text-xs sm:text-sm font-semibold text-gray-700">LCA</span>
                 </div>
@@ -1752,7 +1752,7 @@ const EmissionCalculatorEPA = () => {
         {(hasWizardContext || companyContext) && (
           <div className="fixed right-6 bottom-6 z-40">
             <Button
-              className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg px-5 py-2 rounded-lg"
+              className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg px-5 py-2 rounded-lg"
               onClick={async () => {
                 try {
                   if (hasWizardContext) {

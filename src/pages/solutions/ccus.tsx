@@ -115,7 +115,7 @@ const CCUSPage = () => {
               t: "Capture system design support",
               d: "Structure emissions sources, capture units, and process configurations for different industrial facilities.",
               icon: "🏭",
-              color: "from-sky-500 to-cyan-500",
+              color: "from-sky-500 to-[#EDF8F3]0",
             },
             {
               t: "Utilization &amp; storage modeling",
@@ -192,7 +192,7 @@ const CCUSPage = () => {
             ].map((item, index) => (
               <div
                 key={item.title}
-                className="group relative rounded-3xl bg-gradient-to-br from-sky-500/15 via-emerald-500/10 to-cyan-500/15 ring-1 ring-white/10 p-8 shadow-2xl hover:shadow-sky-500/30 transition-all duration-500 hover:scale-105"
+                className="group relative rounded-3xl bg-gradient-to-br from-sky-500/15 via-emerald-500/10 to-[#EDF8F3]0/15 ring-1 ring-white/10 p-8 shadow-2xl hover:shadow-sky-500/30 transition-all duration-500 hover:scale-105"
               >
                 <div className="absolute top-6 right-6 text-5xl font-black text-white/10 group-hover:text-white/20 transition-colors duration-300">
                   {`0${index + 1}`}

@@ -61,12 +61,6 @@ export interface CompanyOverviewScreenProps {
   monitoringModulesActive?: number;
 }
 
-const BRAND = {
-  forest: "#0B2D26",
-  forestMid: "#0F3D32",
-  forestStrip: "#134A3D",
-};
-
 /** Premium welcome hero — visual layers only; layout unchanged */
 const HeroContourLines = () => (
   <svg
@@ -203,7 +197,7 @@ const CompanyOverviewScreen = ({
 
   const esgImpactAreas = useMemo(
     () => [
-      { label: "Environment", pct: envScore, color: "bg-emerald-500", icon: Leaf },
+      { label: "Environment", pct: envScore, color: "bg-[#1D9E75]", icon: Leaf },
       { label: "Social", pct: socialScore, color: "bg-violet-500", icon: Users },
       { label: "Governance", pct: govScore, color: "bg-sky-500", icon: Building2 },
     ],
@@ -246,37 +240,37 @@ const CompanyOverviewScreen = ({
     <div className="w-full space-y-3.5 pb-6">
       {/* Hero — integrated shell (not floating card) */}
       <div
-        className="relative overflow-hidden text-white rounded-[14px] border border-white/[0.05] shadow-[0_2px_12px_rgba(6,56,46,0.1)]"
+        className="relative overflow-hidden text-white rounded-[14px] border border-white/[0.08] shadow-[0_2px_12px_rgba(29,158,117,0.18)]"
         style={{
-          background: "linear-gradient(145deg, #0B4D3D 0%, #084636 42%, #06382E 100%)",
+          background: "linear-gradient(145deg, #0A4D3E 0%, #1C7A53 42%, #1D9E75 100%)",
         }}
       >
         <HeroContourLines />
 
         <div
-          className="absolute -right-16 top-0 w-[420px] h-[320px] rounded-full blur-[100px] pointer-events-none opacity-[0.35]"
-          style={{ background: "radial-gradient(circle, rgba(72, 160, 120, 0.28) 0%, transparent 70%)" }}
+          className="absolute -right-16 top-0 w-[420px] h-[320px] rounded-full blur-[100px] pointer-events-none opacity-[0.45]"
+          style={{ background: "radial-gradient(circle, rgba(51, 192, 138, 0.45) 0%, transparent 70%)" }}
         />
         <div
-          className="absolute right-[10%] bottom-0 w-[280px] h-[240px] rounded-full blur-[80px] pointer-events-none opacity-[0.25]"
-          style={{ background: "radial-gradient(circle, rgba(45, 120, 95, 0.35) 0%, transparent 68%)" }}
+          className="absolute right-[10%] bottom-0 w-[280px] h-[240px] rounded-full blur-[80px] pointer-events-none opacity-[0.35]"
+          style={{ background: "radial-gradient(circle, rgba(34, 184, 126, 0.4) 0%, transparent 68%)" }}
         />
 
-        <HeroBotanicalLeaf className="absolute -right-10 -top-14 w-[360px] h-[468px] text-white/[0.043] pointer-events-none hidden md:block" />
-        <HeroBotanicalLeaf className="absolute -right-24 bottom-[-88px] w-[440px] h-[572px] text-white/[0.035] pointer-events-none hidden lg:block rotate-[18deg]" />
+        <HeroBotanicalLeaf className="absolute -right-10 -top-14 w-[360px] h-[468px] text-white/[0.06] pointer-events-none hidden md:block" />
+        <HeroBotanicalLeaf className="absolute -right-24 bottom-[-88px] w-[440px] h-[572px] text-white/[0.05] pointer-events-none hidden lg:block rotate-[18deg]" />
 
         <div
           className="absolute -left-24 top-[-20px] w-[480px] h-[260px] rounded-full blur-[90px] pointer-events-none"
           style={{
             background:
-              "radial-gradient(circle, rgba(48, 168, 120, 0.2) 0%, rgba(32, 120, 88, 0.07) 45%, transparent 72%)",
+              "radial-gradient(circle, rgba(159, 225, 203, 0.28) 0%, rgba(29, 158, 117, 0.12) 45%, transparent 72%)",
           }}
         />
         <div
           className="absolute left-0 top-0 w-[min(480px,70%)] h-[180px] pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 85% 75% at 20% 40%, rgba(255,255,255,0.05) 0%, transparent 70%)",
+              "radial-gradient(ellipse 85% 75% at 20% 40%, rgba(255,255,255,0.08) 0%, transparent 70%)",
           }}
         />
 
@@ -285,12 +279,12 @@ const CompanyOverviewScreen = ({
             <h1 className="text-[38px] leading-[1.15] font-medium tracking-[-0.03em] text-white">
               {greeting()}, {firstName}
             </h1>
-            <p className="mt-1.5 text-base leading-[1.5] text-white/[0.38] font-normal tracking-[-0.01em]">
+            <p className="mt-1.5 text-base leading-[1.5] text-[#DFFBEF]/90 font-normal tracking-[-0.01em]">
               Here&apos;s your sustainability overview for today.
             </p>
           </div>
 
-          <div className="mt-5 pt-3 border-t border-white/[0.05]">
+          <div className="mt-5 pt-3 border-t border-white/[0.12]">
             <div className="grid grid-cols-2 lg:grid-cols-4">
               {(
                 [
@@ -306,25 +300,25 @@ const CompanyOverviewScreen = ({
               ).map((stat, index) => (
                 <div
                   key={stat.label}
-                  className={`group flex items-center gap-2.5 min-w-0 px-3.5 lg:px-4 py-2 transition-all duration-200 ease-out hover:bg-white/[0.025] ${
-                    index % 2 === 1 ? "border-l border-white/[0.04]" : ""
-                  } ${index >= 2 ? "border-t border-white/[0.04] lg:border-t-0" : ""} ${
-                    index > 0 ? "lg:border-l lg:border-white/[0.04]" : ""
+                  className={`group flex items-center gap-2.5 min-w-0 px-3.5 lg:px-4 py-2 transition-all duration-200 ease-out hover:bg-white/[0.06] ${
+                    index % 2 === 1 ? "border-l border-white/[0.1]" : ""
+                  } ${index >= 2 ? "border-t border-white/[0.1] lg:border-t-0" : ""} ${
+                    index > 0 ? "lg:border-l lg:border-white/[0.1]" : ""
                   }`}
                 >
                   <stat.icon
-                    className="h-[21px] w-[21px] flex-shrink-0 text-[#9ECFB8]/80 transition-colors duration-200 group-hover:text-[#BDE4D0]"
+                    className="h-[21px] w-[21px] flex-shrink-0 text-[#9FE1CB] transition-colors duration-200 group-hover:text-[#DFFBEF]"
                     strokeWidth={1.75}
                     aria-hidden
                   />
                   <div className="min-w-0 flex flex-col justify-center gap-0.5">
                     <p
-                      className="text-[10px] font-medium uppercase text-white/[0.36] leading-none truncate"
+                      className="text-[10px] font-medium uppercase text-[#BFE3D3]/90 leading-none truncate"
                       style={{ letterSpacing: "0.14em" }}
                     >
                       {stat.label}
                     </p>
-                    <p className="text-[17px] font-medium text-white/[0.9] leading-tight tracking-[-0.02em] truncate">
+                    <p className="text-[17px] font-medium text-white leading-tight tracking-[-0.02em] truncate">
                       {stat.value}
                     </p>
                   </div>
@@ -376,13 +370,13 @@ const CompanyOverviewScreen = ({
             key={kpi.label}
             className="bg-white rounded-2xl border border-gray-100/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_18px_rgba(15,23,42,0.03)] px-5 py-[16px] flex items-center gap-4"
           >
-            <div className="h-[45px] w-[45px] shrink-0 rounded-full bg-[#EDF8F3] border border-black/[0.015] flex items-center justify-center">
-              <kpi.icon className="h-[19px] w-[19px] text-[#1A5C4A]" strokeWidth={1.75} aria-hidden />
+            <div className="h-[45px] w-[45px] shrink-0 rounded-full bg-[#EAF7F1] border border-[#BFE3D3]/50 flex items-center justify-center">
+              <kpi.icon className="h-[19px] w-[19px] text-[#1D9E75]" strokeWidth={1.75} aria-hidden />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-gray-500 mb-0.5">{kpi.label}</p>
               <p className="text-[29px] font-medium text-gray-900 leading-[1.05] tracking-[-0.02em]">{kpi.value}</p>
-              <p className={`text-xs font-medium mt-1 ${kpi.subGreen ? "text-emerald-600" : "text-gray-500"}`}>
+              <p className={`text-xs font-medium mt-1 ${kpi.subGreen ? "text-[#1D9E75]" : "text-gray-500"}`}>
                 {kpi.sub}
               </p>
             </div>
@@ -420,7 +414,7 @@ const CompanyOverviewScreen = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef0f2" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <Line type="monotone" dataKey="scope1" stroke="#0F8A70" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="scope1" stroke="#1D9E75" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="scope2" stroke="#E8C89A" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="scope3" stroke="#4F7FD3" strokeWidth={2} dot={false} />
               </LineChart>
@@ -430,8 +424,8 @@ const CompanyOverviewScreen = ({
 
         <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6">
           <div className="flex items-center gap-2 mb-3">
-            <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center">
-              <Lightbulb className="h-4 w-4 text-emerald-700" strokeWidth={2} aria-hidden />
+            <div className="h-8 w-8 rounded-full bg-[#EAF7F1] flex items-center justify-center">
+              <Lightbulb className="h-4 w-4 text-[#1D9E75]" strokeWidth={2} aria-hidden />
             </div>
             <h2 className="text-sm font-semibold text-gray-900">AI Insight</h2>
           </div>
@@ -440,7 +434,7 @@ const CompanyOverviewScreen = ({
           <ul className="space-y-2">
             {aiInsight.actions.map((action) => (
               <li key={action} className="flex items-start gap-2 text-xs text-gray-600">
-                <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <Check className="h-3.5 w-3.5 text-[#1D9E75] mt-0.5 flex-shrink-0" />
                 {action}
               </li>
             ))}
@@ -455,13 +449,13 @@ const CompanyOverviewScreen = ({
                 <button
                   type="button"
                   onClick={() => navigate(action.path)}
-                  className="w-full flex items-center justify-between py-3 text-sm text-gray-700 hover:text-[#0B2D26] transition-colors group"
+                  className="w-full flex items-center justify-between py-3 text-sm text-gray-700 hover:text-[#0A4D3E] transition-colors group"
                 >
                   <span className="flex items-center gap-2.5">
-                    <action.icon className="h-4 w-4 text-gray-400 group-hover:text-emerald-700" />
+                    <action.icon className="h-4 w-4 text-gray-400 group-hover:text-[#1D9E75]" />
                     {action.label}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-emerald-700" />
+                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-[#1D9E75]" />
                 </button>
               </li>
             ))}
@@ -473,7 +467,7 @@ const CompanyOverviewScreen = ({
       <div className="rounded-2xl border border-gray-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] -mt-[8%] overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#15803D]">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F1] text-[#1D9E75]">
               <Activity className="h-5 w-5" strokeWidth={2} aria-hidden />
             </div>
             <div className="min-w-0">
@@ -486,7 +480,7 @@ const CompanyOverviewScreen = ({
           <button
             type="button"
             onClick={() => navigate("/asset-monitoring")}
-            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-600/80 bg-white px-4 py-2 text-sm font-medium text-emerald-800 transition-colors hover:bg-emerald-50/80"
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[#1D9E75]/70 bg-white px-4 py-2 text-sm font-medium text-[#0A4D3E] transition-colors hover:bg-[#EAF7F1]"
           >
             View all modules
             <ChevronRight className="h-4 w-4" aria-hidden />
@@ -496,10 +490,10 @@ const CompanyOverviewScreen = ({
         <button
           type="button"
           onClick={() => navigate("/asset-monitoring")}
-          className="flex w-full flex-col items-center px-6 py-10 text-center transition-colors hover:bg-gray-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/30 focus-visible:ring-inset"
+          className="flex w-full flex-col items-center px-6 py-10 text-center transition-colors hover:bg-gray-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D9E75]/30 focus-visible:ring-inset"
         >
-          <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200/90 bg-emerald-50/20">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECFDF3] text-emerald-700">
+          <div className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl border-2 border-dashed border-[#BFE3D3] bg-[#EAF7F1]/40">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EAF7F1] text-[#1D9E75]">
               <Plus className="h-6 w-6" strokeWidth={2} aria-hidden />
             </div>
           </div>

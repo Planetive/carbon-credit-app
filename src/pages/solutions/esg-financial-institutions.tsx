@@ -67,7 +67,7 @@ const ESGFinancialInstitutions = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.6, delay: 0.8, ease: "easeOut" }}
-                  className="text-teal-600 inline-block"
+                  className="text-[#1D9E75] inline-block"
                 >
                   portfolio-level
                 </motion.span> decision making
@@ -78,7 +78,7 @@ const ESGFinancialInstitutions = () => {
                 transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
                 className="text-xl md:text-2xl text-gray-600 mb-10 max-w-4xl mx-auto leading-relaxed"
               >
-                Measure financed and facilitated emissions, assess <span className="text-teal-600 font-semibold">climate-related financial risks</span>, and build forward-looking portfolio strategies — all in one integrated climate risk suite.
+                Measure financed and facilitated emissions, assess <span className="text-[#1D9E75] font-semibold">climate-related financial risks</span>, and build forward-looking portfolio strategies — all in one integrated climate risk suite.
               </motion.p>
 
               {/* CTA Buttons */}
@@ -198,10 +198,10 @@ const ESGFinancialInstitutions = () => {
                       scale: 1.05, 
                       y: -8,
                     }}
-                    className="relative bg-white rounded-xl p-6 border-2 border-teal-300 shadow-lg hover:shadow-xl hover:border-teal-500 transition-all duration-200 cursor-pointer group"
+                    className="relative bg-white rounded-xl p-6 border-2 border-[#BFE3D3] shadow-lg hover:shadow-xl hover:border-[#1D9E75] transition-all duration-200 cursor-pointer group"
                   >
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-teal-50/0 to-cyan-50/0 group-hover:from-teal-50/50 group-hover:to-cyan-50/30 transition-all duration-200 opacity-0 group-hover:opacity-100 pointer-events-none" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2 relative z-10 group-hover:text-teal-700 transition-colors">{item.title}</h3>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-teal-50/0 to-[#EDF8F3]/0 group-hover:from-teal-50/50 group-hover:to-[#EDF8F3]/30 transition-all duration-200 opacity-0 group-hover:opacity-100 pointer-events-none" />
+                    <h3 className="text-lg font-bold text-gray-900 mb-2 relative z-10 group-hover:text-[#0F6E56] transition-colors">{item.title}</h3>
                     <p className="text-sm text-gray-600 relative z-10">{item.description}</p>
                   </motion.div>
                 ))}
@@ -223,7 +223,7 @@ const ESGFinancialInstitutions = () => {
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-8">
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 leading-tight">
-                    A complete <span className="text-teal-600">climate risk</span> & portfolio decarbonization suite
+                    A complete <span className="text-[#1D9E75]">climate risk</span> & portfolio decarbonization suite
                   </h2>
                   <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
                     Rethink Carbon brings together emissions accounting, climate risk assessment, and scenario analysis to help financial institutions move from disclosure-driven reporting to decision-useful insights.
@@ -409,16 +409,16 @@ const ESGFinancialInstitutions = () => {
                       boxShadow: "0 10px 25px -5px rgba(20, 184, 166, 0.3)",
                       transition: { duration: 0.15, ease: "easeOut" }
                     }}
-                    className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm text-center hover:border-teal-300 cursor-pointer group"
+                    className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm text-center hover:border-[#BFE3D3] cursor-pointer group"
                   >
                     <motion.div
                       whileHover={{ scale: 1.1, rotate: 5 }}
                       transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="w-12 h-12 rounded-full bg-teal-600 text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-teal-700"
+                      className="w-12 h-12 rounded-full bg-[#1D9E75] text-white font-bold text-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-[#22B87E]"
                     >
                       {item.step}
                     </motion.div>
-                    <h3 className="font-bold text-lg text-gray-900 mb-2 group-hover:text-teal-700 transition-colors">{item.title}</h3>
+                    <h3 className="font-bold text-lg text-gray-900 mb-2 group-hover:text-[#0F6E56] transition-colors">{item.title}</h3>
                     <p className="text-sm text-gray-600">{item.description}</p>
                   </motion.div>
                 ))}
@@ -439,7 +439,7 @@ const ESGFinancialInstitutions = () => {
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-                  Built for <span className="text-teal-600">financial decision-makers</span>
+                  Built for <span className="text-[#1D9E75]">financial decision-makers</span>
                 </h2>
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto mt-4">
                   Empowering institutions with the tools and insights needed to navigate climate risk and drive sustainable portfolio decisions.
@@ -452,15 +452,15 @@ const ESGFinancialInstitutions = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: 0.2 }}
                   whileHover={{ scale: 1.02, y: -5 }}
-                  className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm hover:shadow-lg hover:border-teal-300 transition-all duration-200 cursor-pointer"
+                  className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm hover:shadow-lg hover:border-[#BFE3D3] transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-center gap-3 mb-6">
                     <motion.div
                       whileHover={{ rotate: 360, scale: 1.1 }}
                       transition={{ duration: 0.5 }}
-                      className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center"
+                      className="w-10 h-10 rounded-lg bg-[#EAF7F1] flex items-center justify-center"
                     >
-                      <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-[#1D9E75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </motion.div>
@@ -482,7 +482,7 @@ const ESGFinancialInstitutions = () => {
                         transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
                         className="flex items-start gap-3"
                       >
-                        <span className="text-teal-600 font-bold mt-0.5">•</span>
+                        <span className="text-[#1D9E75] font-bold mt-0.5">•</span>
                         <span className="text-gray-700">{item}</span>
                       </motion.li>
                     ))}
@@ -494,15 +494,15 @@ const ESGFinancialInstitutions = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: 0.2 }}
                   whileHover={{ scale: 1.02, y: -5 }}
-                  className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm hover:shadow-lg hover:border-teal-300 transition-all duration-200 cursor-pointer"
+                  className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm hover:shadow-lg hover:border-[#BFE3D3] transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-center gap-3 mb-6">
                     <motion.div
                       whileHover={{ rotate: -360, scale: 1.1 }}
                       transition={{ duration: 0.5 }}
-                      className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center"
+                      className="w-10 h-10 rounded-lg bg-[#EAF7F1] flex items-center justify-center"
                     >
-                      <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-[#1D9E75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                     </motion.div>
@@ -525,7 +525,7 @@ const ESGFinancialInstitutions = () => {
                         transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
                         className="flex items-start gap-3"
                       >
-                        <span className="text-teal-600 font-bold mt-0.5">•</span>
+                        <span className="text-[#1D9E75] font-bold mt-0.5">•</span>
                         <span className="text-gray-700">{item}</span>
                       </motion.li>
                     ))}

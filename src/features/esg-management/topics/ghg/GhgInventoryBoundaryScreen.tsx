@@ -134,7 +134,7 @@ const GhgInventoryBoundaryScreen = () => {
       <div>
         <Link
           to="/esg-management/topics"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-teal-700 mb-3 transition-colors"
+          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to ESG topics
@@ -142,7 +142,7 @@ const GhgInventoryBoundaryScreen = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-1">GHG: emission sources</h1>
         <p className="text-sm text-slate-600 max-w-2xl">
           Say which types of emission sources apply to each site. Finish{" "}
-          <Link to="/esg-management/boundary-setting" className="font-medium text-teal-700 hover:underline">
+          <Link to="/esg-management/boundary-setting" className="font-medium text-[#0A4D3E] hover:underline">
             boundary setting
           </Link>{" "}
           first. You will add fuel use and activity data in a later step.
@@ -156,7 +156,7 @@ const GhgInventoryBoundaryScreen = () => {
             Add and complete your site and asset details in boundary setting before defining emission sources.
             <Link
               to="/esg-management/boundary-setting"
-              className="block mt-2 font-medium text-teal-800 underline"
+              className="block mt-2 font-medium text-[#0F6E56] underline"
             >
               Go to boundary setting
             </Link>
@@ -174,8 +174,8 @@ const GhgInventoryBoundaryScreen = () => {
             className={cn(
               "rounded-full px-3 sm:px-4 py-2 border-2 transition-all duration-300",
               step === s.id
-                ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white border-transparent shadow-md shadow-teal-500/25"
-                : "bg-white text-slate-600 border-slate-200 hover:border-teal-300/80 hover:bg-slate-50/90",
+                ? "bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white border-transparent shadow-md shadow-[0_10px_24px_-8px_rgba(11,77,61,0.30)]"
+                : "bg-white text-slate-600 border-slate-200 hover:border-[#BFE3D3]/90 hover:bg-slate-50/90",
               locked && s.id !== "reviewLock" && "opacity-50 cursor-not-allowed"
             )}
           >
@@ -318,7 +318,7 @@ const GhgInventoryBoundaryScreen = () => {
             </ul>
           )}
           <Button
-            className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+            className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
             disabled={!canProceedSources || !canProceedAssets || locked}
             onClick={() => goStep("reviewLock")}
           >
@@ -355,7 +355,7 @@ const GhgInventoryBoundaryScreen = () => {
                       <td className="py-2 pr-3 font-medium">{r.asset.asset_name || r.asset.id.slice(0, 8)}</td>
                       <td className="py-2 pr-3 font-mono">{r.attribution_factor.toFixed(4)}</td>
                       <td className="py-2 pr-3 font-mono">{r.time_factor.toFixed(4)}</td>
-                      <td className="py-2 font-mono font-semibold text-teal-800">{r.final_reporting_factor.toFixed(4)}</td>
+                      <td className="py-2 font-mono font-semibold text-[#0F6E56]">{r.final_reporting_factor.toFixed(4)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,14 +373,14 @@ const GhgInventoryBoundaryScreen = () => {
             </p>
           </div>
           {locked && (
-            <Alert className="border-2 border-teal-200 bg-teal-50/50">
-              <Lock className="h-4 w-4 text-teal-800" />
+            <Alert className="border-2 border-[#BFE3D3] bg-[#EAF7F1]/50">
+              <Lock className="h-4 w-4 text-[#0F6E56]" />
               <AlertTitle>GHG inventory is locked</AlertTitle>
               <AlertDescription className="text-sm">
                 Unlock only if your process allows changes to this reporting period.
                 <button
                   type="button"
-                  className="block mt-2 text-teal-800 font-medium underline"
+                  className="block mt-2 text-[#0F6E56] font-medium underline"
                   onClick={() => persist({ ...draft, ghg_inventory_locked: false })}
                 >
                   Unlock to edit
@@ -390,7 +390,7 @@ const GhgInventoryBoundaryScreen = () => {
           )}
           {!locked && (
             <Button
-              className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-md"
+              className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] text-white shadow-md"
               onClick={() => {
                 if (!canProceedAssets || !canProceedSources) {
                   toast({

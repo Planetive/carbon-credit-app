@@ -521,7 +521,7 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
             Factors loaded from <span className="font-medium">Non-Road Vehicle</span>. Enter fuel use in gallons.
           </p>
         </div>
-        <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={loading}>
+        <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white" disabled={loading}>
           <Plus className="h-4 w-4 mr-2" /> Add Row
         </Button>
       </div>
@@ -656,11 +656,11 @@ const NonRoadVehicleEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving}>
+            <Button onClick={handleSave} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white" disabled={saving}>
               <Save className="h-4 w-4 mr-2" /> {saving ? "Saving..." : "Save"}
             </Button>
             {onSaveAndNext && (
-              <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600 hover:bg-teal-50">
+              <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             )}

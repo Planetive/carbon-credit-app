@@ -54,10 +54,10 @@ function sanitizeAnswers(raw: unknown): MrvQuestionnaireAnswers {
 }
 
 function readUiMode(): AssetMonitoringUiMode {
-  if (typeof window === "undefined") return "questionnaire";
-  return localStorage.getItem(ASSET_MONITORING_UI_MODE_KEY) === "catalog"
-    ? "catalog"
-    : "questionnaire";
+  if (typeof window === "undefined") return "catalog";
+  const stored = localStorage.getItem(ASSET_MONITORING_UI_MODE_KEY);
+  if (stored === "questionnaire") return "questionnaire";
+  return "catalog";
 }
 
 const AssetMonitoringScreen = () => {
@@ -276,7 +276,7 @@ const AssetMonitoringScreen = () => {
         {modeToggleBar}
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <div>
-          <Badge variant="outline" className="mb-3 border-teal-200 text-teal-700 bg-teal-50">
+          <Badge variant="outline" className="mb-3 border-[#BFE3D3] text-[#0F6E56] bg-[#EAF7F1]">
             Asset Monitoring · MRV
           </Badge>
           <h1 className="text-3xl font-bold text-gray-900">Your recommended MRV pathway</h1>
@@ -286,15 +286,15 @@ const AssetMonitoringScreen = () => {
           </p>
         </div>
 
-        <Card className="border-teal-200/80 shadow-lg bg-gradient-to-br from-teal-50/80 to-white">
+        <Card className="border-[#BFE3D3]/80 shadow-lg bg-gradient-to-br from-teal-50/80 to-white">
           <CardHeader>
             <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-teal-600 text-white">
+              <div className="p-3 rounded-xl bg-[#1D9E75] text-white">
                 <PrimaryIcon className="h-7 w-7" />
               </div>
               <div>
                 <CardTitle className="text-xl">{primaryProfile.name}</CardTitle>
-                <CardDescription className="text-base text-teal-800/90 mt-1">
+                <CardDescription className="text-base text-[#0A4D3E]/90 mt-1">
                   {primaryProfile.tagline}
                 </CardDescription>
               </div>
@@ -316,7 +316,7 @@ const AssetMonitoringScreen = () => {
             </div>
             <div className="flex flex-wrap gap-3 pt-4">
               <Button
-                className="bg-teal-600 hover:bg-teal-700"
+                className="bg-[#1D9E75] hover:bg-[#22B87E]"
                 onClick={() =>
                   toast({
                     title: "Coming soon",
@@ -344,7 +344,7 @@ const AssetMonitoringScreen = () => {
                   <Card key={id} className="border-gray-200">
                     <CardHeader className="pb-2">
                       <div className="flex items-center gap-3">
-                        <Icon className="h-5 w-5 text-teal-600" />
+                        <Icon className="h-5 w-5 text-[#1D9E75]" />
                         <CardTitle className="text-base">{profile.name}</CardTitle>
                       </div>
                     </CardHeader>
@@ -369,14 +369,14 @@ const AssetMonitoringScreen = () => {
                 <Card
                   key={id}
                   className={`transition-shadow hover:shadow-md ${
-                    isPrimary ? "ring-2 ring-teal-500/40 border-teal-200" : "border-gray-200"
+                    isPrimary ? "ring-2 ring-[#1D9E75]/40 border-[#BFE3D3]" : "border-gray-200"
                   }`}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-2">
                       <Icon className="h-5 w-5 text-gray-600" />
                       {isPrimary && (
-                        <Badge className="bg-teal-600 hover:bg-teal-600">Recommended</Badge>
+                        <Badge className="bg-[#1D9E75] hover:bg-[#1D9E75]">Recommended</Badge>
                       )}
                     </div>
                     <CardTitle className="text-sm leading-snug">{profile.name}</CardTitle>
@@ -402,7 +402,7 @@ const AssetMonitoringScreen = () => {
       {modeToggleBar}
       <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <Badge variant="outline" className="mb-3 border-teal-200 text-teal-700 bg-teal-50">
+        <Badge variant="outline" className="mb-3 border-[#BFE3D3] text-[#0F6E56] bg-[#EAF7F1]">
           Asset Monitoring · MRV setup
         </Badge>
         <h1 className="text-3xl font-bold text-gray-900">Find your MRV fit</h1>
@@ -437,8 +437,8 @@ const AssetMonitoringScreen = () => {
                   onClick={() => setSingle(currentQuestion.id, opt.value)}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
                     active
-                      ? "border-teal-500 bg-teal-50/80 ring-1 ring-teal-500/30"
-                      : "border-gray-200 hover:border-teal-200 hover:bg-gray-50"
+                      ? "border-[#1D9E75] bg-[#EAF7F1]/80 ring-1 ring-[#1D9E75]/30"
+                      : "border-gray-200 hover:border-[#BFE3D3] hover:bg-gray-50"
                   }`}
                 >
                   <div className="font-medium text-gray-900">{opt.label}</div>
@@ -460,13 +460,13 @@ const AssetMonitoringScreen = () => {
                   onClick={() => toggleMulti(currentQuestion.id, opt.value)}
                   className={`w-full text-left p-4 rounded-xl border transition-all flex items-start gap-3 ${
                     active
-                      ? "border-teal-500 bg-teal-50/80 ring-1 ring-teal-500/30"
-                      : "border-gray-200 hover:border-teal-200 hover:bg-gray-50"
+                      ? "border-[#1D9E75] bg-[#EAF7F1]/80 ring-1 ring-[#1D9E75]/30"
+                      : "border-gray-200 hover:border-[#BFE3D3] hover:bg-gray-50"
                   }`}
                 >
                   <div
                     className={`mt-0.5 h-5 w-5 rounded border flex-shrink-0 flex items-center justify-center ${
-                      active ? "bg-teal-600 border-teal-600" : "border-gray-300 bg-white"
+                      active ? "bg-[#1D9E75] border-[#1D9E75]" : "border-gray-300 bg-white"
                     }`}
                   >
                     {active && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
@@ -493,7 +493,7 @@ const AssetMonitoringScreen = () => {
           {stepIndex === 0 ? "Dashboard" : "Back"}
         </Button>
         <Button
-          className="bg-teal-600 hover:bg-teal-700"
+          className="bg-[#1D9E75] hover:bg-[#22B87E]"
           onClick={handleNext}
           disabled={saving || !isStepValid()}
         >

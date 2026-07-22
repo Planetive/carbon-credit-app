@@ -33,10 +33,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 
-/** Matches logged-in sidebar / overview forest accents (not teal). */
-const FOREST = "#0B3D2E";
-const FOREST_MID = "#0F3D32";
-const FOREST_SOFT_BG = "#E8F3EF";
+/** Matches home / overview brighter mint accents. */
+const FOREST = "#1D9E75";
+const FOREST_MID = "#0F6E56";
+const FOREST_SOFT_BG = "#EAF7F1";
 
 interface UserAccountMenuProps {
   trigger: ReactNode;
@@ -71,7 +71,7 @@ const UserAccountMenu = ({
         .select("user_type")
         .eq("user_id", user.id)
         .single();
-      if (data?.user_type) setUserType(data.user_type);
+      setUserType(data?.user_type || "corporate");
     };
     loadType();
   }, [user]);
@@ -216,7 +216,7 @@ const UserAccountMenu = ({
 
           <DropdownMenuItem
             onClick={handleCreateOrganization}
-            className="cursor-pointer mx-1 mt-1 rounded-md text-[#0B3D2E] hover:bg-[#E8F3EF] hover:text-[#0B3D2E]"
+            className="cursor-pointer mx-1 mt-1 rounded-md text-[#1D9E75] hover:bg-[#EAF7F1] hover:text-[#0F6E56]"
           >
             <Plus className="mr-2 h-4 w-4" />
             <span className="text-sm font-medium">Create Organization</span>
@@ -265,7 +265,7 @@ const UserAccountMenu = ({
               </>
             ) : (
               <DropdownMenuItem
-                onClick={() => navigate("/dashboard", { state: { activeSection: "portfolio" } })}
+                onClick={() => navigate("/dashboard", { state: { activeSection: "projects" } })}
                 className="cursor-pointer"
               >
                 <FileText className="mr-2 h-4 w-4" />

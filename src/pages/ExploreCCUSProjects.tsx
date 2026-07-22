@@ -358,10 +358,10 @@ const ExploreCCUSProjects = () => {
   const renderSelectedProjectsCard = () => {
     if (!selectedCategory) return null;
     return (
-      <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg lg:col-span-2">
+      <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg lg:col-span-2">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-lg text-teal-700">Projects for Selected Category</CardTitle>
+            <CardTitle className="text-lg text-[#0F6E56]">Projects for Selected Category</CardTitle>
             <p className="text-sm text-gray-600 mt-1">
               Showing projects for{" "}
               <span className="font-semibold text-gray-800">
@@ -371,7 +371,7 @@ const ExploreCCUSProjects = () => {
                   ? "Project status"
                   : "Sector"}
               </span>
-              : <span className="font-semibold text-teal-700">{selectedCategory.value}</span>
+              : <span className="font-semibold text-[#0F6E56]">{selectedCategory.value}</span>
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setSelectedCategory(null)}>
@@ -384,7 +384,7 @@ const ExploreCCUSProjects = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {selectedCategoryProjects.map((project, idx) => (
-                <Card key={`${project["Project ID"] || project["Project name"] || "project"}-${idx}`} className="border-teal-100 shadow-sm">
+                <Card key={`${project["Project ID"] || project["Project name"] || "project"}-${idx}`} className="border-[#DDF3EA] shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base leading-tight text-gray-900">
                       {project["Project name"] || "Unnamed Project"}
@@ -396,7 +396,7 @@ const ExploreCCUSProjects = () => {
                   <CardContent className="space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-gray-500">Status</span>
-                      <Badge className="bg-teal-100 text-teal-700 border-teal-200">
+                      <Badge className="bg-[#EAF7F1] text-[#0F6E56] border-[#BFE3D3]">
                         {project["Project Status"] || "N/A"}
                       </Badge>
                     </div>
@@ -427,11 +427,11 @@ const ExploreCCUSProjects = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-emerald-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1]/50 to-[#EDF8F3]/40">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#1D9E75]/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       {/* Main Content */}
@@ -440,7 +440,7 @@ const ExploreCCUSProjects = () => {
         <div className="mb-8 animate-in fade-in duration-500">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
             <div className="flex-1">
-              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#1D9E75] via-emerald-600 to-[#1D9E75] bg-clip-text text-transparent mb-2">
                 CCUS Database
               </h1>
               <p className="text-gray-600 text-lg">Explore Carbon Capture, Utilization, and Storage projects worldwide</p>
@@ -448,7 +448,7 @@ const ExploreCCUSProjects = () => {
             <Button
               variant="outline"
               onClick={() => navigate('/explore')}
-              className="border-teal-600 text-teal-600 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-700 transition-all duration-300"
+              className="border-[#1D9E75] text-[#0F6E56] hover:bg-[#EAF7F1] hover:text-[#0F6E56] hover:border-[#0F6E56] transition-all duration-300"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -457,7 +457,7 @@ const ExploreCCUSProjects = () => {
           <div className="flex gap-4">
             <Button
               onClick={() => navigate('/explore/ccus-policies')}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex-1 sm:flex-initial"
+              className="bg-gradient-to-r from-emerald-500 to-[#1C7A53] hover:from-emerald-600 hover:to-[#1D9E75] text-white shadow-lg hover:shadow-xl transition-all duration-300 flex-1 sm:flex-initial"
             >
               View CCUS Policies
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -469,7 +469,7 @@ const ExploreCCUSProjects = () => {
                 })
               }
               disabled={filteredProjects.length === 0}
-              className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-initial"
+              className="bg-gradient-to-r from-[#1C7A53] to-emerald-500 hover:from-[#1D9E75] hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-initial"
             >
               View Project Details
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -479,15 +479,15 @@ const ExploreCCUSProjects = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.1s' }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Projects</p>
-                  <p className="text-3xl font-bold text-teal-600 transition-all duration-300">{stats.total}</p>
+                  <p className="text-3xl font-bold text-[#0F6E56] transition-all duration-300">{stats.total}</p>
                 </div>
-                <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                  <Database className="w-6 h-6 text-teal-600" />
+                <div className="w-12 h-12 bg-[#EAF7F1] rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Database className="w-6 h-6 text-[#0F6E56]" />
                 </div>
               </div>
             </CardContent>
@@ -507,15 +507,15 @@ const ExploreCCUSProjects = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-cyan-200/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.2s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-in fade-in" style={{ animationDelay: '0.2s' }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Countries</p>
-                  <p className="text-3xl font-bold text-cyan-600 transition-all duration-300">{stats.uniqueCountries}</p>
+                  <p className="text-3xl font-bold text-[#1C7A53] transition-all duration-300">{stats.uniqueCountries}</p>
                 </div>
-                <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
-                  <Globe className="w-6 h-6 text-cyan-600" />
+                <div className="w-12 h-12 bg-[#EDF8F3] rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110">
+                  <Globe className="w-6 h-6 text-[#1C7A53]" />
                 </div>
               </div>
             </CardContent>
@@ -537,7 +537,7 @@ const ExploreCCUSProjects = () => {
         </div>
 
         {/* Filters and Search */}
-        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
+        <Card className="mb-6 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.3s' }}>
           <CardContent className="p-4">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1 relative">
@@ -546,17 +546,17 @@ const ExploreCCUSProjects = () => {
                   placeholder="Search projects by name, country, or sector..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-teal-200 focus:border-teal-400 transition-all duration-300 focus:ring-2 focus:ring-teal-200"
+                  className="pl-10 border-[#BFE3D3] focus:border-[#9ECFB8] transition-all duration-300 focus:ring-2 focus:ring-[#BFE3D3]"
                 />
               </div>
 
               <Popover open={showFilters} onOpenChange={setShowFilters}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="border-teal-200 hover:bg-teal-50 transition-all duration-300 hover:scale-105">
+                  <Button variant="outline" className="border-[#BFE3D3] hover:bg-[#EAF7F1] transition-all duration-300 hover:scale-105">
                     <Filter className="w-4 h-4 mr-2 transition-transform duration-300" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                     Filters
                     {(selectedCountries.length > 0 || selectedStatuses.length > 0 || selectedSectors.length > 0 || selectedFates.length > 0) && (
-                      <Badge className="ml-2 bg-teal-500 animate-in fade-in duration-300">
+                      <Badge className="ml-2 bg-[#1D9E75] animate-in fade-in duration-300">
                         {selectedCountries.length + selectedStatuses.length + selectedSectors.length + selectedFates.length}
                       </Badge>
                     )}
@@ -673,7 +673,7 @@ const ExploreCCUSProjects = () => {
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Projects by Type */}
-          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.4s' }}>
             <CardHeader>
               <CardTitle className="text-lg">Projects by Type</CardTitle>
             </CardHeader>
@@ -705,7 +705,7 @@ const ExploreCCUSProjects = () => {
           </Card>
 
           {/* Projects by Status Pie Chart */}
-          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.5s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.5s' }}>
             <CardHeader>
               <CardTitle className="text-lg">Projects by Status</CardTitle>
             </CardHeader>
@@ -746,7 +746,7 @@ const ExploreCCUSProjects = () => {
             renderSelectedProjectsCard()}
 
           {/* Projects by Sector - Full Width */}
-          <Card className="bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500 lg:col-span-2" style={{ animationDelay: '0.6s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500 lg:col-span-2" style={{ animationDelay: '0.6s' }}>
             <CardHeader>
               <CardTitle className="text-lg">Projects by Sector</CardTitle>
             </CardHeader>
@@ -772,7 +772,7 @@ const ExploreCCUSProjects = () => {
                         return (
                           <div className="bg-white p-3 rounded shadow text-sm border border-gray-200">
                             <div className="font-semibold mb-1 text-gray-900">Sector: {label}</div>
-                            <div className="text-teal-600 font-medium">Count: {payload[0].value} {payload[0].value === 1 ? 'project' : 'projects'}</div>
+                            <div className="text-[#0F6E56] font-medium">Count: {payload[0].value} {payload[0].value === 1 ? 'project' : 'projects'}</div>
                           </div>
                         );
                       }
@@ -799,7 +799,7 @@ const ExploreCCUSProjects = () => {
 
 
         {/* Map section */}
-        <Card className="mb-8 bg-white/80 backdrop-blur-sm border-teal-200/50 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.8s' }}>
+        <Card className="mb-8 bg-white/80 backdrop-blur-sm border-[#BFE3D3]/60 shadow-lg animate-in fade-in duration-500" style={{ animationDelay: '0.8s' }}>
           <CardHeader>
             <CardTitle className="text-xl">Project Locations</CardTitle>
             <Badge variant="outline" className="text-sm w-fit mt-2">

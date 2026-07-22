@@ -73,12 +73,12 @@ const AdminLoginScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-[#EAF7F1] to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
           <CardHeader className="text-center pb-4">
-            <div className="mx-auto mb-4 h-16 w-16 bg-teal-100 rounded-full flex items-center justify-center">
-              <Shield className="h-8 w-8 text-teal-600" />
+            <div className="mx-auto mb-4 h-16 w-16 bg-[#EAF7F1] rounded-full flex items-center justify-center">
+              <Shield className="h-8 w-8 text-[#1D9E75]" />
             </div>
             <CardTitle className="text-2xl font-bold text-gray-900">
               Admin Access
@@ -127,7 +127,7 @@ const AdminLoginScreen = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+                className="w-full bg-[#1D9E75] hover:bg-[#22B87E] text-white"
                 disabled={loading}
               >
                 {loading ? (

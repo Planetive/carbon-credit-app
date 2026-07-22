@@ -35,7 +35,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [userType, setUserType] = useState<string>("financial_institution");
+  const [userType, setUserType] = useState<string>("corporate");
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [roleLabel, setRoleLabel] = useState("Admin");
@@ -49,7 +49,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
           .select("user_type, display_name, contact_role")
           .eq("user_id", user.id)
           .single()) as { data: { user_type?: string; display_name?: string; contact_role?: string } | null };
-        if (data?.user_type) setUserType(data.user_type);
+        setUserType(data?.user_type || "corporate");
         if (data?.display_name) setDisplayName(data.display_name);
         else if (user.email) setDisplayName(user.email.split("@")[0]);
         if (data?.contact_role) setRoleLabel(data.contact_role);
@@ -74,7 +74,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
           { id: "portfolio", title: "My Portfolio", icon: Building2, path: "/dashboard" },
           { id: "esg-management", title: "ESG Management", icon: Layers, path: "/esg-management" },
           { id: "esg-assessment", title: "ESG Assessment", icon: FileText, path: "/esg-health-check" },
-          { id: "emissions", title: "Carbon Accounting", icon: Calculator, path: "/emission-calculator" },
+          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: "/emission-calculator" },
           {
             id: "asset-monitoring",
             title: "Asset Monitoring",
@@ -91,10 +91,10 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         ]
       : [
           { id: "overview", title: "Company Overview", icon: Grid3X3, path: "/dashboard" },
-          { id: "portfolio", title: "My Projects", icon: FileText, path: "/dashboard" },
+          { id: "projects", title: "My Projects", icon: FileText, path: "/dashboard" },
           { id: "esg-management", title: "ESG Management", icon: Layers, path: "/esg-management" },
           { id: "esg-assessment", title: "ESG Assessment", icon: FileText, path: "/esg-health-check" },
-          { id: "emissions", title: "Carbon Accounting", icon: Calculator, path: "/emission-calculator" },
+          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: "/emission-calculator" },
           {
             id: "asset-monitoring",
             title: "Asset Monitoring",
@@ -116,11 +116,9 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
 
   const handleSidebarClick = (item: SidebarItem) => {
     if (item.path) {
-      if (item.id === "portfolio" || item.id === "projects") {
+      if (item.id === "portfolio" || item.id === "projects" || item.id === "overview") {
+        onSectionChange?.(item.id);
         navigate("/dashboard", { state: { activeSection: item.id } });
-      } else if (item.id === "overview") {
-        navigate("/dashboard", { state: { activeSection: "overview" } });
-        onSectionChange?.("overview");
       } else {
         navigate(item.path);
       }
@@ -189,13 +187,13 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
                 onClick={() => handleSidebarClick(item)}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium rounded-md transition-colors ${
                   itemActive
-                    ? "bg-[#EEF6F2]/90 text-[#0F3D32]"
+                    ? "bg-[#EEF6F2]/90 text-[#0F6E56]"
                     : "text-gray-600 hover:bg-gray-50/90 hover:text-gray-800"
                 }`}
               >
                 <Icon
                   className={`h-4 w-4 flex-shrink-0 ${
-                    itemActive ? "text-[#1a6b4a]" : "text-gray-400"
+                    itemActive ? "text-[#1D9E75]" : "text-gray-400"
                   }`}
                   strokeWidth={1.75}
                 />
@@ -227,7 +225,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
               type="button"
               className="w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-gray-50/90 transition-colors focus:outline-none"
             >
-              <div className="h-8 w-8 rounded-full bg-[#0B3D2E] text-white flex items-center justify-center text-xs font-medium">
+              <div className="h-8 w-8 rounded-full bg-[#0F6E56] text-white flex items-center justify-center text-xs font-medium">
                 {userInitial}
               </div>
               <div className="flex-1 min-w-0 text-left">

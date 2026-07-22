@@ -6,11 +6,11 @@ import { Building2, Banknote } from "lucide-react";
 
 const LoginChoiceScreen = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-[#EDF8F3]">
       <MainHeader />
       <div className="max-w-5xl mx-auto px-4 pt-28 pb-16">
         <div className="text-center mb-10">
-          <p className="text-sm uppercase tracking-[0.2em] text-teal-600 font-semibold">Sign In</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-[#1D9E75] font-semibold">Sign In</p>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mt-3">
             Choose your experience
           </h1>
@@ -22,7 +22,7 @@ const LoginChoiceScreen = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="border border-teal-100 shadow-sm hover:shadow-lg transition-shadow duration-200">
             <CardHeader className="space-y-3">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-teal-50 text-teal-700">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-[#EAF7F1] text-[#0F6E56]">
                 <Building2 className="h-6 w-6" />
               </div>
               <CardTitle>Carbon Intelligence for Corporates</CardTitle>
@@ -44,7 +44,7 @@ const LoginChoiceScreen = () => {
 
           <Card className="border border-cyan-100 shadow-sm hover:shadow-lg transition-shadow duration-200">
             <CardHeader className="space-y-3">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-cyan-50 text-cyan-700">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-[#EDF8F3] text-[#0F6E56]">
                 <Banknote className="h-6 w-6" />
               </div>
               <CardTitle>Carbon Intelligence for Financial Institutions</CardTitle>
@@ -66,7 +66,7 @@ const LoginChoiceScreen = () => {
         </div>
 
         <div className="text-center mt-10">
-          <Link to="/" className="text-sm text-slate-500 hover:text-teal-600 transition-colors">
+          <Link to="/" className="text-sm text-slate-500 hover:text-[#1D9E75] transition-colors">
             ← Back to home
           </Link>
         </div>

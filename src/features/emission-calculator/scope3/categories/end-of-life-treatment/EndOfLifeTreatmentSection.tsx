@@ -46,7 +46,7 @@ export const EndOfLifeTreatmentSection: React.FC<EndOfLifeTreatmentSectionProps>
           <h4 className="text-lg font-semibold text-gray-900">End-of-Life Treatment</h4>
           <p className="text-sm text-gray-600">Disposal methods, recycling potential, materials</p>
         </div>
-        <Button onClick={onAddRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={onAddRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
           <Plus className="h-4 w-4 mr-2" />Add New Entry
         </Button>
       </div>
@@ -211,7 +211,7 @@ export const EndOfLifeTreatmentSection: React.FC<EndOfLifeTreatmentSectionProps>
           <Button
             onClick={onSave}
             disabled={saving || savePendingCount === 0}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
           >
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving..." : `Save (${savePendingCount})`}
@@ -220,7 +220,7 @@ export const EndOfLifeTreatmentSection: React.FC<EndOfLifeTreatmentSectionProps>
             <Button
               variant="outline"
               onClick={onSaveAndNext}
-              className="border-teal-600 text-teal-600 hover:bg-teal-50"
+              className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]"
             >
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>

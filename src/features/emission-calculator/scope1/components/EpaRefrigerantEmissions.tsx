@@ -254,7 +254,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
             Enter leaked refrigerant gas and the calculator will estimate emissions automatically.
           </p>
         </div>
-        <Button onClick={addRow} className="bg-teal-600 hover:bg-teal-700 text-white">
+        <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
           <Plus className="h-4 w-4 mr-2" />
           Add entry
         </Button>
@@ -461,7 +461,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
                   </div>
 
                   {gwp != null && row.leakageKg != null && row.emissionsKg != null && (
-                    <div className="rounded-lg border border-teal-200 bg-teal-50/60 px-4 py-3 text-sm text-teal-900 space-y-1">
+                    <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1]/60 px-4 py-3 text-sm text-[#0A4D3E] space-y-1">
                       <p className="font-medium">How this was calculated</p>
                       {row.method === "estimated_leakage" && row.chargeKg != null && row.leakageRatePercent != null && (
                         <p>
@@ -495,13 +495,13 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
           <Button
             onClick={saveEntries}
             disabled={saving || pendingNew.length === 0}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
           >
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving…" : `Save (${pendingNew.length})`}
           </Button>
           {onSaveAndNext && (
-            <Button variant="outline" onClick={onSaveAndNext} className="border-teal-600 text-teal-600">
+            <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75]">
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}
