@@ -50,8 +50,8 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "renewable",
     modules: [
       {
-        id: "solar-bess",
-        name: "Solar & BESS",
+        id: "terra",
+        name: "Terra",
         subtitle: "Solar PV & Battery Storage",
         cardDescription:
           "Track solar generation, inverter performance, and battery storage—charge cycles, efficiency, and grid services—in one hybrid renewable workspace.",
@@ -71,8 +71,8 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "biochar",
     modules: [
       {
-        id: "biochar-core",
-        name: "BioChar MRV",
+        id: "helios",
+        name: "Helios",
         subtitle: "Feedstock & Production",
         cardDescription:
           "Manage feedstock tracking, sustainability data, and production monitoring for biochar operations.",
@@ -92,8 +92,8 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "ccus",
     modules: [
       {
-        id: "ccus-core",
-        name: "CCUS MRV",
+        id: "sequest",
+        name: "Sequest",
         subtitle: "Capture • Transport • Storage",
         cardDescription:
           "Monitor capture rates, transport integrity, and storage permanence for carbon capture, utilization, and storage projects.",
