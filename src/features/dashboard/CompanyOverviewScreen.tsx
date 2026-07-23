@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Building2,
   Check,
@@ -44,8 +45,10 @@ const MOCK_EMISSIONS_TREND = [
 ];
 
 export interface CompanyOverviewScreenProps {
-  displayName: string;
-  organizationName: string;
+  displayName?: string;
+  organizationName?: string;
+  /** True while profile name/org are still being fetched — shows skeletons instead of placeholders */
+  profileLoading?: boolean;
   projectsCount: number;
   esgScorePercent: number | null;
   esgMaturityLabel: string;
@@ -121,9 +124,113 @@ function greeting() {
   return "Good evening";
 }
 
+/** Soft bar that matches the green hero — reads as part of the welcome block, not a generic grey skeleton */
+const HeroShimmer = ({ className }: { className?: string }) => (
+  <span
+    className={`block rounded-md bg-white/20 animate-pulse ${className ?? ""}`}
+    aria-hidden
+  />
+);
+
+const HeroShell = ({ children }: { children: ReactNode }) => (
+  <div
+    className="relative overflow-hidden text-white rounded-[14px] border border-white/[0.08] shadow-[0_2px_12px_rgba(29,158,117,0.18)]"
+    style={{
+      background: "linear-gradient(145deg, #0A4D3E 0%, #1C7A53 42%, #1D9E75 100%)",
+    }}
+  >
+    <HeroContourLines />
+
+    <div
+      className="absolute -right-16 top-0 w-[420px] h-[320px] rounded-full blur-[100px] pointer-events-none opacity-[0.45]"
+      style={{ background: "radial-gradient(circle, rgba(51, 192, 138, 0.45) 0%, transparent 70%)" }}
+    />
+    <div
+      className="absolute right-[10%] bottom-0 w-[280px] h-[240px] rounded-full blur-[80px] pointer-events-none opacity-[0.35]"
+      style={{ background: "radial-gradient(circle, rgba(34, 184, 126, 0.4) 0%, transparent 68%)" }}
+    />
+
+    <HeroBotanicalLeaf className="absolute -right-10 -top-14 w-[360px] h-[468px] text-white/[0.06] pointer-events-none hidden md:block" />
+    <HeroBotanicalLeaf className="absolute -right-24 bottom-[-88px] w-[440px] h-[572px] text-white/[0.05] pointer-events-none hidden lg:block rotate-[18deg]" />
+
+    <div
+      className="absolute -left-24 top-[-20px] w-[480px] h-[260px] rounded-full blur-[90px] pointer-events-none"
+      style={{
+        background:
+          "radial-gradient(circle, rgba(159, 225, 203, 0.28) 0%, rgba(29, 158, 117, 0.12) 45%, transparent 72%)",
+      }}
+    />
+    <div
+      className="absolute left-0 top-0 w-[min(480px,70%)] h-[180px] pointer-events-none"
+      style={{
+        background:
+          "radial-gradient(ellipse 85% 75% at 20% 40%, rgba(255,255,255,0.08) 0%, transparent 70%)",
+      }}
+    />
+
+    {children}
+  </div>
+);
+
+const OverviewWelcomeLoading = () => (
+  <div className="w-full space-y-3.5 pb-6" aria-busy="true" aria-label="Loading your overview">
+    <HeroShell>
+      <div className="relative px-[18px] pt-5 pb-4 flex flex-col">
+        <div className="relative max-w-xl z-[1] pb-1 space-y-3">
+          <HeroShimmer className="h-10 w-[min(100%,22rem)]" />
+          <HeroShimmer className="h-4 w-[min(100%,18rem)] opacity-80" />
+        </div>
+
+        <div className="mt-5 pt-3 border-t border-white/[0.12]">
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className={`flex items-center gap-2.5 min-w-0 px-3.5 lg:px-4 py-2 ${
+                  index % 2 === 1 ? "border-l border-white/[0.1]" : ""
+                } ${index >= 2 ? "border-t border-white/[0.1] lg:border-t-0" : ""} ${
+                  index > 0 ? "lg:border-l lg:border-white/[0.1]" : ""
+                }`}
+              >
+                <HeroShimmer className="h-[21px] w-[21px] rounded-full shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <HeroShimmer className="h-2.5 w-16" />
+                  <HeroShimmer className="h-4 w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </HeroShell>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="bg-white rounded-2xl border border-gray-100/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_18px_rgba(15,23,42,0.03)] px-5 py-[16px] flex items-center gap-4"
+        >
+          <div className="h-[45px] w-[45px] shrink-0 rounded-full bg-[#EAF7F1] animate-pulse" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-3 w-20 rounded bg-gray-100 animate-pulse" />
+            <div className="h-7 w-16 rounded bg-gray-100 animate-pulse" />
+            <div className="h-3 w-24 rounded bg-gray-100 animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="h-[280px] rounded-2xl border border-gray-100/80 bg-white animate-pulse" />
+      <div className="h-[280px] rounded-2xl border border-gray-100/80 bg-white animate-pulse" />
+    </div>
+  </div>
+);
+
 const CompanyOverviewScreen = ({
   displayName,
   organizationName,
+  profileLoading = false,
   projectsCount,
   esgScorePercent,
   esgMaturityLabel,
@@ -139,7 +246,7 @@ const CompanyOverviewScreen = ({
   monitoringModulesActive = 0,
 }: CompanyOverviewScreenProps) => {
   const navigate = useNavigate();
-  const firstName = displayName?.split(" ")[0] || "Farhan";
+  const firstName = displayName?.trim().split(/\s+/)[0] || "";
 
   const esgScore = esgScorePercent ?? 0;
   const readinessLabel = esgMaturityLabel || "Not scored";
@@ -172,7 +279,7 @@ const CompanyOverviewScreen = ({
     { label: "Invite Team Member", path: "/settings", icon: UserPlus },
   ];
 
-  const orgDisplay = organizationName?.trim() || "Rethink Carbon";
+  const orgDisplay = organizationName?.trim() || "—";
 
   const emissionScopeRows = useMemo(
     () => [
@@ -236,48 +343,24 @@ const CompanyOverviewScreen = ({
     };
   }, [s1, s2, s3, totalEmissions]);
 
+  if (profileLoading) {
+    return <OverviewWelcomeLoading />;
+  }
+
   return (
-    <div className="w-full space-y-3.5 pb-6">
+    <motion.div
+      className="w-full space-y-3.5 pb-6"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+    >
       {/* Hero — integrated shell (not floating card) */}
-      <div
-        className="relative overflow-hidden text-white rounded-[14px] border border-white/[0.08] shadow-[0_2px_12px_rgba(29,158,117,0.18)]"
-        style={{
-          background: "linear-gradient(145deg, #0A4D3E 0%, #1C7A53 42%, #1D9E75 100%)",
-        }}
-      >
-        <HeroContourLines />
-
-        <div
-          className="absolute -right-16 top-0 w-[420px] h-[320px] rounded-full blur-[100px] pointer-events-none opacity-[0.45]"
-          style={{ background: "radial-gradient(circle, rgba(51, 192, 138, 0.45) 0%, transparent 70%)" }}
-        />
-        <div
-          className="absolute right-[10%] bottom-0 w-[280px] h-[240px] rounded-full blur-[80px] pointer-events-none opacity-[0.35]"
-          style={{ background: "radial-gradient(circle, rgba(34, 184, 126, 0.4) 0%, transparent 68%)" }}
-        />
-
-        <HeroBotanicalLeaf className="absolute -right-10 -top-14 w-[360px] h-[468px] text-white/[0.06] pointer-events-none hidden md:block" />
-        <HeroBotanicalLeaf className="absolute -right-24 bottom-[-88px] w-[440px] h-[572px] text-white/[0.05] pointer-events-none hidden lg:block rotate-[18deg]" />
-
-        <div
-          className="absolute -left-24 top-[-20px] w-[480px] h-[260px] rounded-full blur-[90px] pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(159, 225, 203, 0.28) 0%, rgba(29, 158, 117, 0.12) 45%, transparent 72%)",
-          }}
-        />
-        <div
-          className="absolute left-0 top-0 w-[min(480px,70%)] h-[180px] pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse 85% 75% at 20% 40%, rgba(255,255,255,0.08) 0%, transparent 70%)",
-          }}
-        />
-
+      <HeroShell>
         <div className="relative px-[18px] pt-5 pb-4 flex flex-col">
           <div className="relative max-w-xl z-[1] pb-1">
             <h1 className="text-[38px] leading-[1.15] font-medium tracking-[-0.03em] text-white">
-              {greeting()}, {firstName}
+              {greeting()}
+              {firstName ? <>, {firstName}</> : null}
             </h1>
             <p className="mt-1.5 text-base leading-[1.5] text-[#DFFBEF]/90 font-normal tracking-[-0.01em]">
               Here&apos;s your sustainability overview for today.
@@ -327,7 +410,7 @@ const CompanyOverviewScreen = ({
             </div>
           </div>
         </div>
-      </div>
+      </HeroShell>
 
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -503,7 +586,7 @@ const CompanyOverviewScreen = ({
           <p className="mt-1 text-sm font-semibold text-gray-900">None</p>
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

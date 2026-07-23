@@ -49,6 +49,7 @@ const Dashboard2 = () => {
   const [profileMissing, setProfileMissing] = useState(false);
   const [profileForm, setProfileForm] = useState({ organizationName: "", displayName: "", phone: "" });
   const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string>("");
   const [organizationName, setOrganizationName] = useState<string>("");
   const [userType, setUserType] = useState<string>("corporate");
@@ -85,48 +86,62 @@ const Dashboard2 = () => {
 
   useEffect(() => {
     const checkProfile = async () => {
-      if (!user) return;
-      const { data, error } = await (supabase as any)
-        .from("profiles")
-        .select("id, user_type, organization_name, display_name, phone")
-        .eq("user_id", user.id)
-        .single();
-      if (!data || error) {
-        setProfileMissing(true);
-        setDisplayName("");
-      } else {
-        // Check if organization_name, display_name, or phone are missing or just default values
-        // If display_name is just the email prefix (from default), phone is null, or organization_name is missing, show the form
-        const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
-        const phoneIsMissing = !data.phone || data.phone.trim() === '';
-        const organizationNameIsMissing = !data.organization_name || data.organization_name.trim() === '' || data.organization_name === 'My Organization';
-        
-        // Show questionnaire if any required field is missing
-        setProfileMissing(displayNameIsDefault || phoneIsMissing || organizationNameIsMissing);
-        
-        // Pre-fill the form with existing data if available
-        if (data.organization_name && !organizationNameIsMissing) {
-          setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
-          setOrganizationName(data.organization_name);
-        } else {
-          setOrganizationName("");
-        }
-        if (data.display_name && !displayNameIsDefault) {
-          setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
-          setDisplayName(data.display_name);
-        } else {
+      if (!user) {
+        setProfileLoading(false);
+        return;
+      }
+
+      // Clear immediately so a previous session's name never flashes
+      setProfileLoading(true);
+      setDisplayName("");
+      setOrganizationName("");
+      setProfileForm({ organizationName: "", displayName: "", phone: "" });
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from("profiles")
+          .select("id, user_type, organization_name, display_name, phone")
+          .eq("user_id", user.id)
+          .single();
+        if (!data || error) {
+          setProfileMissing(true);
           setDisplayName("");
+        } else {
+          // Check if organization_name, display_name, or phone are missing or just default values
+          // If display_name is just the email prefix (from default), phone is null, or organization_name is missing, show the form
+          const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
+          const phoneIsMissing = !data.phone || data.phone.trim() === '';
+          const organizationNameIsMissing = !data.organization_name || data.organization_name.trim() === '' || data.organization_name === 'My Organization';
+          
+          // Show questionnaire if any required field is missing
+          setProfileMissing(displayNameIsDefault || phoneIsMissing || organizationNameIsMissing);
+          
+          // Pre-fill the form with existing data if available
+          if (data.organization_name && !organizationNameIsMissing) {
+            setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
+            setOrganizationName(data.organization_name);
+          } else {
+            setOrganizationName("");
+          }
+          if (data.display_name && !displayNameIsDefault) {
+            setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
+            setDisplayName(data.display_name);
+          } else {
+            setDisplayName("");
+          }
+          if (data.phone && !phoneIsMissing) {
+            setProfileForm(prev => ({ ...prev, phone: data.phone }));
+          }
         }
-        if (data.phone && !phoneIsMissing) {
-          setProfileForm(prev => ({ ...prev, phone: data.phone }));
+        if (data && data.user_type) {
+          setUserType(data.user_type);
+        } else {
+          setUserType("corporate"); // Default to corporate for safety
         }
+        setUserTypeResolved(true);
+      } finally {
+        setProfileLoading(false);
       }
-      if (data && data.user_type) {
-        setUserType(data.user_type);
-      } else {
-        setUserType("corporate"); // Default to corporate for safety
-      }
-      setUserTypeResolved(true);
 
       // Onboarding completion check removed
     };
@@ -835,7 +850,7 @@ const Dashboard2 = () => {
 
   // Section title mapping
   const sectionTitles: Record<string, string> = {
-    'overview': 'Company Overview',
+    'overview': 'Impact Overview',
     'portfolio': 'My Portfolio',
     'projects': 'My Projects',
     'reports': 'Reports & Analytics',
@@ -856,8 +871,9 @@ const Dashboard2 = () => {
                 transition={{ duration: 0.35 }}
               >
                 <CompanyOverviewScreen
-                  displayName={displayName || profileForm.displayName || "Farhan"}
-                  organizationName={organizationName || profileForm.organizationName || "Rethink Carbon"}
+                  displayName={displayName || profileForm.displayName || undefined}
+                  organizationName={organizationName || profileForm.organizationName || undefined}
+                  profileLoading={profileLoading}
                   projectsCount={projects.length}
                   esgScorePercent={
                     esgScores?.readiness_overall_score != null
