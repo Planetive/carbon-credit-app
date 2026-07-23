@@ -20,16 +20,18 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1500, // raise limit to avoid noisy warnings
     rollupOptions: {
       output: {
-        manualChunks: {
-          // split heavy libs so they don’t bloat the main chunk
-          html2canvas: ["html2canvas"],
-          jspdf: ["jspdf"],
-          vendor: [
-            "react",
-            "react-dom",
-            "react-router-dom",
-            "@tanstack/react-query",
-          ],
+        // Vite 8 / Rolldown requires a function (object form is invalid)
+        manualChunks(id) {
+          if (id.includes("node_modules/html2canvas")) return "html2canvas";
+          if (id.includes("node_modules/jspdf")) return "jspdf";
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom") ||
+            id.includes("node_modules/react-router") ||
+            id.includes("node_modules/@tanstack/react-query")
+          ) {
+            return "vendor";
+          }
         },
       },
     },
