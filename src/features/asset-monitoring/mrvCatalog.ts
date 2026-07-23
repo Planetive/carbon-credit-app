@@ -17,7 +17,7 @@ export interface MrvCatalogSection {
   id: string;
   title: string;
   summary?: string;
-  iconKey: "agriculture" | "renewable" | "biomass";
+  iconKey: "agriculture" | "renewable" | "biochar" | "ccus";
   modules: MrvCatalogModule[];
 }
 
@@ -50,49 +50,58 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "renewable",
     modules: [
       {
-        id: "solar",
-        name: "Solar energy",
-        subtitle: "Solar PV Monitoring",
+        id: "solar-bess",
+        name: "Solar & BESS",
+        subtitle: "Solar PV & Battery Storage",
         cardDescription:
-          "Track solar generation, inverter performance, and reporting across photovoltaic installations.",
-        capabilities: "Track • Analyze • Export",
+          "Track solar generation, inverter performance, and battery storage—charge cycles, efficiency, and grid services—in one hybrid renewable workspace.",
+        capabilities: "Track • Measure • Report",
         status: "preview",
         description:
-          "Site-level solar MRV for installed capacity, irradiance-adjusted generation, performance ratio, and export or self-consumption. " +
-          "Align meter reads and inverter telemetry with registry and disclosure workflows.",
-      },
-      {
-        id: "bess",
-        name: "BESS",
-        subtitle: "Battery Energy Storage",
-        cardDescription:
-          "Monitor charge cycles, round-trip efficiency, and grid services for battery storage assets.",
-        capabilities: "Measure • Validate • Report",
-        status: "preview",
-        description:
-          "Battery energy storage MRV for state of charge, round-trip efficiency, cycling, and grid or behind-the-meter services. " +
-          "Support availability, degradation, and attributable emissions for hybrid renewable portfolios.",
+          "Combined solar and BESS MRV for installed PV capacity, irradiance-adjusted generation, performance ratio, and export or self-consumption, " +
+          "alongside battery state of charge, round-trip efficiency, cycling, and grid or behind-the-meter services. " +
+          "Align meter reads, inverter telemetry, and storage degradation with registry and disclosure workflows for hybrid renewable portfolios.",
       },
     ],
   },
   {
-    id: "biomass",
-    title: "Biomass",
-    summary: "Feedstock and conversion monitoring for biomass operations.",
-    iconKey: "biomass",
+    id: "biochar",
+    title: "BioChar",
+    summary: "Feedstock and production monitoring for biochar operations.",
+    iconKey: "biochar",
     modules: [
       {
-        id: "biomass-core",
-        name: "Biomass MRV",
-        subtitle: "Feedstock & Conversion",
+        id: "biochar-core",
+        name: "BioChar MRV",
+        subtitle: "Feedstock & Production",
         cardDescription:
-          "Manage feedstock tracking, sustainability data, and conversion monitoring for biomass operations.",
+          "Manage feedstock tracking, sustainability data, and production monitoring for biochar operations.",
         capabilities: "Monitor • Report • Verify",
         status: "preview",
         description:
-          "Monitor feedstock origin, moisture, and sustainability criteria alongside combustion or conversion outputs. " +
-          "Reconcile mass–energy balances and emission factors for CHP, bioenergy, and industrial heat applications. " +
+          "Monitor feedstock origin, moisture, and sustainability criteria alongside pyrolysis or conversion outputs. " +
+          "Reconcile mass–energy balances and carbon permanence for biochar production and application. " +
           "Package evidence for voluntary and compliance programs without spreadsheet sprawl.",
+      },
+    ],
+  },
+  {
+    id: "ccus",
+    title: "CCUS",
+    summary: "Carbon capture, utilization, and storage monitoring for industrial and project assets.",
+    iconKey: "ccus",
+    modules: [
+      {
+        id: "ccus-core",
+        name: "CCUS MRV",
+        subtitle: "Capture • Transport • Storage",
+        cardDescription:
+          "Monitor capture rates, transport integrity, and storage permanence for carbon capture, utilization, and storage projects.",
+        capabilities: "Monitor • Report • Verify",
+        status: "coming_soon",
+        description:
+          "CCUS MRV for capture facility performance, CO₂ stream composition, pipeline or shipping transport, and geological or utilization sinks. " +
+          "Support measurement, reporting, and verification packages for project registries and compliance programs.",
       },
     ],
   },

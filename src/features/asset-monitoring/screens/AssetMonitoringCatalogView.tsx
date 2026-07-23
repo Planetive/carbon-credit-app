@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Battery, Flame, Leaf, Sprout, Sun, SunMedium } from "lucide-react";
+import { ArrowRight, Flame, Factory, Leaf, Sprout, Sun, SunMedium } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -21,14 +21,15 @@ const CARD_SHELL =
 const sectionIcons = {
   agriculture: Sprout,
   renewable: SunMedium,
-  biomass: Flame,
+  biochar: Flame,
+  ccus: Factory,
 } as const;
 
 const moduleIcons: Record<string, typeof Sprout> = {
   "vert-os": Sprout,
-  solar: Sun,
-  bess: Battery,
-  "biomass-core": Flame,
+  "solar-bess": Sun,
+  "biochar-core": Flame,
+  "ccus-core": Factory,
 };
 
 const sectionHeaderTone: Record<
@@ -37,13 +38,15 @@ const sectionHeaderTone: Record<
 > = {
   agriculture: { container: "bg-[#ECFDF3] text-[#15803D]", icon: "text-[#15803D]" },
   renewable: { container: "bg-[#EFF6FF] text-[#2563EB]", icon: "text-[#2563EB]" },
-  biomass: { container: "bg-[#F0FDF4] text-[#166534]", icon: "text-[#166534]" },
+  biochar: { container: "bg-[#F0FDF4] text-[#166534]", icon: "text-[#166534]" },
+  ccus: { container: "bg-[#F1F5F9] text-[#475569]", icon: "text-[#475569]" },
 };
 
 const iconContainerBg: Record<MrvCatalogSection["iconKey"], string> = {
   agriculture: "bg-[#ECFDF3] group-hover:bg-[#DDF9EB]",
   renewable: "bg-[#EFF6FF] group-hover:bg-[#E0EDFF]",
-  biomass: "bg-[#F0FDF4] group-hover:bg-[#E3F9EA]",
+  biochar: "bg-[#F0FDF4] group-hover:bg-[#E3F9EA]",
+  ccus: "bg-[#F1F5F9] group-hover:bg-[#E2E8F0]",
 };
 
 const statusBadge: Record<MrvModuleStatus, { label: string; className: string }> = {
@@ -180,10 +183,20 @@ function SectionBlock({ section }: { section: MrvCatalogSection }) {
   const placeholderMedium = Math.max(0, MEDIUM_COLUMNS - section.modules.length);
 
   const openModule = (mod: MrvCatalogModule) => {
-    if (mod.id === "vert-os") {
-      window.location.assign("https://hydroponics-planetive.vercel.app");
+    // Paste real module URLs here when ready
+    const MODULE_URLS: Record<string, string> = {
+      "vert-os": "https://hydroponics-planetive.vercel.app",
+      "biochar-core": "https://bio-char-mrv-api-server.vercel.app",
+      // TODO: replace this demo URL with the real Solar & BESS link
+      "solar-bess": "https://example.com/solar-bess-demo",
+    };
+
+    const url = MODULE_URLS[mod.id];
+    if (url) {
+      window.location.assign(url);
       return;
     }
+
     toast({
       title: "Coming soon",
       description: `${mod.name} monitoring workflows are in development.`,
