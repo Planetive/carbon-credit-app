@@ -244,7 +244,7 @@ const UserAccountMenu = ({
               className="cursor-pointer"
             >
               <Grid3X3 className="mr-2 h-4 w-4" />
-              <span>Company Overview</span>
+              <span>Impact Overview</span>
             </DropdownMenuItem>
             {userType === "financial_institution" ? (
               <>
@@ -287,7 +287,7 @@ const UserAccountMenu = ({
             {userType === "corporate" && (
               <DropdownMenuItem onClick={() => navigate("/asset-monitoring")} className="cursor-pointer">
                 <Activity className="mr-2 h-4 w-4" />
-                <span>Asset Monitoring</span>
+                <span>MRV Modules</span>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem

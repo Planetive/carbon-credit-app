@@ -220,6 +220,9 @@ const BoundarySettingScreen = () => {
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Back to dashboard
           </Link>
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400 mb-1">
+            ESG Management
+          </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-1">Boundary setting</h1>
           <p className="text-sm text-slate-600 max-w-xl">
             Set your reporting period, industry, how you draw your organisational boundary, and the sites or assets you
@@ -236,6 +239,14 @@ const BoundarySettingScreen = () => {
             <span className="text-slate-500"> — continue here when this setup is complete.</span>
           </p>
         </div>
+
+        <span
+          className="inline-flex w-fit items-center gap-1.5 self-start rounded-md border border-slate-200/90 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500"
+          title="SSIB-aligned reporting"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]/80" aria-hidden />
+          SSIB
+        </span>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs sm:text-sm font-medium">

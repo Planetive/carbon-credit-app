@@ -334,7 +334,7 @@ const AppHeader = () => {
                   className="cursor-pointer"
                 >
                   <Grid3X3 className="mr-2 h-4 w-4" />
-                  <span>Company Overview</span>
+                  <span>Impact Overview</span>
                 </DropdownMenuItem>
                 {userType === "financial_institution" ? (
                   <>
@@ -391,7 +391,7 @@ const AppHeader = () => {
                     className="cursor-pointer"
                   >
                     <Activity className="mr-2 h-4 w-4" />
-                    <span>Asset Monitoring</span>
+                    <span>MRV Modules</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
@@ -565,7 +565,7 @@ const AppHeader = () => {
                               }`}
                             >
                               <Grid3X3 className="h-4 w-4" />
-                              <span>Company Overview</span>
+                              <span>Impact Overview</span>
                             </button>
                             {userType === "financial_institution" ? (
                               <>
@@ -684,7 +684,7 @@ const AppHeader = () => {
                                 }`}
                               >
                                 <Activity className="h-4 w-4" />
-                                <span>Asset Monitoring</span>
+                                <span>MRV Modules</span>
                               </button>
                             )}
                             <button

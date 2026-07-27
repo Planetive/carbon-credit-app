@@ -13,11 +13,18 @@ import {
   Calculator,
   Sparkles,
   ChevronDown,
+  Leaf,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import UserAccountMenu from "@/components/UserAccountMenu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SidebarItem {
   id: string;
@@ -26,10 +33,37 @@ interface SidebarItem {
   path: string | null;
 }
 
+interface EmissionChild {
+  id: string;
+  title: string;
+  path: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+}
+
 interface DashboardSidebarProps {
   activeSection?: string;
   onSectionChange?: (section: string) => void;
 }
+
+const EMISSION_CHILDREN: EmissionChild[] = [
+  {
+    id: "emissions-epa",
+    title: "EPA",
+    path: "/emission-calculator-epa",
+    description:
+      "US EPA emission factors and methodology. Best for US reporting and EPA-aligned disclosures.",
+    icon: Leaf,
+  },
+  {
+    id: "emissions-uk",
+    title: "UK DEFRA",
+    path: "/emission-calculator-uk",
+    description:
+      "UK Government DEFRA emission factors and methodology. Best for UK and international reporting standards.",
+    icon: Building2,
+  },
+];
 
 const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarProps) => {
   const navigate = useNavigate();
@@ -39,6 +73,19 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [roleLabel, setRoleLabel] = useState("Admin");
+
+  const isOnEmissionsRoute =
+    location.pathname === "/emission-calculator" ||
+    location.pathname === "/emission-calculator-uk" ||
+    location.pathname === "/emission-calculator-epa" ||
+    location.pathname.startsWith("/emission-results") ||
+    location.pathname.startsWith("/emission-history");
+
+  const [emissionsOpen, setEmissionsOpen] = useState(isOnEmissionsRoute);
+
+  useEffect(() => {
+    if (isOnEmissionsRoute) setEmissionsOpen(true);
+  }, [isOnEmissionsRoute]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -69,15 +116,15 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   let sidebarItems: SidebarItem[] =
     effectiveUserType === "financial_institution"
       ? [
-          { id: "overview", title: "Company Overview", icon: Grid3X3, path: "/dashboard" },
+          { id: "overview", title: "Impact Overview", icon: Grid3X3, path: "/dashboard" },
           { id: "projects", title: "My Projects", icon: FolderOpen, path: "/dashboard" },
           { id: "portfolio", title: "My Portfolio", icon: Building2, path: "/dashboard" },
           { id: "esg-management", title: "ESG Management", icon: Layers, path: "/esg-management" },
           { id: "esg-assessment", title: "ESG Assessment", icon: FileText, path: "/esg-health-check" },
-          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: "/emission-calculator" },
+          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: null },
           {
             id: "asset-monitoring",
-            title: "Asset Monitoring",
+            title: "MRV Modules",
             icon: Activity,
             path: "/asset-monitoring",
           },
@@ -90,14 +137,14 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
           { id: "reports", title: "Reports & Analytics", icon: BarChart3, path: "/reports" },
         ]
       : [
-          { id: "overview", title: "Company Overview", icon: Grid3X3, path: "/dashboard" },
+          { id: "overview", title: "Impact Overview", icon: Grid3X3, path: "/dashboard" },
           { id: "projects", title: "My Projects", icon: FileText, path: "/dashboard" },
           { id: "esg-management", title: "ESG Management", icon: Layers, path: "/esg-management" },
           { id: "esg-assessment", title: "ESG Assessment", icon: FileText, path: "/esg-health-check" },
-          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: "/emission-calculator" },
+          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: null },
           {
             id: "asset-monitoring",
-            title: "Asset Monitoring",
+            title: "MRV Modules",
             icon: Activity,
             path: "/asset-monitoring",
           },
@@ -115,6 +162,10 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
   }
 
   const handleSidebarClick = (item: SidebarItem) => {
+    if (item.id === "emissions") {
+      setEmissionsOpen((open) => !open);
+      return;
+    }
     if (item.path) {
       if (item.id === "portfolio" || item.id === "projects" || item.id === "overview") {
         onSectionChange?.(item.id);
@@ -141,13 +192,8 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     if (item.id === "esg-assessment" && item.path) {
       return location.pathname === item.path || location.pathname.startsWith("/esg-results");
     }
-    if (item.id === "emissions" && item.path) {
-      return (
-        location.pathname === item.path ||
-        location.pathname === "/emission-calculator-uk" ||
-        location.pathname === "/emission-calculator-epa" ||
-        location.pathname.startsWith("/emission-results")
-      );
+    if (item.id === "emissions") {
+      return isOnEmissionsRoute;
     }
     if (item.id === "asset-monitoring" && item.path) {
       return location.pathname.startsWith("/asset-monitoring");
@@ -157,6 +203,8 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     }
     return false;
   };
+
+  const isEmissionChildActive = (child: EmissionChild) => location.pathname === child.path;
 
   const userInitial = (displayName || "U").charAt(0).toUpperCase();
 
@@ -176,32 +224,107 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
       </div>
 
       <div className="flex-1 min-h-0 px-2 py-2 overflow-y-auto custom-scrollbar">
-        <nav className="space-y-1">
-          {sidebarItems.map((item) => {
-            const itemActive = isActive(item);
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSidebarClick(item)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium rounded-md transition-colors ${
-                  itemActive
-                    ? "bg-[#EEF6F2]/90 text-[#0F6E56]"
-                    : "text-gray-600 hover:bg-gray-50/90 hover:text-gray-800"
-                }`}
-              >
-                <Icon
-                  className={`h-4 w-4 flex-shrink-0 ${
-                    itemActive ? "text-[#1D9E75]" : "text-gray-400"
+        <TooltipProvider delayDuration={200}>
+          <nav className="space-y-1">
+            {sidebarItems.map((item) => {
+              const itemActive = isActive(item);
+              const Icon = item.icon;
+
+              if (item.id === "emissions") {
+                return (
+                  <div key={item.id} className="space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSidebarClick(item)}
+                      aria-expanded={emissionsOpen}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium rounded-md transition-colors ${
+                        itemActive
+                          ? "bg-[#EEF6F2]/90 text-[#0F6E56]"
+                          : "text-gray-600 hover:bg-gray-50/90 hover:text-gray-800"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 flex-shrink-0 ${
+                          itemActive ? "text-[#1D9E75]" : "text-gray-400"
+                        }`}
+                        strokeWidth={1.75}
+                      />
+                      <span className="flex-1 text-left leading-snug">{item.title}</span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 flex-shrink-0 text-gray-400 transition-transform duration-200 ${
+                          emissionsOpen ? "rotate-180" : ""
+                        }`}
+                        strokeWidth={1.75}
+                      />
+                    </button>
+
+                    {emissionsOpen && (
+                      <div className="ml-3 pl-2 border-l border-gray-200/80 space-y-0.5">
+                        {EMISSION_CHILDREN.map((child) => {
+                          const ChildIcon = child.icon;
+                          const active = isEmissionChildActive(child);
+
+                          return (
+                            <Tooltip key={child.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(child.path)}
+                                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[13px] font-medium rounded-md transition-colors ${
+                                    active
+                                      ? "bg-[#EAF7F1] text-[#0F6E56]"
+                                      : "text-gray-600 hover:bg-gray-50/90 hover:text-gray-800"
+                                  }`}
+                                >
+                                  <ChildIcon
+                                    className={`h-3.5 w-3.5 flex-shrink-0 ${
+                                      active ? "text-[#1D9E75]" : "text-gray-400"
+                                    }`}
+                                    strokeWidth={1.75}
+                                  />
+                                  <span className="text-left leading-snug">{child.title}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="right"
+                                sideOffset={10}
+                                className="max-w-[220px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12px] leading-relaxed text-gray-600 shadow-lg"
+                              >
+                                <p className="font-semibold text-gray-900 mb-0.5">{child.title}</p>
+                                {child.description}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSidebarClick(item)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium rounded-md transition-colors ${
+                    itemActive
+                      ? "bg-[#EEF6F2]/90 text-[#0F6E56]"
+                      : "text-gray-600 hover:bg-gray-50/90 hover:text-gray-800"
                   }`}
-                  strokeWidth={1.75}
-                />
-                <span className="text-left leading-snug">{item.title}</span>
-              </button>
-            );
-          })}
-        </nav>
+                >
+                  <Icon
+                    className={`h-4 w-4 flex-shrink-0 ${
+                      itemActive ? "text-[#1D9E75]" : "text-gray-400"
+                    }`}
+                    strokeWidth={1.75}
+                  />
+                  <span className="text-left leading-snug">{item.title}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </TooltipProvider>
       </div>
 
       <div className="p-2 border-t border-gray-100/80 space-y-2">
