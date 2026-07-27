@@ -57,10 +57,10 @@ const EMISSION_CHILDREN: EmissionChild[] = [
   },
   {
     id: "emissions-uk",
-    title: "UK DEFRA",
+    title: "EBT",
     path: "/emission-calculator-uk",
     description:
-      "UK Government DEFRA emission factors and methodology. Best for UK and international reporting standards.",
+      "EBT emission factors and methodology. Best for UK and international reporting standards.",
     icon: Building2,
   },
 ];
