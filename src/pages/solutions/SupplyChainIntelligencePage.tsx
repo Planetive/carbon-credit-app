@@ -254,7 +254,7 @@ const SupplyChainIntelligencePage = ({
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
               The usual problem
             </p>
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-[1.25] tracking-tight text-[#0A4D3E] sm:text-[2.35rem] sm:leading-[1.2]">
               Scope 3 should not live in inboxes and spreadsheets
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base text-[#5B6B63] sm:text-lg">
@@ -306,7 +306,7 @@ const SupplyChainIntelligencePage = ({
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
               By supplier tier
             </p>
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-[1.25] tracking-tight text-[#0A4D3E] sm:text-[2.35rem] sm:leading-[1.2]">
               See where emissions add up in your network
             </h2>
             <p className="mt-4 text-base text-[#5B6B63] sm:text-lg">
@@ -449,11 +449,11 @@ const SupplyChainIntelligencePage = ({
       {/* Workflow — horizontal stepper */}
       <section id="how-it-works" className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-10">
-          <motion.div {...fadeUp} className="mx-auto mb-12 max-w-2xl text-center">
+          <motion.div {...fadeUp} className="mx-auto mb-12 max-w-3xl text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">
               How it works
             </p>
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-[1.25] tracking-tight text-[#0A4D3E] sm:text-[2.35rem] sm:leading-[1.2]">
               From mapping suppliers to acting on the data
             </h2>
           </motion.div>
