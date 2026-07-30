@@ -15,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   Activity,
@@ -23,6 +25,7 @@ import {
   Bookmark,
   Building2,
   CalendarDays,
+  ChevronDown,
   Cpu,
   Droplets,
   Factory,
@@ -162,6 +165,25 @@ function reportingDuration(start: string, end: string) {
   return { days, months, tag };
 }
 
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseIsoDate(iso: string): Date | undefined {
+  if (!iso) return undefined;
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function formatDisplayDate(iso: string): string {
+  const d = parseIsoDate(iso);
+  if (!d) return "Pick a date";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function stepIndexOf(step: WizardStep) {
   return STEP_META.findIndex((s) => s.id === step);
 }
@@ -296,9 +318,9 @@ const BoundarySettingScreen = () => {
               </p>
               <span
                 className="inline-flex items-center rounded-full bg-[#EAF7F1] px-2.5 py-0.5 text-[11px] font-semibold text-[#0F6E56]"
-                title="SSIB-aligned reporting"
+                title="SASB-aligned reporting"
               >
-                SSIB
+                SASB
               </span>
             </div>
             <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-[#0F172A] sm:text-[32px]">
@@ -386,37 +408,94 @@ const BoundarySettingScreen = () => {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
+              <div className="flex flex-wrap gap-4">
+                <div className="w-full max-w-[240px] space-y-2">
                   <Label className="text-[#334155]">Start date</Label>
-                  <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-                    <Input
-                      type="date"
-                      className="border-[#E2E8F0] bg-[#F8FAFC] pl-10"
-                      value={draft.period_start}
-                      onChange={(e) =>
-                        persist({
-                          ...draft,
-                          period_start: e.target.value,
-                          period_end: addOneYear(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-10 w-full justify-between border-[#E2E8F0] bg-[#F8FAFC] px-3 font-normal text-[#0F172A] hover:bg-[#F1F5F9]",
+                          !draft.period_start && "text-[#94A3B8]"
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-2 truncate">
+                          <CalendarDays className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                          {formatDisplayDate(draft.period_start)}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto rounded-xl border-[#E8EEF0] p-0 shadow-lg"
+                      align="start"
+                      side="bottom"
+                      sideOffset={6}
+                      avoidCollisions={false}
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={parseIsoDate(draft.period_start)}
+                        defaultMonth={parseIsoDate(draft.period_start)}
+                        onSelect={(date) => {
+                          if (!date) return;
+                          const start = toIsoDate(date);
+                          persist({
+                            ...draft,
+                            period_start: start,
+                            period_end: addOneYear(start),
+                          });
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   {dateErrors.start && <p className="text-xs text-red-600">{dateErrors.start}</p>}
                 </div>
-                <div className="space-y-2">
+
+                <div className="w-full max-w-[240px] space-y-2">
                   <Label className="text-[#334155]">End date</Label>
-                  <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-                    <Input
-                      type="date"
-                      className="border-[#E2E8F0] bg-[#F8FAFC] pl-10"
-                      value={draft.period_end}
-                      onChange={(e) => persist({ ...draft, period_end: e.target.value })}
-                    />
-                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-10 w-full justify-between border-[#E2E8F0] bg-[#F8FAFC] px-3 font-normal text-[#0F172A] hover:bg-[#F1F5F9]",
+                          !draft.period_end && "text-[#94A3B8]"
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-2 truncate">
+                          <CalendarDays className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                          {formatDisplayDate(draft.period_end)}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto rounded-xl border-[#E8EEF0] p-0 shadow-lg"
+                      align="start"
+                      side="bottom"
+                      sideOffset={6}
+                      avoidCollisions={false}
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={parseIsoDate(draft.period_end)}
+                        defaultMonth={parseIsoDate(draft.period_end)}
+                        disabled={
+                          draft.period_start
+                            ? { before: parseIsoDate(draft.period_start) }
+                            : undefined
+                        }
+                        onSelect={(date) => {
+                          if (!date) return;
+                          persist({ ...draft, period_end: toIsoDate(date) });
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   {dateErrors.end && <p className="text-xs text-red-600">{dateErrors.end}</p>}
                 </div>
               </div>

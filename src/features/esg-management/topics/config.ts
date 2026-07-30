@@ -34,11 +34,12 @@ export type EsgTopicCard = {
   description: string;
   icon: LucideIcon;
   implementation: TopicImplementation;
-  /** Framework / standard tags shown on topic cards (e.g. SSIB). */
+  /** Framework / standard tags shown on topic cards (e.g. SASB). */
   tags?: string[];
 };
 
-const SSIB_TAGS = ["SSIB"] as const;
+const SASB_TAGS = ["SASB"] as const;
+const GRI_TAGS = ["GRI"] as const;
 
 /**
  * Fixed order: 11 topic cards shown on ESG topics screen. All listed topics are live (implementation: full).
@@ -50,7 +51,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Greenhouse gas emissions and climate-related reporting.",
     icon: Cloud,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: AIR_QUALITY_TOPIC_ID,
@@ -58,7 +59,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Air pollutants and how you manage them.",
     icon: Wind,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: WATER_TOPIC_ID,
@@ -66,7 +67,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Water use, discharges, and stewardship.",
     icon: Droplets,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: BIODIVERSITY_TOPIC_ID,
@@ -74,7 +75,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Habitats, species, and nature-related impacts.",
     icon: Leaf,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: ENVIRONMENTAL_MANAGEMENT_TOPIC_ID,
@@ -82,7 +83,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Environmental systems, compliance, and permits.",
     icon: ClipboardCheck,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: RESERVES_VALUATION_CAPEX_TOPIC_ID,
@@ -90,7 +91,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Reserves, asset valuation, and investment in operations.",
     icon: LineChart,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: WORKFORCE_HEALTH_SAFETY_TOPIC_ID,
@@ -98,7 +99,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Health, safety, and wellbeing at work.",
     icon: HeartPulse,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: INDIGENOUS_PEOPLES_RIGHTS_TOPIC_ID,
@@ -106,7 +107,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Security, human rights, FPIC, community engagement, and indigenous peoples' lands.",
     icon: Handshake,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: COMMUNITY_RELATIONS_TOPIC_ID,
@@ -114,7 +115,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Community rights, engagement processes, and non-technical project delays.",
     icon: Users,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: BUSINESS_ETHICS_TOPIC_ID,
@@ -122,7 +123,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Anti-corruption, integrity, and ethical conduct.",
     icon: Scale,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...SASB_TAGS],
   },
   {
     id: WASTE_TOPIC_ID,
@@ -130,7 +131,7 @@ export const ESG_TOPIC_CARDS: EsgTopicCard[] = [
     description: "Track waste generation, diversion and disposal.",
     icon: Trash2,
     implementation: "full",
-    tags: [...SSIB_TAGS],
+    tags: [...GRI_TAGS],
   },
 ];
 

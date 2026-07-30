@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";import {
+import { useToast } from "@/hooks/use-toast";
+import {
   AIR_QUALITY_TOPIC_ID,
   ESG_TOPIC_CARDS,
   GHG_TOPIC_ID,
@@ -86,18 +87,9 @@ const EsgTopicsScreen = () => {
     <div className="min-w-0 max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 max-w-2xl">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
-              ESG Management
-            </p>
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#BFE3D3]/80 bg-[#EAF7F1]/80 px-2.5 py-0.5 text-[11px] font-medium text-[#0F6E56]"
-              title="SSIB-aligned disclosure topics"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]" aria-hidden />
-              SSIB
-            </span>
-          </div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
+            ESG Management
+          </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">ESG topics</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Four topics are ready to use. Complete boundary setting first if you have not already. More topics are
@@ -140,14 +132,22 @@ const EsgTopicsScreen = () => {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-sm sm:text-base leading-snug text-slate-800">{t.label}</p>
+                  <p className="text-sm sm:text-base leading-snug text-slate-800">
+                    <span className="font-semibold">{t.label}</span>
+                    {(t.tags ?? []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full border border-[#BFE3D3]/80 bg-[#EAF7F1]/80 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-[#0F6E56]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                     {!isLive && (
-                      <span className="text-[10px] uppercase tracking-wide font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-slate-100 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Coming soon
                       </span>
                     )}
-                  </div>
+                  </p>
                   <p className="text-sm text-slate-500 mt-1 leading-snug">{t.description}</p>
                 </div>
               </button>
