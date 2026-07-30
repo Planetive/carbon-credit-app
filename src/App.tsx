@@ -16,7 +16,7 @@ import ForgotPassword from "@/features/auth/screens/ForgotPasswordScreen";
 import ConfirmEmail from "@/features/auth/screens/ConfirmEmailScreen";
 import Dashboard from "./pages/Dashboard";
 import AIAdvisor from "./pages/AIAdvisor";
-import ProjectWizard from "./pages/ProjectWizard";
+import ProjectWizard from "@/features/projects/screens/ProjectWizardScreen";
 import BankPortfolio from "@/features/portfolio/screens/BankPortfolioScreen";
 import CompanyDetail from "@/features/portfolio/screens/CompanyDetailScreen";
 import SimpleScenarioBuilding from "@/features/climate-risk/screens/ScenarioBuildingScreen";

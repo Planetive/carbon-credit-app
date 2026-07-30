@@ -24,7 +24,7 @@ import { useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
-const ProjectWizard = () => {
+const ProjectWizardScreen = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -707,4 +707,4 @@ const ProjectWizard = () => {
   );
 };
 
-export default ProjectWizard;
+export default ProjectWizardScreen;
