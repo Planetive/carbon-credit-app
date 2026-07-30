@@ -455,7 +455,7 @@ export const ProcessingSoldProductsSection: React.FC<ProcessingSoldProductsSecti
                     {/* Standard Selection */}
                     <div className="mb-4">
                       <Label className="flex items-center gap-1 mb-2">
-                        Standard <FieldTooltip content="Select the emission factor standard (UK or EBT)" />
+                        Standard <FieldTooltip content="Select the emission factor standard (UK or DEFRA)" />
                       </Label>
                       <Select 
                         value={row.heatSteamStandard || 'UK'} 
@@ -487,7 +487,7 @@ export const ProcessingSoldProductsSection: React.FC<ProcessingSoldProductsSecti
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="UK">UK Standard</SelectItem>
-                          <SelectItem value="EBT">EBT Standard</SelectItem>
+                          <SelectItem value="EBT">DEFRA Standard</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -17,7 +17,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { sendContactNotificationEmail } from "@/utils/emailService";
 
-const ContactUs = () => {
+const ContactUsScreen = () => {
   const prefersReducedMotion = useReducedMotion();
   const heroCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -633,4 +633,4 @@ const ContactUs = () => {
   );
 };
 
-export default ContactUs;
+export default ContactUsScreen;

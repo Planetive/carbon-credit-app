@@ -24,7 +24,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
-const AboutUs = () => {
+const AboutUsScreen = () => {
   const prefersReducedMotion = useReducedMotion();
   const [expandedBios, setExpandedBios] = useState<Record<string, boolean>>({});
   const [api, setApi] = useState<{ scrollNext: () => void } | null>(null);
@@ -760,4 +760,4 @@ const TeamCard = ({
   </article>
 );
 
-export default AboutUs;
+export default AboutUsScreen;

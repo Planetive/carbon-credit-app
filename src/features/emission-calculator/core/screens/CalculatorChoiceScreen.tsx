@@ -71,9 +71,9 @@ const CalculatorChoiceScreen = () => {
                   <Building2 className="h-8 w-8 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-bold text-gray-900 mb-1">UK Version</h2>
+                  <h2 className="text-lg font-bold text-gray-900 mb-1">DEFRA Version</h2>
                   <p className="text-sm text-gray-600 mb-4">
-                    UK/EBT emission factors and methodology. Best for UK and international reporting standards.
+                    DEFRA emission factors and methodology. Best for UK and international reporting standards.
                   </p>
                   <Button
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white group-hover:shadow-md"
@@ -82,7 +82,7 @@ const CalculatorChoiceScreen = () => {
                       goToUK();
                     }}
                   >
-                    Open UK Calculator
+                    Open DEFRA Calculator
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>

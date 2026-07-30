@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-const ProjectCards = () => {
+const ProjectCardsScreen = () => {
   const location = useLocation();
   const projects = location.state?.projects || [];
   const [modalProject, setModalProject] = useState<any | null>(null);
@@ -101,4 +101,4 @@ const ProjectCards = () => {
   );
 };
 
-export default ProjectCards; 
+export default ProjectCardsScreen; 

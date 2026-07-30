@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-const ProjectDetails = () => {
+const ProjectDetailsScreen = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -146,4 +146,4 @@ const ProjectDetails = () => {
   );
 };
 
-export default ProjectDetails; 
+export default ProjectDetailsScreen; 

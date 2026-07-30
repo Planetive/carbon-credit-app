@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const ProjectDrafts = () => {
+const ProjectDraftsScreen = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<any[]>([]);
@@ -316,4 +316,4 @@ const ProjectDrafts = () => {
   );
 };
 
-export default ProjectDrafts;
+export default ProjectDraftsScreen;

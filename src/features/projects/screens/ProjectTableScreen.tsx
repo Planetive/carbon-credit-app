@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Filter, ArrowLeft } from "lucide-react";
 
-const ProjectTable = () => {
+const ProjectTableScreen = () => {
   const navigate = useNavigate();
   // Filter options
   const [regions, setRegions] = useState<string[]>([]);
@@ -360,4 +360,4 @@ const ProjectTable = () => {
   );
 };
 
-export default ProjectTable; 
+export default ProjectTableScreen; 

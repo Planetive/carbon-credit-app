@@ -77,7 +77,7 @@ const faqs = [
   },
 ];
 
-const Pricing = () => {
+const PricingScreen = () => {
   const prefersReducedMotion = useReducedMotion();
   const [typedText, setTypedText] = useState(prefersReducedMotion ? HEADLINE : "");
   const [typingDone, setTypingDone] = useState(!!prefersReducedMotion);
@@ -366,4 +366,4 @@ const Pricing = () => {
   );
 };
 
-export default Pricing;
+export default PricingScreen;

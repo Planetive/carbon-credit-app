@@ -19,7 +19,7 @@ import {
   Plus,
 } from "lucide-react";
 
-const ProjectReports = () => {
+const ProjectReportsScreen = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -280,4 +280,4 @@ const ProjectReports = () => {
   );
 };
 
-export default ProjectReports;
+export default ProjectReportsScreen;

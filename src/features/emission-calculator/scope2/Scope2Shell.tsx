@@ -750,7 +750,7 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="UK">UK Standard</SelectItem>
-                <SelectItem value="EBT">EBT Standard</SelectItem>
+                <SelectItem value="EBT">DEFRA Standard</SelectItem>
               </SelectContent>
             </Select>
           </div>

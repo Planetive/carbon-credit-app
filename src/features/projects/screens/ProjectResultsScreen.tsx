@@ -20,7 +20,7 @@ import {
   Bot
 } from "lucide-react";
 
-const ProjectResults = () => {
+const ProjectResultsScreen = () => {
   const location = useLocation();
   const projectData = location.state?.projectData || {};
   const methodologyResults = location.state?.methodologyResults || [];
@@ -816,4 +816,4 @@ const ProjectResults = () => {
   );
 };
 
-export default ProjectResults;
+export default ProjectResultsScreen;

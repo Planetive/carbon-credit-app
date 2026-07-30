@@ -1,8 +1,8 @@
 import LegalMarkdownPage from "@/components/legal/LegalMarkdownPage";
-import dataConsentMarkdown from "../../docs/legal/data-consent-form.md?raw";
+import dataConsentMarkdown from "../../../../docs/legal/data-consent-form.md?raw";
 
-const DataConsent = () => {
+const DataConsentScreen = () => {
   return <LegalMarkdownPage markdown={dataConsentMarkdown} showHeader={false} backTo="/dashboard" />;
 };
 
-export default DataConsent;
+export default DataConsentScreen;

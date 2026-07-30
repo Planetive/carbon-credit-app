@@ -944,7 +944,7 @@ const EmissionCalculatorEPA = () => {
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-5xl mx-auto p-6">
           <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-            <CardContent className="p-8">
+            <CardContent className="p-4 sm:p-6">
               <LCAQuestionnaire
                 emissionData={emissionData}
                 setEmissionData={setEmissionData}
@@ -1462,7 +1462,7 @@ const EmissionCalculatorEPA = () => {
       <div className="flex-1 flex flex-col">
         {/* Header with mode switch */}
         {(calculationMode === "manual" || calculationMode === "lca") && (
-          <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-4 sm:py-6 shadow-sm">
+          <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 sm:px-4 py-3 sm:py-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
               <div className="flex-1">
                 {calculationMode === "manual" ? (
@@ -1550,11 +1550,11 @@ const EmissionCalculatorEPA = () => {
         </AlertDialog>
 
         {/* Content */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50" data-content-area>
+        <main className="flex-1 p-3 sm:p-4 bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50" data-content-area>
           {calculationMode === "lca" && (
-            <div className="max-w-5xl mx-auto">
+            <div className="w-full max-w-none">
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                <CardContent className="p-8">
+                <CardContent className="p-4 sm:p-6">
                   <LCAQuestionnaire
                     emissionData={emissionData}
                     setEmissionData={setEmissionData}
@@ -1585,7 +1585,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "ukRefrigerant" && (
                 <div className="w-full" key={`epa-refrigerant-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <EpaRefrigerantEmissions
                         onDataChange={handleRefrigerantDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1599,7 +1599,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "fuel" && (
                 <div className="w-full" key={`fuel-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <FuelEmissions
                         onDataChange={handleFuelDataChange}
                         companyContext={!!companyContext}
@@ -1616,7 +1616,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "scope1HeatSteam" && (
                 <div className="w-full" key={`scope1-heat-steam-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <FuelEmissions
                         onDataChange={handleScope1HeatSteamDataChange}
                         companyContext={!!companyContext}
@@ -1635,7 +1635,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "mobileFuel" && (
                 <div className="w-full" key={`mobile-fuel-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <MobileFuelEmissions
                         onDataChange={handleMobileFuelDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1651,7 +1651,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "onRoadGasoline" && (
                 <div className="w-full" key={`on-road-gasoline-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <OnRoadGasolineEmissions
                         onDataChange={handleOnRoadGasolineDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1667,7 +1667,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "onRoadDieselAltFuel" && (
                 <div className="w-full" key={`on-road-diesel-alt-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <OnRoadDieselAltFuelEmissions
                         onDataChange={handleOnRoadDieselAltFuelDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1683,7 +1683,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope1" && activeCategory === "nonRoadVehicle" && (
                 <div className="w-full" key={`non-road-vehicle-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <NonRoadVehicleEmissions
                         onDataChange={handleNonRoadVehicleDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1699,7 +1699,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope2" && activeCategory === "heatSteam" && (
                 <div className="w-full" key={`heat-steam-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <HeatSteamEPAEmissions
                         onTotalChange={handleHeatSteamTotalChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1715,7 +1715,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope2" && activeCategory === "electricity" && (
                 <div className="w-full" key={`electricity-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <ElectricityEmissions
                         onTotalChange={handleElectricityDataChange}
                         onSaveAndNext={navigateToNextCategory}
@@ -1731,7 +1731,7 @@ const EmissionCalculatorEPA = () => {
               {activeScope === "scope3" && (
                 <div className="w-full" key={`scope3-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-8">
+                    <CardContent className="p-4 sm:p-6">
                       <Scope3Section
                         activeCategory={activeCategory}
                         emissionData={emissionData}

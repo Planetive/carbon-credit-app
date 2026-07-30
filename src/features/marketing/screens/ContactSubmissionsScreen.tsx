@@ -56,7 +56,7 @@ interface ContactSubmission {
   updated_at: string;
 }
 
-const ContactSubmissions = () => {
+const ContactSubmissionsScreen = () => {
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -375,4 +375,4 @@ const ContactSubmissions = () => {
   );
 };
 
-export default ContactSubmissions; 
+export default ContactSubmissionsScreen; 

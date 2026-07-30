@@ -791,7 +791,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="UK">UK Standard</SelectItem>
-              <SelectItem value="EBT">EBT Standard</SelectItem>
+              <SelectItem value="EBT">DEFRA Standard</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -1,15 +1,18 @@
-import React, { useEffect, useState, useMemo, Fragment } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Share2, BarChart3, TrendingDown, Factory, Leaf, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   exportFullEmissionReportPdf,
   mapEmissionResultsPageToCalculatorShape,
 } from '@/utils/fullEmissionReportExport';
+import type { EpaIpccResultsData } from '@/lib/epaIpccResults';
+import ResultsSummaryCard from './components/ResultsSummaryCard';
+import ScopeHighlightCards from './components/ScopeHighlightCards';
+import EmissionsAnalyticsRow from './components/EmissionsAnalyticsRow';
+import ResultsBreakdownTabs from './components/ResultsBreakdownTabs';
 
 interface EmissionResultsData {
   scope1_completion: number;
@@ -66,6 +69,7 @@ const UKResultsScreen = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [breakdownTab, setBreakdownTab] = useState('scope1');
 
   useEffect(() => {
     if (isEPA) {
@@ -684,18 +688,71 @@ const UKResultsScreen = () => {
     loadScope1Totals();
   }, [user]);
 
+
+  const mappedResults: EpaIpccResultsData = useMemo(() => {
+    const scope1 = breakdown.map(({ key, label, value }) => ({ key, label, value }));
+    const scope2 = scope2Breakdown.map(({ key, label, value }) => ({ key, label, value }));
+    const scope3 = scope3Breakdown.map(({ key, label, value }) => ({ key, label, value }));
+    return {
+      scope1,
+      scope2,
+      scope3,
+      totals: {
+        scope1: scope1Total,
+        scope2: scope2Total,
+        scope3: scope3Total,
+        grand: scope1Total + scope2Total + scope3Total,
+      },
+    };
+  }, [breakdown, scope2Breakdown, scope3Breakdown, scope1Total, scope2Total, scope3Total]);
+
+  const categoriesWithScope = useMemo(
+    () => [
+      ...mappedResults.scope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
+      ...mappedResults.scope2.map((r) => ({ ...r, scope: "Scope 2" as const })),
+      ...mappedResults.scope3.map((r) => ({ ...r, scope: "Scope 3" as const })),
+    ],
+    [mappedResults]
+  );
+
+  const categoriesCalculated = useMemo(
+    () => categoriesWithScope.filter((r) => r.value > 0).length,
+    [categoriesWithScope]
+  );
+
+  const submittedAt = results?.submitted_at || new Date().toISOString();
+
+  const formatDetailValue = (column: string, value: any): string => {
+    if (value == null) return "";
+    if (typeof value === "number") return value.toLocaleString();
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
+  const isNumericDetailColumn = (column: string, rows: any[]): boolean => {
+    return rows.some((row) => {
+      const v = row?.[column];
+      return (
+        typeof v === "number" ||
+        column === "emissions" ||
+        column === "quantity" ||
+        /(_kg|_liters|_miles|_factor|_pct|_percent)$/i.test(column)
+      );
+    });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center relative overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
-        </div>
-        <div className="text-center relative z-10">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#BFE3D3] border-t-[#1D9E75] mx-auto mb-4"></div>
-          <p className="text-gray-700 font-medium text-lg">Loading emission results...</p>
+      <div className="min-h-full bg-[#F8FAFC] flex items-center justify-center py-24">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1D9E75] mx-auto mb-3" />
+          <p className="text-slate-600">Loading assessment results…</p>
         </div>
       </div>
     );
@@ -703,858 +760,68 @@ const UKResultsScreen = () => {
 
   if (!results) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6] flex items-center justify-center relative overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
-        </div>
-        <div className="text-center relative z-10">
-          <p className="text-gray-700 mb-4 text-lg">No emission results found</p>
-          <Button onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')} className="bg-[#1D9E75] hover:bg-[#22B87E]">
-            Go to {isEPA ? 'EPA' : 'Emission Calculator'}
-          </Button>
-        </div>
+      <div className="min-h-full bg-[#F8FAFC] flex items-center justify-center px-4 py-24">
+        <Card className="w-full max-w-lg border-slate-200 shadow-sm">
+          <CardContent className="p-6 text-center space-y-4">
+            <p className="text-slate-700">No results found yet for this emission calculator assessment.</p>
+            <Button
+              onClick={() => navigate("/emission-calculator-uk")}
+              className="bg-[#1D9E75] hover:bg-[#178A66] text-white"
+            >
+              Back to calculator
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <>
-      {/* Global Styles for Animations */}
-      <style>{`
-        @keyframes blob {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-        }
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(-30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        @keyframes shimmer {
-          0% {
-            background-position: -1000px 0;
-          }
-          100% {
-            background-position: 1000px 0;
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        .animate-fade-in-up {
-          animation: fadeInUp 0.6s ease-out forwards;
-        }
-        .animate-slide-in-right {
-          animation: slideInRight 0.6s ease-out forwards;
-        }
-        .animate-shimmer {
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-          background-size: 1000px 100%;
-          animation: shimmer 2s infinite;
-        }
-        .glass-effect {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .card-hover {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .card-hover:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        .progress-bar-animate {
-          transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-      `}</style>
+    <div className="min-h-full bg-[#F8FAFC]">
+      <div className="w-full px-3 sm:px-4 py-5 sm:py-6 space-y-6">
+        <ResultsSummaryCard
+          grandTotalKg={mappedResults.totals.grand}
+          categoriesCalculated={categoriesCalculated}
+          submittedAt={submittedAt}
+          methodologyLabel="DEFRA / GHG Protocol"
+          onEditAssessment={() => navigate("/emission-calculator-uk")}
+          onExportPdf={exportPdf}
+          onExportExcel={exportCsv}
+          isGeneratingPdf={isGeneratingPdf}
+        />
 
-      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#EAF7F1] via-[#EDF8F3] to-[#F0F9F6]">
-        {/* Animated Background with Blobs */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#BFE3D3] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#9FE1CB] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-          
-          {/* Floating particles */}
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full bg-[#33C08A]/20 animate-float"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                width: `${Math.random() * 10 + 5}px`,
-                height: `${Math.random() * 10 + 5}px`,
-                animationDelay: `${Math.random() * 6}s`,
-                animationDuration: `${Math.random() * 4 + 4}s`,
-              }}
-            />
-          ))}
-        </div>
+        <ScopeHighlightCards
+          scope1Kg={mappedResults.totals.scope1}
+          scope2Kg={mappedResults.totals.scope2}
+          scope3Kg={mappedResults.totals.scope3}
+          grandKg={mappedResults.totals.grand}
+        />
 
-        {/* Main Content */}
-        <div className="relative z-10">
-          {/* Hero Section */}
-          <div 
-            className={`relative glass-effect rounded-3xl shadow-2xl mx-4 sm:mx-6 lg:mx-auto mt-6 sm:mt-8 max-w-7xl overflow-hidden ${
-              mounted ? 'animate-fade-in-up' : 'opacity-0'
-            }`}
-            style={{ animationDelay: '0.1s' }}
-          >
-            {/* Shimmer effect overlay */}
-            <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
-            
-            <div className="relative px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
-    {/* Icon + Title */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="flex items-center justify-center gap-4 mb-4">
-                  <div className="relative">
-                    <BarChart3 className="h-10 w-10 sm:h-12 sm:w-12 text-[#1D9E75] relative z-10" />
-                    <Sparkles className="h-6 w-6 text-[#33C08A] absolute -top-1 -right-1 animate-pulse" />
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-[#1C7A53] via-[#1D9E75] to-[#33C08A] bg-clip-text text-transparent">
-          Emission Results
-        </h1>
-      </div>
-                <p className="text-gray-600 text-base md:text-xl mb-2">
-        Your sustainability insights at a glance
-      </p>
+        <EmissionsAnalyticsRow
+          scope1Kg={mappedResults.totals.scope1}
+          scope2Kg={mappedResults.totals.scope2}
+          scope3Kg={mappedResults.totals.scope3}
+          grandKg={mappedResults.totals.grand}
+          categories={categoriesWithScope}
+          onViewBreakdown={() => setBreakdownTab("scope1")}
+        />
 
-      {/* Submission Date */}
-                <p className="text-sm text-gray-500">
-        Submitted on{" "}
-                  <span className="font-semibold text-gray-800">
-          {new Date(results.submitted_at).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-      </p>
-    </div>
-
-    {/* Action Buttons */}
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-      <Button
-        variant="outline"
-                  size="lg"
-        onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
-                  className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50 transition-all duration-300 hover:scale-105"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Change your emissions
-      </Button>
-      <Button
-                  className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                  size="lg"
-        onClick={exportCsv}
-      >
-        <Download className="h-4 w-4 mr-2" />
-        Export CSV
-      </Button>
-      <Button
-                  className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                  size="lg"
-        onClick={exportPdf}
-        disabled={isGeneratingPdf}
-      >
-        <Download className="h-4 w-4 mr-2" />
-        {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
-      </Button>
-    </div>
-  </div>
-</div>
-
-          {/* Main Content Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* KPI Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
-              {/* Scope 1 */}
-              <Card 
-                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
-                  mounted ? 'animate-fade-in-up' : 'opacity-0'
-                }`}
-                style={{ animationDelay: '0.2s' }}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
-                      <Factory className="h-6 w-6 text-white" />
-                    </div>
-                    <CardTitle className="text-base font-semibold text-gray-800">Scope 1 Emissions</CardTitle>
-                  </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(scope1Total)}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
-            </CardContent>
-          </Card>
-
-              {/* Scope 2 */}
-              <Card 
-                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
-                  mounted ? 'animate-fade-in-up' : 'opacity-0'
-                }`}
-                style={{ animationDelay: '0.3s' }}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
-                      <BarChart3 className="h-6 w-6 text-white" />
-                </div>
-                    <CardTitle className="text-base font-semibold text-gray-800">Scope 2 Emissions</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(scope2Total)}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
-            </CardContent>
-          </Card>
-
-              {/* Scope 3 */}
-              <Card 
-                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
-                  mounted ? 'animate-fade-in-up' : 'opacity-0'
-                }`}
-                style={{ animationDelay: '0.4s' }}
-              >
-                <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
-                      <TrendingDown className="h-6 w-6 text-white" />
-                </div>
-                    <CardTitle className="text-base font-semibold text-gray-800">Scope 3</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(scope3Total)}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">t CO2e</div>
-            </CardContent>
-          </Card>
-
-              {/* Total */}
-              <Card 
-                className={`glass-effect shadow-lg card-hover rounded-2xl border border-white/50 h-full ${
-                  mounted ? 'animate-fade-in-up' : 'opacity-0'
-                }`}
-                style={{ animationDelay: '0.5s' }}
-              >
-                <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
-                      <Leaf className="h-6 w-6 text-white" />
-                </div>
-                    <CardTitle className="text-base font-semibold text-gray-800">Total</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent tracking-tight">
-                    {formatTonnes(scope1Total + scope2Total + scope3Total)}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">t CO2e (All Scopes)</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Scope 1 Breakdown + Insights */}
-            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 ${
-              mounted ? 'animate-fade-in-up' : 'opacity-0'
-            }`}
-            style={{ animationDelay: '0.6s' }}
-            >
-              <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
-            <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
-                    Scope 1 Breakdown
-                  </CardTitle>
-            </CardHeader>
-            <CardContent>
-                  <div className="overflow-x-auto rounded-2xl border border-gray-200/60 bg-white/70 shadow-sm">
-                <table className="min-w-full text-sm">
-                  <thead>
-                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50/90">
-                          <th className="py-3 px-4">Category</th>
-                          <th className="py-3 px-4 text-right">Emissions (t CO2e)</th>
-                          <th className="py-3 px-4 text-right">Share</th>
-                          <th className="py-3 px-4 text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                        {breakdown.map((b, idx) => (
-                          <Fragment key={b.label}>
-                            <tr 
-                              className="hover:bg-gray-50 transition-colors"
-                              style={{ animationDelay: `${0.7 + idx * 0.1}s` }}
-                            >
-                              <td className="py-3 px-4 font-medium text-gray-900">{b.label}</td>
-                              <td className="py-3 px-4 font-semibold text-right text-gray-800">{formatTonnes(b.value)}</td>
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`${b.color} h-2.5 rounded-full progress-bar-animate shadow-sm`} 
-                                      style={{ width: `${b.pct}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-xs font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => loadCategoryDetails(b.key)}
-                                >
-                                  {detailKey === b.key ? 'Hide' : 'View'}
-                                </Button>
-                              </td>
-                            </tr>
-                            {detailKey === b.key && !detailLoading && !detailError && detailRows.length > 0 && (
-                              <tr>
-                                <td colSpan={4} className="bg-white/60 px-4 pb-4">
-                                  <div className="mt-2 space-y-2 text-xs text-gray-700">
-                                    <div className="text-gray-500">
-                                      {detailRows.length.toLocaleString()} entries • Total emissions{' '}
-                                      <span className="font-semibold">
-                                        {formatKg(
-                                          detailRows.reduce(
-                                            (sum: number, r: any) => sum + (Number(r.emissions) || 0),
-                                            0
-                                          )
-                                        )}{' '}
-                                        kg CO2e
-                                      </span>
-                                    </div>
-                                    <div className="overflow-x-auto border border-gray-200 rounded-md bg-white/80">
-                                      <table className="min-w-full text-[11px]">
-                                        <thead>
-                                          <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-600">
-                                            {Object.keys(detailRows[0] || {})
-                                              .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
-                                              .map((col) => (
-                                                <th
-                                                  key={col}
-                                                  className="px-3 py-2 text-left font-semibold"
-                                                >
-                                                  {prettifyColumnLabel(col)}
-                                                </th>
-                                              ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                          {detailRows.map((row: any, ridx: number) => (
-                                            <tr key={ridx} className="bg-white/70">
-                                              {Object.keys(detailRows[0] || {})
-                                                .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
-                                                .map((col) => {
-                                                  const isNumeric = typeof row[col] === 'number' || col === 'emissions' || col === 'quantity';
-                                                  const baseClasses = 'px-3 py-1.5 whitespace-nowrap text-[11px]';
-                                                  const alignClasses = isNumeric ? 'text-right tabular-nums' : 'text-left';
-                                                  return (
-                                                    <td key={col} className={`${baseClasses} ${alignClasses}`}>
-                                                      {col === 'emissions'
-                                                        ? `${formatKg(Number(row[col]) || 0)} kg CO2e`
-                                                        : typeof row[col] === 'number'
-                                                        ? row[col].toLocaleString()
-                                                        : row[col] != null
-                                                        ? String(row[col])
-                                                        : ''}
-                                                    </td>
-                                                  );
-                                                })}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                            {detailKey === b.key && detailLoading && (
-                              <tr>
-                                <td colSpan={4} className="px-4 pb-4 text-xs text-gray-500">
-                                  Loading details...
-                                </td>
-                              </tr>
-                            )}
-                            {detailKey === b.key && detailError && (
-                              <tr>
-                                <td colSpan={4} className="px-4 pb-4 text-xs text-red-600">
-                                  {detailError}
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        ))}
-                  </tbody>
-                  <tfoot>
-                        <tr className="bg-gray-50/80">
-                          <td className="py-3 px-4 font-bold text-gray-900">Total</td>
-                          <td className="py-3 px-4 font-bold text-right text-gray-900">{formatTonnes(scope1Total)}</td>
-                          <td className="py-3 px-4 text-xs font-semibold text-gray-700 text-right pr-4">100%</td>
-                          <td />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-              <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
-            <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-[#1D9E75]" />
-                    Insights
-                  </CardTitle>
-            </CardHeader>
-            <CardContent>
-                  <ul className="space-y-4 text-sm">
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">
-                        Largest contributor: <span className="font-bold text-gray-900">{topContributor.label}</span> ({(topContributor.pct || 0).toFixed(1)}%)
-                  </span>
-                </li>
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">
-                        Total Scope 1: <span className="font-bold text-gray-900">{formatTonnes(scope1Total)} t CO2e</span>
-                      </span>
-                </li>
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
-                </li>
-              </ul>
-                  <div className="mt-6">
-                    <Button 
-                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
-                      onClick={exportCsv}
-                    >
-                  <Download className="h-4 w-4 mr-2" /> Download CSV
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Scope 2 Breakdown + Insights */}
-            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 ${
-              mounted ? 'animate-fade-in-up' : 'opacity-0'
-            }`}
-            style={{ animationDelay: '0.8s' }}
-            >
-              <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
-            <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></div>
-                    Scope 2 Breakdown
-                  </CardTitle>
-            </CardHeader>
-            <CardContent>
-                  <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
-                <table className="min-w-full">
-                  <thead>
-                        <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                          <th className="py-3 px-4 font-semibold">Category</th>
-                          <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
-                          <th className="py-3 px-4 font-semibold">Share</th>
-                          <th className="py-3 px-4 font-semibold text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                        {scope2Breakdown.map((b, idx) => (
-                          <Fragment key={b.label}>
-                            <tr 
-                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
-                              style={{ animationDelay: `${0.9 + idx * 0.1}s` }}
-                            >
-                              <td className="py-4 px-4 font-medium text-gray-900">{b.label}</td>
-                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
-                              <td className="py-4 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
-                                      style={{ width: `${b.pct}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                                </div>
-                              </td>
-                              <td className="py-4 px-4 text-right">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => loadCategoryDetails(b.key)}
-                                >
-                                  {detailKey === b.key ? 'Hide' : 'View'}
-                                </Button>
-                              </td>
-                            </tr>
-                            {detailKey === b.key && !detailLoading && !detailError && detailRows.length > 0 && (
-                              <tr>
-                                <td colSpan={4} className="bg-white/60 px-4 pb-4">
-                                  <div className="mt-2 space-y-2 text-xs text-gray-700">
-                                    <div className="text-gray-500">
-                                      {detailRows.length.toLocaleString()} entries • Total emissions{' '}
-                                      <span className="font-semibold">
-                                        {formatKg(
-                                          detailRows.reduce(
-                                            (sum: number, r: any) => sum + (Number(r.emissions) || 0),
-                                            0
-                                          )
-                                        )}{' '}
-                                        kg CO2e
-                                      </span>
-                                    </div>
-                                    <div className="overflow-x-auto border border-gray-200 rounded-md bg-white/80">
-                                      <table className="min-w-full text-[11px]">
-                                        <thead>
-                                          <tr className="bg-gray-50">
-                                            {Object.keys(detailRows[0] || {})
-                                              .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
-                                              .map((col) => (
-                                                <th
-                                                  key={col}
-                                                  className="px-2 py-1 text-left font-semibold text-gray-700"
-                                                >
-                                                  {prettifyColumnLabel(col)}
-                                                </th>
-                                              ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {detailRows.map((row: any, ridx: number) => (
-                                            <tr key={ridx} className="border-t border-gray-200">
-                                              {Object.keys(detailRows[0] || {})
-                                                .filter((col) => !HIDDEN_DETAIL_COLUMNS.includes(col))
-                                                .map((col) => (
-                                                  <td key={col} className="px-2 py-1 whitespace-nowrap">
-                                                    {col === 'emissions'
-                                                      ? `${formatKg(Number(row[col]) || 0)} kg CO2e`
-                                                      : typeof row[col] === 'number'
-                                                      ? row[col].toLocaleString()
-                                                      : row[col] != null
-                                                      ? String(row[col])
-                                                      : ''}
-                                                  </td>
-                                                ))}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                            {detailKey === b.key && detailLoading && (
-                              <tr>
-                                <td colSpan={4} className="px-4 pb-4 text-xs text-gray-500">
-                                  Loading details...
-                                </td>
-                              </tr>
-                            )}
-                            {detailKey === b.key && detailError && (
-                              <tr>
-                                <td colSpan={4} className="px-4 pb-4 text-xs text-red-600">
-                                  {detailError}
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        ))}
-                  </tbody>
-                  <tfoot>
-                        <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                          <td className="py-4 px-4 font-bold text-gray-900">Total</td>
-                          <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope2Total)}</td>
-                          <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
-                          <td className="py-4 px-4" />
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-effect shadow-xl rounded-2xl border border-white/50">
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-[#1D9E75]" />
-                    Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-4 text-sm">
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">
-                        Largest contributor: <span className="font-bold text-gray-900">{topContributorS2.label}</span> ({(topContributorS2.pct || 0).toFixed(1)}%)
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">
-                        Total Scope 2: <span className="font-bold text-gray-900">{formatKg(scope2Total)} kg CO2e</span>
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                      <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                      <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
-                    </li>
-                  </ul>
-                  <div className="mt-6">
-                    <Button 
-                      className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
-                      onClick={exportCsvScope2}
-                    >
-                      <Download className="h-4 w-4 mr-2" /> Download CSV
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Scope 3 Breakdown + Insights */}
-            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 items-start ${
-              mounted ? 'animate-fade-in-up' : 'opacity-0'
-            }`}
-            style={{ animationDelay: '1s' }}
-            >
-                <Card className="lg:col-span-2 glass-effect shadow-xl rounded-2xl border border-white/50">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-                      Scope 3 Breakdown
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto rounded-xl border border-gray-200/50 bg-white/30">
-                      <table className="min-w-full">
-                        <thead>
-                          <tr className="text-left text-gray-700 text-sm bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                            <th className="py-3 px-4 font-semibold">Category</th>
-                            <th className="py-3 px-4 font-semibold">Emissions (kg CO2e)</th>
-                            <th className="py-3 px-4 font-semibold">Share</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Upstream Emissions Section */}
-                          <tr>
-                            <td colSpan={3} className="py-3 px-4 bg-blue-50/50 border-t-2 border-blue-200">
-                              <div className="font-bold text-blue-700 text-sm uppercase tracking-wide">Upstream Emissions</div>
-                            </td>
-                          </tr>
-                          {scope3UpstreamBreakdown.map((b, idx) => (
-                            <tr 
-                              key={b.label} 
-                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
-                              style={{ animationDelay: `${1.1 + idx * 0.05}s` }}
-                            >
-                              <td className="py-4 px-4 font-medium text-gray-900 pl-8">{b.label}</td>
-                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
-                              <td className="py-4 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
-                                      style={{ width: `${b.pct}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-blue-50/30">
-                            <td className="py-3 px-4 font-semibold text-blue-800 pl-8">Upstream Total</td>
-                            <td className="py-3 px-4 font-semibold text-blue-800">{formatKg(scope3UpstreamTotal)}</td>
-                            <td className="py-3 px-4 text-sm font-semibold text-blue-700">
-                              {scope3Total > 0 ? ((scope3UpstreamTotal / scope3Total) * 100).toFixed(1) : '0.0'}%
-                            </td>
-                          </tr>
-                          
-                          {/* Downstream Emissions Section */}
-                          <tr>
-                            <td colSpan={3} className="py-3 px-4 bg-green-50/50 border-t-2 border-green-200">
-                              <div className="font-bold text-green-700 text-sm uppercase tracking-wide">Downstream Emissions</div>
-                            </td>
-                          </tr>
-                          {scope3DownstreamBreakdown.map((b, idx) => (
-                            <tr 
-                              key={b.label} 
-                              className="border-t border-gray-200/50 hover:bg-white/50 transition-colors"
-                              style={{ animationDelay: `${1.1 + (scope3UpstreamBreakdown.length + idx) * 0.05}s` }}
-                            >
-                              <td className="py-4 px-4 font-medium text-gray-900 pl-8">{b.label}</td>
-                              <td className="py-4 px-4 font-semibold text-gray-800">{formatKg(b.value)}</td>
-                              <td className="py-4 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`${b.color} h-3 rounded-full progress-bar-animate shadow-sm`} 
-                                      style={{ width: `${b.pct}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-700 w-16 text-right">{b.pct.toFixed(1)}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr className="bg-green-50/30">
-                            <td className="py-3 px-4 font-semibold text-green-800 pl-8">Downstream Total</td>
-                            <td className="py-3 px-4 font-semibold text-green-800">{formatKg(scope3DownstreamTotal)}</td>
-                            <td className="py-3 px-4 text-sm font-semibold text-green-700">
-                              {scope3Total > 0 ? ((scope3DownstreamTotal / scope3Total) * 100).toFixed(1) : '0.0'}%
-                            </td>
-                          </tr>
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50/80 to-gray-100/80">
-                            <td className="py-4 px-4 font-bold text-gray-900">Scope 3 Total</td>
-                            <td className="py-4 px-4 font-bold text-gray-900">{formatKg(scope3Total)}</td>
-                            <td className="py-4 px-4 text-sm font-semibold text-gray-700">100%</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-                <Card className="glass-effect shadow-xl rounded-2xl border border-white/50 self-start">
-            <CardHeader>
-                    <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-[#1D9E75]" />
-                      Insights
-                    </CardTitle>
-            </CardHeader>
-            <CardContent>
-                    <ul className="space-y-4 text-sm">
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-blue-500 mt-2 animate-pulse"></span>
-                        <span className="text-gray-700">
-                          Upstream Total: <span className="font-bold text-gray-900">{formatKg(scope3UpstreamTotal)} kg CO2e</span>
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-green-500 mt-2 animate-pulse"></span>
-                        <span className="text-gray-700">
-                          Downstream Total: <span className="font-bold text-gray-900">{formatKg(scope3DownstreamTotal)} kg CO2e</span>
-                        </span>
-                      </li>
-                      {topContributorS3.label && (
-                        <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                          <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                          <span className="text-gray-700">
-                            Largest contributor: <span className="font-bold text-gray-900">{topContributorS3.label}</span> ({(topContributorS3.pct || 0).toFixed(1)}%)
-                  </span>
-                </li>
-                      )}
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                        <span className="text-gray-700">
-                          Total Scope 3: <span className="font-bold text-gray-900">{formatKg(scope3Total)} kg CO2e</span>
-                        </span>
-                </li>
-                      <li className="flex items-start gap-3 p-3 rounded-lg bg-white/30 hover:bg-white/50 transition-colors">
-                        <span className="h-2 w-2 rounded-full bg-[#1D9E75] mt-2 animate-pulse"></span>
-                        <span className="text-gray-700">Export breakdown via CSV for reporting or audits.</span>
-                </li>
-              </ul>
-                    <div className="mt-6">
-                      <Button 
-                        className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] w-full shadow-lg transition-all duration-300 hover:scale-105" 
-                        onClick={exportCsv}
-                      >
-                  <Download className="h-4 w-4 mr-2" /> Download CSV
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Action Buttons */}
-            <div 
-              className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 ${
-                mounted ? 'animate-fade-in-up' : 'opacity-0'
-              }`}
-              style={{ animationDelay: '1.2s' }}
-            >
-      <Button 
-        onClick={() => navigate(isEPA ? '/emission-calculator-epa' : '/emission-calculator')}
-                className="bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
-                size="lg"
-          >
-            Edit Assessment
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => navigate('/dashboard')}
-                className="glass-effect border-[#BFE3D3] hover:border-[#9ECFB8] hover:bg-[#EAF7F1]/50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105"
-                size="lg"
-          >
-            Back to Dashboard
-          </Button>
-        </div>
+        <ResultsBreakdownTabs
+          results={mappedResults}
+          detailKey={detailKey}
+          detailRows={detailRows}
+          detailLoading={detailLoading}
+          detailError={detailError}
+          onToggleDetails={loadCategoryDetails}
+          formatDetailValue={formatDetailValue}
+          isNumericDetailColumn={isNumericDetailColumn}
+          prettifyColumnLabel={prettifyColumnLabel}
+          hiddenDetailColumns={HIDDEN_DETAIL_COLUMNS}
+          activeTab={breakdownTab}
+          onTabChange={setBreakdownTab}
+        />
       </div>
     </div>
-      </div>
-    </>
   );
 };
 
