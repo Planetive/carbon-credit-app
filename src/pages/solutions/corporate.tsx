@@ -252,7 +252,7 @@ const CorporateSolutions = () => {
            <div className="max-w-6xl mx-auto">
             {/* Feature 1 - Carbon Footprint Measurement */}
             <motion.div
-              ref={(el) => (cardRefs.current[0] = el)}
+              ref={(el) => { cardRefs.current[0] = el; }}
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -320,7 +320,7 @@ const CorporateSolutions = () => {
            <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
             {/* Card 1 - ESG Assessments */}
             <motion.div
-              ref={(el) => (cardRefs.current[1] = el)}
+              ref={(el) => { cardRefs.current[1] = el; }}
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -376,7 +376,7 @@ const CorporateSolutions = () => {
 
             {/* Card 2 - AI Carbon Strategist */}
             <motion.div
-              ref={(el) => (cardRefs.current[2] = el)}
+              ref={(el) => { cardRefs.current[2] = el; }}
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -435,7 +435,7 @@ const CorporateSolutions = () => {
 
             {/* Card 3 - Roadmaps */}
             <motion.div
-              ref={(el) => (cardRefs.current[3] = el)}
+              ref={(el) => { cardRefs.current[3] = el; }}
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -505,7 +505,7 @@ const CorporateSolutions = () => {
             </h2>
             <div className="grid md:grid-cols-2 gap-6 md:ml-12">
               <div
-                ref={(el) => (benefitRefs.current[0] = el)}
+                ref={(el) => { benefitRefs.current[0] = el; }}
                 className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(0)
                     ? "opacity-100 translate-x-0"
@@ -521,7 +521,7 @@ const CorporateSolutions = () => {
                 </div>
               </div>
               <div
-                ref={(el) => (benefitRefs.current[1] = el)}
+                ref={(el) => { benefitRefs.current[1] = el; }}
                 className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(1)
                     ? "opacity-100 translate-x-0"
@@ -537,7 +537,7 @@ const CorporateSolutions = () => {
                 </div>
               </div>
               <div
-                ref={(el) => (benefitRefs.current[2] = el)}
+                ref={(el) => { benefitRefs.current[2] = el; }}
                 className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(2)
                     ? "opacity-100 translate-x-0"
@@ -553,7 +553,7 @@ const CorporateSolutions = () => {
                 </div>
               </div>
               <div
-                ref={(el) => (benefitRefs.current[3] = el)}
+                ref={(el) => { benefitRefs.current[3] = el; }}
                 className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] ${
                   visibleBenefits.has(3)
                     ? "opacity-100 translate-x-0"
@@ -569,7 +569,7 @@ const CorporateSolutions = () => {
                 </div>
               </div>
               <div
-                ref={(el) => (benefitRefs.current[4] = el)}
+                ref={(el) => { benefitRefs.current[4] = el; }}
                 className={`flex items-start gap-4 p-4 rounded-xl bg-white/10 backdrop-blur-xl border border-[#BFE3D3]/50 shadow-lg transition-all duration-1000 ease-out hover:shadow-xl hover:scale-[1.04] hover:border-[#BFE3D3] md:col-span-2 ${
                   visibleBenefits.has(4)
                     ? "opacity-100 translate-y-0"

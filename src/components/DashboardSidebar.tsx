@@ -138,16 +138,16 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
         ]
       : [
           { id: "overview", title: "Impact Overview", icon: Grid3X3, path: "/dashboard" },
-          { id: "projects", title: "My Projects", icon: FileText, path: "/dashboard" },
+          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: null },
           { id: "esg-management", title: "ESG Management", icon: Layers, path: "/esg-management" },
           { id: "esg-assessment", title: "ESG Assessment", icon: FileText, path: "/esg-health-check" },
-          { id: "emissions", title: "Emission Calculator", icon: Calculator, path: null },
           {
             id: "asset-monitoring",
             title: "MRV Modules",
             icon: Activity,
             path: "/asset-monitoring",
           },
+          { id: "projects", title: "My Projects", icon: FolderOpen, path: "/dashboard" },
           {
             id: "supply-chain-intel",
             title: "Supply Chain Intelligence",
