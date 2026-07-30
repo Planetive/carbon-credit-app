@@ -1,4 +1,4 @@
-import { ArrowRight, CircleDot, Lightbulb } from "lucide-react";
+import { CircleDot, Lightbulb } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { EmissionCategoryTotal } from "@/lib/epaIpccResults";
 import { SCOPE_COLORS, formatPct, formatTonnes, pctOfTotal } from "./formatters";
@@ -9,7 +9,6 @@ type EmissionsAnalyticsRowProps = {
   scope3Kg: number;
   grandKg: number;
   categories: Array<EmissionCategoryTotal & { scope: "Scope 1" | "Scope 2" | "Scope 3" }>;
-  onViewBreakdown?: () => void;
 };
 
 const EmissionsAnalyticsRow = ({
@@ -18,7 +17,6 @@ const EmissionsAnalyticsRow = ({
   scope3Kg,
   grandKg,
   categories,
-  onViewBreakdown,
 }: EmissionsAnalyticsRowProps) => {
   const donutData = [
     { name: "Scope 1", value: scope1Kg, color: SCOPE_COLORS.scope1.solid },
@@ -101,16 +99,6 @@ const EmissionsAnalyticsRow = ({
             ))}
           </ul>
         </div>
-        {onViewBreakdown && (
-          <button
-            type="button"
-            onClick={onViewBreakdown}
-            className="mt-4 text-sm font-medium text-[#1D9E75] hover:text-[#0F6E56] inline-flex items-center gap-1"
-          >
-            View full breakdown
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        )}
       </article>
 
       <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] flex flex-col">

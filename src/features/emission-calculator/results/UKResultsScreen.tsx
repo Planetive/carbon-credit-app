@@ -803,7 +803,6 @@ const UKResultsScreen = () => {
           scope3Kg={mappedResults.totals.scope3}
           grandKg={mappedResults.totals.grand}
           categories={categoriesWithScope}
-          onViewBreakdown={() => setBreakdownTab("scope1")}
         />
 
         <ResultsBreakdownTabs

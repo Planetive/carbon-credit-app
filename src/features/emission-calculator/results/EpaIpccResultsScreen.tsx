@@ -375,7 +375,6 @@ const EpaIpccResultsScreen = () => {
           scope3Kg={results.totals.scope3}
           grandKg={results.totals.grand}
           categories={categoriesWithScope}
-          onViewBreakdown={() => setBreakdownTab("scope1")}
         />
 
         <ResultsBreakdownTabs
