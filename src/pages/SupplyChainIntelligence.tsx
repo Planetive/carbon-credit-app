@@ -1,13 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Factory } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 const SupplyChainIntelligence = () => {
-  const navigate = useNavigate();
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4 py-16">
       <Card className="w-full max-w-xl bg-white/90 backdrop-blur-sm border border-red-200/60 shadow-xl rounded-2xl">
         <CardContent className="p-8">
           <div className="flex flex-col items-center text-center gap-4">
@@ -22,13 +18,8 @@ const SupplyChainIntelligence = () => {
             </p>
             <p className="text-sm text-gray-600 max-w-md">
               Please contact your administrator if you believe you should have access to this part of the platform.
+              Use the sidebar to return to Impact Overview or another module.
             </p>
-            <Button
-              className="mt-2 bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg"
-              onClick={() => navigate("/dashboard")}
-            >
-              Back to Dashboard
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -37,4 +28,3 @@ const SupplyChainIntelligence = () => {
 };
 
 export default SupplyChainIntelligence;
-

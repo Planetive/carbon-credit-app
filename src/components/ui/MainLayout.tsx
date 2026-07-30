@@ -25,6 +25,7 @@ const MainLayout = () => {
     '/reports',
     '/asset-monitoring',
     '/supply-chain-intelligence',
+    '/ai-advisor',
   ];
 
   const shouldShowSidebar = sidebarRoutes.some(route => location.pathname.startsWith(route));
@@ -32,7 +33,8 @@ const MainLayout = () => {
   const isFullBleedContentRoute =
     isAssetMonitoringRoute ||
     location.pathname.startsWith("/reports") ||
-    location.pathname.startsWith("/esg-management");
+    location.pathname.startsWith("/esg-management") ||
+    location.pathname.startsWith("/ai-advisor");
 
   // Check if navigation state has activeSection and set it
   useEffect(() => {

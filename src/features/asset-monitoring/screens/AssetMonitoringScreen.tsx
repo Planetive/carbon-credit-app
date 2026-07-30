@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Activity,
   ArrowLeft,
@@ -61,7 +60,6 @@ function readUiMode(): AssetMonitoringUiMode {
 }
 
 const AssetMonitoringScreen = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -484,14 +482,14 @@ const AssetMonitoringScreen = () => {
       </Card>
 
       <div className="flex items-center justify-between mt-8">
-        <Button
-          variant="ghost"
-          onClick={() => (stepIndex === 0 ? navigate("/dashboard") : handleBack())}
-          disabled={saving}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          {stepIndex === 0 ? "Dashboard" : "Back"}
-        </Button>
+        {stepIndex > 0 ? (
+          <Button variant="ghost" onClick={handleBack} disabled={saving}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        ) : (
+          <div />
+        )}
         <Button
           className="bg-[#1D9E75] hover:bg-[#22B87E]"
           onClick={handleNext}
