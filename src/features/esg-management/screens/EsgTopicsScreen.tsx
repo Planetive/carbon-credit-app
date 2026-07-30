@@ -1,9 +1,7 @@
 import { useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import {
+import { useToast } from "@/hooks/use-toast";import {
   AIR_QUALITY_TOPIC_ID,
   ESG_TOPIC_CARDS,
   GHG_TOPIC_ID,
@@ -86,42 +84,36 @@ const EsgTopicsScreen = () => {
 
   return (
     <div className="min-w-0 max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div>
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-[#0A4D3E] mb-3 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          Back to dashboard
-        </Link>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400 mb-1">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 max-w-2xl">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
               ESG Management
             </p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">ESG topics</h1>
-            <p className="text-sm text-slate-600 max-w-2xl mt-1.5">
-              Four topics are ready to use. Complete boundary setting first if you have not already. More topics are
-              coming soon.
-            </p>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#BFE3D3]/80 bg-[#EAF7F1]/80 px-2.5 py-0.5 text-[11px] font-medium text-[#0F6E56]"
+              title="SSIB-aligned disclosure topics"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]" aria-hidden />
+              SSIB
+            </span>
           </div>
-
-          <span
-            className="inline-flex w-fit items-center gap-1.5 self-start sm:self-auto rounded-md border border-slate-200/90 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500"
-            title="SSIB-aligned disclosure topics"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#1D9E75]/80" aria-hidden />
-            SSIB
-          </span>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">ESG topics</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            Four topics are ready to use. Complete boundary setting first if you have not already. More topics are
+            coming soon.
+          </p>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" className="border-2 border-slate-200 text-slate-800" asChild>
-            <Link to="/esg-management/boundary-setting">Edit boundary setting & sites</Link>
-          </Button>
-        </div>
-      </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full shrink-0 border-2 border-slate-200 text-slate-800 sm:w-auto"
+          asChild
+        >
+          <Link to="/esg-management/boundary-setting">Edit boundary & sites</Link>
+        </Button>
+      </header>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {ESG_TOPIC_CARDS.map((t) => {

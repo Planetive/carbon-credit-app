@@ -29,6 +29,10 @@ const MainLayout = () => {
 
   const shouldShowSidebar = sidebarRoutes.some(route => location.pathname.startsWith(route));
   const isAssetMonitoringRoute = location.pathname.startsWith("/asset-monitoring");
+  const isFullBleedContentRoute =
+    isAssetMonitoringRoute ||
+    location.pathname.startsWith("/reports") ||
+    location.pathname.startsWith("/esg-management");
 
   // Check if navigation state has activeSection and set it
   useEffect(() => {
@@ -112,7 +116,7 @@ const MainLayout = () => {
         <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">
           <main
             className={
-              isAssetMonitoringRoute
+              isFullBleedContentRoute
                 ? "flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-[#F8FAF8] p-0"
                 : "flex-1 min-h-0 overflow-y-auto custom-scrollbar pt-4 px-[18px] pb-5"
             }

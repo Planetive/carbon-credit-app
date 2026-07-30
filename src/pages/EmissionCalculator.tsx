@@ -1,1 +1,0 @@
-export { default } from "@/features/emission-calculator/methodologies/uk/UKCalculatorScreen";
