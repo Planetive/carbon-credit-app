@@ -44,7 +44,7 @@ function normalizeBESSRow(row: any): BESSProject {
   };
 }
 
-const ExploreBESS = () => {
+const ExploreBESSScreen = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<BESSProject[]>([]);
@@ -367,4 +367,4 @@ const ExploreBESS = () => {
   );
 };
 
-export default ExploreBESS;
+export default ExploreBESSScreen;

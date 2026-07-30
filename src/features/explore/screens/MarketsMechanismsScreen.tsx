@@ -31,7 +31,7 @@ const marketColumns = [
   { key: 'Cummulative Credits Issued', label: 'Credits Issued', sortable: true },
 ];
 
-const MarketsMechanisms: React.FC = () => {
+const MarketsMechanismsScreen: React.FC = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'compliance' | 'market'>('compliance');
   const [complianceData, setComplianceData] = useState<any[]>([]);
@@ -497,4 +497,4 @@ const MarketsMechanisms: React.FC = () => {
   );
 };
 
-export default MarketsMechanisms;
+export default MarketsMechanismsScreen;

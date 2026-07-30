@@ -223,7 +223,7 @@ function getCountryCode(country: string) {
   return countryCodeMap[country] || null;
 }
 
-const ExploreCCUSPolicies = () => {
+const ExploreCCUSPoliciesScreen = () => {
   const [policies, setPolicies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [managementStrategies, setManagementStrategies] = useState<Database["public"]["Tables"]["ccus_management_strategies"]["Row"][]>([]);
@@ -372,4 +372,4 @@ const ExploreCCUSPolicies = () => {
   );
 };
 
-export default ExploreCCUSPolicies; 
+export default ExploreCCUSPoliciesScreen; 

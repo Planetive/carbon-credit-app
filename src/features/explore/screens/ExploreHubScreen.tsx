@@ -81,7 +81,7 @@ const AnimatedCounter: React.FC<{ target: number; suffix?: string; duration?: nu
   );
 };
 
-const ExploreHub: React.FC = () => {
+const ExploreHubScreen: React.FC = () => {
   const navigate = useNavigate();
 
   const exploreOptions = [
@@ -332,4 +332,4 @@ const ExploreHub: React.FC = () => {
   );
 };
 
-export default ExploreHub; 
+export default ExploreHubScreen; 
