@@ -312,17 +312,6 @@ const BoundarySettingScreen = () => {
       <div className="mx-auto max-w-[1280px] px-4 pb-28 pt-6 md:px-6 md:pt-8">
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                ESG Management
-              </p>
-              <span
-                className="inline-flex items-center rounded-full bg-[#EAF7F1] px-2.5 py-0.5 text-[11px] font-semibold text-[#0F6E56]"
-                title="SASB-aligned reporting"
-              >
-                SASB
-              </span>
-            </div>
             <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-[#0F172A] sm:text-[32px]">
               Boundary Settings
             </h1>
