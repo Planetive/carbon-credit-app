@@ -60,7 +60,7 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
     kicker: "ESG MANAGEMENT",
     headline: "Built for every stage of your sustainability journey.",
     subhead:
-      "Understand what is financially and environmentally material, automate ESG data collection, align with IFRS S1, IFRS S2, SASB, GRI and TCFD, and generate decision-ready insights, not just reports.",
+      "Understand what is financially and environmentally material, automate ESG data collection, aligned with globally recognized standards, and generate decision-ready insights, not just reports.",
     preview: ["ESG maturity", "Developing"],
     previewNote: "Governance gap identified across 2 pillars",
     challenges: [
@@ -282,7 +282,7 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
       ["Markets & Mechanisms", "Searchable compliance and voluntary market tables."],
       ["Regional filters", "Country, region and status filters on live data."],
       ["Pricing context", "Price rates and ranges per instrument."],
-      ["Standards alignment", "Verra, Gold Standard and ICVCM screening."],
+      ["Standards alignment", "Screen against globally recognized quality expectations."],
     ],
     outcomes: [
       "Defensible credit claims",
@@ -320,7 +320,7 @@ export const solutionModules: Record<SolutionModuleKey, SolutionModule> = {
       "Faster risk analysis",
       "Cleaner reporting",
     ],
-    stats: [["Workspace", "My Portfolio"], ["Standards", "PCAF"]],
+    stats: [["Workspace", "My Portfolio"], ["Standards", "Globally aligned"]],
   },
 };
 

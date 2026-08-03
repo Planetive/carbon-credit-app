@@ -134,14 +134,6 @@ const EsgTopicsScreen = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm sm:text-base leading-snug text-slate-800">
                     <span className="font-semibold">{t.label}</span>
-                    {(t.tags ?? []).map((tag) => (
-                      <span
-                        key={tag}
-                        className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full border border-[#BFE3D3]/80 bg-[#EAF7F1]/80 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-[#0F6E56]"
-                      >
-                        {tag}
-                      </span>
-                    ))}
                     {!isLive && (
                       <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-slate-100 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Coming soon

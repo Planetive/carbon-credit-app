@@ -41,7 +41,7 @@ const pillars = [
   {
     tag: "03",
     title: "Registry ready",
-    desc: "Built for ISO, Verra, Gold Standard and Article 6 requirements.",
+    desc: "Built for globally recognized registry and verification requirements.",
   },
   {
     tag: "04",
@@ -73,8 +73,8 @@ const workflows = [
   {
     icon: Coins,
     title: "Carbon markets",
-    blurb: "Move from monitoring to credit issuance, registry submission, and Article 6 readiness.",
-    tags: ["Credits", "Registries", "Article 6"],
+    blurb: "Move from monitoring to credit issuance, registry submission, and market readiness.",
+    tags: ["Credits", "Registries", "Market ready"],
   },
 ];
 
@@ -97,7 +97,7 @@ const stages = [
   {
     title: "Verification",
     tag: "STAGE 04",
-    text: "Independent, evidence-backed review against ISO, Verra, Gold Standard and Article 6 criteria.",
+    text: "Independent, evidence-backed review against globally recognized verification criteria.",
   },
   {
     title: "Credit issuance",

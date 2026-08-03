@@ -17,15 +17,6 @@ type CarbonAccountingPageProps = {
   prefersReducedMotion?: boolean;
 };
 
-const frameworkLogos = [
-  { name: "PCAF", src: "/frameworks/PCAF.png" },
-  { name: "SASB", src: "/frameworks/SASB.png" },
-  { name: "Science Based Targets", src: "/frameworks/Science based targets.png" },
-  { name: "TCFD", src: "/frameworks/TCFD.png" },
-  { name: "CSRD", src: "/frameworks/CSRD.png" },
-  { name: "ISSB", src: "/frameworks/ISSB.png" },
-] as const;
-
 const heroLead = "Carbon accounting that behaves like".split(" ");
 const heroAccent = ["enterprise", "software,"];
 const heroTrail = "not a spreadsheet.".split(" ");
@@ -85,7 +76,7 @@ const calcData = {
     formula: "12,400 litres × 2.68 kgCO₂e/litre = 33,232 kgCO₂e",
     result: "33.2 tCO₂e",
     uncertainty: "± 5%",
-    method: "GHG Protocol, stationary combustion",
+    method: "Stationary combustion methodology",
   },
   electricity: {
     label: "Grid electricity — HQ office",
@@ -95,7 +86,7 @@ const calcData = {
     formula: "29,660 kWh × 0.207 kgCO₂e/kWh = 6,140 kgCO₂e",
     result: "6.1 tCO₂e",
     uncertainty: "± 3%",
-    method: "GHG Protocol, purchased electricity",
+    method: "Purchased electricity methodology",
   },
   steel: {
     label: "Steel purchase — 40 tonnes",
@@ -105,7 +96,7 @@ const calcData = {
     formula: "40,000 kg × 1.85 kgCO₂e/kg = 74,000 kgCO₂e",
     result: "74.0 tCO₂e",
     uncertainty: "± 12%",
-    method: "GHG Protocol, purchased goods and services",
+    method: "Purchased goods and services methodology",
   },
 } as const;
 
@@ -334,7 +325,7 @@ const FootprintModeler = ({ prefersReducedMotion }: { prefersReducedMotion: bool
             ))}
           </div>
           <p className="mt-6 text-[11px] leading-relaxed text-[#7A958B]">
-            Illustrative GHG Protocol–style factors for demo only. The platform uses audited, region-specific emission
+            Illustrative emission factors for demo only. The platform uses audited, region-specific emission
             factors.
           </p>
         </div>
@@ -663,12 +654,12 @@ const CarbonAccountingPage = ({ prefersReducedMotion: prefersReducedMotionProp }
     {
       num: "06",
       title: "One inventory, every disclosure format",
-      desc: "Generate reports aligned to GHG Protocol, IFRS S2, CDP, GRI or your own internal format, and export directly to PDF, Excel or XBRL.",
+      desc: "Generate reports aligned with globally recognized standards or your own internal format, and export directly to PDF, Excel or XBRL.",
       tag: "Reporting Center",
       mock: (
         <MockChrome title="Reporting Center">
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {["GHG Protocol", "IFRS S2", "CDP", "CSRD", "GRI", "Custom"].map((fw, i) => (
+            {["Inventory report", "Climate disclosure", "Questionnaire", "Board pack", "Custom format", "Internal"].map((fw, i) => (
               <div
                 key={fw}
                 className={[
@@ -693,9 +684,9 @@ const CarbonAccountingPage = ({ prefersReducedMotion: prefersReducedMotionProp }
           </div>
           <div className="space-y-2">
             {[
-              ["FY2025 GHG inventory report", "GHG Protocol · Scope 1, 2 and 3", "Ready"],
-              ["IFRS S2 climate disclosure", "Board pack draft", "In review"],
-              ["CDP climate response", "Questionnaire mapped, 82% complete", "In review"],
+              ["FY2025 GHG inventory report", "Scope 1, 2 and 3 · Globally recognized standards", "Ready"],
+              ["Climate disclosure pack", "Board pack draft", "In review"],
+              ["Climate questionnaire response", "Mapped, 82% complete", "In review"],
             ].map(([name, meta, status]) => (
               <div
                 key={name}
@@ -816,31 +807,6 @@ const CarbonAccountingPage = ({ prefersReducedMotion: prefersReducedMotionProp }
           </div>
 
           <HeroInventoryMock prefersReducedMotion={prefersReducedMotion} />
-        </div>
-      </section>
-
-      {/* Framework logos carousel */}
-      <section className="overflow-hidden border-y border-[#DCEAE2] bg-white py-12">
-        <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.18em] text-[#7A958B]">
-          Aligned to the standards that matter
-        </p>
-        <div className="relative">
-          <div
-            className={prefersReducedMotion ? "flex justify-center flex-wrap gap-4 px-4" : "flex animate-scroll-logos"}
-          >
-            {(prefersReducedMotion ? frameworkLogos : [...frameworkLogos, ...frameworkLogos]).map((logo, index) => (
-              <div
-                key={`${logo.name}-${index}`}
-                className="mx-8 flex h-[120px] w-[200px] flex-shrink-0 items-center justify-center"
-              >
-                <img
-                  src={logo.src}
-                  alt={logo.name}
-                  className="max-h-full max-w-full object-contain opacity-70 grayscale transition-all duration-300 hover:opacity-100 hover:grayscale-0"
-                />
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

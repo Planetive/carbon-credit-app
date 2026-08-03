@@ -109,60 +109,6 @@ const ESGFinancialInstitutions = () => {
           </div>
         </section>
 
-        {/* Framework Logos Carousel */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8 }}
-          className="bg-white py-12 border-b border-gray-200 overflow-hidden"
-        >
-          <div className="relative">
-            <div className="flex animate-scroll-logos">
-              {/* First set of logos */}
-              {[
-                { name: "PCAF", src: "/frameworks/PCAF.png" },
-                { name: "SASB", src: "/frameworks/SASB.png" },
-                { name: "Science Based Targets", src: "/frameworks/Science based targets.png" },
-                { name: "TCFD", src: "/frameworks/TCFD.png" },
-                { name: "CSRD", src: "/frameworks/CSRD.png" },
-                { name: "ISSB", src: "/frameworks/ISSB.png" },
-              ].map((logo, index) => (
-                <div
-                  key={`first-${index}`}
-                  className="flex-shrink-0 mx-8 flex items-center justify-center w-[200px] h-[120px]"
-                >
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    className="max-w-full max-h-full object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-70 hover:opacity-100"
-                  />
-                </div>
-              ))}
-              {/* Duplicate set for seamless loop */}
-              {[
-                { name: "PCAF", src: "/frameworks/PCAF.png" },
-                { name: "SASB", src: "/frameworks/SASB.png" },
-                { name: "Science Based Targets", src: "/frameworks/Science based targets.png" },
-                { name: "TCFD", src: "/frameworks/TCFD.png" },
-                { name: "CSRD", src: "/frameworks/CSRD.png" },
-                { name: "ISSB", src: "/frameworks/ISSB.png" },
-              ].map((logo, index) => (
-                <div
-                  key={`second-${index}`}
-                  className="flex-shrink-0 mx-8 flex items-center justify-center w-[200px] h-[120px]"
-                >
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    className="max-w-full max-h-full object-contain grayscale hover:grayscale-0 transition-all duration-300 opacity-70 hover:opacity-100"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.section>
-
         {/* Who It's For */}
         <motion.section
           initial={{ opacity: 0 }}

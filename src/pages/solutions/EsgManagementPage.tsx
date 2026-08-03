@@ -25,7 +25,7 @@ const heroSteps = [
   "KPIs",
   "Targets",
   "Dashboards",
-  "IFRS report",
+  "Audit-ready report",
   "Board dashboard",
 ];
 
@@ -38,8 +38,7 @@ const pillars = [
   {
     tag: "02",
     title: "Multiple frameworks",
-    desc: "One dataset, mapped across every framework you report against.",
-    chips: ["IFRS S1", "IFRS S2", "GRI", "SASB", "TCFD"],
+    desc: "One dataset, mapped across globally recognized standards so you can report with confidence.",
   },
   {
     tag: "03",
@@ -58,7 +57,7 @@ const capabilities = [
   {
     icon: Target,
     title: "Materiality intelligence",
-    desc: "Automatically identifies the sustainability topics most relevant to your industry using SASB and IFRS S1/S2 guidance.",
+    desc: "Automatically identifies the sustainability topics most relevant to your industry using globally recognized guidance.",
   },
   {
     icon: Database,
@@ -73,7 +72,7 @@ const capabilities = [
   {
     icon: FileText,
     title: "Reporting and disclosure",
-    desc: "Generate audit-ready disclosures aligned with IFRS S1, IFRS S2, GRI, SASB, CDP and TCFD.",
+    desc: "Generate audit-ready disclosures aligned with globally recognized standards.",
   },
   {
     icon: Activity,
@@ -101,7 +100,7 @@ const journeyStages = [
   },
   {
     title: "Report & Disclose",
-    text: "Disclose against IFRS S2, CSRD, GRI, and CDP, then export audit-ready reports without rebuilding the evidence trail from scratch.",
+    text: "Disclose against globally recognized standards, then export audit-ready reports without rebuilding the evidence trail from scratch.",
   },
 ];
 
@@ -331,7 +330,7 @@ const EsgManagementPage = ({ prefersReducedMotion: prefersReducedMotionProp }: E
               className="mt-6 max-w-lg text-base leading-relaxed text-white/70 sm:text-lg"
             >
               Rethink Carbon helps organisations understand what is financially and environmentally material, automate
-              ESG data collection across operations and suppliers, align with IFRS S1, IFRS S2, SASB, GRI and TCFD, and
+              ESG data collection across operations and suppliers, aligned with globally recognized standards, and
               generate decision-ready insights, not just reports.
             </motion.p>
 

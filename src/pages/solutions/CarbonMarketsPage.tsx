@@ -47,7 +47,7 @@ const complianceSamples = [
 
 const voluntarySamples = [
   {
-    name: "Verra VCS",
+    name: "Voluntary credit programme A",
     instrument: "Voluntary credits",
     status: "Active",
     country: "Global",
@@ -55,7 +55,7 @@ const voluntarySamples = [
     price: "$4–15 / tCO2e",
   },
   {
-    name: "Gold Standard",
+    name: "Voluntary credit programme B",
     instrument: "Voluntary credits",
     status: "Active",
     country: "Global",
@@ -63,7 +63,7 @@ const voluntarySamples = [
     price: "$8–22 / tCO2e",
   },
   {
-    name: "Article 6 pilots",
+    name: "Cooperative market pilots",
     instrument: "ITMOs / cooperative",
     status: "Planned",
     country: "Multi-country",
@@ -106,15 +106,13 @@ const capabilities = [
   },
   {
     title: "Standards-aware sourcing",
-    desc: "Screen project types against Verra, Gold Standard and ICVCM quality expectations before credits enter your portfolio.",
+    desc: "Screen project types against globally recognized quality expectations before credits enter your portfolio.",
   },
   {
     title: "Connected to the wider platform",
     desc: "Move from market intelligence to global projects, MRV evidence and accounting — one workspace, not disconnected tools.",
   },
 ];
-
-const standards = ["Verra VCS", "Gold Standard", "ICVCM", "Article 6", "PCAF"];
 
 const tabStats: Record<MarketTab, { total: string; active: string; countries: string; regions: string }> = {
   compliance: { total: "48", active: "41", countries: "32", regions: "6" },
@@ -503,20 +501,6 @@ const CarbonMarketsPage = ({ prefersReducedMotion: prefersReducedMotionProp }: C
               compact
             />
           </motion.div>
-        </div>
-      </section>
-
-      {/* Standards strip */}
-      <section className="overflow-hidden border-b border-gray-200 bg-white py-10">
-        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 sm:px-6 lg:px-10">
-          {standards.map((name) => (
-            <span
-              key={name}
-              className="text-sm font-medium tracking-wide text-[#7A958B] transition hover:text-[#0A4D3E]"
-            >
-              {name}
-            </span>
-          ))}
         </div>
       </section>
 

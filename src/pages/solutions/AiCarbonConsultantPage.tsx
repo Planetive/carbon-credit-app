@@ -33,7 +33,7 @@ const recommendations = [
     credits: "12,000 tCO2e/yr",
     investment: "$800K – $1.2M",
     timeline: "2025–2035",
-    methodology: "VCS VM0006",
+    methodology: "Nature-based methodology",
     coBenefits: ["Biodiversity", "Water quality", "Community jobs"],
     reasons: [
       "Aligns with carbon neutrality goal",
@@ -50,7 +50,7 @@ const recommendations = [
     credits: "8,500 tCO2e/yr",
     investment: "$900K – $1.5M",
     timeline: "2025–2030",
-    methodology: "Gold Standard RE",
+    methodology: "Renewable energy methodology",
     coBenefits: ["Energy security", "Air quality", "Job creation"],
     reasons: [
       "Direct GHG emission reduction",
@@ -67,7 +67,7 @@ const recommendations = [
     credits: "6,200 tCO2e/yr",
     investment: "$400K – $700K",
     timeline: "2025–2032",
-    methodology: "VCS VM0026",
+    methodology: "Agricultural practices methodology",
     coBenefits: ["Soil health", "Water conservation", "Food security"],
     reasons: [
       "Lower initial investment requirement",
@@ -335,8 +335,10 @@ const AiCarbonConsultantPage = ({
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mx-auto mb-12 max-w-2xl text-center">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
-              Ask a direct question. Get a ranked answer.
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+              Ask a direct question.
+              <br className="hidden sm:block" />
+              {" "}Get a ranked answer.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#5B6B63] sm:text-lg">
               Share your target, timeline and budget — the strategist surfaces initiatives,
@@ -417,7 +419,7 @@ const AiCarbonConsultantPage = ({
       <section id="explore-matches" className="bg-[#F8FCFA] py-16 sm:py-20">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mx-auto mb-10 max-w-3xl text-center">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
               Compare ranked opportunities
             </h2>
             <p className="mt-4 text-base text-[#5B6B63] sm:text-lg">
@@ -544,7 +546,7 @@ const AiCarbonConsultantPage = ({
       <section className="bg-[#F7F4EE] py-16 sm:py-20">
         <div className="mx-auto max-w-[900px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mb-14 text-center">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight text-[#0A4D3E] sm:text-[2.35rem]">
               Built into the product
             </h2>
           </motion.div>

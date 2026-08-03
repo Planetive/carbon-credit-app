@@ -94,7 +94,7 @@ const boardCapabilities = [
   {
     icon: FileText,
     title: "Integrated Disclosure",
-    desc: "Outputs formatted natively for TCFD, CSRD, and ISSB frameworks. Audit-ready methodology trails included.",
+    desc: "Outputs formatted natively for globally recognized disclosure frameworks. Audit-ready methodology trails included.",
   },
   {
     icon: CheckCircle2,
@@ -243,8 +243,8 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#5B6B63] sm:text-lg">
               Switch between warming pathways and time horizons to watch physical and transition risk
-              trade places. This mirrors the scenario analysis regulators now expect under TCFD and
-              ISSB.
+              trade places. This mirrors the scenario analysis regulators now expect under globally
+              recognized disclosure standards.
             </p>
           </motion.div>
 

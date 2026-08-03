@@ -292,7 +292,7 @@ const CorporateSolutions = () => {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-teal-300 font-semibold mt-0.5">•</span>
-                      <span>Aligned with GHG Protocol and global reporting standards</span>
+                      <span>Aligned with globally recognized reporting standards</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-teal-300 font-semibold mt-0.5">•</span>
@@ -565,7 +565,7 @@ const CorporateSolutions = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900 mb-1">Aligned with international standards</p>
-                  <p className="text-gray-600 text-sm">GHG Protocol, PCAF, TCFD, and more</p>
+                  <p className="text-gray-600 text-sm">Aligned with globally recognized standards</p>
                 </div>
               </div>
               <div

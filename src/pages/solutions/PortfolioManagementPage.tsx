@@ -8,15 +8,6 @@ type PortfolioManagementPageProps = {
   prefersReducedMotion?: boolean;
 };
 
-const frameworkLogos = [
-  { name: "PCAF", src: "/frameworks/PCAF.png" },
-  { name: "SASB", src: "/frameworks/SASB.png" },
-  { name: "Science Based Targets", src: "/frameworks/Science based targets.png" },
-  { name: "TCFD", src: "/frameworks/TCFD.png" },
-  { name: "CSRD", src: "/frameworks/CSRD.png" },
-  { name: "ISSB", src: "/frameworks/ISSB.png" },
-] as const;
-
 const audience = [
   {
     title: "Banks & DFIs",
@@ -49,14 +40,14 @@ const workflow = [
     blurb: "Connect each position to finance and facilitated emission calculations.",
     detail:
       "Outstanding amounts update from your finance emission workflows, so portfolio totals reflect measured impact rather than manually maintained figures.",
-    tags: ["Finance emissions", "Facilitated emissions", "PCAF-aligned"],
+    tags: ["Finance emissions", "Facilitated emissions", "Standards-aligned"],
   },
   {
     title: "Stress-test the portfolio",
     blurb: "Run scenario analysis and surface hotspots by sector or region.",
     detail:
       "Send counterparty data from My Portfolio straight into climate stress testing — physical and transition risk expressed as financial exposure your risk team can use.",
-    tags: ["Scenario analysis", "Hotspot mapping", "TCFD-ready"],
+    tags: ["Scenario analysis", "Hotspot mapping", "Disclosure-ready"],
   },
   {
     title: "Report and investigate",
@@ -249,30 +240,6 @@ const PortfolioManagementPage = ({
           >
             <PortfolioDashboardMock prefersReducedMotion={prefersReducedMotion} />
           </motion.div>
-        </div>
-      </section>
-
-      {/* Framework logos */}
-      <section className="overflow-hidden border-b border-gray-200 bg-white py-12">
-        <div className="relative">
-          <div
-            className={prefersReducedMotion ? "flex flex-wrap justify-center gap-4 px-4" : "flex animate-scroll-logos"}
-          >
-            {(prefersReducedMotion ? frameworkLogos : [...frameworkLogos, ...frameworkLogos]).map(
-              (logo, index) => (
-                <div
-                  key={`${logo.name}-${index}`}
-                  className="mx-8 flex h-[120px] w-[200px] flex-shrink-0 items-center justify-center"
-                >
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    className="max-h-full max-w-full object-contain opacity-70 grayscale transition-all duration-300 hover:opacity-100 hover:grayscale-0"
-                  />
-                </div>
-              )
-            )}
-          </div>
         </div>
       </section>
 
