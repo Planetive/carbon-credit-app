@@ -199,7 +199,7 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mb-12 text-center sm:mb-14">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem] md:text-[2.75rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight text-[#0A4D3E] sm:text-[2.35rem] md:text-[2.75rem]">
               The problem with standard risk reporting
             </h2>
             <div
@@ -238,7 +238,7 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
       <section className="bg-[#F8FCFA] py-16 sm:py-20">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-10">
           <motion.div {...fadeUp} className="mx-auto mb-10 max-w-3xl text-center sm:mb-12">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight text-[#0A4D3E] sm:text-[2.35rem] md:text-[2.75rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight text-[#0A4D3E] sm:text-[2.35rem] md:text-[2.75rem]">
               See how exposure shifts across warming scenarios
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#5B6B63] sm:text-lg">
@@ -378,7 +378,7 @@ const ClimateRiskPage = ({ prefersReducedMotion: prefersReducedMotionProp }: Cli
       <section id="risk-capabilities" className="relative bg-[#F8FCFA] pb-16 sm:pb-20">
         <div className="bg-[#0a1a1d] pb-28 pt-16 text-white sm:pb-36 sm:pt-20">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl px-4 text-center sm:px-6">
-            <h2 className="text-[1.85rem] font-semibold tracking-tight sm:text-[2.35rem] md:text-[2.75rem]">
+            <h2 className="text-[1.85rem] font-semibold leading-snug tracking-tight sm:text-[2.35rem] md:text-[2.75rem]">
               Board-Ready Capabilities
             </h2>
             <p className="mt-3 text-base text-white/70 sm:text-lg">
