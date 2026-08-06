@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, Clock, FileText, Trash2, Play, Eye } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { listProjectInputs, deleteProjectInput } from "@/integrations/supabase/projectInputsClient";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,20 +27,17 @@ const ProjectDraftsScreen = () => {
       if (!user) return;
       setLoading(true);
       setError(null);
-      const { data, error } = await (supabase as any)
-        .from("project_inputs")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) {
+      try {
+        const data = await listProjectInputs(user.id);
+        setDrafts(data || []);
+        const types = Array.from(
+          new Set((data || []).map((d) => (d.type || "").trim()).filter(Boolean))
+        ) as string[];
+        setTypeOptions(types);
+      } catch {
         setError("Failed to load drafts");
         setDrafts([]);
         setTypeOptions([]);
-      } else {
-        setDrafts(data || []);
-        // Extract unique type values from the 'type' column
-        const types = Array.from(new Set((data || []).map((d: any) => (d.type || '').trim()).filter(Boolean))) as string[];
-        setTypeOptions(types);
       }
       setLoading(false);
     };
@@ -65,20 +62,17 @@ const ProjectDraftsScreen = () => {
   const handleDeleteDraft = async (id: string) => {
     const prevDrafts = drafts;
     setDrafts((drafts) => drafts.filter((d) => d.id !== id));
-    const { error } = await (supabase as any).from("project_inputs").delete().eq("id", id);
-    if (error) {
-      // console.error("Delete error:", error);
-    }
-    if (error) {
-      setDrafts(prevDrafts); // revert UI
-      toast({
-        title: "Failed to delete draft",
-        description: error.message,
-      });
-    } else {
+    try {
+      await deleteProjectInput(id);
       toast({
         title: "Draft deleted",
         description: "The draft project was deleted successfully.",
+      });
+    } catch (err: unknown) {
+      setDrafts(prevDrafts);
+      toast({
+        title: "Failed to delete draft",
+        description: err instanceof Error ? err.message : "Delete failed",
       });
     }
   };

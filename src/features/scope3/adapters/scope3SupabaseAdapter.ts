@@ -1,4 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  companyScopedListFilters,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
 import type { EmissionCalculationDetails, FinanceCalculationDetails } from "../types/calculationDetails";
 
 type Scope3InvestmentRecord = {
@@ -28,22 +35,11 @@ export async function fetchScope3Investments(
   companyContext?: boolean,
   counterpartyId?: string,
 ): Promise<Scope3InvestmentRecord[]> {
-  let query = supabase
-    .from("scope3_investments")
-    .select(
-      "id, company_name, emissions, total_emissions, ownership_percentage, calculated_emissions, line_type, linked_emission_calculation_id, linked_finance_emission_calculation_id",
-    )
-    .eq("user_id", userId);
-
-  if (companyContext && counterpartyId) {
-    query = query.eq("counterparty_id", counterpartyId);
-  } else {
-    query = query.is("counterparty_id", null);
-  }
-
-  const { data, error } = await query.order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data || []) as Scope3InvestmentRecord[];
+  const rows = await listLegacyTableEntries(
+    "scope3_investments",
+    companyScopedListFilters(userId, !!companyContext, counterpartyId),
+  );
+  return rows as Scope3InvestmentRecord[];
 }
 
 export async function findScope3InvestmentDuplicate(
@@ -56,35 +52,25 @@ export async function findScope3InvestmentDuplicate(
       ? "linked_emission_calculation_id"
       : "linked_finance_emission_calculation_id";
 
-  const { data, error } = await supabase
-    .from("scope3_investments")
-    .select("id")
-    .eq("user_id", userId)
-    .eq(linkedField, linkedId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return (data as { id: string } | null) || null;
+  const rows = await listLegacyTableEntries("scope3_investments", { user_id: userId });
+  const hit = rows.find((r) => String(r[linkedField] ?? "") === linkedId);
+  return hit ? { id: String(hit.id) } : null;
 }
 
 export async function insertScope3Investment(payload: Record<string, unknown>) {
-  const { error } = await supabase.from("scope3_investments").insert(payload);
-  if (error) throw error;
+  await insertLegacyTableEntries("scope3_investments", [payload]);
 }
 
 export async function insertScope3Investments(payload: Record<string, unknown>[]) {
-  const { error } = await supabase.from("scope3_investments").insert(payload);
-  if (error) throw error;
+  await insertLegacyTableEntries("scope3_investments", payload);
 }
 
 export async function updateScope3Investment(id: string, payload: Record<string, unknown>) {
-  const { error } = await supabase.from("scope3_investments").update(payload).eq("id", id);
-  if (error) throw error;
+  await updateLegacyTableEntry("scope3_investments", id, payload);
 }
 
 export async function deleteScope3Investment(id: string) {
-  const { error } = await supabase.from("scope3_investments").delete().eq("id", id);
-  if (error) throw error;
+  await deleteLegacyTableEntry("scope3_investments", id);
 }
 
 export async function fetchScope3FacilitatedEmissions(
@@ -92,34 +78,55 @@ export async function fetchScope3FacilitatedEmissions(
   companyContext?: boolean,
   counterpartyId?: string,
 ): Promise<Scope3FacilitatedRecord[]> {
-  let query = supabase
-    .from("scope3_facilitated_emissions")
-    .select("id, activity_label, emissions, linked_emission_calculation_id, linked_finance_emission_calculation_id")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (companyContext && counterpartyId) {
-    query = query.eq("counterparty_id", counterpartyId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data || []) as Scope3FacilitatedRecord[];
+  const rows = await listLegacyTableEntries(
+    "scope3_facilitated_emissions",
+    companyScopedListFilters(userId, !!companyContext, counterpartyId),
+  );
+  return rows as Scope3FacilitatedRecord[];
 }
 
 export async function insertScope3FacilitatedEmission(payload: Record<string, unknown>) {
-  const { error } = await supabase.from("scope3_facilitated_emissions").insert(payload);
-  if (error) throw error;
+  await insertLegacyTableEntries("scope3_facilitated_emissions", [payload]);
 }
 
 export async function updateScope3FacilitatedEmission(id: string, payload: Record<string, unknown>) {
-  const { error } = await supabase.from("scope3_facilitated_emissions").update(payload).eq("id", id);
-  if (error) throw error;
+  await updateLegacyTableEntry("scope3_facilitated_emissions", id, payload);
 }
 
 export async function deleteScope3FacilitatedEmission(id: string) {
-  const { error } = await supabase.from("scope3_facilitated_emissions").delete().eq("id", id);
-  if (error) throw error;
+  await deleteLegacyTableEntry("scope3_facilitated_emissions", id);
+}
+
+/** Generic Scope 3 category row CRUD (transport, waste, travel, etc.). */
+export async function fetchScope3CategoryEntries(
+  tableName: string,
+  userId: string,
+  companyContext: boolean,
+  counterpartyId?: string,
+) {
+  return listLegacyTableEntries(
+    tableName,
+    companyScopedListFilters(userId, companyContext, counterpartyId),
+  );
+}
+
+export async function insertScope3CategoryEntries(
+  tableName: string,
+  payload: Record<string, unknown>[],
+) {
+  return insertLegacyTableEntries(tableName, payload);
+}
+
+export async function updateScope3CategoryEntry(
+  tableName: string,
+  id: string,
+  payload: Record<string, unknown>,
+) {
+  return updateLegacyTableEntry(tableName, id, payload);
+}
+
+export async function deleteScope3CategoryEntry(tableName: string, id: string) {
+  return deleteLegacyTableEntry(tableName, id);
 }
 
 export async function getOrCreateCorporateCounterparty(userId: string, name: string): Promise<string> {

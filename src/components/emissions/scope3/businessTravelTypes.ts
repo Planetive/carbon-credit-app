@@ -1,3 +1,4 @@
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface BusinessTravelType {
@@ -15,64 +16,22 @@ export interface BusinessTravelType {
  */
 export async function getAllBusinessTravelTypes(): Promise<BusinessTravelType[]> {
   try {
-    console.log("📦 Fetching all business travel types from: business travel table");
-    
-    const { data, error } = await supabase
-      .from("business travel" as any)
-      .select("*")
-      .order("Vehicle Type", { ascending: true });
+    console.log("📦 Fetching all business travel types (API dual-read / Supabase fallback)");
 
-    if (error) {
-      console.error("❌ Error fetching all business travel types:", error);
-      console.error("Error code:", error.code);
-      console.error("Error message:", error.message);
-      console.error("Error details:", JSON.stringify(error, null, 2));
-      
-      // Try alternative table name format
-      if (error.message?.includes("column") || error.message?.includes("does not exist")) {
-        console.log("⚠️ Trying alternative column name format...");
-        const { data: data2, error: error2 } = await supabase
-          .from("business travel" as any)
-          .select("*")
-          .order("vehicle_type", { ascending: true });
-        
-        if (!error2 && data2) {
-          console.log("✅ Success with alternative column name");
-          return mapBusinessTravelData(data2);
-        }
-      }
-      
-      return [];
+    const { rows } = await loadIpccFactorTableRows([
+      "business travel",
+      "business_travel",
+    ]);
+
+    if (rows.length > 0) {
+      console.log("✅ Fetched business travel types data:", rows.length, "items");
+      console.log("📋 Sample item structure:", rows[0]);
+      console.log("📋 Available keys:", Object.keys(rows[0]));
+      return mapBusinessTravelData(rows);
     }
 
-    console.log("✅ Fetched business travel types data:", data?.length || 0, "items");
-    
-    if (data && data.length > 0) {
-      console.log("📋 Sample item structure:", data[0]);
-      console.log("📋 Available keys:", Object.keys(data[0]));
-      console.log("📋 Full sample item (for debugging):", JSON.stringify(data[0], null, 2));
-      
-      // Try to find CO2 Factor column
-      const sampleItem = data[0];
-      const possibleCo2Columns = Object.keys(sampleItem).filter(key => 
-        key.toLowerCase().includes('co2') || 
-        key.toLowerCase().includes('factor') ||
-        key.toLowerCase().includes('emission')
-      );
-      console.log("🔍 Possible CO2 Factor columns found:", possibleCo2Columns);
-      if (possibleCo2Columns.length > 0) {
-        possibleCo2Columns.forEach(col => {
-          console.log(`  - "${col}":`, sampleItem[col], `(type: ${typeof sampleItem[col]})`);
-        });
-      }
-    } else {
-      console.warn("⚠️ No data returned. Possible issues:");
-      console.warn("1. Table might be empty");
-      console.warn("2. RLS policies might be blocking access");
-      console.warn("3. Table name might be incorrect");
-    }
-
-    return mapBusinessTravelData(data || []);
+    console.warn("⚠️ No business travel factor rows from API or Supabase");
+    return [];
   } catch (error) {
     console.error("❌ Exception fetching all business travel types:", error);
     return [];
@@ -86,6 +45,10 @@ export async function getAllBusinessTravelTypes(): Promise<BusinessTravelType[]>
  */
 export async function getBusinessTravelTypeById(id: string): Promise<BusinessTravelType | null> {
   try {
+    const all = await getAllBusinessTravelTypes();
+    const hit = all.find((t) => t.id === id);
+    if (hit) return hit;
+
     const { data, error } = await supabase
       .from("business travel" as any)
       .select("*")
@@ -112,36 +75,39 @@ function mapBusinessTravelData(data: any[]): BusinessTravelType[] {
   return data.map((item: any, index: number) => {
     // The actual column name has a newline character: "CO2 Factor \n(kg CO2 / unit)"
     // Try both with and without newline
-    const co2FactorValue = item["CO2 Factor \n(kg CO2 / unit)"] || item["CO2 Factor (kg CO2 / unit)"];
-    
+    const co2FactorValue =
+      item["CO2 Factor \n(kg CO2 / unit)"] ||
+      item["CO2 Factor (kg CO2 / unit)"] ||
+      item.co2_factor ||
+      item["co2_factor"];
+
     // Handle different data types
     let co2Factor = 0;
-    if (co2FactorValue !== null && co2FactorValue !== undefined && co2FactorValue !== '') {
-      if (typeof co2FactorValue === 'number') {
+    if (co2FactorValue !== null && co2FactorValue !== undefined && co2FactorValue !== "") {
+      if (typeof co2FactorValue === "number") {
         co2Factor = co2FactorValue;
-      } else if (typeof co2FactorValue === 'string') {
+      } else if (typeof co2FactorValue === "string") {
         const parsed = parseFloat(co2FactorValue);
         co2Factor = isNaN(parsed) ? 0 : parsed;
       } else {
         co2Factor = parseFloat(String(co2FactorValue)) || 0;
       }
     }
-    
+
     // Debug logging for first item
     if (index === 0) {
       console.log("🔍 Mapping Business Travel Data - Sample Item:");
       console.log("CO2 Factor value found:", co2FactorValue);
       console.log("Parsed CO2 Factor:", co2Factor);
     }
-    
+
     return {
       id: item.id || `business-travel-${index}`,
       vehicle_type: item["Vehicle Type"] || item.vehicle_type || item.vehicleType || "",
       co2_factor: co2Factor,
       unit: item["Units"] || item["Unit"] || item.unit || item.units || "",
       created_at: item.created_at,
-      updated_at: item.updated_at
+      updated_at: item.updated_at,
     };
   });
 }
-

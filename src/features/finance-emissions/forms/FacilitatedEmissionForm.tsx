@@ -16,6 +16,7 @@ import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChan
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import type { FacilitatedCalculationResult } from "../types/contracts";
+import { resolveFinancedCalculation } from "@/api/financedConnection";
 
 interface FacilitatedEmissionFormProps {
   corporateStructure?: string; // 'listed' or 'unlisted'
@@ -303,7 +304,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
 
       const calculationResult = calculationEngine.calculate(selectedFormula, calculationInputs, companyType === 'unlisted' ? 'private' : companyType);
       
-      const result: FacilitatedCalculationResult = {
+      const localResult: FacilitatedCalculationResult = {
         attributionFactor: calculationResult.attributionFactor,
         facilitatedEmission: calculationResult.financedEmissions,
         evic: companyType === 'listed' ? totalAssetsValue : undefined,
@@ -313,21 +314,54 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
         calculationSteps: calculationResult.calculationSteps
       };
 
-      setResult(result);
-      // Persist facilitated form state for navigation back
-      try {
-        sessionStorage.setItem('facilitatedFormState', JSON.stringify({
-          formData,
+      // Instant local preview; parent callback after API confirm (or local if JWT off)
+      setResult(localResult);
+
+      void (async () => {
+        const confirmed = await resolveFinancedCalculation({
+          calc_kind: "facilitated",
+          formula_id: selectedFormula,
+          company_type: companyType === "unlisted" ? "unlisted" : companyType,
+          inputs: calculationInputs as Record<string, unknown>,
+          persist: false,
+          local: {
+            attributionFactor: calculationResult.attributionFactor,
+            financedEmissions: calculationResult.financedEmissions,
+            dataQualityScore: calculationResult.dataQualityScore,
+            methodology: calculationResult.methodology,
+            calculationSteps: calculationResult.calculationSteps,
+          },
+        });
+
+        const result: FacilitatedCalculationResult = {
+          attributionFactor: confirmed.attributionFactor,
+          facilitatedEmission: confirmed.financedEmissions,
+          evic: companyType === 'listed' ? totalAssetsValue : undefined,
+          totalEquityPlusDebt: companyType === 'unlisted' ? totalAssetsValue : undefined,
+          dataQualityScore: confirmed.dataQualityScore,
+          methodology: confirmed.methodology ?? calculationResult.methodology,
+          calculationSteps:
+            confirmed.calculationSteps ?? calculationResult.calculationSteps,
+          pcafFormulaId: selectedFormula,
+          pcafInputs: calculationInputs as Record<string, unknown>,
           companyType,
-          ts: Date.now()
-        }));
-      } catch (error) {
-        void error;
-      }
-      
-      if (onCalculationComplete) {
-        onCalculationComplete(result);
-      }
+        };
+
+        setResult(result);
+        try {
+          sessionStorage.setItem('facilitatedFormState', JSON.stringify({
+            formData,
+            companyType,
+            ts: Date.now()
+          }));
+        } catch (error) {
+          void error;
+        }
+
+        if (onCalculationComplete) {
+          onCalculationComplete(result);
+        }
+      })();
       
       toast({
         title: "Facilitated Emission Calculation Complete",

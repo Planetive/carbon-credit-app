@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/layout/AppHeader";
 
@@ -22,6 +23,27 @@ const FilteredMethodologies = () => {
       setError(null);
       const { areaOfInterest, type, goal } = state;
       try {
+        const apiRows = await tryLoadCatalogViaApi("global-projects");
+        if (apiRows) {
+          const unique = Array.from(
+            new Set(
+              apiRows
+                .filter(
+                  (r) =>
+                    String(r["Area of Interest"] ?? "") === areaOfInterest &&
+                    String(r["Type"] ?? "") === type &&
+                    String(r["End Goal"] ?? "") === goal
+                )
+                .map((d) => d.Methodology)
+                .filter(Boolean)
+                .map(String)
+            )
+          );
+          setMethodologies(unique);
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from("global_projects" as any)
           .select("Methodology")

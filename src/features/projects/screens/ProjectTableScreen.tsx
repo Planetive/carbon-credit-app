@@ -1,10 +1,24 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Filter, ArrowLeft } from "lucide-react";
+
+function uniqueColumnValues(
+  rows: Record<string, unknown>[],
+  column: string
+): string[] {
+  return Array.from(
+    new Set(
+      rows
+        .map((p) => String(p[column] ?? "").trim())
+        .filter((val) => val.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+}
 
 const ProjectTableScreen = () => {
   const navigate = useNavigate();
@@ -23,13 +37,14 @@ const ProjectTableScreen = () => {
   const [selectedAreasOfInterest, setSelectedAreasOfInterest] = useState<string[]>([]);
   
   const [projects, setProjects] = useState<any[]>([]);
+  const [allApiProjects, setAllApiProjects] = useState<Record<string, unknown>[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtersLoading, setFiltersLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
   const [hasAreaOfInterestColumn, setHasAreaOfInterestColumn] = useState(false);
 
-  // Helper function to fetch all unique values for a column in batches
+  // Helper function to fetch all unique values for a column in batches (Supabase path)
   async function fetchAllUniqueColumnValues(column: string): Promise<string[]> {
     const BATCH_SIZE = 1000;
     let allRows: any[] = [];
@@ -50,14 +65,7 @@ const ProjectTableScreen = () => {
         to += BATCH_SIZE;
       }
     }
-    const unique = Array.from(
-      new Set(
-        allRows
-          .map((p: any) => (p[column] || "").trim())
-          .filter((val: string) => val.length > 0)
-      )
-    ).sort((a, b) => a.localeCompare(b));
-    return unique;
+    return uniqueColumnValues(allRows, column);
   }
 
   // Fetch all filter options on mount
@@ -65,7 +73,20 @@ const ProjectTableScreen = () => {
     const fetchFilters = async () => {
       setFiltersLoading(true);
       try {
-        // Fetch required columns
+        const apiRows = await tryLoadCatalogViaApi("global-projects");
+        if (apiRows && apiRows.length > 0) {
+          setAllApiProjects(apiRows);
+          setRegions(uniqueColumnValues(apiRows, "Region"));
+          setVoluntaryStatuses(uniqueColumnValues(apiRows, "Voluntary Status"));
+          setVoluntaryRegistries(uniqueColumnValues(apiRows, "Voluntary Registry"));
+          setCountries(uniqueColumnValues(apiRows, "Country"));
+          const areas = uniqueColumnValues(apiRows, "Area of Interest");
+          setAreasOfInterest(areas);
+          setHasAreaOfInterestColumn(areas.length > 0);
+          setFiltersLoading(false);
+          return;
+        }
+
         const [regionsData, statusesData, registriesData, countriesData] = await Promise.all([
           fetchAllUniqueColumnValues("Region"),
           fetchAllUniqueColumnValues("Voluntary Status"),
@@ -77,7 +98,6 @@ const ProjectTableScreen = () => {
         setVoluntaryRegistries(registriesData);
         setCountries(countriesData);
         
-        // Try to fetch Area of Interest, but don't fail if it doesn't exist
         try {
           const areasData = await fetchAllUniqueColumnValues("Area of Interest");
           setAreasOfInterest(areasData);
@@ -101,7 +121,43 @@ const ProjectTableScreen = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    // Build select columns - check if Area of Interest exists
+
+    if (allApiProjects) {
+      let filtered = allApiProjects;
+      if (selectedRegions.length > 0) {
+        filtered = filtered.filter((p) =>
+          selectedRegions.includes(String(p["Region"] ?? ""))
+        );
+      }
+      if (selectedVoluntaryStatuses.length > 0) {
+        filtered = filtered.filter((p) =>
+          selectedVoluntaryStatuses.includes(String(p["Voluntary Status"] ?? ""))
+        );
+      }
+      if (selectedVoluntaryRegistries.length > 0) {
+        filtered = filtered.filter((p) =>
+          selectedVoluntaryRegistries.includes(
+            String(p["Voluntary Registry"] ?? "")
+          )
+        );
+      }
+      if (selectedCountries.length > 0) {
+        filtered = filtered.filter((p) =>
+          selectedCountries.includes(String(p["Country"] ?? ""))
+        );
+      }
+      if (selectedAreasOfInterest.length > 0 && hasAreaOfInterestColumn) {
+        filtered = filtered.filter((p) =>
+          selectedAreasOfInterest.includes(String(p["Area of Interest"] ?? ""))
+        );
+      }
+      setProjects(filtered);
+      setLoading(false);
+      return;
+    }
+
+    if (filtersLoading) return;
+
     const selectColumns = '"Project Name", Methodology, "Country", "Region", "Voluntary Status", "Voluntary Registry"';
     
     let query: any = supabase.from("global_projects_2025" as any).select(
@@ -110,7 +166,6 @@ const ProjectTableScreen = () => {
         : selectColumns
     );
     
-    // Apply all filters
     if (selectedRegions.length > 0) query = query.in("Region", selectedRegions);
     if (selectedVoluntaryStatuses.length > 0) query = query.in("Voluntary Status", selectedVoluntaryStatuses);
     if (selectedVoluntaryRegistries.length > 0) query = query.in("Voluntary Registry", selectedVoluntaryRegistries);
@@ -134,7 +189,7 @@ const ProjectTableScreen = () => {
         setProjects([]);
         setLoading(false);
       });
-  }, [selectedRegions, selectedVoluntaryStatuses, selectedVoluntaryRegistries, selectedCountries, selectedAreasOfInterest]);
+  }, [selectedRegions, selectedVoluntaryStatuses, selectedVoluntaryRegistries, selectedCountries, selectedAreasOfInterest, allApiProjects, hasAreaOfInterestColumn, filtersLoading]);
 
   // Filter projects based on search
   const filteredProjects = projects.filter(project =>

@@ -1,6 +1,13 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { USE_JWT_AUTH } from "@/api/config";
+import { getMyProfile } from "@/api/profile";
 import type { EpaIpccResultsData, EmissionCategoryTotal } from "@/lib/epaIpccResults";
+import {
+  loadLegacyCategoryDetailRows,
+  safeListLegacyTable,
+} from "@/integrations/supabase/ghgEntryAggregates";
+import { listEmissionHistoryTrendRows } from "@/integrations/supabase/emissionHistoryClient";
 
 export type EmissionReportFuelFramework = "uk" | "epa";
 
@@ -79,6 +86,51 @@ const formatKg = (value: number) =>
 
 const formatTonnes = (value: number) =>
   (value / 1000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+type HistoryTrendRow = {
+  created_at?: string | null;
+  scope1_emissions?: number | null;
+  scope2_emissions?: number | null;
+  scope3_emissions?: number | null;
+};
+
+async function loadEmissionHistoryTrendRows(userId: string): Promise<HistoryTrendRow[]> {
+  return listEmissionHistoryTrendRows(userId);
+}
+
+async function loadReportProfile(user: User): Promise<{
+  company: string;
+  headerName: string;
+}> {
+  let company = "Organization";
+  let headerName = user.email?.split("@")[0] || "User";
+
+  if (USE_JWT_AUTH) {
+    try {
+      const profile = await getMyProfile();
+      if (profile.organization_name?.trim()) company = profile.organization_name.trim();
+      if (profile.display_name?.trim()) headerName = profile.display_name.trim();
+      return { company, headerName };
+    } catch {
+      // fall through to Supabase / metadata
+    }
+  }
+
+  const { data: profileData } = await (supabase as any)
+    .from("profiles")
+    .select("display_name, organization_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const resolvedDisplayName =
+    profileData?.display_name?.trim() ||
+    user.user_metadata?.full_name?.trim() ||
+    user.user_metadata?.name?.trim();
+  const resolvedOrganizationName =
+    profileData?.organization_name?.trim() || user.user_metadata?.organization_name?.trim();
+  if (resolvedOrganizationName) company = resolvedOrganizationName;
+  if (resolvedDisplayName) headerName = resolvedDisplayName;
+  return { company, headerName };
+}
 
 const escapeHtml = (unsafe: string): string =>
   unsafe
@@ -323,17 +375,13 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
 
       const historicalByYear: Record<number, { scope1: number; scope2: number; scope3: number; total: number }> = {};
       if (user?.id) {
-        const { data: historyRows } = await (supabase as any)
-          .from("emission_history_assessments")
-          .select("created_at, scope1_emissions, scope2_emissions, scope3_emissions")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+        const historyRows = await loadEmissionHistoryTrendRows(user.id);
 
-        (historyRows || []).forEach((row: any) => {
+        historyRows.forEach((row) => {
           const dt = row?.created_at ? new Date(row.created_at) : null;
           if (!dt || Number.isNaN(dt.getTime())) return;
           const year = dt.getFullYear();
-          if (historicalByYear[year]) return; // keep latest record per year due to desc order
+          if (historicalByYear[year]) return;
           const s1 = Number(row?.scope1_emissions || 0);
           const s2 = Number(row?.scope2_emissions || 0);
           const s3 = Number(row?.scope3_emissions || 0);
@@ -343,16 +391,23 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
 
       const gasTotalsKg: Record<"CO2" | "CH4" | "N2O" | "CO2e", number> = { CO2: 0, CH4: 0, N2O: 0, CO2e: 0 };
       if ((isMariUser || fuelFramework === "epa") && user?.id) {
-        const [onRoadGasRows, onRoadDieselRows, nonRoadRows, roadVehicleRows, usaRows, altFuelRows, ventingRows] =
-          await Promise.all([
-            (supabase as any).from("scope1_epa_on_road_gasoline_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("scope1_epa_on_road_diesel_alt_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("scope1_epa_non_road_vehicle_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("ipcc_scope3_road_transport_vehicle_type_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("ipcc_scope3_usa_gasoline_diesel_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("ipcc_scope3_alternative_fuel_entries").select("emissions, emission_selection").eq("user_id", user.id),
-            (supabase as any).from("ipcc_scope1_venting_entries").select("result").eq("user_id", user.id),
-          ]);
+        const [
+          onRoadGasRows,
+          onRoadDieselRows,
+          nonRoadRows,
+          roadVehicleRows,
+          usaRows,
+          altFuelRows,
+          ventingRows,
+        ] = await Promise.all([
+          safeListLegacyTable("scope1_epa_on_road_gasoline_entries", user.id),
+          safeListLegacyTable("scope1_epa_on_road_diesel_alt_fuel_entries", user.id),
+          safeListLegacyTable("scope1_epa_non_road_vehicle_entries", user.id),
+          safeListLegacyTable("ipcc_scope3_road_transport_vehicle_type_entries", user.id),
+          safeListLegacyTable("ipcc_scope3_usa_gasoline_diesel_entries", user.id),
+          safeListLegacyTable("ipcc_scope3_alternative_fuel_entries", user.id),
+          safeListLegacyTable("ipcc_scope1_venting_entries", user.id),
+        ]);
 
         const addBySelection = (rows: any[] | null | undefined) => {
           (rows || []).forEach((row: any) => {
@@ -366,15 +421,14 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
           });
         };
 
-        addBySelection(onRoadGasRows?.data);
-        addBySelection(onRoadDieselRows?.data);
-        addBySelection(nonRoadRows?.data);
-        addBySelection(roadVehicleRows?.data);
-        addBySelection(usaRows?.data);
-        addBySelection(altFuelRows?.data);
+        addBySelection(onRoadGasRows);
+        addBySelection(onRoadDieselRows);
+        addBySelection(nonRoadRows);
+        addBySelection(roadVehicleRows);
+        addBySelection(usaRows);
+        addBySelection(altFuelRows);
 
-        // Venting includes per-gas co2e contributions in breakdown; include where available.
-        (ventingRows?.data || []).forEach((row: any) => {
+        ventingRows.forEach((row: any) => {
           const breakdown = row?.result?.breakdown;
           if (!Array.isArray(breakdown)) return;
           breakdown.forEach((b: any) => {
@@ -390,28 +444,9 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       }
 
       const generatedAt = new Date();
-      let company = "Organization";
-      let headerName = user?.email?.split("@")[0] || "User";
-      if (user?.id) {
-        const { data: profileData } = await (supabase as any)
-          .from("profiles")
-          .select("display_name, organization_name")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        const resolvedDisplayName =
-          profileData?.display_name?.trim() ||
-          user?.user_metadata?.full_name?.trim() ||
-          user?.user_metadata?.name?.trim();
-        const resolvedOrganizationName =
-          profileData?.organization_name?.trim() ||
-          user?.user_metadata?.organization_name?.trim();
-        if (resolvedOrganizationName) {
-          company = resolvedOrganizationName;
-        }
-        if (resolvedDisplayName) {
-          headerName = resolvedDisplayName;
-        }
-      }
+      const { company, headerName } = user?.id
+        ? await loadReportProfile(user)
+        : { company: "Organization", headerName: "User" };
       const period = generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
       const year = String(generatedAt.getFullYear());
       const reportPeriodStart = `01/01/${year}`;
@@ -509,21 +544,19 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         ? (
             await Promise.all(
               ipccMonthlySources.map(async (source) => {
-                const { data } = await (supabase as any)
-                  .from(source.table)
-                  .select("month_start, result")
-                  .eq("user_id", user.id)
-                  .order("month_start", { ascending: false });
+                const data = await safeListLegacyTable(source.table, user.id, {
+                  order: { column: "month_start", ascending: false },
+                });
 
-                const monthly = (data || [])
-                  .filter((row: any) => row?.month_start)
-                  .map((row: any) => ({
+                const monthly = data
+                  .filter((row) => row?.month_start)
+                  .map((row) => ({
                     monthStart: String(row.month_start),
                     kg: extractRowKg(row),
                   }))
-                  .filter((row: any) => row.kg > 0)
+                  .filter((row) => row.kg > 0)
                   .slice(0, 12)
-                  .sort((a: any, b: any) => new Date(a.monthStart).getTime() - new Date(b.monthStart).getTime());
+                  .sort((a, b) => new Date(a.monthStart).getTime() - new Date(b.monthStart).getTime());
 
                 return { label: source.label, monthly };
               })
@@ -702,22 +735,17 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         const table = scopeKeyToTable[category.key];
         if (!table) return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
 
-        let detailQuery = (supabase as any)
-          .from(table)
-          .select("*")
-          .eq("user_id", user.id)
-          .limit(300);
-        if (category.key === "fuel") {
-          if (fuelFramework === "uk") {
-            detailQuery = detailQuery.eq("emission_framework", "uk");
-          } else {
-            detailQuery = detailQuery.or("emission_framework.eq.epa,emission_framework.is.null");
-          }
+        const detailKey = Object.entries(scopeKeyToTable).find(([, t]) => t === table)?.[0] ?? category.key;
+        let rows = await loadLegacyCategoryDetailRows(detailKey, user.id, {
+          variant: fuelFramework === "epa" ? "epa_ipcc" : "uk",
+          fuelFramework,
+        });
+        if (!rows.length) {
+          rows = await safeListLegacyTable(table, user.id, {
+            emission_framework: category.key === "fuel" ? fuelFramework : undefined,
+          });
         }
 
-        const { data } = await detailQuery;
-
-        const rows = data || [];
         if (!rows.length) {
           return `${scopeName} top contributor is ${category.label} (${pct(category.value, scopeTotalByName(scopeName))}%).`;
         }

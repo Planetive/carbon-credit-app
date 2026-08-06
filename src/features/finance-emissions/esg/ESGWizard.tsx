@@ -15,7 +15,6 @@ import { ChevronLeft, ChevronRight, Plus, Trash2, Building2, Users, CheckCircle,
 import { FinanceEmissionCalculator } from './FinanceEmissionCalculator';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { EmissionResultRow, FinanceMode, WizardLocationState, WizardResumePayload } from "../types/contracts";
 
@@ -149,20 +148,14 @@ export const ESGWizard: React.FC = () => {
           // Load loan types from emission calculations for this counterparty (only for finance mode)
           const loanTypes: Array<{ type: string; quantity: number }> = [];
           if (mode === 'finance') {
-            const { data: emissionCalculations } = await supabase
-              .from('emission_calculations')
-              .select('formula_id, inputs')
-              .eq('counterparty_id', counterpartyId)
-              .eq('calculation_type', mode);
-            // #region agent log
-            fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H1',location:'ESGWizard.tsx:114',message:'Fetched finance emission calculations for loan type restore',data:{counterpartyId,mode,rowCount:Array.isArray(emissionCalculations)?emissionCalculations.length:0},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
+            const emissionCalculations = (
+              await PortfolioClient.getEmissionCalculations(counterpartyId)
+            ).filter((c) => c.calculation_type === 'finance');
             
             // Extract loan types from emission calculations (only for finance mode)
-            if (emissionCalculations) {
+            if (emissionCalculations.length > 0) {
               const loanTypeMap = new Map<string, number>();
-              const shapeCounters = { singularLoanType: 0, arrayLoanTypes: 0, missingLoanTypeData: 0 };
-              emissionCalculations.forEach(calc => {
+              emissionCalculations.forEach((calc) => {
                 if (calc.inputs && typeof calc.inputs === 'object') {
                   const inputs = calc.inputs as Record<string, unknown>;
                   if (Array.isArray(inputs.loanTypes) && inputs.loanTypes.length > 0) {
@@ -172,30 +165,18 @@ export const ESGWizard: React.FC = () => {
                       const count = loanTypeMap.get(normalizedType) || 0;
                       loanTypeMap.set(normalizedType, count + 1);
                     });
-                    shapeCounters.arrayLoanTypes += 1;
                     return;
                   }
                   if (inputs.loanType) {
-                    const count = loanTypeMap.get(inputs.loanType) || 0;
-                    loanTypeMap.set(inputs.loanType, count + 1);
-                    shapeCounters.singularLoanType += 1;
-                  } else {
-                    shapeCounters.missingLoanTypeData += 1;
+                    const count = loanTypeMap.get(String(inputs.loanType)) || 0;
+                    loanTypeMap.set(String(inputs.loanType), count + 1);
                   }
-                } else {
-                  shapeCounters.missingLoanTypeData += 1;
                 }
               });
-              // #region agent log
-              fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H2',location:'ESGWizard.tsx:132',message:'Detected loan type field shape in stored inputs',data:shapeCounters,timestamp:Date.now()})}).catch(()=>{});
-              // #endregion
               
               loanTypeMap.forEach((quantity, type) => {
                 loanTypes.push({ type, quantity });
               });
-              // #region agent log
-              fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H3',location:'ESGWizard.tsx:137',message:'Loan types reconstructed for form state',data:{reconstructedCount:loanTypes.length,reconstructedLoanTypes:loanTypes.map(l=>l.type)},timestamp:Date.now()})}).catch(()=>{});
-              // #endregion
             }
           }
           // For facilitated mode, loanTypes should always be empty array
@@ -236,9 +217,6 @@ export const ESGWizard: React.FC = () => {
             verified_emissions,
             unverified_emissions
           });
-          // #region agent log
-          fetch('http://127.0.0.1:7883/ingest/caded7f5-9f52-4640-a41e-7e882af9dcbb',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5471bb'},body:JSON.stringify({sessionId:'5471bb',runId:'pre-fix',hypothesisId:'H4',location:'ESGWizard.tsx:161',message:'Form state set after loading questionnaire',data:{mode,loanTypeCount:loanTypes.length,verificationStatus:questionnaire.verification_status||null},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
 
           console.log('Loaded questionnaire data into form:', {
             corporateStructure: questionnaire.corporate_structure,
@@ -604,38 +582,8 @@ export const ESGWizard: React.FC = () => {
   // Delete ALL finance emission calculations for a counterparty and mode (used when startFresh is true)
   const deleteAllFinanceEmissionCalculations = async (counterpartyId: string, calculationMode: 'finance' | 'facilitated') => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const calculationType = calculationMode === 'finance' ? 'finance_emission' : 'facilitated_emission';
-      
-      // Delete all records from finance_emission_calculations table
-      const { error: financeError } = await supabase
-        .from('finance_emission_calculations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('counterparty_id', counterpartyId)
-        .eq('calculation_type', calculationType);
-
-      if (financeError) {
-        console.warn('Error deleting all finance emission calculations:', financeError);
-      } else {
-        console.log('Deleted all finance emission calculations for fresh start');
-      }
-
-      // Also delete all from emission_calculations table
-      const { error: emissionError } = await supabase
-        .from('emission_calculations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('counterparty_id', counterpartyId)
-        .eq('calculation_type', calculationMode);
-
-      if (emissionError) {
-        console.warn('Error deleting all emission calculations:', emissionError);
-      } else {
-        console.log('Deleted all emission calculations for fresh start');
-      }
+      await PortfolioClient.deleteAllEmissionCalculationsForMode(counterpartyId, calculationMode);
+      console.log('Deleted all emission calculations for fresh start');
     } catch (error) {
       console.warn('Error in deleteAllFinanceEmissionCalculations:', error);
     }
@@ -655,43 +603,12 @@ export const ESGWizard: React.FC = () => {
     }>
   ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Get current formula IDs from results
-      const currentFormulaIds = currentResults.map(r => r.type);
-      
-      // Delete records that don't match current formula IDs from finance_emission_calculations table
-      const { error: financeError } = await supabase
-        .from('finance_emission_calculations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('counterparty_id', counterpartyId)
-        .eq('calculation_type', mode === 'finance' ? 'finance_emission' : 'facilitated_emission')
-        .not('formula_id', 'in', `(${currentFormulaIds.map(id => `'${id}'`).join(',')})`);
-
-      if (financeError) {
-        console.warn('Error cleaning up old finance emission calculations:', financeError);
-      } else {
-        console.log('Cleaned up old finance emission calculations');
-      }
-
-      // Also clean up emission_calculations table
-      // IMPORTANT: Don't delete the 'aggregate' record - it's the main record used by dashboard for both finance and facilitated
-      const { error: emissionError } = await supabase
-        .from('emission_calculations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('counterparty_id', counterpartyId)
-        .eq('calculation_type', mode)
-        .neq('formula_id', 'aggregate') // Never delete the aggregate record (works for both finance and facilitated)
-        .not('formula_id', 'in', `(${currentFormulaIds.map(id => `'${id}'`).join(',')})`);
-
-      if (emissionError) {
-        console.warn('Error cleaning up old emission calculations:', emissionError);
-      } else {
-        console.log('Cleaned up old emission calculations');
-      }
+      await PortfolioClient.cleanupStaleEmissionCalculations(
+        counterpartyId,
+        mode,
+        currentResults.map((r) => r.type)
+      );
+      console.log('Cleaned up old emission calculations');
     } catch (error) {
       console.warn('Error in cleanup function:', error);
     }
@@ -707,6 +624,9 @@ export const ESGWizard: React.FC = () => {
       denominatorLabel: string;
       denominatorValue: number;
       dataQualityScore?: number;
+      pcafFormulaId?: string;
+      pcafInputs?: Record<string, unknown>;
+      companyType?: string;
     }>,
     formData?: Record<string, unknown>
   ) => {
@@ -776,7 +696,7 @@ export const ESGWizard: React.FC = () => {
           calculation_type: mode === 'finance' ? 'finance_emission' : 'facilitated_emission',
           formula_id: result.type,
           formula_name: result.label,
-          company_type: formData?.corporateStructure || 'unlisted',
+          company_type: (formData?.corporateStructure as 'listed' | 'unlisted') || 'unlisted',
           total_assets: sanitizeNumericValue(formData?.totalAssets || 0),
           evic: sanitizeNumericValue(result.denominatorValue),
           total_equity_plus_debt: sanitizeNumericValue(result.denominatorValue),
@@ -788,13 +708,14 @@ export const ESGWizard: React.FC = () => {
               : null
           ),
           status: 'completed',
-          // Additional financial data
           share_price: sanitizeNumericValue(formData?.sharePrice || 0),
           outstanding_shares: sanitizeNumericValue(formData?.outstandingShares || 0),
           total_debt: sanitizeNumericValue(formData?.totalDebt || 0),
           total_equity: sanitizeNumericValue(formData?.totalEquity || 0),
           minority_interest: sanitizeNumericValue(formData?.minorityInterest || 0),
-          preferred_stock: sanitizeNumericValue(formData?.preferredStock || 0)
+          preferred_stock: sanitizeNumericValue(formData?.preferredStock || 0),
+          pcaf_formula_id: result.pcafFormulaId,
+          pcaf_inputs: result.pcafInputs,
         });
       }
 

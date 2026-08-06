@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import LoadingScreen from "@/components/LoadingScreen";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 
 const complianceColumns = [
   { key: 'Name', label: 'Name', sortable: true },
@@ -50,12 +51,22 @@ const MarketsMechanismsScreen: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [complianceResult, marketResult] = await Promise.all([
-          supabase.from('compliance_mechanisms').select('*'),
-          supabase.from('carbon_credit_markets').select('*')
+        const [apiCompliance, apiMarkets] = await Promise.all([
+          tryLoadCatalogViaApi("compliance"),
+          tryLoadCatalogViaApi("markets"),
         ]);
-        setComplianceData(complianceResult.data || []);
-        setMarketData(marketResult.data || []);
+
+        if (apiCompliance && apiMarkets) {
+          setComplianceData(apiCompliance);
+          setMarketData(apiMarkets);
+        } else {
+          const [complianceResult, marketResult] = await Promise.all([
+            supabase.from("compliance_mechanisms").select("*"),
+            supabase.from("carbon_credit_markets").select("*"),
+          ]);
+          setComplianceData(apiCompliance ?? complianceResult.data ?? []);
+          setMarketData(apiMarkets ?? marketResult.data ?? []);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {

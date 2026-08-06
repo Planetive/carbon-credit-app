@@ -7,7 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  localRound6Multiply,
+  resolveUkDeliveryEmissionsKg,
+} from "@/api/calcConnection";
 import { DeliveryVehicleRow, UkFactorBasis } from "@/components/emissions/shared/types";
 import {
   availableUkDeliveryBasises,
@@ -127,20 +137,17 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
       if (!userId) return;
 
       try {
-        const { data: delData, error: delError } = await supabase
-          .from("scope1_delivery_vehicle_entries")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-
-        if (delError) throw delError;
+        const delData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", {
+          user_id: userId,
+          order: { column: "created_at", ascending: false },
+        });
 
         const existingDelRows = (delData || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ladenLevel:
             (entry as { laden_level?: string }).laden_level !== undefined &&
@@ -245,6 +252,7 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
   const updateRow = (id: string, patch: Partial<DeliveryVehicleRow>) => {
+    let snapshot: DeliveryVehicleRow | null = null;
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -280,13 +288,43 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
           next.factor = undefined;
         }
         if (typeof next.distance === "number" && typeof next.factor === "number") {
-          next.emissions = Number((next.distance * next.factor).toFixed(6));
+          next.emissions = localRound6Multiply(next.distance, next.factor);
         } else {
           next.emissions = undefined;
         }
+        snapshot = next;
         return next;
       })
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.distance === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveUkDeliveryEmissionsKg({
+          distance: snap.distance!,
+          factor: snap.factor!,
+          activity: snap.activity,
+          vehicle_type: snap.vehicleType,
+          unit: snap.unit,
+          fuel_type: snap.fuelType,
+          laden_level: snap.ladenLevel,
+          uk_factor_basis: snap.ukFactorBasis || "total",
+        });
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.distance !== snap.distance || r.factor !== snap.factor) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
   const deleteExistingRow = async (id: string) => {
@@ -299,9 +337,7 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
 
     setDeletingRows((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase.from("scope1_delivery_vehicle_entries").delete().eq("id", row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_delivery_vehicle_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 
@@ -361,15 +397,13 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
       }));
 
       if (payload.length > 0) {
-        const { error } = await supabase.from("scope1_delivery_vehicle_entries").insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((v) =>
-          supabase
-            .from("scope1_delivery_vehicle_entries")
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_delivery_vehicle_entries", v.dbId!, {
               activity: v.activity!,
               vehicle_type: v.vehicleType!,
               unit: v.unit!,
@@ -380,11 +414,8 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
               emission_factor: v.factor!,
               emissions: v.emissions!,
             })
-            .eq("id", v.dbId!)
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find((r) => (r as { error?: unknown }).error)?.error;
-        if (updateError) throw updateError;
       }
 
       toast({
@@ -392,19 +423,18 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
       });
 
-      const { data: newData } = await supabase
-        .from("scope1_delivery_vehicle_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", {
+        user_id: user.id,
+        order: { column: "created_at", ascending: false },
+      });
 
       if (newData) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ladenLevel:
             (entry as { laden_level?: string }).laden_level !== undefined &&

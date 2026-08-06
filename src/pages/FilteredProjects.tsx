@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,8 +32,21 @@ const FilteredProjects = () => {
       setError(null);
       const { areaOfInterest, type, goal } = state;
       try {
+        const apiRows = await tryLoadCatalogViaApi("global-projects");
+        if (apiRows) {
+          const filtered = apiRows.filter(
+            (r) =>
+              String(r["Area of Interest"] ?? "") === areaOfInterest &&
+              String(r["Type"] ?? "") === type &&
+              String(r["End Goal"] ?? "") === goal
+          );
+          setProjects(filtered);
+          setLoading(false);
+          return;
+        }
+
         const result: any = await supabase
-          .from("global_projects"  as any)
+          .from("global_projects" as any)
           .select("*")
           .eq("Area of Interest", areaOfInterest)
           .eq("Type", type)

@@ -30,8 +30,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { fetchMyProfileDual } from "@/api/profileDualRead";
 
 /** Matches home / overview brighter mint accents. */
 const FOREST = "#1D9E75";
@@ -66,11 +66,7 @@ const UserAccountMenu = ({
   useEffect(() => {
     const loadType = async () => {
       if (!user) return;
-      const { data } = await (supabase as any)
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", user.id)
-        .single();
+      const data = await fetchMyProfileDual(user.id);
       setUserType(data?.user_type || "corporate");
     };
     loadType();

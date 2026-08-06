@@ -8,7 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  listLegacyTableEntries,
+  upsertLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  resolveIpccAltFuelKg,
+  resolveIpccFlaringKg,
+  resolveIpccHeatingKg,
+  resolveIpccIndustryKg,
+  resolveIpccKitchenKg,
+  resolveIpccPowerKg,
+  resolveIpccRoadKg,
+  resolveIpccRoadVehicleKg,
+  resolveIpccStationaryKg,
+  resolveIpccUsaVehiclesKg,
+  resolveIpccVehicularKg,
+  resolveIpccVentingKg,
+} from "@/api/calcConnection";
 import Scope3ModeSelector, { type Scope3Mode } from "@/components/emissions/scope3/Scope3ModeSelector";
 import { getIPCCCategoryDescription, getIPCCCategoryTitle } from "@/features/emissions/ipcc/categoryMeta";
 
@@ -1012,7 +1031,7 @@ const EmissionCalculatorIPCC = ({
     );
   };
 
-  const totalStationaryEmissions = useMemo(() => {
+  const totalStationaryEmissionsLocal = useMemo(() => {
     return calculatorRows.reduce((sum, row) => {
       const factorRow = getFactorRow(row.fuelTypeDescription, row.subType);
       const factor = factorRow?.coEmissionFactor;
@@ -1022,6 +1041,26 @@ const EmissionCalculatorIPCC = ({
       return sum;
     }, 0);
   }, [calculatorRows, stationaryRows]);
+
+  const [totalStationaryEmissions, setTotalStationaryEmissions] = useState(0);
+  useEffect(() => {
+    setTotalStationaryEmissions(totalStationaryEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = calculatorRows
+      .map((row) => {
+        const factor = getFactorRow(row.fuelTypeDescription, row.subType)?.coEmissionFactor;
+        if (typeof row.quantity !== "number" || typeof factor !== "number") return null;
+        return { quantity: row.quantity, factor };
+      })
+      .filter((r): r is { quantity: number; factor: number } => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(
+        rows.map((r) => resolveIpccStationaryKg({ quantity: r.quantity, factor: r.factor }))
+      );
+      setTotalStationaryEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [totalStationaryEmissionsLocal, calculatorRows, stationaryRows]);
 
   const flaringPercentageTotal = useMemo(
     () =>
@@ -1068,12 +1107,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setFlaringHistoryLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("ipcc_scope1_flaring_entries" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_flaring_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
 
       const mapped: FlaringSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
@@ -1132,10 +1169,12 @@ const EmissionCalculatorIPCC = ({
         result: resultToSave,
       };
 
-      const { error } = await (supabase as any)
-        .from("ipcc_scope1_flaring_entries")
-        .upsert(payload, { onConflict: "user_id,month_start" });
-      if (error) throw error;
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_flaring_entries",
+        user.id,
+        { month_start: `${flaringMonth}-01` },
+        payload
+      );
 
       await loadFlaringHistory();
     } catch (error: any) {
@@ -1343,12 +1382,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setVentingHistoryLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("ipcc_scope1_venting_entries" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_venting_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
 
       const mapped: VentingSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
@@ -1408,10 +1445,12 @@ const EmissionCalculatorIPCC = ({
         })),
         result: resultToSave,
       };
-      const { error } = await (supabase as any)
-        .from("ipcc_scope1_venting_entries")
-        .upsert(payload, { onConflict: "user_id,month_start" });
-      if (error) throw error;
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_venting_entries",
+        user.id,
+        { month_start: `${ventingMonth}-01` },
+        payload
+      );
 
       await loadVentingHistory();
     } catch (error: any) {
@@ -1433,12 +1472,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setVehicularHistoryLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("ipcc_scope1_vehicular_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_vehicular_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
 
       const mapped: VehicularSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
@@ -1497,10 +1534,12 @@ const EmissionCalculatorIPCC = ({
         result: resultToSave,
       };
 
-      const { error } = await (supabase as any)
-        .from("ipcc_scope1_vehicular_entries")
-        .upsert(payload, { onConflict: "user_id,month_start" });
-      if (error) throw error;
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_vehicular_entries",
+        user.id,
+        { month_start: `${vehicularMonth}-01` },
+        payload
+      );
 
       await loadVehicularHistory();
     } catch (error: any) {
@@ -1526,12 +1565,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setKitchenHistoryLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("ipcc_scope1_kitchen_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_kitchen_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
       const mapped: KitchenSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
         month: String(row.month_start || "").slice(0, 7),
@@ -1564,9 +1601,11 @@ const EmissionCalculatorIPCC = ({
     const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
     setKitchenSaving(true);
     try {
-      const { error } = await (supabase as any).from("ipcc_scope1_kitchen_entries").upsert(
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_kitchen_entries",
+        user.id,
+        { month_start: `${kitchenMonth}-01` },
         {
-          user_id: user.id,
           month_start: `${kitchenMonth}-01`,
           lpg_kg: lpgKg,
           ng_mmscf: ngMmscf,
@@ -1574,10 +1613,8 @@ const EmissionCalculatorIPCC = ({
           lpg_factor: scope1KitchenFactors.lpg,
           natural_gas_factor: scope1KitchenFactors.naturalGasCo2,
           result: resultToSave,
-        },
-        { onConflict: "user_id,month_start" }
+        }
       );
-      if (error) throw error;
       await loadKitchenHistory();
     } catch (error: any) {
       setKitchenSaveError(error?.message || "Failed to save monthly kitchen entry.");
@@ -1599,12 +1636,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setPowerHistoryLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("ipcc_scope1_power_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_power_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
       const mapped: PowerSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
         month: String(row.month_start || "").slice(0, 7),
@@ -1638,9 +1673,11 @@ const EmissionCalculatorIPCC = ({
     const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
     setPowerSaving(true);
     try {
-      const { error } = await (supabase as any).from("ipcc_scope1_power_entries").upsert(
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_power_entries",
+        user.id,
+        { month_start: `${powerMonth}-01` },
         {
-          user_id: user.id,
           month_start: `${powerMonth}-01`,
           diesel_liters: dieselLiters,
           ng_mmscf: ngMmscf,
@@ -1648,10 +1685,8 @@ const EmissionCalculatorIPCC = ({
           diesel_factor: scope1PowerFactors.diesel,
           natural_gas_factor: scope1PowerFactors.naturalGasCo2,
           result: resultToSave,
-        },
-        { onConflict: "user_id,month_start" }
+        }
       );
-      if (error) throw error;
       await loadPowerHistory();
     } catch (error: any) {
       setPowerSaveError(error?.message || "Failed to save monthly power entry.");
@@ -1677,12 +1712,10 @@ const EmissionCalculatorIPCC = ({
     if (!user) return;
     setHeatingHistoryLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from("ipcc_scope1_heating_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("month_start", { ascending: false });
-      if (error) throw error;
+      const data = await listLegacyTableEntries("ipcc_scope1_heating_entries", {
+        user_id: user.id,
+        order: { column: "month_start", ascending: false },
+      });
       const mapped: HeatingSavedEntry[] = (data || []).map((row: any) => ({
         id: String(row.id),
         month: String(row.month_start || "").slice(0, 7),
@@ -1712,18 +1745,18 @@ const EmissionCalculatorIPCC = ({
     const resultToSave = { totalCO2e_kg, totalCO2e_tonnes: totalCO2e_kg / 1000 };
     setHeatingSaving(true);
     try {
-      const { error } = await (supabase as any).from("ipcc_scope1_heating_entries").upsert(
+      await upsertLegacyTableEntry(
+        "ipcc_scope1_heating_entries",
+        user.id,
+        { month_start: `${heatingMonth}-01` },
         {
-          user_id: user.id,
           month_start: `${heatingMonth}-01`,
           heating_mmscf: heating,
           ghv,
           natural_gas_factor: scope1PowerFactors.naturalGasCo2,
           result: resultToSave,
-        },
-        { onConflict: "user_id,month_start" }
+        }
       );
-      if (error) throw error;
       await loadHeatingHistory();
     } catch (error: any) {
       setHeatingSaveError(error?.message || "Failed to save monthly heating entry.");
@@ -1812,7 +1845,7 @@ const EmissionCalculatorIPCC = ({
     return options[0];
   };
 
-  const totalEnergyIndustryEmissions = useMemo(() => {
+  const totalEnergyIndustryEmissionsLocal = useMemo(() => {
     return energyCalculatorRows.reduce((sum, row) => {
       const factors = getEnergyFactorRow(row.fuel, row.subType);
       const selectedFactor = getSelectedFactorValue(factors, row.selectedFactor);
@@ -1821,31 +1854,131 @@ const EmissionCalculatorIPCC = ({
     }, 0);
   }, [energyCalculatorRows, energyIndustryRows]);
 
-  const scope1VehicularCo2eMeT = useMemo(() => {
+  const [totalEnergyIndustryEmissions, setTotalEnergyIndustryEmissions] = useState(0);
+  useEffect(() => {
+    setTotalEnergyIndustryEmissions(totalEnergyIndustryEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = energyCalculatorRows
+      .map((row) => {
+        const factors = getEnergyFactorRow(row.fuel, row.subType);
+        if (typeof row.quantity !== "number" || !factors) return null;
+        return {
+          quantity: row.quantity,
+          ef_co2: factors.efCo2 ?? undefined,
+          ef_ch4: factors.efCh4 ?? undefined,
+          ef_n2o: factors.efN2o ?? undefined,
+          selected_factor: row.selectedFactor,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(rows.map((r) => resolveIpccIndustryKg(r)));
+      setTotalEnergyIndustryEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [totalEnergyIndustryEmissionsLocal, energyCalculatorRows, energyIndustryRows]);
+
+  const scope1VehicularCo2eMeTLocal = useMemo(() => {
     const dieselLiters = typeof vehicularDieselLiters === "number" ? vehicularDieselLiters : 0;
     const petrolLiters = typeof vehicularPetrolLiters === "number" ? vehicularPetrolLiters : 0;
     return (dieselLiters * scope1VehicularFactors.diesel + petrolLiters * scope1VehicularFactors.petrol) / 1000;
   }, [vehicularDieselLiters, vehicularPetrolLiters, scope1VehicularFactors]);
 
-  const scope1KitchenCo2eMeT = useMemo(() => {
+  const [scope1VehicularCo2eMeT, setScope1VehicularCo2eMeT] = useState(0);
+  useEffect(() => {
+    setScope1VehicularCo2eMeT(scope1VehicularCo2eMeTLocal);
+    if (!USE_JWT_AUTH) return;
+    const dieselLiters = typeof vehicularDieselLiters === "number" ? vehicularDieselLiters : 0;
+    const petrolLiters = typeof vehicularPetrolLiters === "number" ? vehicularPetrolLiters : 0;
+    void (async () => {
+      const kg = await resolveIpccVehicularKg({
+        diesel_liters: dieselLiters,
+        petrol_liters: petrolLiters,
+        diesel_factor: scope1VehicularFactors.diesel,
+        petrol_factor: scope1VehicularFactors.petrol,
+      });
+      setScope1VehicularCo2eMeT(kg / 1000);
+    })();
+  }, [
+    scope1VehicularCo2eMeTLocal,
+    vehicularDieselLiters,
+    vehicularPetrolLiters,
+    scope1VehicularFactors,
+  ]);
+
+  const scope1KitchenCo2eMeTLocal = useMemo(() => {
     const lpgKg = typeof kitchenLpgKg === "number" ? kitchenLpgKg : 0;
     const ngMmscf = typeof kitchenNgMmscf === "number" ? kitchenNgMmscf : 0;
     const ghv = typeof kitchenGhv === "number" ? kitchenGhv : 0;
     return (lpgKg * scope1KitchenFactors.lpg + ngMmscf * ghv * scope1KitchenFactors.naturalGasCo2) / 1000;
   }, [kitchenLpgKg, kitchenNgMmscf, kitchenGhv, scope1KitchenFactors]);
 
-  const scope1PowerCo2eMeT = useMemo(() => {
+  const [scope1KitchenCo2eMeT, setScope1KitchenCo2eMeT] = useState(0);
+  useEffect(() => {
+    setScope1KitchenCo2eMeT(scope1KitchenCo2eMeTLocal);
+    if (!USE_JWT_AUTH) return;
+    const lpgKg = typeof kitchenLpgKg === "number" ? kitchenLpgKg : 0;
+    const ngMmscf = typeof kitchenNgMmscf === "number" ? kitchenNgMmscf : 0;
+    const ghv = typeof kitchenGhv === "number" ? kitchenGhv : 0;
+    void (async () => {
+      const kg = await resolveIpccKitchenKg({
+        lpg_kg: lpgKg,
+        ng_mmscf: ngMmscf,
+        ghv,
+        lpg_factor: scope1KitchenFactors.lpg,
+        natural_gas_co2: scope1KitchenFactors.naturalGasCo2,
+      });
+      setScope1KitchenCo2eMeT(kg / 1000);
+    })();
+  }, [scope1KitchenCo2eMeTLocal, kitchenLpgKg, kitchenNgMmscf, kitchenGhv, scope1KitchenFactors]);
+
+  const scope1PowerCo2eMeTLocal = useMemo(() => {
     const dieselLiters = typeof powerDieselLiters === "number" ? powerDieselLiters : 0;
     const ngMmscf = typeof powerNgMmscf === "number" ? powerNgMmscf : 0;
     const ghv = typeof powerGhv === "number" ? powerGhv : 0;
     return (dieselLiters * scope1PowerFactors.diesel + ngMmscf * ghv * scope1PowerFactors.naturalGasCo2) / 1000;
   }, [powerDieselLiters, powerNgMmscf, powerGhv, scope1PowerFactors]);
 
-  const scope1HeatingCo2eMeT = useMemo(() => {
+  const [scope1PowerCo2eMeT, setScope1PowerCo2eMeT] = useState(0);
+  useEffect(() => {
+    setScope1PowerCo2eMeT(scope1PowerCo2eMeTLocal);
+    if (!USE_JWT_AUTH) return;
+    const dieselLiters = typeof powerDieselLiters === "number" ? powerDieselLiters : 0;
+    const ngMmscf = typeof powerNgMmscf === "number" ? powerNgMmscf : 0;
+    const ghv = typeof powerGhv === "number" ? powerGhv : 0;
+    void (async () => {
+      const kg = await resolveIpccPowerKg({
+        diesel_liters: dieselLiters,
+        ng_mmscf: ngMmscf,
+        ghv,
+        diesel_factor: scope1PowerFactors.diesel,
+        natural_gas_co2: scope1PowerFactors.naturalGasCo2,
+      });
+      setScope1PowerCo2eMeT(kg / 1000);
+    })();
+  }, [scope1PowerCo2eMeTLocal, powerDieselLiters, powerNgMmscf, powerGhv, scope1PowerFactors]);
+
+  const scope1HeatingCo2eMeTLocal = useMemo(() => {
     const ngMmscf = typeof heatingMmscf === "number" ? heatingMmscf : 0;
     const ghv = typeof heatingGhv === "number" ? heatingGhv : 0;
     return (ngMmscf * ghv * scope1PowerFactors.naturalGasCo2) / 1000;
   }, [heatingMmscf, heatingGhv, scope1PowerFactors.naturalGasCo2]);
+
+  const [scope1HeatingCo2eMeT, setScope1HeatingCo2eMeT] = useState(0);
+  useEffect(() => {
+    setScope1HeatingCo2eMeT(scope1HeatingCo2eMeTLocal);
+    if (!USE_JWT_AUTH) return;
+    const ngMmscf = typeof heatingMmscf === "number" ? heatingMmscf : 0;
+    const ghv = typeof heatingGhv === "number" ? heatingGhv : 0;
+    void (async () => {
+      const kg = await resolveIpccHeatingKg({
+        ng_mmscf: ngMmscf,
+        ghv,
+        natural_gas_co2: scope1PowerFactors.naturalGasCo2,
+      });
+      setScope1HeatingCo2eMeT(kg / 1000);
+    })();
+  }, [scope1HeatingCo2eMeTLocal, heatingMmscf, heatingGhv, scope1PowerFactors.naturalGasCo2]);
 
   useEffect(() => {
     if (!embedded || !onScope1CategoryTotalChange) return;
@@ -1906,13 +2039,33 @@ const EmissionCalculatorIPCC = ({
     );
   };
 
-  const totalRoadTransportEmissions = useMemo(() => {
+  const totalRoadTransportEmissionsLocal = useMemo(() => {
     return roadTransportCalculatorRows.reduce((sum, row) => {
       const factorRow = getRoadFactorRow(row.fuelType);
       if (typeof row.quantity !== "number" || typeof factorRow?.emissionFactor !== "number") return sum;
       return sum + row.quantity * factorRow.emissionFactor;
     }, 0);
   }, [roadTransportCalculatorRows, roadTransportRows]);
+
+  const [totalRoadTransportEmissions, setTotalRoadTransportEmissions] = useState(0);
+  useEffect(() => {
+    setTotalRoadTransportEmissions(totalRoadTransportEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = roadTransportCalculatorRows
+      .map((row) => {
+        const factor = getRoadFactorRow(row.fuelType)?.emissionFactor;
+        if (typeof row.quantity !== "number" || typeof factor !== "number") return null;
+        return { quantity: row.quantity, factor };
+      })
+      .filter((r): r is { quantity: number; factor: number } => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(
+        rows.map((r) => resolveIpccRoadKg({ quantity: r.quantity, factor: r.factor }))
+      );
+      setTotalRoadTransportEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [totalRoadTransportEmissionsLocal, roadTransportCalculatorRows, roadTransportRows]);
 
   const availableRoadVehicleFuelTypes = useMemo(
     () =>
@@ -1949,7 +2102,7 @@ const EmissionCalculatorIPCC = ({
     );
   };
 
-  const totalRoadTransportVehicleEmissions = useMemo(() => {
+  const totalRoadTransportVehicleEmissionsLocal = useMemo(() => {
     return roadTransportVehicleCalculatorRows.reduce((sum, row) => {
       const factorRow = getRoadVehicleFactorRow(row.fuelType);
       if (!factorRow || typeof row.quantity !== "number") return sum;
@@ -1958,6 +2111,33 @@ const EmissionCalculatorIPCC = ({
       return sum + row.quantity * factor;
     }, 0);
   }, [roadTransportVehicleCalculatorRows, roadTransportVehicleRows]);
+
+  const [totalRoadTransportVehicleEmissions, setTotalRoadTransportVehicleEmissions] = useState(0);
+  useEffect(() => {
+    setTotalRoadTransportVehicleEmissions(totalRoadTransportVehicleEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = roadTransportVehicleCalculatorRows
+      .map((row) => {
+        const factorRow = getRoadVehicleFactorRow(row.fuelType);
+        if (!factorRow || typeof row.quantity !== "number") return null;
+        return {
+          quantity: row.quantity,
+          ch4_factor: factorRow.ch4 ?? undefined,
+          n2o_factor: factorRow.no2 ?? undefined,
+          selected_factor: row.selectedFactor,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(rows.map((r) => resolveIpccRoadVehicleKg(r)));
+      setTotalRoadTransportVehicleEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [
+    totalRoadTransportVehicleEmissionsLocal,
+    roadTransportVehicleCalculatorRows,
+    roadTransportVehicleRows,
+  ]);
 
   const availableUsaVehicleTypes = useMemo(
     () =>
@@ -2049,7 +2229,7 @@ const EmissionCalculatorIPCC = ({
     );
   };
 
-  const totalUsaGasDieselEmissions = useMemo(() => {
+  const totalUsaGasDieselEmissionsLocal = useMemo(() => {
     return usaGasDieselCalculatorRows.reduce((sum, row) => {
       const factorRow = getUsaGasDieselFactorRow(row.vehicleType, row.emissionControlTechnology);
       const factor = getUsaSelectedFactorValue(factorRow, row.selectedFactor);
@@ -2057,6 +2237,27 @@ const EmissionCalculatorIPCC = ({
       return sum + row.quantity * factor;
     }, 0);
   }, [usaGasDieselCalculatorRows, usaGasDieselRows]);
+
+  const [totalUsaGasDieselEmissions, setTotalUsaGasDieselEmissions] = useState(0);
+  useEffect(() => {
+    setTotalUsaGasDieselEmissions(totalUsaGasDieselEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = usaGasDieselCalculatorRows
+      .map((row) => {
+        const factorRow = getUsaGasDieselFactorRow(row.vehicleType, row.emissionControlTechnology);
+        const factor = getUsaSelectedFactorValue(factorRow, row.selectedFactor);
+        if (typeof row.quantity !== "number" || typeof factor !== "number") return null;
+        return { quantity: row.quantity, factor };
+      })
+      .filter((r): r is { quantity: number; factor: number } => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(
+        rows.map((r) => resolveIpccUsaVehiclesKg({ quantity: r.quantity, factor: r.factor }))
+      );
+      setTotalUsaGasDieselEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [totalUsaGasDieselEmissionsLocal, usaGasDieselCalculatorRows, usaGasDieselRows]);
 
   const availableAlternativeVehicleTypes = useMemo(
     () =>
@@ -2100,7 +2301,7 @@ const EmissionCalculatorIPCC = ({
     );
   };
 
-  const totalAlternativeFuelEmissions = useMemo(() => {
+  const totalAlternativeFuelEmissionsLocal = useMemo(() => {
     return alternativeFuelCalculatorRows.reduce((sum, row) => {
       const factorRow = getAlternativeFactorRow(row.vehicleType, row.fuel);
       if (!factorRow || typeof row.quantity !== "number") return sum;
@@ -2109,6 +2310,29 @@ const EmissionCalculatorIPCC = ({
       return sum + row.quantity * factor;
     }, 0);
   }, [alternativeFuelCalculatorRows, alternativeFuelRows]);
+
+  const [totalAlternativeFuelEmissions, setTotalAlternativeFuelEmissions] = useState(0);
+  useEffect(() => {
+    setTotalAlternativeFuelEmissions(totalAlternativeFuelEmissionsLocal);
+    if (!USE_JWT_AUTH) return;
+    const rows = alternativeFuelCalculatorRows
+      .map((row) => {
+        const factorRow = getAlternativeFactorRow(row.vehicleType, row.fuel);
+        if (!factorRow || typeof row.quantity !== "number") return null;
+        return {
+          quantity: row.quantity,
+          ch4_factor: factorRow.ch4Factor ?? undefined,
+          n2o_factor: factorRow.no2Factor ?? undefined,
+          selected_factor: row.selectedFactor,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    if (rows.length === 0) return;
+    void (async () => {
+      const parts = await Promise.all(rows.map((r) => resolveIpccAltFuelKg(r)));
+      setTotalAlternativeFuelEmissions(parts.reduce((s, n) => s + n, 0));
+    })();
+  }, [totalAlternativeFuelEmissionsLocal, alternativeFuelCalculatorRows, alternativeFuelRows]);
 
   useEffect(() => {
     const loadIpccChapter1Data = async () => {
@@ -2126,35 +2350,10 @@ const EmissionCalculatorIPCC = ({
           "ipcc 1",
         ] as const;
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          // Keep the first successfully queried empty table as fallback.
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read any IPCC Chapter 1 table. Tried: ${tableCandidates.join(", ")}. ${
               attemptErrors.length ? `Errors: ${attemptErrors.join(" | ")}` : ""
@@ -2251,6 +2450,23 @@ const EmissionCalculatorIPCC = ({
       const result = calculateFlaringEmissions(flaringVolume, flaringUnit, compositionForCalculation);
       setFlaringCalculated(result);
       setFlaringCalculationError(null);
+
+      if (USE_JWT_AUTH) {
+        const snapVolume = flaringVolume;
+        const snapUnit = flaringUnit;
+        const snapComp = compositionForCalculation;
+        void (async () => {
+          const kg = await resolveIpccFlaringKg(
+            { volume: snapVolume, unit: snapUnit, composition: snapComp },
+            result.CO2_kg
+          );
+          if (kg === result.CO2_kg) return;
+          setFlaringCalculated((prev) => {
+            if (!prev || prev.CO2_kg !== result.CO2_kg) return prev;
+            return { ...prev, CO2_kg: kg, CO2_tonnes: kg / 1000 };
+          });
+        })();
+      }
     } catch (error: any) {
       setFlaringCalculated(null);
       setFlaringCalculationError(error?.message || "Failed to calculate flaring emissions.");
@@ -2302,6 +2518,23 @@ const EmissionCalculatorIPCC = ({
       const result = calculateVentingEmissions(ventingVolume, ventingUnit, compositionForCalculation);
       setVentingCalculated(result);
       setVentingCalculationError(null);
+
+      if (USE_JWT_AUTH) {
+        const snapVolume = ventingVolume;
+        const snapUnit = ventingUnit;
+        const snapComp = compositionForCalculation;
+        void (async () => {
+          const kg = await resolveIpccVentingKg(
+            { volume: snapVolume, unit: snapUnit, composition: snapComp },
+            result.totalCO2e_kg
+          );
+          if (kg === result.totalCO2e_kg) return;
+          setVentingCalculated((prev) => {
+            if (!prev || prev.totalCO2e_kg !== result.totalCO2e_kg) return prev;
+            return { ...prev, totalCO2e_kg: kg, totalCO2e_tonnes: kg / 1000 };
+          });
+        })();
+      }
     } catch (error: any) {
       setVentingCalculated(null);
       setVentingCalculationError(error?.message || "Failed to calculate venting emissions.");
@@ -2378,34 +2611,10 @@ const EmissionCalculatorIPCC = ({
                 "ipcc2energy",
               ] as const);
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read any IPCC Chapter 2 table for ${selectedIndustry}. Tried: ${tableCandidates.join(", ")}. ${
               attemptErrors.length ? `Errors: ${attemptErrors.join(" | ")}` : ""
@@ -2530,34 +2739,10 @@ const EmissionCalculatorIPCC = ({
           "ipcc3roadtransport",
         ] as const;
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read Chapter 3 Road Transport table. Tried: ${tableCandidates.join(", ")}. ${
               attemptErrors.length ? `Errors: ${attemptErrors.join(" | ")}` : ""
@@ -2667,27 +2852,13 @@ const EmissionCalculatorIPCC = ({
 
         let resolved: Scope1VehicularFactors = DEFAULT_SCOPE1_VEHICULAR_FACTORS;
         let successfulTable: string | undefined;
-        const attemptErrors: string[] = [];
+        const { rows: vehicularRows, source, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
+        successfulTable = source || undefined;
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          const rows = (attemptData || []) as Record<string, any>[];
-          if (rows.length === 0) {
-            if (!successfulTable) successfulTable = tableName;
-            continue;
-          }
-
-          const dieselRow = rows.find((row) => fuelLabel(row).includes("diesel"));
-          const petrolRow = rows.find((row) => {
+        if (vehicularRows.length > 0) {
+          const dieselRow = vehicularRows.find((row) => fuelLabel(row).includes("diesel"));
+          const petrolRow = vehicularRows.find((row) => {
             const label = fuelLabel(row);
             return label.includes("motor gasoline") || label.includes("gasoline") || label.includes("petrol");
           });
@@ -2700,8 +2871,6 @@ const EmissionCalculatorIPCC = ({
             petrol: typeof petrolFactor === "number" ? petrolFactor : DEFAULT_SCOPE1_VEHICULAR_FACTORS.petrol,
             sourceTable: "Mobile Combustion",
           };
-          successfulTable = tableName;
-          break;
         }
 
         setScope1VehicularFactors(resolved);
@@ -2819,21 +2988,16 @@ const EmissionCalculatorIPCC = ({
           "MOBILE COMBUSTION",
           "mobile_combustion",
         ] as const;
-        for (const tableName of mobileTableCandidates) {
-          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
-          if (error) continue;
-          const rows = (data || []) as Record<string, any>[];
-          const lpgRow = rows.find((row) => {
-            const label = fuelLabel(row);
-            return label.includes("lpg") || label.includes("liquefied petroleum");
-          });
-          if (lpgRow) {
-            const factor = toFactorPerLpgKg(lpgRow);
-            if (typeof factor === "number") {
-              lpgFactor = factor;
-              lpgSourceTable = "Mobile Combustion";
-              break;
-            }
+        const { rows: mobileRows } = await loadIpccFactorTableRows(mobileTableCandidates);
+        const lpgRow = mobileRows.find((row) => {
+          const label = fuelLabel(row);
+          return label.includes("lpg") || label.includes("liquefied petroleum");
+        });
+        if (lpgRow) {
+          const factor = toFactorPerLpgKg(lpgRow);
+          if (typeof factor === "number") {
+            lpgFactor = factor;
+            lpgSourceTable = "Mobile Combustion";
           }
         }
 
@@ -2849,12 +3013,9 @@ const EmissionCalculatorIPCC = ({
           "IPCC1",
           "ipcc1",
         ] as const;
-        for (const tableName of stationaryTableCandidates) {
-          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
-          if (error) continue;
-          const rows = (data || []) as Record<string, any>[];
-          const ngCandidates = rows
-            .map((row) => {
+        const { rows: stationaryRows } = await loadIpccFactorTableRows(stationaryTableCandidates);
+        const ngCandidates = stationaryRows
+          .map((row) => {
               const fuelLabel = String(
                 pickFirst(row, [
                   "Fuel type English description",
@@ -2884,17 +3045,15 @@ const EmissionCalculatorIPCC = ({
             })
             .filter((item): item is { factor: number; unit: string; combinedLabel: string } => item !== null);
 
-          if (ngCandidates.length > 0) {
-            const mmbtuCandidates = ngCandidates.filter(
-              (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
-            );
-            // Prioritize Stationary Combustion NG CO2 factor range (~53 kg/MMBtu) when multiple rows exist.
-            const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
-            const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
-            ngFactor = selected.factor;
-            naturalGasSourceTable = "Stationary Combustion";
-            break;
-          }
+        if (ngCandidates.length > 0) {
+          const mmbtuCandidates = ngCandidates.filter(
+            (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
+          );
+          // Prioritize Stationary Combustion NG CO2 factor range (~53 kg/MMBtu) when multiple rows exist.
+          const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
+          const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
+          ngFactor = selected.factor;
+          naturalGasSourceTable = "Stationary Combustion";
         }
 
         setScope1KitchenFactors({
@@ -2986,18 +3145,13 @@ const EmissionCalculatorIPCC = ({
           "MOBILE COMBUSTION",
           "mobile_combustion",
         ] as const;
-        for (const tableName of mobileTableCandidates) {
-          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
-          if (error) continue;
-          const rows = (data || []) as Record<string, any>[];
-          const dieselRow = rows.find((row) => fuelLabel(row).includes("diesel"));
-          if (dieselRow) {
-            const factor = toFactorPerLiter(dieselRow);
-            if (typeof factor === "number") {
-              dieselFactor = factor;
-              dieselSourceTable = "Mobile Combustion";
-              break;
-            }
+        const { rows: powerMobileRows } = await loadIpccFactorTableRows(mobileTableCandidates);
+        const dieselRow = powerMobileRows.find((row) => fuelLabel(row).includes("diesel"));
+        if (dieselRow) {
+          const factor = toFactorPerLiter(dieselRow);
+          if (typeof factor === "number") {
+            dieselFactor = factor;
+            dieselSourceTable = "Mobile Combustion";
           }
         }
 
@@ -3013,12 +3167,9 @@ const EmissionCalculatorIPCC = ({
           "IPCC1",
           "ipcc1",
         ] as const;
-        for (const tableName of stationaryTableCandidates) {
-          const { data, error } = await supabase.from(tableName as any).select("*").limit(1000);
-          if (error) continue;
-          const rows = (data || []) as Record<string, any>[];
-          const ngCandidates = rows
-            .map((row) => {
+        const { rows: stationaryRows } = await loadIpccFactorTableRows(stationaryTableCandidates);
+        const ngCandidates = stationaryRows
+          .map((row) => {
               const fuelText = String(
                 pickFirst(row, [
                   "Fuel type English description",
@@ -3047,16 +3198,14 @@ const EmissionCalculatorIPCC = ({
             })
             .filter((item): item is { factor: number; unit: string } => item !== null);
 
-          if (ngCandidates.length > 0) {
-            const mmbtuCandidates = ngCandidates.filter(
-              (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
-            );
-            const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
-            const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
-            ngFactor = selected.factor;
-            naturalGasSourceTable = "Stationary Combustion";
-            break;
-          }
+        if (ngCandidates.length > 0) {
+          const mmbtuCandidates = ngCandidates.filter(
+            (item) => item.unit.includes("mmbtu") || item.unit.includes("mm btu")
+          );
+          const preferredMmbtu = mmbtuCandidates.find((item) => item.factor >= 50 && item.factor <= 56);
+          const selected = preferredMmbtu || mmbtuCandidates[0] || ngCandidates[0];
+          ngFactor = selected.factor;
+          naturalGasSourceTable = "Stationary Combustion";
         }
 
         setScope1PowerFactors({
@@ -3094,34 +3243,10 @@ const EmissionCalculatorIPCC = ({
           "ipcc3roadtransportwithvehicletype",
         ] as const;
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read Chapter 3 Road Transport with Vehicle Type table. Tried: ${tableCandidates.join(
               ", "
@@ -3181,34 +3306,10 @@ const EmissionCalculatorIPCC = ({
           "ipcc3usagasolineanddieselvehicles",
         ] as const;
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read Chapter 3 USA Gasoline and Diesel Vehicles table. Tried: ${tableCandidates.join(
               ", "
@@ -3278,34 +3379,10 @@ const EmissionCalculatorIPCC = ({
           "ipcc3alternativefuelvehicles",
         ] as const;
 
-        let data: Record<string, any>[] | null = null;
-        let successfulTable: string | null = null;
-        const attemptErrors: string[] = [];
+        const { rows: data, source: successfulTable, attemptErrors } =
+          await loadIpccFactorTableRows(tableCandidates);
 
-        for (const tableName of tableCandidates) {
-          const { data: attemptData, error: attemptError } = await supabase
-            .from(tableName as any)
-            .select("*")
-            .limit(1000);
-
-          if (attemptError) {
-            attemptErrors.push(`${tableName}: ${attemptError.message}`);
-            continue;
-          }
-
-          if ((attemptData || []).length > 0) {
-            data = attemptData as Record<string, any>[];
-            successfulTable = tableName;
-            break;
-          }
-
-          if (data === null) {
-            data = (attemptData || []) as Record<string, any>[];
-            successfulTable = tableName;
-          }
-        }
-
-        if (data === null) {
+        if (!successfulTable && attemptErrors.length > 0) {
           throw new Error(
             `Could not read Chapter 3 Alternative Fuel Vehicles table. Tried: ${tableCandidates.join(
               ", "

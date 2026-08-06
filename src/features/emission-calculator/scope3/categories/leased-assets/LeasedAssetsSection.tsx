@@ -23,6 +23,14 @@ import {
   type UkDeliveryFactorsMap,
 } from "@/components/emissions/shared/ukDeliveryFactors";
 import { formatEmissions } from "@/components/emissions/shared/utils";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  resolveLeasedElectricityKg,
+  resolveLeasedRefrigerantKg,
+  resolveLeasedTotalKg,
+  resolveLeasedTransportKg,
+  resolveSoldProductsQtyFactorKg,
+} from "@/api/calcConnection";
 
 interface LeasedAssetsSectionProps {
   type: 'upstream' | 'downstream';
@@ -276,7 +284,191 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const infrastructureTotalEmissions = useMemo(() => {
     return infrastructureComputedElectricityEmissions + infrastructureTotalRefrigerantEmissions;
   }, [infrastructureComputedElectricityEmissions, infrastructureTotalRefrigerantEmissions]);
-  
+
+  const [apiBuildingsElecKg, setApiBuildingsElecKg] = useState<number | null>(null);
+  const [apiEquipmentElecKg, setApiEquipmentElecKg] = useState<number | null>(null);
+  const [apiInfrastructureElecKg, setApiInfrastructureElecKg] = useState<number | null>(null);
+  const [apiBuildingsTotalKg, setApiBuildingsTotalKg] = useState<number | null>(null);
+  const [apiEquipmentTotalKg, setApiEquipmentTotalKg] = useState<number | null>(null);
+  const [apiInfrastructureTotalKg, setApiInfrastructureTotalKg] = useState<number | null>(null);
+  const [apiTransportTotalKg, setApiTransportTotalKg] = useState<number | null>(null);
+
+  const buildingsElecLocal =
+    apiBuildingsElecKg ?? computedElectricityEmissions;
+  const displayBuildingsElec = apiBuildingsTotalKg ?? buildingsElecLocal;
+  const displayEquipmentElec =
+    apiEquipmentElecKg ?? equipmentComputedElectricityEmissions;
+  const displayInfrastructureElec =
+    apiInfrastructureElecKg ?? infrastructureComputedElectricityEmissions;
+  const displayEquipmentTotal =
+    apiEquipmentTotalKg ??
+    displayEquipmentElec + equipmentTotalTransportEmissions;
+  const displayInfrastructureTotal =
+    apiInfrastructureTotalKg ??
+    displayInfrastructureElec + infrastructureTotalRefrigerantEmissions;
+  const displayTransportTotal =
+    apiTransportTotalKg ?? totalTransportEmissions;
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH || !totalKwh) {
+      setApiBuildingsElecKg(null);
+      return;
+    }
+    const sumOther = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedElectricityKg({
+        total_kwh: totalKwh,
+        grid_pct: gridPct,
+        grid_factor: gridFactor,
+        other_pct: otherPct,
+        other_row_emissions_sum: sumOther,
+        renewable_pct: renewablePct,
+      });
+      if (!cancelled) setApiBuildingsElecKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [totalKwh, gridPct, gridFactor, otherPct, renewablePct, otherRows]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH || !equipmentTotalKwh) {
+      setApiEquipmentElecKg(null);
+      return;
+    }
+    const sumOther = equipmentOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedElectricityKg({
+        total_kwh: equipmentTotalKwh,
+        grid_pct: equipmentGridPct,
+        grid_factor: equipmentGridFactor,
+        other_pct: equipmentOtherPct,
+        other_row_emissions_sum: sumOther,
+        renewable_pct: equipmentRenewablePct,
+      });
+      if (!cancelled) setApiEquipmentElecKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    equipmentTotalKwh,
+    equipmentGridPct,
+    equipmentGridFactor,
+    equipmentOtherPct,
+    equipmentRenewablePct,
+    equipmentOtherRows,
+  ]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH || !infrastructureTotalKwh) {
+      setApiInfrastructureElecKg(null);
+      return;
+    }
+    const sumOther = infrastructureOtherRows.reduce(
+      (s, r) => s + (r.emissions || 0),
+      0
+    );
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedElectricityKg({
+        total_kwh: infrastructureTotalKwh,
+        grid_pct: infrastructureGridPct,
+        grid_factor: infrastructureGridFactor,
+        other_pct: infrastructureOtherPct,
+        other_row_emissions_sum: sumOther,
+        renewable_pct: infrastructureRenewablePct,
+      });
+      if (!cancelled) setApiInfrastructureElecKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    infrastructureTotalKwh,
+    infrastructureGridPct,
+    infrastructureGridFactor,
+    infrastructureOtherPct,
+    infrastructureRenewablePct,
+    infrastructureOtherRows,
+  ]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH) {
+      setApiBuildingsTotalKg(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedTotalKg({
+        category: "buildings",
+        electricity_kg: buildingsElecLocal,
+      });
+      if (!cancelled) setApiBuildingsTotalKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [buildingsElecLocal]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH) {
+      setApiEquipmentTotalKg(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedTotalKg({
+        category: "equipment",
+        electricity_kg: displayEquipmentElec,
+        transport_rows_kg: equipmentTransportRows.map((r) => r.emissions || 0),
+      });
+      if (!cancelled) setApiEquipmentTotalKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayEquipmentElec, equipmentTransportRows]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH) {
+      setApiInfrastructureTotalKg(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedTotalKg({
+        category: "infrastructure",
+        electricity_kg: displayInfrastructureElec,
+        refrigerant_kg: infrastructureTotalRefrigerantEmissions,
+      });
+      if (!cancelled) setApiInfrastructureTotalKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayInfrastructureElec, infrastructureTotalRefrigerantEmissions]);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH) {
+      setApiTransportTotalKg(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveLeasedTotalKg({
+        category: "transport",
+        transport_rows_kg: transportRows.map((r) => r.emissions || 0),
+      });
+      if (!cancelled) setApiTransportTotalKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [transportRows]);
+
   // Helper functions - Buildings & Facilities
   const addOtherRow = () => {
     setOtherRows(prev => [...prev, { id: crypto.randomUUID() }]);
@@ -287,6 +479,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   };
   
   const updateOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    let snapshot: OtherSourceRow | null = null;
     setOtherRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next: OtherSourceRow = { ...r, ...updates };
@@ -299,8 +492,21 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
       } else {
         next.emissions = undefined;
       }
+      snapshot = next;
       return next;
     }));
+    if (USE_JWT_AUTH && snapshot && typeof snapshot.quantity === "number" && typeof snapshot.factor === "number") {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveSoldProductsQtyFactorKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+        });
+        setOtherRows((prev) =>
+          prev.map((r) => (r.id === id && r.quantity === snap.quantity ? { ...r, emissions: kg } : r))
+        );
+      })();
+    }
   };
   
   // Helper functions - Transport
@@ -384,6 +590,33 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
       return updated;
     }));
+    if (
+      USE_JWT_AUTH &&
+      typeof updates.distance === "number"
+    ) {
+      // Re-read latest row after local update for API reconcile
+      void (async () => {
+        setTransportRows((prev) => {
+          const row = prev.find((r) => r.id === id);
+          if (!row || typeof row.distance !== "number" || typeof row.factor !== "number") {
+            return prev;
+          }
+          void resolveLeasedTransportKg({
+            quantity: row.distance,
+            factor: row.factor,
+          }).then((kg) => {
+            setTransportRows((cur) =>
+              cur.map((r) =>
+                r.id === id && r.distance === row.distance && r.emissions !== kg
+                  ? { ...r, emissions: kg }
+                  : r
+              )
+            );
+          });
+          return prev;
+        });
+      })();
+    }
   };
 
   const addTransportRow = () => {
@@ -398,6 +631,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   
   // Helper functions - Equipment & Machinery
   const updateEquipmentOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    let snapshot: OtherSourceRow | null = null;
     setEquipmentOtherRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...updates };
@@ -414,8 +648,28 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
         next.factor = undefined;
         next.emissions = undefined;
       }
+      snapshot = next;
       return next;
     }));
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveSoldProductsQtyFactorKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+        });
+        setEquipmentOtherRows((prev) =>
+          prev.map((r) =>
+            r.id === id && r.quantity === snap.quantity ? { ...r, emissions: kg } : r
+          )
+        );
+      })();
+    }
   };
   
   const addEquipmentOtherRow = () => {
@@ -522,6 +776,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   
   // Helper functions - Infrastructure & Utilities
   const updateInfrastructureOtherRow = (id: string, updates: Partial<OtherSourceRow>) => {
+    let snapshot: OtherSourceRow | null = null;
     setInfrastructureOtherRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...updates };
@@ -538,8 +793,28 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
         next.factor = undefined;
         next.emissions = undefined;
       }
+      snapshot = next;
       return next;
     }));
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveSoldProductsQtyFactorKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+        });
+        setInfrastructureOtherRows((prev) =>
+          prev.map((r) =>
+            r.id === id && r.quantity === snap.quantity ? { ...r, emissions: kg } : r
+          )
+        );
+      })();
+    }
   };
   
   const addInfrastructureOtherRow = () => {
@@ -553,6 +828,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   };
   
   const updateInfrastructureRefrigerantRow = (id: string, updates: Partial<RefrigerantRow>) => {
+    let snapshot: RefrigerantRow | null = null;
     setInfrastructureRefrigerantRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next = { ...r, ...updates };
@@ -567,8 +843,28 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
       } else {
         next.emissions = undefined;
       }
+      snapshot = next;
       return next;
     }));
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveLeasedRefrigerantKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+        });
+        setInfrastructureRefrigerantRows((prev) =>
+          prev.map((r) =>
+            r.id === id && r.quantity === snap.quantity ? { ...r, emissions: kg } : r
+          )
+        );
+      })();
+    }
   };
   
   const addInfrastructureRefrigerantRow = () => {
@@ -847,7 +1143,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="text-gray-900 font-medium">
-              Total electricity emissions: <span className="font-semibold">{computedElectricityEmissions.toFixed(6)} kg CO2e</span>
+              Total electricity emissions: <span className="font-semibold">{displayBuildingsElec.toFixed(6)} kg CO2e</span>
             </div>
             <Button onClick={() => toast({ title: 'Saved', description: 'Buildings & Facilities data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> Save
@@ -1157,7 +1453,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
           <div className="flex items-center justify-between pt-4 border-t">
             <div className="text-gray-900 font-medium">
-              Total transport emissions: <span className="font-semibold">{formatEmissions(totalTransportEmissions)} kg CO2e</span>
+              Total transport emissions: <span className="font-semibold">{formatEmissions(displayTransportTotal)} kg CO2e</span>
             </div>
             <Button onClick={() => toast({ title: 'Saved', description: 'Transport & Logistics data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
               <Save className="h-4 w-4 mr-2" /> Save
@@ -1405,7 +1701,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="text-gray-900 font-medium">
-                Total electricity emissions: <span className="font-semibold">{equipmentComputedElectricityEmissions.toFixed(6)} kg CO2e</span>
+                Total electricity emissions: <span className="font-semibold">{displayEquipmentElec.toFixed(6)} kg CO2e</span>
               </div>
             </div>
           </div>
@@ -1719,7 +2015,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           {(equipmentComputedElectricityEmissions > 0 || equipmentTotalTransportEmissions > 0) && (
             <div className="flex items-center justify-between pt-4 border-t-2 border-[#1D9E75]">
               <div className="text-lg font-semibold text-gray-900">
-                Total Equipment & Machinery emissions: <span className="text-[#1D9E75]">{equipmentTotalEmissions.toFixed(6)} kg CO2e</span>
+                Total Equipment & Machinery emissions: <span className="text-[#1D9E75]">{displayEquipmentTotal.toFixed(6)} kg CO2e</span>
               </div>
               <Button onClick={() => toast({ title: 'Saved', description: 'Equipment & Machinery data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Save className="h-4 w-4 mr-2" /> Save
@@ -1970,7 +2266,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
 
             <div className="flex items-center justify-between pt-4 border-t">
               <div className="text-gray-900 font-medium">
-                Total electricity emissions: <span className="font-semibold">{infrastructureComputedElectricityEmissions.toFixed(6)} kg CO2e</span>
+                Total electricity emissions: <span className="font-semibold">{displayInfrastructureElec.toFixed(6)} kg CO2e</span>
               </div>
             </div>
           </div>
@@ -2057,7 +2353,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
           {(infrastructureComputedElectricityEmissions > 0 || infrastructureTotalRefrigerantEmissions > 0) && (
             <div className="flex items-center justify-between pt-4 border-t-2 border-[#1D9E75]">
               <div className="text-lg font-semibold text-gray-900">
-                Total Infrastructure & Utilities emissions: <span className="text-[#1D9E75]">{infrastructureTotalEmissions.toFixed(6)} kg CO2e</span>
+                Total Infrastructure & Utilities emissions: <span className="text-[#1D9E75]">{displayInfrastructureTotal.toFixed(6)} kg CO2e</span>
               </div>
               <Button onClick={() => toast({ title: 'Saved', description: 'Infrastructure & Utilities data saved (frontend only for now).' })} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
                 <Save className="h-4 w-4 mr-2" /> Save

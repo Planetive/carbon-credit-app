@@ -8,7 +8,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  getLatestEmissionHistoryAssessment,
+  saveEmissionHistoryAssessment,
+  type EmissionHistoryAssessment,
+} from "@/integrations/supabase/emissionHistoryClient";
 import { ArrowRight, Building2, MapPin, Users, Calculator, CheckCircle, AlertCircle, Save } from "lucide-react";
 
 const EmissionHistoryScreen: React.FC = () => {
@@ -40,24 +44,23 @@ const EmissionHistoryScreen: React.FC = () => {
   const [existingAssessment, setExistingAssessment] = useState<EmissionHistoryAssessment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Type definition for emission history assessment
-  interface EmissionHistoryAssessment {
-    id: string;
-    user_id: string;
-    company_name: string;
-    sector: string;
-    location: string;
-    governance_structure: string;
-    is_measuring_emissions: boolean;
-    are_emissions_verified: boolean | null;
-    scope1_emissions: number | null;
-    scope2_emissions: number | null;
-    scope3_emissions: number | null;
-    wants_to_use_calculator: boolean | null;
-    status: string;
-    created_at: string;
-    updated_at: string;
-  }
+  const buildPayload = (status: string) => {
+    if (!user) throw new Error("Not signed in");
+    return {
+      user_id: user.id,
+      company_name: companyInfo.companyName,
+      sector: companyInfo.sector,
+      location: companyInfo.location,
+      governance_structure: companyInfo.governanceStructure,
+      is_measuring_emissions: isMeasuringEmissions === "yes",
+      are_emissions_verified: isMeasuringEmissions === "yes" ? (areEmissionsVerified === "yes") : null,
+      scope1_emissions: isMeasuringEmissions === "yes" && emissionsData.scope1 ? parseFloat(emissionsData.scope1) : null,
+      scope2_emissions: isMeasuringEmissions === "yes" && emissionsData.scope2 ? parseFloat(emissionsData.scope2) : null,
+      scope3_emissions: isMeasuringEmissions === "yes" && emissionsData.scope3 ? parseFloat(emissionsData.scope3) : null,
+      wants_to_use_calculator: isMeasuringEmissions === "no" ? (wantsToUseCalculator === "yes") : null,
+      status,
+    };
+  };
 
   const handleCompanyInfoChange = (field: string, value: string) => {
     setCompanyInfo(prev => ({ ...prev, [field]: value }));
@@ -81,31 +84,11 @@ const EmissionHistoryScreen: React.FC = () => {
 
     // Save current form data as draft before navigating
     try {
-      const payload = {
-        user_id: user.id,
-        company_name: companyInfo.companyName,
-        sector: companyInfo.sector,
-        location: companyInfo.location,
-        governance_structure: companyInfo.governanceStructure,
-        is_measuring_emissions: isMeasuringEmissions === "yes",
-        are_emissions_verified: isMeasuringEmissions === "yes" ? (areEmissionsVerified === "yes") : null,
-        scope1_emissions: isMeasuringEmissions === "yes" && emissionsData.scope1 ? parseFloat(emissionsData.scope1) : null,
-        scope2_emissions: isMeasuringEmissions === "yes" && emissionsData.scope2 ? parseFloat(emissionsData.scope2) : null,
-        scope3_emissions: isMeasuringEmissions === "yes" && emissionsData.scope3 ? parseFloat(emissionsData.scope3) : null,
-        wants_to_use_calculator: isMeasuringEmissions === "no" ? (wantsToUseCalculator === "yes") : null,
-        status: 'draft'
-      };
-
-      if (existingAssessment) {
-        await (supabase as any)
-          .from('emission_history_assessments')
-          .update(payload)
-          .eq('id', existingAssessment.id);
-      } else {
-        await (supabase as any)
-          .from('emission_history_assessments')
-          .insert(payload);
-      }
+      const saved = await saveEmissionHistoryAssessment(
+        buildPayload("draft"),
+        existingAssessment?.id
+      );
+      setExistingAssessment(saved);
 
       toast({
         title: "Progress Saved",
@@ -135,18 +118,9 @@ const EmissionHistoryScreen: React.FC = () => {
       }
 
       try {
-        const { data, error } = await (supabase as any)
-          .from('emission_history_assessments')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const assessment = await getLatestEmissionHistoryAssessment(user.id);
 
-        if (error) throw error;
-
-        if (data) {
-          const assessment = data as EmissionHistoryAssessment;
+        if (assessment) {
           setExistingAssessment(assessment);
           setCompanyInfo({
             companyName: assessment.company_name || "",
@@ -190,35 +164,11 @@ const EmissionHistoryScreen: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        user_id: user.id,
-        company_name: companyInfo.companyName,
-        sector: companyInfo.sector,
-        location: companyInfo.location,
-        governance_structure: companyInfo.governanceStructure,
-        is_measuring_emissions: isMeasuringEmissions === "yes",
-        are_emissions_verified: isMeasuringEmissions === "yes" ? (areEmissionsVerified === "yes") : null,
-        scope1_emissions: isMeasuringEmissions === "yes" && emissionsData.scope1 ? parseFloat(emissionsData.scope1) : null,
-        scope2_emissions: isMeasuringEmissions === "yes" && emissionsData.scope2 ? parseFloat(emissionsData.scope2) : null,
-        scope3_emissions: isMeasuringEmissions === "yes" && emissionsData.scope3 ? parseFloat(emissionsData.scope3) : null,
-        wants_to_use_calculator: isMeasuringEmissions === "no" ? (wantsToUseCalculator === "yes") : null,
-        status: 'submitted'
-      };
-
-      if (existingAssessment) {
-        const { error } = await (supabase as any)
-          .from('emission_history_assessments')
-          .update(payload)
-          .eq('id', existingAssessment.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any)
-          .from('emission_history_assessments')
-          .insert(payload);
-
-        if (error) throw error;
-      }
+      const saved = await saveEmissionHistoryAssessment(
+        buildPayload("submitted"),
+        existingAssessment?.id
+      );
+      setExistingAssessment(saved);
 
       toast({
         title: "Success",

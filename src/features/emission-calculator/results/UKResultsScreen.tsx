@@ -3,7 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  calculateLegacyScope2ElectricityTotal,
+  loadLegacyCategoryDetailRows,
+  safeListLegacyTable,
+  sumEmissionsField,
+  sumInvestmentAttributed,
+  sumRowDataEmissions,
+} from '@/integrations/supabase/ghgEntryAggregates';
 import {
   exportFullEmissionReportPdf,
   mapEmissionResultsPageToCalculatorShape,
@@ -125,16 +132,6 @@ const UKResultsScreen = () => {
     "standard",
   ];
 
-  const applyFuelFrameworkFilter = (query: any) => {
-    if (isEPA) return query.or("emission_framework.eq.epa,emission_framework.is.null");
-    return query.eq("emission_framework", "uk");
-  };
-
-  const applyRefrigerantFrameworkFilter = (query: any) => {
-    if (isEPA) return query.or("emission_framework.eq.epa,emission_framework.is.null");
-    return query.eq("emission_framework", "uk");
-  };
-
   const prettifyColumnLabel = (col: string) => {
     return col
       .replace(/_/g, " ")
@@ -154,103 +151,11 @@ const UKResultsScreen = () => {
     setDetailLoading(true);
     setDetailError(null);
     try {
-      let query: any = null;
-      switch (key) {
-        // Scope 1
-        case 'fuel':
-          query = applyFuelFrameworkFilter(
-            (supabase as any).from('scope1_fuel_entries').select('*').eq('user_id', user.id)
-          );
-          break;
-        case 'refrigerant':
-          query = applyRefrigerantFrameworkFilter(
-            (supabase as any).from('scope1_refrigerant_entries').select('*').eq('user_id', user.id)
-          );
-          break;
-        case 'passenger':
-          query = (supabase as any).from('scope1_passenger_vehicle_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'delivery':
-          query = (supabase as any).from('scope1_delivery_vehicle_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_mobile':
-          query = (supabase as any).from('scope1_epa_mobile_fuel_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_on_road_gas':
-          query = (supabase as any).from('scope1_epa_on_road_gasoline_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_on_road_diesel':
-          query = (supabase as any).from('scope1_epa_on_road_diesel_alt_fuel_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_non_road':
-          query = (supabase as any).from('scope1_epa_non_road_vehicle_entries').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_scope1_heat_steam':
-          query = (supabase as any).from('scope1_heatsteam_entries_epa').select('*').eq('user_id', user.id);
-          break;
-        case 'epa_heat_steam':
-          query = (supabase as any).from('scope2_heatsteam_entries_epa').select('*').eq('user_id', user.id);
-          break;
-        // Scope 2
-        case 'scope2_electricity':
-          query = (supabase as any).from('scope2_electricity_subanswers').select('*').eq('user_id', user.id);
-          break;
-        case 'scope2_heatsteam':
-          query = (supabase as any).from('scope2_heatsteam_entries').select('*').eq('user_id', user.id);
-          break;
-        // Scope 3 upstream
-        case 'scope3_purchased_goods':
-          query = (supabase as any).from('scope3_purchased_goods_services').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_capital_goods':
-          query = (supabase as any).from('scope3_capital_goods').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_fuel_energy':
-          query = (supabase as any).from('scope3_fuel_energy_activities').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_upstream_transport':
-          query = (supabase as any).from('scope3_upstream_transportation').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_waste_generated':
-          query = (supabase as any).from('scope3_waste_generated').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_business_travel':
-          query = (supabase as any).from('scope3_business_travel').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_employee_commuting':
-          query = (supabase as any).from('scope3_employee_commuting').select('*').eq('user_id', user.id);
-          break;
-        // Scope 3 downstream
-        case 'scope3_downstream_transport':
-          query = (supabase as any).from('scope3_downstream_transportation').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_processing_sold':
-          query = (supabase as any).from('scope3_processing_sold_products').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_use_of_sold':
-          query = (supabase as any).from('scope3_use_of_sold_products').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_end_of_life':
-          query = (supabase as any).from('scope3_end_of_life_treatment').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_investments':
-          query = (supabase as any).from('scope3_investments').select('*').eq('user_id', user.id);
-          break;
-        case 'scope3_facilitated':
-          query = (supabase as any).from('scope3_facilitated_emissions').select('*').eq('user_id', user.id);
-          break;
-        default:
-          query = null;
-      }
-
-      if (!query) {
-        setDetailRows([]);
-        return;
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setDetailRows(data || []);
+      const rows = await loadLegacyCategoryDetailRows(key, user.id, {
+        variant: 'uk',
+        fuelFramework: isEPA ? 'epa' : 'uk',
+      });
+      setDetailRows(rows);
     } catch (e: any) {
       setDetailError(e.message || 'Failed to load details');
     } finally {
@@ -478,198 +383,115 @@ const UKResultsScreen = () => {
         return;
       }
       try {
+        const fuelFramework = isEPA ? 'epa' : 'uk';
         const [
-          fuelRes,
-          refRes,
-          passRes,
-          delRes,
-          mobileEpaRes,
-          onRoadGasRes,
-          onRoadDieselRes,
-          nonRoadEpaRes,
+          fuelRows,
+          refRows,
+          passRows,
+          delRows,
+          mobileEpaRows,
+          onRoadGasRows,
+          onRoadDieselRows,
+          nonRoadEpaRows,
+          heatRows,
+          epaHeatRows,
+          scope1HeatSteamRows,
+          purchasedGoodsRows,
+          capitalGoodsRows,
+          fuelEnergyRows,
+          upstreamTransportRows,
+          wasteGeneratedRows,
+          businessTravelRows,
+          employeeCommutingRows,
+          investmentsRows,
+          facilitatedRows,
+          downstreamTransportRows,
+          endOfLifeRows,
+          processingSoldRows,
+          useOfSoldRows,
+          lcaRows,
         ] = await Promise.all([
-          applyFuelFrameworkFilter(
-            (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id)
+          safeListLegacyTable('scope1_fuel_entries', user.id, { emission_framework: fuelFramework }),
+          safeListLegacyTable('scope1_refrigerant_entries', user.id, { emission_framework: fuelFramework }),
+          safeListLegacyTable('scope1_passenger_vehicle_entries', user.id),
+          safeListLegacyTable('scope1_delivery_vehicle_entries', user.id),
+          safeListLegacyTable('scope1_epa_mobile_fuel_entries', user.id),
+          safeListLegacyTable('scope1_epa_on_road_gasoline_entries', user.id),
+          safeListLegacyTable('scope1_epa_on_road_diesel_alt_fuel_entries', user.id),
+          safeListLegacyTable('scope1_epa_non_road_vehicle_entries', user.id),
+          safeListLegacyTable('scope2_heatsteam_entries', user.id),
+          safeListLegacyTable('scope2_heatsteam_entries_epa', user.id),
+          safeListLegacyTable('scope1_heatsteam_entries_epa', user.id),
+          safeListLegacyTable('scope3_purchased_goods_services', user.id),
+          safeListLegacyTable('scope3_capital_goods', user.id),
+          safeListLegacyTable('scope3_fuel_energy_activities', user.id),
+          safeListLegacyTable('scope3_upstream_transportation', user.id),
+          safeListLegacyTable('scope3_waste_generated', user.id),
+          safeListLegacyTable('scope3_business_travel', user.id),
+          safeListLegacyTable('scope3_employee_commuting', user.id),
+          safeListLegacyTable('scope3_investments', user.id),
+          safeListLegacyTable('scope3_facilitated_emissions', user.id),
+          safeListLegacyTable('scope3_downstream_transportation', user.id),
+          safeListLegacyTable('scope3_end_of_life_treatment', user.id),
+          safeListLegacyTable('scope3_processing_sold_products', user.id),
+          safeListLegacyTable('scope3_use_of_sold_products', user.id),
+          safeListLegacyTable('scope3_lca_entries', user.id, {}, (row) =>
+            ['scope3_upstream', 'scope3_downstream'].includes(String(row.scope_type))
           ),
-          applyRefrigerantFrameworkFilter(
-            (supabase as any).from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id)
-          ),
-          supabase.from('scope1_passenger_vehicle_entries').select('emissions').eq('user_id', user.id),
-          supabase.from('scope1_delivery_vehicle_entries').select('emissions').eq('user_id', user.id),
-          // EPA Scope 1 tables (new calculators)
-          (supabase as any).from('scope1_epa_mobile_fuel_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_epa_on_road_gasoline_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_epa_on_road_diesel_alt_fuel_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_epa_non_road_vehicle_entries').select('emissions').eq('user_id', user.id),
         ]);
 
-        const sum = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
+        setFuelEmissions(sumEmissionsField(fuelRows));
+        setEpaMobileEmissions(sumEmissionsField(mobileEpaRows));
+        setEpaOnRoadGasEmissions(sumEmissionsField(onRoadGasRows));
+        setEpaOnRoadDieselEmissions(sumEmissionsField(onRoadDieselRows));
+        setEpaNonRoadEmissions(sumEmissionsField(nonRoadEpaRows));
+        setRefrigerantEmissions(sumEmissionsField(refRows));
+        setPassengerEmissions(sumEmissionsField(passRows));
+        setDeliveryEmissions(sumEmissionsField(delRows));
 
-        // Include EPA Scope 1 calculators inside the "Fuel" bucket so they show
-        // up in the existing Scope 1 breakdown and totals.
-        const epaMobile = sum(mobileEpaRes.data);
-        const epaOnRoadGas = sum(onRoadGasRes.data);
-        const epaOnRoadDiesel = sum(onRoadDieselRes.data);
-        const epaNonRoad = sum(nonRoadEpaRes.data);
-
-        // Base fuel always includes stationary fuel entries.
-        setFuelEmissions(sum(fuelRes.data));
-        // Store EPA-specific scope 1 buckets separately for EPA results view.
-        setEpaMobileEmissions(epaMobile);
-        setEpaOnRoadGasEmissions(epaOnRoadGas);
-        setEpaOnRoadDieselEmissions(epaOnRoadDiesel);
-        setEpaNonRoadEmissions(epaNonRoad);
-        setRefrigerantEmissions(sum(refRes.data));
-        setPassengerEmissions(sum(passRes.data));
-        setDeliveryEmissions(sum(delRes.data));
-
-        // Scope 2 - Electricity: pull latest main and its subanswers
-        const { data: mainRow } = await (supabase as any)
-          .from('scope2_electricity_main')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let elecTotal = 0;
-        if (mainRow) {
-          const totalKwh = Number(mainRow.total_kwh) || 0;
-          const gridPct = Number(mainRow.grid_pct) || 0;
-          const otherPct = Number(mainRow.other_pct) || 0;
-
-          const { data: subs } = await (supabase as any)
-            .from('scope2_electricity_subanswers')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('main_id', mainRow.id);
-
-          const gridRow = (subs || []).find((r: any) => r.type === 'grid');
-          const gridFactor = gridRow?.grid_emission_factor ? Number(gridRow.grid_emission_factor) : 0;
-          const gridPart = totalKwh > 0 && gridPct > 0 && gridFactor > 0 ? (gridPct / 100) * totalKwh * gridFactor : 0;
-
-          const otherRows = (subs || []).filter((r: any) => r.type === 'other');
-          const sumOtherEmissions = otherRows.reduce((s: number, r: any) => s + (Number(r.other_sources_emissions) || 0), 0);
-          const otherPart = totalKwh > 0 && otherPct > 0 ? (otherPct / 100) * totalKwh * sumOtherEmissions : 0;
-
-          elecTotal = Number((gridPart + otherPart).toFixed(6));
-        }
+        const elecTotal = await calculateLegacyScope2ElectricityTotal(user.id);
         setElectricityEmissions(elecTotal);
 
-        // Scope 2 - Heat & Steam (UK table)
-        const { data: heatRows } = await (supabase as any)
-          .from('scope2_heatsteam_entries')
-          .select('emissions')
-          .eq('user_id', user.id);
-        const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        const heatTotalRounded = Number(heatTotal.toFixed(6));
+        const heatTotalRounded = Number(sumEmissionsField(heatRows).toFixed(6));
         setHeatSteamEmissions(heatTotalRounded);
+        setEpaHeatSteamEmissions(Number(sumEmissionsField(epaHeatRows).toFixed(6)));
+        setEpaScope1HeatSteamEmissions(Number(sumEmissionsField(scope1HeatSteamRows).toFixed(6)));
 
-        // Scope 2 - Heat & Steam (EPA table, separate storage)
-        const { data: epaHeatRows } = await (supabase as any)
-          .from('scope2_heatsteam_entries_epa')
-          .select('emissions')
-          .eq('user_id', user.id);
-        const epaHeatTotal = (epaHeatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        setEpaHeatSteamEmissions(Number(epaHeatTotal.toFixed(6)));
+        const processingTotal = sumRowDataEmissions(processingSoldRows);
+        const useTotal = sumRowDataEmissions(useOfSoldRows);
+        const lcaUpstream = lcaRows.filter((r) => r.scope_type === 'scope3_upstream');
+        const lcaDownstream = lcaRows.filter((r) => r.scope_type === 'scope3_downstream');
 
-        // Scope 1 - Heat and Steam (EPA, same form as Fuel, separate table)
-        const { data: scope1HeatSteamRows } = await (supabase as any)
-          .from('scope1_heatsteam_entries_epa')
-          .select('emissions')
-          .eq('user_id', user.id);
-        const scope1HeatSteamTotal = (scope1HeatSteamRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        setEpaScope1HeatSteamEmissions(Number(scope1HeatSteamTotal.toFixed(6)));
-
-        // Scope 3 - Load all categories
-        const [
-          purchasedGoodsRes,
-          capitalGoodsRes,
-          fuelEnergyRes,
-          upstreamTransportRes,
-          wasteGeneratedRes,
-          businessTravelRes,
-          employeeCommutingRes,
-          investmentsRes,
-          facilitatedRes,
-          downstreamTransportRes,
-          endOfLifeRes,
-          processingSoldRes,
-          useOfSoldRes,
-          lcaRes,
-        ] = await Promise.all([
-          (supabase as any).from('scope3_purchased_goods_services').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_capital_goods').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_fuel_energy_activities').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_upstream_transportation').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
-          (supabase as any)
-            .from('scope3_investments')
-            .select('calculated_emissions, emissions, ownership_percentage')
-            .eq('user_id', user.id),
-          (supabase as any).from('scope3_facilitated_emissions').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
-          (supabase as any).from('scope3_use_of_sold_products').select('row_data').eq('user_id', user.id),
-          (supabase as any).from('scope3_lca_entries').select('emissions').eq('user_id', user.id).in('scope_type', ['scope3_upstream', 'scope3_downstream']),
-        ]);
-
-        const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
-        const sumInvestmentAttributed = (arr: any[] | null | undefined) =>
-          (arr || []).reduce((s, r) => {
-            const c = Number(r?.calculated_emissions);
-            if (Number.isFinite(c)) return s + c;
-            const inv = Number(r?.emissions) || 0;
-            const pct = Number(r?.ownership_percentage) || 0;
-            return s + (inv * pct) / 100;
-          }, 0);
-
-        setScope3PurchasedGoods(sumScope3(purchasedGoodsRes.data));
-        setScope3CapitalGoods(sumScope3(capitalGoodsRes.data));
-        setScope3FuelEnergy(sumScope3(fuelEnergyRes.data));
-        setScope3UpstreamTransport(sumScope3(upstreamTransportRes.data));
-        setScope3WasteGenerated(sumScope3(wasteGeneratedRes.data));
-        setScope3BusinessTravel(sumScope3(businessTravelRes.data));
-        setScope3EmployeeCommuting(sumScope3(employeeCommutingRes.data));
-        setScope3Investments(sumInvestmentAttributed(investmentsRes.data));
-        setScope3Facilitated(sumScope3(facilitatedRes.data));
-        setScope3DownstreamTransport(sumScope3(downstreamTransportRes.data));
-        setScope3EndOfLife(sumScope3(endOfLifeRes.data));
-
-        // Processing and Use of Sold Products - extract emissions from JSONB
-        const processingTotal = (processingSoldRes.data || []).reduce((s: number, r: any) => {
-          const rowData = r.row_data;
-          if (rowData && typeof rowData.emissions === 'number') {
-            return s + rowData.emissions;
-          }
-          return s;
-        }, 0);
+        setScope3PurchasedGoods(sumEmissionsField(purchasedGoodsRows));
+        setScope3CapitalGoods(sumEmissionsField(capitalGoodsRows));
+        setScope3FuelEnergy(sumEmissionsField(fuelEnergyRows));
+        setScope3UpstreamTransport(sumEmissionsField(upstreamTransportRows));
+        setScope3WasteGenerated(sumEmissionsField(wasteGeneratedRows));
+        setScope3BusinessTravel(sumEmissionsField(businessTravelRows));
+        setScope3EmployeeCommuting(sumEmissionsField(employeeCommutingRows));
+        setScope3Investments(sumInvestmentAttributed(investmentsRows));
+        setScope3Facilitated(sumEmissionsField(facilitatedRows));
+        setScope3DownstreamTransport(sumEmissionsField(downstreamTransportRows));
+        setScope3EndOfLife(sumEmissionsField(endOfLifeRows));
         setScope3ProcessingSold(processingTotal);
-
-        const useTotal = (useOfSoldRes.data || []).reduce((s: number, r: any) => {
-          const rowData = r.row_data;
-          if (rowData && typeof rowData.emissions === 'number') {
-            return s + rowData.emissions;
-          }
-          return s;
-        }, 0);
         setScope3UseOfSold(useTotal);
+        setScope3LCAUpstream(sumEmissionsField(lcaUpstream));
+        setScope3LCADownstream(sumEmissionsField(lcaDownstream));
 
-        // LCA entries are loaded but not included in Scope 3 totals (they are separate)
-        const lcaUpstream = (lcaRes.data || []).filter((r: any) => r.scope_type === 'scope3_upstream');
-        const lcaDownstream = (lcaRes.data || []).filter((r: any) => r.scope_type === 'scope3_downstream');
-        setScope3LCAUpstream(sumScope3(lcaUpstream));
-        setScope3LCADownstream(sumScope3(lcaDownstream));
-
-        // Keep minimal meta so existing UI sections render (excluding LCA entries)
-        const scope3TotalCalc = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
-          sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
-          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumInvestmentAttributed(investmentsRes.data) + 
-          sumScope3(facilitatedRes.data) +
-          sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
+        const scope3TotalCalc =
+          sumEmissionsField(purchasedGoodsRows) +
+          sumEmissionsField(capitalGoodsRows) +
+          sumEmissionsField(fuelEnergyRows) +
+          sumEmissionsField(upstreamTransportRows) +
+          sumEmissionsField(wasteGeneratedRows) +
+          sumEmissionsField(businessTravelRows) +
+          sumEmissionsField(employeeCommutingRows) +
+          sumInvestmentAttributed(investmentsRows) +
+          sumEmissionsField(facilitatedRows) +
+          sumEmissionsField(downstreamTransportRows) +
+          sumEmissionsField(endOfLifeRows) +
+          processingTotal +
+          useTotal;
 
         setResults({
           scope1_completion: 100,

@@ -4,7 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteScope3CategoryEntry,
+  fetchScope3CategoryEntries,
+  insertScope3CategoryEntries,
+  updateScope3CategoryEntry,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
+import { USE_JWT_AUTH } from "@/api/config";
+import { resolveSpendBasedEmissionsKg } from "@/api/calcConnection";
 import { SupplierAutocomplete } from "@/components/emissions/scope3/SupplierAutocomplete";
 import type { Supplier } from "@/components/emissions/scope3/types";
 import type { EmissionData } from "@/components/emissions/shared/types";
@@ -49,19 +56,47 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
     setPurchasedGoodsRows((prev) => prev.filter((r) => r.id !== id));
 
   const updatePurchasedGoodsRow = (id: string, patch: Partial<PurchasedGoodsRow>) => {
+    let snapshot: PurchasedGoodsRow | null = null;
+    let factor = 0;
     setPurchasedGoodsRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
         const updated: PurchasedGoodsRow = { ...r, ...patch };
         const supplier: Supplier | null | undefined = updated.supplier;
         if (supplier && typeof updated.amountSpent === "number" && updated.amountSpent > 0) {
+          factor = supplier.emission_factor;
           updated.emissions = updated.amountSpent * supplier.emission_factor;
         } else {
           updated.emissions = undefined;
         }
+        snapshot = updated;
         return updated;
       }),
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.amountSpent === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveSpendBasedEmissionsKg({
+          amount: snap.amountSpent!,
+          emission_factor: factor,
+          category: "purchased_goods",
+        });
+        setPurchasedGoodsRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.amountSpent !== snap.amountSpent) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
   // Load existing Purchased Goods entries
@@ -77,20 +112,12 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
       }
 
       try {
-        let query = supabase
-          .from("scope3_purchased_goods_services")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq("counterparty_id", counterpartyId);
-        } else {
-          query = query.is("counterparty_id", null);
-        }
-
-        const { data, error } = await query.order("created_at", { ascending: false });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_purchased_goods_services",
+          user.id,
+          !!companyContext,
+          counterpartyId,
+        );
 
         const loadedRows: PurchasedGoodsRow[] = (data || []).map((entry) => {
           const supplier: Supplier | null =
@@ -106,7 +133,7 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
 
           return {
             id: crypto.randomUUID(),
-            dbId: entry.id,
+            dbId: String(entry.id),
             isExisting: true,
             supplier,
             amountSpent: entry.amount_spent,
@@ -204,18 +231,13 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
           emissions: r.emissions!,
         }));
 
-        const { error } = await supabase
-          .from("scope3_purchased_goods_services")
-          .insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_purchased_goods_services", payload);
       }
 
-      // Update changed entries
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((r) =>
-          supabase
-            .from("scope3_purchased_goods_services")
-            .update({
+        await Promise.all(
+          changedExisting.map((r) =>
+            updateScope3CategoryEntry("scope3_purchased_goods_services", r.dbId!, {
               supplier_id: r.supplier!.id,
               supplier_name: r.supplier!.supplier_name,
               supplier_code: r.supplier!.code,
@@ -223,11 +245,8 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
               emission_factor: r.supplier!.emission_factor,
               emissions: r.emissions!,
             })
-            .eq("id", r.dbId!),
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find((r) => r.error)?.error;
-        if (updateError) throw updateError;
       }
 
       toast({
@@ -235,18 +254,17 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
       });
 
-      // Reload data
-      const { data: newData } = await supabase
-        .from("scope3_purchased_goods_services")
-        .select("*")
-        .eq("user_id", user.id)
-        .is("counterparty_id", companyContext && counterpartyId ? counterpartyId : null)
-        .order("created_at", { ascending: false });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_purchased_goods_services",
+        user.id,
+        !!companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows: PurchasedGoodsRow[] = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           supplier: entry.supplier_id
             ? {
@@ -289,12 +307,7 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
 
     setDeletingPurchasedGoods((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from("scope3_purchased_goods_services")
-        .delete()
-        .eq("id", row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_purchased_goods_services", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 

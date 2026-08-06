@@ -11,12 +11,17 @@ import {
   updateProcessingOtherSourceRows,
   updateProcessingRows,
 } from "../helpers/processingCalculations";
+import {
+  confirmOtherSourceKg,
+  confirmProcessingRowKg,
+} from "../helpers/confirmSoldProductsCalc";
 import { createProcessingRow } from "../rowFactories";
 import type {
   OtherSourceRow,
   PersistedProcessingSoldProductsRow,
   ProcessingSoldProductsRow,
 } from "../types";
+import { USE_JWT_AUTH } from "@/api/config";
 
 type UseProcessingSoldProductsOptions = {
   enabled: boolean;
@@ -122,16 +127,83 @@ export function useProcessingSoldProducts({
     addRow: () => setRows((prev) => [...prev, createProcessingRow()]),
     removeRow: (id: string) =>
       setRows((prev) => prev.filter((row) => row.id !== id)),
-    updateRow: (id: string, patch: Partial<ProcessingSoldProductsRow>) =>
-      setRows((prev) => updateProcessingRows(prev, id, patch)),
+    updateRow: (id: string, patch: Partial<ProcessingSoldProductsRow>) => {
+      let snapshot: ProcessingSoldProductsRow | null = null;
+      setRows((prev) => {
+        const next = updateProcessingRows(prev, id, patch);
+        snapshot = next.find((r) => r.id === id) ?? null;
+        return next;
+      });
+      if (USE_JWT_AUTH && snapshot) {
+        const snap = snapshot;
+        void (async () => {
+          const kg = await confirmProcessingRowKg(snap);
+          if (kg === undefined) return;
+          setRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: kg } : r)),
+          );
+        })();
+      }
+    },
     updateOtherSourceRow: (
       rowId: string,
       sourceId: string,
       patch: Partial<OtherSourceRow>,
-    ) =>
-      setRows((prev) =>
-        updateProcessingOtherSourceRows(prev, rowId, sourceId, patch),
-      ),
+    ) => {
+      let snapshotRow: ProcessingSoldProductsRow | null = null;
+      let snapshotSource: OtherSourceRow | null = null;
+      setRows((prev) => {
+        const next = updateProcessingOtherSourceRows(
+          prev,
+          rowId,
+          sourceId,
+          patch,
+        );
+        snapshotRow = next.find((r) => r.id === rowId) ?? null;
+        snapshotSource =
+          snapshotRow?.otherSources?.find((s) => s.id === sourceId) ?? null;
+        return next;
+      });
+      if (!USE_JWT_AUTH) return;
+      void (async () => {
+        if (
+          snapshotSource &&
+          typeof snapshotSource.quantity === "number" &&
+          typeof snapshotSource.factor === "number"
+        ) {
+          const srcKg = await confirmOtherSourceKg(snapshotSource);
+          if (srcKg !== undefined) {
+            setRows((prev) =>
+              prev.map((r) => {
+                if (r.id !== rowId) return r;
+                return {
+                  ...r,
+                  otherSources: (r.otherSources || []).map((s) =>
+                    s.id === sourceId ? { ...s, emissions: srcKg } : s,
+                  ),
+                };
+              }),
+            );
+          }
+        }
+        const row =
+          snapshotRow &&
+          ({
+            ...snapshotRow,
+            otherSources: (snapshotRow.otherSources || []).map((s) =>
+              s.id === sourceId && snapshotSource
+                ? { ...s, ...snapshotSource }
+                : s,
+            ),
+          } as ProcessingSoldProductsRow);
+        if (!row) return;
+        const kg = await confirmProcessingRowKg(row);
+        if (kg === undefined) return;
+        setRows((prev) =>
+          prev.map((r) => (r.id === rowId ? { ...r, emissions: kg } : r)),
+        );
+      })();
+    },
     addOtherSourceRow: (rowId: string) =>
       setRows((prev) => addProcessingOtherSourceRow(prev, rowId)),
     removeOtherSourceRow: (rowId: string, sourceId: string) =>

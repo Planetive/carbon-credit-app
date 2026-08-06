@@ -8,7 +8,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { USE_JWT_AUTH } from "@/api/config";
+import { resolveEpaRefrigerantEmissionsKg } from "@/api/calcConnection";
 import {
   calculateEpaRefrigerantEmissions,
   EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS,
@@ -111,14 +118,12 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
       }
       setLoading(true);
       try {
-        const { data, error } = await (supabase as any)
-          .from("scope1_refrigerant_entries")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("emission_framework", "epa")
-          .order("created_at", { ascending: false });
+        const data = await listLegacyTableEntries("scope1_refrigerant_entries", {
+          user_id: user.id,
+          emission_framework: "epa",
+          order: { column: "created_at", ascending: false },
+        });
 
-        if (error) throw error;
         const mapped = (data || []).map(mapDbRow);
         setRows(mapped);
         onDataChange(mapped.map((r) => ({ emissions: r.emissionsKg })));
@@ -138,11 +143,46 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
   }, [user?.id, toast]);
 
   const updateRow = (id: string, patch: Partial<EpaRefrigerantRow>) => {
+    let snapshot: EpaRefrigerantRow | null = null;
     setRows((prev) => {
-      const next = prev.map((r) => (r.id === id ? computeRow({ ...r, ...patch }) : r));
+      const next = prev.map((r) => {
+        if (r.id !== id) return r;
+        const computed = computeRow({ ...r, ...patch });
+        snapshot = computed;
+        return computed;
+      });
       onDataChange(next.map((r) => ({ emissions: r.emissionsKg })));
       return next;
     });
+
+    if (USE_JWT_AUTH && snapshot && snapshot.gwp != null && snapshot.emissionsKg != null) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveEpaRefrigerantEmissionsKg({
+          method: snap.method,
+          gwp: snap.gwp!,
+          leakage_kg: snap.leakageKg,
+          charge_kg: snap.chargeKg,
+          leakage_rate_percent: snap.leakageRatePercent,
+        });
+        setRows((prev) => {
+          const next = prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.method !== snap.method || r.gwp !== snap.gwp) return r;
+            if (r.leakageKg !== snap.leakageKg || r.chargeKg !== snap.chargeKg) return r;
+            if (r.leakageRatePercent !== snap.leakageRatePercent) return r;
+            if (r.emissionsKg === kg) return r;
+            return {
+              ...r,
+              emissionsKg: kg,
+              emissionsTonnes: kg / 1000,
+            };
+          });
+          onDataChange(next.map((r) => ({ emissions: r.emissionsKg })));
+          return next;
+        });
+      })();
+    }
   };
 
   const addRow = () => setRows((prev) => [...prev, computeRow(newRow())]);
@@ -162,14 +202,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
 
     setDeletingIds((prev) => new Set(prev).add(id));
     try {
-      const { data: deleted, error } = await (supabase as any)
-        .from("scope1_refrigerant_entries")
-        .delete()
-        .eq("id", row.dbId)
-        .eq("user_id", user!.id)
-        .select("id");
-      if (error) throw error;
-      if (!deleted?.length) throw new Error("Entry was not removed from the database.");
+      await deleteLegacyTableEntry("scope1_refrigerant_entries", row.dbId);
 
       removeRow(id);
       toast({ title: "Deleted", description: "Refrigerant entry removed." });
@@ -215,15 +248,13 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
         equipment_type: r.equipmentType ?? null,
       }));
 
-      const { error } = await (supabase as any).from("scope1_refrigerant_entries").insert(payload);
-      if (error) throw error;
+      await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
 
-      const { data: reloaded } = await (supabase as any)
-        .from("scope1_refrigerant_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("emission_framework", "epa")
-        .order("created_at", { ascending: false });
+      const reloaded = await listLegacyTableEntries("scope1_refrigerant_entries", {
+        user_id: user.id,
+        emission_framework: "epa",
+        order: { column: "created_at", ascending: false },
+      });
 
       const mapped = (reloaded || []).map(mapDbRow);
       setRows(mapped);

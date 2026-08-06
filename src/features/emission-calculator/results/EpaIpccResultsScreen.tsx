@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadEpaIpccResults, EpaIpccResultsData } from "@/lib/epaIpccResults";
-import { supabase } from "@/integrations/supabase/client";
+import { loadLegacyCategoryDetailRows } from "@/integrations/supabase/ghgEntryAggregates";
 import { exportFullEmissionReportPdf } from "@/utils/fullEmissionReportExport";
 import ResultsSummaryCard from "./components/ResultsSummaryCard";
 import ScopeHighlightCards from "./components/ScopeHighlightCards";
@@ -198,107 +198,8 @@ const EpaIpccResultsScreen = () => {
     setDetailError(null);
 
     try {
-      let query: any = null;
-      switch (key) {
-        case "fuel":
-          query = (supabase as any)
-            .from("scope1_fuel_entries")
-            .select("*")
-            .eq("user_id", user.id)
-            .or("emission_framework.eq.epa,emission_framework.is.null");
-          break;
-        case "mobile":
-          query = (supabase as any).from("scope1_epa_mobile_fuel_entries").select("*").eq("user_id", user.id);
-          break;
-        case "onroad_gas":
-          query = (supabase as any).from("scope1_epa_on_road_gasoline_entries").select("*").eq("user_id", user.id);
-          break;
-        case "onroad_diesel":
-          query = (supabase as any).from("scope1_epa_on_road_diesel_alt_fuel_entries").select("*").eq("user_id", user.id);
-          break;
-        case "nonroad":
-          query = (supabase as any).from("scope1_epa_non_road_vehicle_entries").select("*").eq("user_id", user.id);
-          break;
-        case "heatsteam":
-          query = (supabase as any).from("scope1_heatsteam_entries_epa").select("*").eq("user_id", user.id);
-          break;
-        case "uk_refrigerant":
-          query = (supabase as any)
-            .from("scope1_refrigerant_entries")
-            .select("*")
-            .eq("user_id", user.id)
-            .in("emission_framework", ["epa", "uk_epa"]);
-          break;
-        case "flaring":
-          query = (supabase as any).from("ipcc_scope1_flaring_entries").select("*").eq("user_id", user.id);
-          break;
-        case "venting":
-          query = (supabase as any).from("ipcc_scope1_venting_entries").select("*").eq("user_id", user.id);
-          break;
-        case "vehicular":
-          query = (supabase as any).from("ipcc_scope1_vehicular_entries").select("*").eq("user_id", user.id);
-          break;
-        case "kitchen":
-          query = (supabase as any).from("ipcc_scope1_kitchen_entries").select("*").eq("user_id", user.id);
-          break;
-        case "power":
-          query = (supabase as any).from("ipcc_scope1_power_entries").select("*").eq("user_id", user.id);
-          break;
-        case "heating":
-          query = (supabase as any).from("ipcc_scope1_heating_entries").select("*").eq("user_id", user.id);
-          break;
-        case "electricity":
-          query = (supabase as any).from("scope2_electricity_subanswers").select("*").eq("user_id", user.id);
-          break;
-        case "scope2_heatsteam":
-          query = (supabase as any).from("scope2_heatsteam_entries_epa").select("*").eq("user_id", user.id);
-          break;
-        case "purchased_goods":
-          query = (supabase as any).from("scope3_purchased_goods_services").select("*").eq("user_id", user.id);
-          break;
-        case "capital_goods":
-          query = (supabase as any).from("scope3_capital_goods").select("*").eq("user_id", user.id);
-          break;
-        case "fuel_energy":
-          query = (supabase as any).from("scope3_fuel_energy_activities").select("*").eq("user_id", user.id);
-          break;
-        case "upstream_transport":
-          query = (supabase as any).from("scope3_upstream_transportation").select("*").eq("user_id", user.id);
-          break;
-        case "waste":
-          query = (supabase as any).from("scope3_waste_generated").select("*").eq("user_id", user.id);
-          break;
-        case "business_travel":
-          query = (supabase as any).from("scope3_business_travel").select("*").eq("user_id", user.id);
-          break;
-        case "employee_commuting":
-          query = (supabase as any).from("scope3_employee_commuting").select("*").eq("user_id", user.id);
-          break;
-        case "investments":
-          query = (supabase as any).from("scope3_investments").select("*").eq("user_id", user.id);
-          break;
-        case "downstream_transport":
-          query = (supabase as any).from("scope3_downstream_transportation").select("*").eq("user_id", user.id);
-          break;
-        case "end_of_life":
-          query = (supabase as any).from("scope3_end_of_life_treatment").select("*").eq("user_id", user.id);
-          break;
-        case "processing_sold":
-          query = (supabase as any).from("scope3_processing_sold_products").select("*").eq("user_id", user.id);
-          break;
-        case "use_of_sold":
-          query = (supabase as any).from("scope3_use_of_sold_products").select("*").eq("user_id", user.id);
-          break;
-      }
-
-      if (!query) {
-        setDetailRows([]);
-        return;
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setDetailRows(data || []);
+      const rows = await loadLegacyCategoryDetailRows(key, user.id, { variant: "epa_ipcc" });
+      setDetailRows(rows);
     } catch (e: any) {
       setDetailError(e?.message || "Failed to load details");
     } finally {

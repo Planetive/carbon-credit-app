@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  ArrowLeft, 
-  Search, 
-  FileText, 
-  Clock, 
-  CheckCircle, 
-  Users, 
+import {
+  ArrowLeft,
+  Search,
+  FileText,
+  Clock,
+  CheckCircle,
   TrendingUp,
   LogOut,
-  Eye
 } from 'lucide-react';
-import { supabase, adminSupabase } from '@/integrations/supabase/client';
+import { adminSupabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminAuth } from '@/features/admin/hooks/useAdminAuth';
+import {
+  isAdminEsgApiEnabled,
+  listAdminEsgAssessments,
+} from '@/api/esg';
+import { ESG_READINESS_ASSESSMENT_TYPE } from '@/features/esg-readiness/constants';
 
 interface Assessment {
   id: string;
@@ -28,106 +31,112 @@ interface Assessment {
   created_at: string;
   submitted_at: string | null;
   updated_at?: string;
-  // user_email?: string;
   user_display_name?: string;
   organization_name?: string;
-  admin_status?: 'draft' | 'scored'; // Admin status: draft if no scores, scored if admin has given scores
-  needs_update?: boolean; // True when scores exist but are older than latest assessment update
-  scored_at?: string | null; // Latest scoring publish time
+  admin_status?: 'draft' | 'scored';
+  needs_update?: boolean;
+  scored_at?: string | null;
 }
 
 const AdminDashboardScreen = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'need_updates' | 'submitted' | 'drafts' | 'new'>('all');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { requireAuth, logout } = useAdminAuth();
 
   useEffect(() => {
-    // Check if admin is authenticated
     if (!requireAuth()) {
       return;
     }
-
     fetchAssessments();
   }, [requireAuth]);
 
   const fetchAssessments = async () => {
     try {
-      console.log('Fetching assessments...'); // Debug log
-      
-      // First, fetch all assessments using admin client to bypass RLS
+      if (isAdminEsgApiEnabled()) {
+        const rows = await listAdminEsgAssessments(ESG_READINESS_ASSESSMENT_TYPE, 500);
+        const transformedData: Assessment[] = rows.map((row) => {
+          const hasScores = !!row.has_score;
+          const scoredAt = row.scored_at || null;
+          const needsUpdate =
+            hasScores && row.updated_at && scoredAt
+              ? new Date(scoredAt).getTime() < new Date(row.updated_at).getTime()
+              : false;
+          return {
+            id: row.id,
+            user_id: row.user_id,
+            status: (row.status as 'draft' | 'submitted') || 'draft',
+            total_completion: Number(row.total_completion ?? 0),
+            assessment_type: row.assessment_type,
+            created_at: row.created_at || new Date().toISOString(),
+            submitted_at: row.submitted_at ?? null,
+            updated_at: row.updated_at || undefined,
+            user_display_name: row.user_display_name || 'Unknown User',
+            organization_name: row.organization_name || 'Unknown Organization',
+            admin_status: (hasScores ? 'scored' : 'draft') as 'draft' | 'scored',
+            needs_update: needsUpdate,
+            scored_at: scoredAt,
+          };
+        });
+        setAssessments(transformedData);
+        return;
+      }
+
       const { data: assessmentsData, error: assessmentsError } = await (adminSupabase as any)
         .from('esg_assessments')
         .select('id, user_id, status, total_completion, assessment_type, created_at, submitted_at, updated_at')
-        .eq('assessment_type', 'issb_readiness_v1')
+        .eq('assessment_type', ESG_READINESS_ASSESSMENT_TYPE)
         .order('created_at', { ascending: false });
-
-      console.log('Assessments query result:', { data: assessmentsData, error: assessmentsError }); // Debug log
 
       if (assessmentsError) {
         console.error('Assessments query error:', assessmentsError);
         toast({
-          title: "Error",
+          title: 'Error',
           description: `Failed to fetch assessments: ${assessmentsError.message}`,
-          variant: "destructive",
+          variant: 'destructive',
         });
         return;
       }
 
       if (!assessmentsData || assessmentsData.length === 0) {
         setAssessments([]);
-        setLoading(false);
         return;
       }
 
-      // Get unique user IDs from assessments
-      const userIds = [...new Set(assessmentsData.map(a => a.user_id))];
-      console.log('User IDs to fetch:', userIds); // Debug log
+      const userIds = [...new Set(assessmentsData.map((a: any) => a.user_id))];
 
-      // Fetch user profiles separately using admin client to bypass RLS
       const { data: profilesData, error: profilesError } = await (adminSupabase as any)
         .from('profiles')
         .select('user_id, display_name, organization_name')
         .in('user_id', userIds);
 
-      // Fetch existing scores with timestamps to determine admin status and staleness
-      const { data: scoresData, error: scoresError } = await (adminSupabase as any)
+      const { data: scoresData } = await (adminSupabase as any)
         .from('esg_scores')
         .select('assessment_id, scored_at')
-        .in('assessment_id', assessmentsData.map(a => a.id));
-
-      console.log('Scores query result:', { data: scoresData, error: scoresError }); // Debug log
-
-      console.log('Profiles query result:', { data: profilesData, error: profilesError }); // Debug log
-      console.log('User IDs requested:', userIds); // Debug log
+        .in('assessment_id', assessmentsData.map((a: any) => a.id));
 
       if (profilesError) {
         console.error('Profiles query error:', profilesError);
-        console.log('Continuing without profile data due to RLS restrictions');
-        // Continue with assessments but without profile data
-        const transformedData = assessmentsData.map(assessment => ({
-          ...assessment,
-          // user_email: assessment.user_id, // Use user_id as email for now
-          user_display_name: 'Unknown User',
-          organization_name: 'Unknown Organization'
-        }));
-        setAssessments(transformedData);
-        setLoading(false);
+        setAssessments(
+          assessmentsData.map((assessment: any) => ({
+            ...assessment,
+            user_display_name: 'Unknown User',
+            organization_name: 'Unknown Organization',
+          }))
+        );
         return;
       }
 
-      // Create a map of user_id to profile data
       const profileMap = new Map();
       if (profilesData) {
-        profilesData.forEach(profile => {
+        profilesData.forEach((profile: any) => {
           profileMap.set(profile.user_id, profile);
         });
       }
 
-      // Create a map of assessment_id -> scored_at and a set of scored ids
       const scoredAtByAssessmentId = new Map<string, string | null>();
       const scoredAssessmentIds = new Set<string>();
       if (scoresData) {
@@ -137,39 +146,31 @@ const AdminDashboardScreen = () => {
         });
       }
 
-      console.log('Profile map entries:', Array.from(profileMap.entries())); // Debug log
-      console.log('Profile data found for user IDs:', profilesData?.map(p => p.user_id) || []); // Debug log
-      console.log('Scored assessment IDs:', Array.from(scoredAssessmentIds)); // Debug log
-
-      // Combine assessments with profile data and admin status
-      const transformedData = assessmentsData.map((assessment: any) => {
-        const profile = profileMap.get(assessment.user_id);
-        const hasScores = scoredAssessmentIds.has(assessment.id);
-        const scoredAt = scoredAtByAssessmentId.get(assessment.id) || null;
-        const needsUpdate = hasScores && assessment.updated_at && scoredAt
-          ? new Date(scoredAt).getTime() < new Date(assessment.updated_at).getTime()
-          : false;
-        console.log(`Assessment ${assessment.id}: user_id=${assessment.user_id}, profile found=${!!profile}, has scores=${hasScores}`); // Debug log
-        return {
-          ...assessment,
-          // user_email: assessment.user_id, // Use user_id as email for now
-          user_display_name: profile?.display_name || 'Unknown User',
-          organization_name: profile?.organization_name || 'Unknown Organization',
-          admin_status: (hasScores ? 'scored' : 'draft') as 'draft' | 'scored',
-          needs_update: needsUpdate,
-          scored_at: scoredAt
-        };
-      });
-
-      console.log('Final transformed data:', transformedData); // Debug log
-      console.log('Profile map:', profileMap); // Debug log
-      setAssessments(transformedData);
+      setAssessments(
+        assessmentsData.map((assessment: any) => {
+          const profile = profileMap.get(assessment.user_id);
+          const hasScores = scoredAssessmentIds.has(assessment.id);
+          const scoredAt = scoredAtByAssessmentId.get(assessment.id) || null;
+          const needsUpdate =
+            hasScores && assessment.updated_at && scoredAt
+              ? new Date(scoredAt).getTime() < new Date(assessment.updated_at).getTime()
+              : false;
+          return {
+            ...assessment,
+            user_display_name: profile?.display_name || 'Unknown User',
+            organization_name: profile?.organization_name || 'Unknown Organization',
+            admin_status: (hasScores ? 'scored' : 'draft') as 'draft' | 'scored',
+            needs_update: needsUpdate,
+            scored_at: scoredAt,
+          };
+        })
+      );
     } catch (error) {
       console.error('Error fetching assessments:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch assessments",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to fetch assessments',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -180,8 +181,8 @@ const AdminDashboardScreen = () => {
     logout();
   };
 
-  const filteredAssessments = assessments.filter(assessment => {
-    const matchesSearch = 
+  const filteredAssessments = assessments.filter((assessment) => {
+    const matchesSearch =
       assessment.user_display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       assessment.organization_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -194,7 +195,7 @@ const AdminDashboardScreen = () => {
         matchesStatus = !!assessment.scored_at && !assessment.needs_update;
         break;
       case 'drafts':
-        matchesStatus = assessment.admin_status === 'scored' && !assessment.scored_at; // scoring started, not published
+        matchesStatus = assessment.admin_status === 'scored' && !assessment.scored_at;
         break;
       case 'new':
         matchesStatus = assessment.admin_status === 'draft' && !assessment.scored_at;
@@ -208,11 +209,14 @@ const AdminDashboardScreen = () => {
 
   const stats = {
     total: assessments.length,
-    scored: assessments.filter(a => a.admin_status === 'scored').length,
-    draft: assessments.filter(a => a.admin_status === 'draft').length,
-    averageCompletion: assessments.length > 0 
-      ? Math.round(assessments.reduce((sum, a) => sum + a.total_completion, 0) / assessments.length)
-      : 0
+    scored: assessments.filter((a) => a.admin_status === 'scored').length,
+    draft: assessments.filter((a) => a.admin_status === 'draft').length,
+    averageCompletion:
+      assessments.length > 0
+        ? Math.round(
+            assessments.reduce((sum, a) => sum + a.total_completion, 0) / assessments.length
+          )
+        : 0,
   };
 
   if (loading) {
@@ -229,7 +233,6 @@ const AdminDashboardScreen = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
             <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
@@ -243,7 +246,9 @@ const AdminDashboardScreen = () => {
               </Button>
               <div className="text-center sm:text-left">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">ESG Assessment Admin</h1>
-                <p className="text-sm sm:text-base text-gray-600">View ISSB readiness assessments (auto-scored on submit)</p>
+                <p className="text-sm sm:text-base text-gray-600">
+                  View ISSB readiness assessments (auto-scored on submit)
+                </p>
               </div>
             </div>
             <Button
@@ -257,7 +262,6 @@ const AdminDashboardScreen = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardContent className="p-4 sm:p-6">
@@ -316,7 +320,6 @@ const AdminDashboardScreen = () => {
           </Card>
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex flex-col space-y-4">
             <div className="flex-1 w-full">
@@ -331,79 +334,83 @@ const AdminDashboardScreen = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant={filterStatus === 'all' ? 'default' : 'outline'}
-                onClick={() => setFilterStatus('all')}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                All
-              </Button>
-              <Button
-                variant={filterStatus === 'need_updates' ? 'default' : 'outline'}
-                onClick={() => setFilterStatus('need_updates')}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                Need Updates
-              </Button>
-              <Button
-                variant={filterStatus === 'submitted' ? 'default' : 'outline'}
-                onClick={() => setFilterStatus('submitted')}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                Submitted
-              </Button>
-              <Button
-                variant={filterStatus === 'drafts' ? 'default' : 'outline'}
-                onClick={() => setFilterStatus('drafts')}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                Drafts
-              </Button>
-              <Button
-                variant={filterStatus === 'new' ? 'default' : 'outline'}
-                onClick={() => setFilterStatus('new')}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                New
-              </Button>
+              {(
+                [
+                  ['all', 'All'],
+                  ['need_updates', 'Need Updates'],
+                  ['submitted', 'Submitted'],
+                  ['drafts', 'Drafts'],
+                  ['new', 'New'],
+                ] as const
+              ).map(([key, label]) => (
+                <Button
+                  key={key}
+                  variant={filterStatus === key ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus(key)}
+                  size="sm"
+                  className="flex-1 sm:flex-none"
+                >
+                  {label}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Unified List - respects selected filter */}
         <div className="space-y-3 sm:space-y-4">
           {filteredAssessments.length === 0 ? (
             <Card>
               <CardContent className="p-6 sm:p-8 text-center">
                 <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No assessments found</h3>
-                <p className="text-sm sm:text-base text-gray-600">Try adjusting your search or changing the filter.</p>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                  No assessments found
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Try adjusting your search or changing the filter.
+                </p>
               </CardContent>
             </Card>
           ) : (
             filteredAssessments.map((assessment) => (
-              <Card key={assessment.id} className={`hover:shadow-md transition-shadow`}>
+              <Card key={assessment.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-gray-900">{assessment.user_display_name}</h3>
                       <p className="text-sm text-gray-600">{assessment.organization_name}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {assessment.needs_update ? `Last updated: ${new Date(assessment.updated_at || assessment.created_at).toLocaleString()}` : assessment.scored_at ? `Scored: ${new Date(assessment.scored_at).toLocaleString()}` : `Created: ${new Date(assessment.created_at).toLocaleDateString()}`}
+                        {assessment.needs_update
+                          ? `Last updated: ${new Date(assessment.updated_at || assessment.created_at).toLocaleString()}`
+                          : assessment.scored_at
+                            ? `Scored: ${new Date(assessment.scored_at).toLocaleString()}`
+                            : `Created: ${new Date(assessment.created_at).toLocaleDateString()}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      {assessment.needs_update && <Badge className="bg-yellow-100 text-yellow-800">Needs Re-scoring</Badge>}
-                      {!assessment.needs_update && assessment.scored_at && <Badge className="bg-green-100 text-green-800">Scored</Badge>}
-                      {!assessment.scored_at && assessment.admin_status === 'scored' && <Badge className="bg-yellow-100 text-yellow-800">Draft</Badge>}
-                      {!assessment.scored_at && assessment.admin_status === 'draft' && <Badge variant="secondary">New</Badge>}
-                      <Button size="sm" className="bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => navigate(`/admin/score/${assessment.id}`)}>
-                        {assessment.needs_update ? 'Re-score' : assessment.scored_at ? 'View' : assessment.admin_status === 'scored' ? 'Continue' : 'Score'}
+                      {assessment.needs_update && (
+                        <Badge className="bg-yellow-100 text-yellow-800">Needs Re-scoring</Badge>
+                      )}
+                      {!assessment.needs_update && assessment.scored_at && (
+                        <Badge className="bg-green-100 text-green-800">Scored</Badge>
+                      )}
+                      {!assessment.scored_at && assessment.admin_status === 'scored' && (
+                        <Badge className="bg-yellow-100 text-yellow-800">Draft</Badge>
+                      )}
+                      {!assessment.scored_at && assessment.admin_status === 'draft' && (
+                        <Badge variant="secondary">New</Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        className="bg-[#1D9E75] hover:bg-[#22B87E]"
+                        onClick={() => navigate(`/admin/score/${assessment.id}`)}
+                      >
+                        {assessment.needs_update
+                          ? 'Re-score'
+                          : assessment.scored_at
+                            ? 'View'
+                            : assessment.admin_status === 'scored'
+                              ? 'Continue'
+                              : 'Score'}
                       </Button>
                     </div>
                   </div>

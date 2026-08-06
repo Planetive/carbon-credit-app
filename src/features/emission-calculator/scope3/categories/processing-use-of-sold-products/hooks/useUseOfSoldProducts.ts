@@ -14,12 +14,17 @@ import {
   updateHybridOtherSourceRows,
   updateUseRows,
 } from "../helpers/useCalculations";
+import {
+  confirmOtherSourceKg,
+  confirmUseRowKg,
+} from "../helpers/confirmSoldProductsCalc";
 import { createUseRow } from "../rowFactories";
 import type {
   OtherSourceRow,
   PersistedUseOfSoldProductsRow,
   UseOfSoldProductsRow,
 } from "../types";
+import { USE_JWT_AUTH } from "@/api/config";
 
 type UseUseOfSoldProductsOptions = {
   enabled: boolean;
@@ -116,6 +121,57 @@ export function useUseOfSoldProducts({
     [rows],
   );
 
+  const confirmRowAfterLocal = (
+    id: string,
+    snapshot: UseOfSoldProductsRow | null,
+  ) => {
+    if (!USE_JWT_AUTH || !snapshot) return;
+    const snap = snapshot;
+    void (async () => {
+      const kg = await confirmUseRowKg(snap);
+      if (kg === undefined) return;
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, emissions: kg } : r)),
+      );
+    })();
+  };
+
+  const confirmOtherThenRow = async (
+    rowId: string,
+    sourceId: string,
+    listKey: "hybridOtherSources" | "electricityOtherSources",
+    snapshotRow: UseOfSoldProductsRow | null,
+    snapshotSource: OtherSourceRow | null,
+  ) => {
+    if (!USE_JWT_AUTH) return;
+    if (
+      snapshotSource &&
+      typeof snapshotSource.quantity === "number" &&
+      typeof snapshotSource.factor === "number"
+    ) {
+      const srcKg = await confirmOtherSourceKg(snapshotSource);
+      if (srcKg !== undefined) {
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== rowId) return r;
+            return {
+              ...r,
+              [listKey]: ((r[listKey] as OtherSourceRow[]) || []).map((s) =>
+                s.id === sourceId ? { ...s, emissions: srcKg } : s,
+              ),
+            };
+          }),
+        );
+      }
+    }
+    if (!snapshotRow) return;
+    const kg = await confirmUseRowKg(snapshotRow);
+    if (kg === undefined) return;
+    setRows((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, emissions: kg } : r)),
+    );
+  };
+
   return {
     rows,
     existingRows,
@@ -125,16 +181,38 @@ export function useUseOfSoldProducts({
     addRow: () => setRows((prev) => [...prev, createUseRow()]),
     removeRow: (id: string) =>
       setRows((prev) => prev.filter((row) => row.id !== id)),
-    updateRow: (id: string, patch: Partial<UseOfSoldProductsRow>) =>
-      setRows((prev) => updateUseRows(prev, id, patch)),
+    updateRow: (id: string, patch: Partial<UseOfSoldProductsRow>) => {
+      let snapshot: UseOfSoldProductsRow | null = null;
+      setRows((prev) => {
+        const next = updateUseRows(prev, id, patch);
+        snapshot = next.find((r) => r.id === id) ?? null;
+        return next;
+      });
+      confirmRowAfterLocal(id, snapshot);
+    },
     updateHybridOtherSourceRow: (
       rowId: string,
       sourceId: string,
       patch: Partial<OtherSourceRow>,
-    ) =>
-      setRows((prev) =>
-        updateHybridOtherSourceRows(prev, rowId, sourceId, patch),
-      ),
+    ) => {
+      let snapshotRow: UseOfSoldProductsRow | null = null;
+      let snapshotSource: OtherSourceRow | null = null;
+      setRows((prev) => {
+        const next = updateHybridOtherSourceRows(prev, rowId, sourceId, patch);
+        snapshotRow = next.find((r) => r.id === rowId) ?? null;
+        snapshotSource =
+          snapshotRow?.hybridOtherSources?.find((s) => s.id === sourceId) ??
+          null;
+        return next;
+      });
+      void confirmOtherThenRow(
+        rowId,
+        sourceId,
+        "hybridOtherSources",
+        snapshotRow,
+        snapshotSource,
+      );
+    },
     addHybridOtherSourceRow: (rowId: string) =>
       setRows((prev) => addHybridOtherSourceRow(prev, rowId)),
     removeHybridOtherSourceRow: (rowId: string, sourceId: string) =>
@@ -143,10 +221,30 @@ export function useUseOfSoldProducts({
       rowId: string,
       sourceId: string,
       patch: Partial<OtherSourceRow>,
-    ) =>
-      setRows((prev) =>
-        updateElectricityOtherSourceRows(prev, rowId, sourceId, patch),
-      ),
+    ) => {
+      let snapshotRow: UseOfSoldProductsRow | null = null;
+      let snapshotSource: OtherSourceRow | null = null;
+      setRows((prev) => {
+        const next = updateElectricityOtherSourceRows(
+          prev,
+          rowId,
+          sourceId,
+          patch,
+        );
+        snapshotRow = next.find((r) => r.id === rowId) ?? null;
+        snapshotSource =
+          snapshotRow?.electricityOtherSources?.find((s) => s.id === sourceId) ??
+          null;
+        return next;
+      });
+      void confirmOtherThenRow(
+        rowId,
+        sourceId,
+        "electricityOtherSources",
+        snapshotRow,
+        snapshotSource,
+      );
+    },
     addElectricityOtherSourceRow: (rowId: string) =>
       setRows((prev) => addElectricityOtherSourceRow(prev, rowId)),
     removeElectricityOtherSourceRow: (rowId: string, sourceId: string) =>

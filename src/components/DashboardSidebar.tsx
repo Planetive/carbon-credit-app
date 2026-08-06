@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchMyProfileDual } from "@/api/profileDualRead";
 import UserAccountMenu from "@/components/UserAccountMenu";
 import {
   Tooltip,
@@ -91,15 +91,14 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
     const fetchProfile = async () => {
       if (!user) return;
       try {
-        const { data } = (await (supabase as any)
-          .from("profiles")
-          .select("user_type, display_name, contact_role")
-          .eq("user_id", user.id)
-          .single()) as { data: { user_type?: string; display_name?: string; contact_role?: string } | null };
+        const data = await fetchMyProfileDual(user.id);
         setUserType(data?.user_type || "corporate");
         if (data?.display_name) setDisplayName(data.display_name);
         else if (user.email) setDisplayName(user.email.split("@")[0]);
-        if (data?.contact_role) setRoleLabel(data.contact_role);
+        const role =
+          (data as { contact_role?: string } | null)?.contact_role ||
+          data?.role;
+        if (role) setRoleLabel(role);
       } finally {
         setUserTypeResolved(true);
       }

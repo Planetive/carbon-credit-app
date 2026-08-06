@@ -41,7 +41,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData, ScopeTotals } from "@/components/emissions/shared/types";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  loadCalculatorPreferences,
+  saveCalculatorPreferences,
+} from "@/integrations/supabase/calculatorPreferencesClient";
 import FuelEmissions from "@/components/emissions/scope1/FuelEmissions";
 import RefrigerantEmissions from "@/components/emissions/scope1/RefrigerantEmissions";
 import PassengerVehicleEmissions from "@/components/emissions/scope1/PassengerVehicleEmissions";
@@ -256,25 +259,13 @@ const UKCalculatorScreen = () => {
       }
 
       try {
-        const { data, error } = await (supabase as any)
-          .from("emission_calculator_preferences")
-          .select("has_lca_data, calculation_mode, initial_questionnaire_completed")
-          .eq("user_id", user.id)
-          .single();
-
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-          console.error('Error loading LCA preferences:', error);
-        } else if (data) {
-          // If user has completed the questionnaire, set the state
-          if (data.initial_questionnaire_completed) {
-            setInitialQuestionnaireCompleted(true);
-            // Set calculation mode from database
-            if (data.calculation_mode) {
-              setCalculationMode(data.calculation_mode as 'lca' | 'manual');
-            } else {
-              // Default based on has_lca_data if calculation_mode is not set
-              setCalculationMode(data.has_lca_data ? 'lca' : 'manual');
-            }
+        const data = await loadCalculatorPreferences(user.id);
+        if (data?.initial_questionnaire_completed) {
+          setInitialQuestionnaireCompleted(true);
+          if (data.calculation_mode === "lca" || data.calculation_mode === "manual") {
+            setCalculationMode(data.calculation_mode);
+          } else {
+            setCalculationMode(data.has_lca_data ? "lca" : "manual");
           }
         }
       } catch (error) {
@@ -292,28 +283,18 @@ const UKCalculatorScreen = () => {
     if (!user) return;
 
     try {
-      // Use upsert to handle both insert and update
-      const { error } = await (supabase as any)
-        .from("emission_calculator_preferences")
-        .upsert({
-          user_id: user.id,
-          has_lca_data: hasLCA,
-          calculation_mode: mode,
-          initial_questionnaire_completed: true,
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) {
-        console.error('Error saving LCA preferences:', error);
-        toast({
-          title: "Error",
-          description: "Failed to save preferences. Please try again.",
-          variant: "destructive",
-        });
-      }
+      await saveCalculatorPreferences(user.id, {
+        has_lca_data: hasLCA,
+        calculation_mode: mode,
+        initial_questionnaire_completed: true,
+      });
     } catch (error) {
       console.error('Error saving LCA preferences:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

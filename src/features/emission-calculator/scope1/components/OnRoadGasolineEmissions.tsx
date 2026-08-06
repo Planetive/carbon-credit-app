@@ -6,7 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  companyScopedListFilters,
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
+import { USE_JWT_AUTH } from "@/api/config";
+import { resolveEpaOnRoadGasolineEmissionsKg } from "@/api/calcConnection";
 import { formatDynamicEmission } from "./emissionFormatting";
 
 const TABLE_NAME = "scope1_epa_on_road_gasoline_entries";
@@ -198,27 +207,25 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
         return;
       }
       try {
-        let q = supabase.from(TABLE_NAME as any).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-        if (companyContext && counterpartyId) q = q.eq("counterparty_id", counterpartyId);
-        else q = q.is("counterparty_id", null);
-        const { data, error } = await q;
-        if (error) throw error;
-        const mapped: OnRoadRow[] = (data || []).map((entry: any) => ({
+        const data = await listLegacyTableEntries(
+          TABLE_NAME,
+          companyScopedListFilters(userId, !!companyContext, counterpartyId),
+        );
+        const mapped: OnRoadRow[] = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
-          vehicleType: entry.vehicle_type,
-          modelYear: entry.model_year,
+          vehicleType: entry.vehicle_type as string | undefined,
+          modelYear: entry.model_year as string | undefined,
           emissionSelection: toEmissionSelection(entry.emission_selection),
           distanceUnit: "mile",
-          miles: entry.miles,
-          emissions: entry.emissions,
+          miles: entry.miles as number | undefined,
+          emissions: entry.emissions as number | undefined,
         }));
         setExistingEntries(mapped);
         setRows(mapped.length > 0 ? mapped : []);
-        // If rows have a stored display unit, restore it; otherwise keep default "kg".
-        if (mapped.length > 0 && (data?.[0] as any)?.emissions_output_unit) {
-          const u = String((data![0] as any).emissions_output_unit) as OutputUnit;
+        if (mapped.length > 0 && data?.[0]?.emissions_output_unit) {
+          const u = String(data[0].emissions_output_unit) as OutputUnit;
           if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
             setOutputUnit(u);
             setInitialOutputUnit(u);
@@ -239,22 +246,11 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     const load = async () => {
       setLoading(true);
       try {
-        let result = await supabase.from("On-Road Gasoline" as any).select("*");
-        if (result.error) {
-          // try underscore variant if needed
-          result = await supabase.from("on_road_gasoline" as any).select("*");
-        }
-        if (result.error) {
-          console.error('Error loading "On-Road Gasoline":', result.error);
-          toast({
-            title: "Error",
-            description: result.error.message || 'Failed to load "On-Road Gasoline" reference data.',
-            variant: "destructive",
-          });
-          return;
-        }
+        const { rows: data } = await loadIpccFactorTableRows([
+          "On-Road Gasoline",
+          "on_road_gasoline",
+        ]);
 
-        const data = result.data || [];
         const raw: Array<OnRoadFactorRow | null> = data.map((r: any): OnRoadFactorRow | null => {
             const vehicleType =
               pickFirstKey(r, [/^Vehicle\s*Type$/i, /vehicle[_\s]*type/i]) ??
@@ -398,8 +394,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
     const row = rows.find((r) => r.id === id);
     if (row?.dbId && user) {
       try {
-        const { error } = await supabase.from(TABLE_NAME as any).delete().eq("id", row.dbId);
-        if (error) throw error;
+        await deleteLegacyTableEntry(TABLE_NAME, row.dbId);
       } catch (e: any) {
         toast({ title: "Error", description: e?.message || "Failed to delete entry", variant: "destructive" });
         return;
@@ -409,6 +404,8 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   };
 
   const updateRow = (id: string, patch: Partial<OnRoadRow>) => {
+    let snapshot: OnRoadRow | null = null;
+    let factorSnap: OnRoadFactorRow | undefined;
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -418,9 +415,40 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
             ? factors.find((f) => f.vehicleType === next.vehicleType && f.modelYear === next.modelYear)
             : undefined;
         next.emissions = computeEmissions(factorRow, next.miles, next.emissionSelection ?? "ch4_only");
+        snapshot = next;
+        factorSnap = factorRow;
         return next;
       }),
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.miles === "number" &&
+      factorSnap
+    ) {
+      const snap = snapshot;
+      const f = factorSnap;
+      void (async () => {
+        const kg = await resolveEpaOnRoadGasolineEmissionsKg({
+          distance: snap.miles!,
+          distance_unit: "mile",
+          ch4_g_per_mile: f.ch4_g_per_mile,
+          n2o_g_per_mile: f.n2o_g_per_mile,
+          emission_selection: snap.emissionSelection ?? "ch4_only",
+          vehicle_type: snap.vehicleType,
+          model_year: snap.modelYear,
+        });
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.miles !== snap.miles || r.emissionSelection !== snap.emissionSelection) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
 
@@ -471,31 +499,25 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
           emissions_output_unit: outputUnit,
         }));
-        const { error } = await supabase.from(TABLE_NAME as any).insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries(TABLE_NAME, payload);
       }
       const rowsToUpdate = unitChanged
         ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
         : changedExisting;
       if (rowsToUpdate.length > 0) {
-        const results = await Promise.all(
+        await Promise.all(
           rowsToUpdate.map((v) =>
-            supabase
-              .from(TABLE_NAME as any)
-              .update({
-                vehicle_type: v.vehicleType!,
-                model_year: v.modelYear!,
-                emission_selection: v.emissionSelection ?? "ch4_only",
-                miles: v.miles!,
-                emissions: v.emissions!,
-                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
-                emissions_output_unit: outputUnit,
-              })
-              .eq("id", v.dbId!)
+            updateLegacyTableEntry(TABLE_NAME, v.dbId!, {
+              vehicle_type: v.vehicleType!,
+              model_year: v.modelYear!,
+              emission_selection: v.emissionSelection ?? "ch4_only",
+              miles: v.miles!,
+              emissions: v.emissions!,
+              emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+              emissions_output_unit: outputUnit,
+            })
           )
         );
-        const updateError = results.find((r: { error?: unknown }) => r.error)?.error;
-        if (updateError) throw updateError;
       }
       toast({
         title: "Saved",

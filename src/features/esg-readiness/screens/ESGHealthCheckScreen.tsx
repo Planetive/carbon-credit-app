@@ -20,6 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  createEsgAssessment,
+  getLatestEsgAssessment,
+  isEsgApiEnabled,
+  updateEsgAssessment,
+  upsertEsgScore,
+} from "@/api/esg";
+import {
   READINESS_PILLARS,
   type PillarId,
   type QuestionId,
@@ -68,21 +75,30 @@ const ESGHealthCheckScreen = () => {
     const loadAssessment = async () => {
       if (!user) return;
       try {
-        const { data, error } = await supabase
-          .from("esg_assessments")
-          .select("id, readiness_answers, status, assessment_type")
-          .eq("user_id", user.id)
-          .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        if (isEsgApiEnabled()) {
+          const data = await getLatestEsgAssessment(ESG_READINESS_ASSESSMENT_TYPE);
+          if (data) {
+            setAssessmentId(data.id);
+            setAssessmentStatus((data.status as "draft" | "submitted") ?? null);
+            setAnswers(sanitizeReadinessAnswers((data.readiness_answers as ReadinessAnswers) ?? {}));
+          }
+        } else {
+          const { data, error } = await supabase
+            .from("esg_assessments")
+            .select("id, readiness_answers, status, assessment_type")
+            .eq("user_id", user.id)
+            .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        if (error) throw error;
+          if (error) throw error;
 
-        if (data) {
-          setAssessmentId((data as any).id);
-          setAssessmentStatus(((data as any).status as "draft" | "submitted" | null) ?? null);
-          setAnswers(sanitizeReadinessAnswers((data as any).readiness_answers ?? {}));
+          if (data) {
+            setAssessmentId((data as any).id);
+            setAssessmentStatus(((data as any).status as "draft" | "submitted" | null) ?? null);
+            setAnswers(sanitizeReadinessAnswers((data as any).readiness_answers ?? {}));
+          }
         }
       } catch (error) {
         console.error("Error loading readiness assessment:", error);
@@ -140,36 +156,65 @@ const ESGHealthCheckScreen = () => {
         readiness_version: 1,
       };
 
-      const result = assessmentId
-        ? await supabase
-            .from("esg_assessments")
-            .update(payload as any)
-            .eq("id", assessmentId)
-            .eq("user_id", user.id)
-            .select("id")
-            .single()
-        : await supabase.from("esg_assessments").insert(payload as any).select("id").single();
+      let currentAssessmentId = assessmentId;
 
-      if (result.error) throw result.error;
-      const currentAssessmentId = (result.data as any)?.id ?? assessmentId;
+      if (isEsgApiEnabled()) {
+        const apiBody = {
+          assessment_type: ESG_READINESS_ASSESSMENT_TYPE,
+          status,
+          readiness_answers: answers as Record<string, unknown>,
+          total_completion: readiness.completionPercent,
+          readiness_version: 1,
+          submitted_at: status === "submitted" ? new Date().toISOString() : null,
+        };
+        const saved = assessmentId
+          ? await updateEsgAssessment(assessmentId, apiBody)
+          : await createEsgAssessment(apiBody);
+        currentAssessmentId = saved.id;
+      } else {
+        const result = assessmentId
+          ? await supabase
+              .from("esg_assessments")
+              .update(payload as any)
+              .eq("id", assessmentId)
+              .eq("user_id", user.id)
+              .select("id")
+              .single()
+          : await supabase.from("esg_assessments").insert(payload as any).select("id").single();
+
+        if (result.error) throw result.error;
+        currentAssessmentId = (result.data as any)?.id ?? assessmentId;
+      }
+
       setAssessmentId(currentAssessmentId);
       setAssessmentStatus(status);
 
       if (status === "submitted" && currentAssessmentId) {
         const resultSnapshot = computeReadiness(answers);
-        const scorePayload = {
-          user_id: user.id,
-          assessment_id: currentAssessmentId,
-          readiness_results: resultSnapshot,
-          readiness_overall_score: resultSnapshot.overallReadinessPercent,
-          readiness_maturity_band: resultSnapshot.maturityBand,
-          readiness_completion_pct: resultSnapshot.completionPercent,
-          scored_by: "Automated System",
-          scored_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        const scoreResult = await supabase.from("esg_scores").upsert(scorePayload as any, { onConflict: "assessment_id" });
-        if (scoreResult.error) throw scoreResult.error;
+        if (isEsgApiEnabled()) {
+          await upsertEsgScore({
+            assessment_id: currentAssessmentId,
+            readiness_results: resultSnapshot,
+            readiness_overall_score: resultSnapshot.overallReadinessPercent,
+            readiness_maturity_band: resultSnapshot.maturityBand,
+            readiness_completion_pct: resultSnapshot.completionPercent,
+            scored_by: "Automated System",
+          });
+        } else {
+          const scorePayload = {
+            user_id: user.id,
+            assessment_id: currentAssessmentId,
+            readiness_results: resultSnapshot,
+            readiness_overall_score: resultSnapshot.overallReadinessPercent,
+            readiness_maturity_band: resultSnapshot.maturityBand,
+            readiness_completion_pct: resultSnapshot.completionPercent,
+            scored_by: "Automated System",
+            scored_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          const scoreResult = await supabase.from("esg_scores").upsert(scorePayload as any, { onConflict: "assessment_id" });
+          if (scoreResult.error) throw scoreResult.error;
+        }
       }
 
       toast({

@@ -8,7 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
 import { 
   FuelRow, 
   RefrigerantRow, 
@@ -200,95 +205,72 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
       if (!user) return;
 
       try {
-        // Load fuel entries
-        const { data: fuelData, error: fuelError } = await supabase
-          .from('scope1_fuel_entries')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const listOpts = {
+          user_id: user.id,
+          order: { column: "created_at", ascending: false },
+        } as const;
 
-        if (fuelError) throw fuelError;
+        const fuelData = await listLegacyTableEntries("scope1_fuel_entries", listOpts);
 
-        const existingFuelRows = (fuelData || []).map(entry => ({
+        const existingFuelRows = (fuelData || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           type: entry.fuel_type_group as FuelType,
-          fuel: entry.fuel,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
+          fuel: entry.fuel as string,
+          unit: entry.unit as string,
+          quantity: entry.quantity as number,
+          factor: entry.factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
 
         setExistingEntries(existingFuelRows);
         setRows(existingFuelRows.length > 0 ? existingFuelRows : []);
 
-        // Load refrigerant entries
-        const { data: refrigerantData, error: refrigerantError } = await supabase
-          .from('scope1_refrigerant_entries')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const refrigerantData = await listLegacyTableEntries("scope1_refrigerant_entries", listOpts);
 
-        if (refrigerantError) throw refrigerantError;
-
-        const existingRefrigerantRows = (refrigerantData || []).map(entry => ({
+        const existingRefrigerantRows = (refrigerantData || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          refrigerantType: entry.refrigerant_type,
-          quantity: entry.quantity,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          dbId: String(entry.id),
+          refrigerantType: entry.refrigerant_type as string,
+          quantity: entry.quantity as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
 
         setExistingRefrigerantEntries(existingRefrigerantRows);
         setRefrigerantRows(existingRefrigerantRows.length > 0 ? existingRefrigerantRows : []);
 
-        // Load vehicle entries
-        const { data: vehicleData, error: vehicleError } = await supabase
-          .from('scope1_passenger_vehicle_entries')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const vehicleData = await listLegacyTableEntries("scope1_passenger_vehicle_entries", listOpts);
 
-        if (vehicleError) throw vehicleError;
-
-        const existingVehicleRows = (vehicleData || []).map(entry => ({
+        const existingVehicleRows = (vehicleData || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ukFactorBasis:
             passengerUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
             "total",
-          distance: entry.distance,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          distance: entry.distance as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
 
         setExistingVehicleEntries(existingVehicleRows);
         setVehicleRows(existingVehicleRows.length > 0 ? existingVehicleRows : []);
 
-        // Load delivery vehicle entries
-        const { data: delData, error: delError } = await supabase
-          .from('scope1_delivery_vehicle_entries')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        const delData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", listOpts);
 
-        if (delError) throw delError;
-
-        const existingDelRows = (delData || []).map(entry => ({
+        const existingDelRows = (delData || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ladenLevel:
             (entry as { laden_level?: string }).laden_level !== undefined &&
@@ -298,9 +280,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
           ukFactorBasis:
             deliveryUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
             "total",
-          distance: entry.distance,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          distance: entry.distance as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
 
@@ -474,12 +456,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope1_fuel_entries')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_fuel_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -506,12 +483,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope1_refrigerant_entries')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_refrigerant_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -538,12 +510,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope1_passenger_vehicle_entries')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_passenger_vehicle_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -570,12 +537,7 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope1_delivery_vehicle_entries')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_delivery_vehicle_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -626,15 +588,13 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
       }));
 
       if (payload.length > 0) {
-        const { error } = await supabase.from('scope1_fuel_entries').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_fuel_entries", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(v => (
-          supabase
-            .from('scope1_fuel_entries')
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_fuel_entries", v.dbId!, {
               fuel_type_group: v.type!,
               fuel: v.fuel!,
               unit: v.unit!,
@@ -642,11 +602,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
               factor: v.factor!,
               emissions: v.emissions!,
             })
-            .eq('id', v.dbId!)
-        ));
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+          )
+        );
       }
 
       toast({ 
@@ -654,23 +611,21 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      // Reload data
-      const { data: newData } = await supabase
-        .from('scope1_fuel_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_fuel_entries", {
+        user_id: user.id,
+        order: { column: "created_at", ascending: false },
+      });
 
       if (newData) {
-        const updatedExistingRows = newData.map(entry => ({
+        const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           type: entry.fuel_type_group as FuelType,
-          fuel: entry.fuel,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
+          fuel: entry.fuel as string,
+          unit: entry.unit as string,
+          quantity: entry.quantity as number,
+          factor: entry.factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
         setExistingEntries(updatedExistingRows);
@@ -714,25 +669,20 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
       }));
 
       if (payload.length > 0) {
-        const { error } = await supabase.from('scope1_refrigerant_entries').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(v => (
-          supabase
-            .from('scope1_refrigerant_entries')
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_refrigerant_entries", v.dbId!, {
               refrigerant_type: v.refrigerantType!,
               quantity: v.quantity!,
               emission_factor: v.factor!,
               emissions: v.emissions!,
             })
-            .eq('id', v.dbId!)
-        ));
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+          )
+        );
       }
 
       toast({ 
@@ -740,21 +690,19 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      // Reload data
-      const { data: newData } = await supabase
-        .from('scope1_refrigerant_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_refrigerant_entries", {
+        user_id: user.id,
+        order: { column: "created_at", ascending: false },
+      });
 
       if (newData) {
-        const updatedExistingRows = newData.map(entry => ({
+        const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
-          refrigerantType: entry.refrigerant_type,
-          quantity: entry.quantity,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          refrigerantType: entry.refrigerant_type as string,
+          quantity: entry.quantity as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
         setExistingRefrigerantEntries(updatedExistingRows);
@@ -810,15 +758,13 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
       }));
 
       if (payload.length > 0) {
-        const { error } = await supabase.from('scope1_passenger_vehicle_entries').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_passenger_vehicle_entries", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(v => (
-          supabase
-            .from('scope1_passenger_vehicle_entries')
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_passenger_vehicle_entries", v.dbId!, {
               activity: v.activity!,
               vehicle_type: v.vehicleType!,
               unit: v.unit!,
@@ -828,11 +774,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
               emission_factor: v.factor!,
               emissions: v.emissions!,
             })
-            .eq('id', v.dbId!)
-        ));
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+          )
+        );
       }
 
       toast({ 
@@ -840,27 +783,25 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      // Reload data
-      const { data: newData } = await supabase
-        .from('scope1_passenger_vehicle_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_passenger_vehicle_entries", {
+        user_id: user.id,
+        order: { column: "created_at", ascending: false },
+      });
 
       if (newData) {
-        const updatedExistingRows = newData.map(entry => ({
+        const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ukFactorBasis:
             passengerUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
             "total",
-          distance: entry.distance,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          distance: entry.distance as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
         setExistingVehicleEntries(updatedExistingRows);
@@ -909,15 +850,13 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
       }));
       
       if (payload.length > 0) {
-        const { error } = await supabase.from('scope1_delivery_vehicle_entries').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
       }
       
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(v => (
-          supabase
-            .from('scope1_delivery_vehicle_entries')
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_delivery_vehicle_entries", v.dbId!, {
               activity: v.activity!,
               vehicle_type: v.vehicleType!,
               unit: v.unit!,
@@ -928,29 +867,24 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
               emission_factor: v.factor!,
               emissions: v.emissions!,
             })
-            .eq('id', v.dbId!)
-        ));
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+          )
+        );
       }
       
       toast({ title: "Saved", description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` });
       
-      // Reload data
-      const { data: newData } = await supabase
-        .from('scope1_delivery_vehicle_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", {
+        user_id: user.id,
+        order: { column: "created_at", ascending: false },
+      });
         
       if (newData) {
-        const updatedExistingRows = newData.map(entry => ({
+        const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
-          activity: entry.activity,
-          vehicleType: entry.vehicle_type,
-          unit: entry.unit,
+          dbId: String(entry.id),
+          activity: entry.activity as string,
+          vehicleType: entry.vehicle_type as string,
+          unit: entry.unit as string,
           fuelType: (entry as { fuel_type?: string }).fuel_type ?? undefined,
           ladenLevel:
             (entry as { laden_level?: string }).laden_level !== undefined &&
@@ -960,9 +894,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
           ukFactorBasis:
             deliveryUkFactorBasisFromDb((entry as { uk_factor_basis?: string }).uk_factor_basis) ??
             "total",
-          distance: entry.distance,
-          factor: entry.emission_factor,
-          emissions: entry.emissions,
+          distance: entry.distance as number,
+          factor: entry.emission_factor as number,
+          emissions: entry.emissions as number,
           isExisting: true,
         }));
         setExistingDeliveryVehicleEntries(updatedExistingRows);

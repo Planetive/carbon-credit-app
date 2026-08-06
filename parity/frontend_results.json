@@ -1,0 +1,313 @@
+{
+  "side": "frontend_spaMath",
+  "generated_at": "2026-08-05T07:39:51.068Z",
+  "case_count": 60,
+  "results": [
+    {
+      "suite": "uk_fuel",
+      "id": "uk_qty10_factor_2_0627",
+      "emissions_kg": 20.627
+    },
+    {
+      "suite": "uk_fuel",
+      "id": "uk_qty1000_factor_0_18254",
+      "emissions_kg": 182.54
+    },
+    {
+      "suite": "uk_fuel",
+      "id": "uk_round6_fractional",
+      "emissions_kg": 3.878506
+    },
+    {
+      "suite": "epa_fuel",
+      "id": "epa_co2_mmbtu",
+      "emissions_kg": 5306
+    },
+    {
+      "suite": "epa_fuel",
+      "id": "epa_ch4_g_per_mmbtu_div1000",
+      "emissions_kg": 0.3
+    },
+    {
+      "suite": "epa_fuel",
+      "id": "epa_n2o_g_per_gallon_div1000",
+      "emissions_kg": 0.01
+    },
+    {
+      "suite": "mobile_fuel",
+      "id": "mobile_gallon",
+      "emissions_kg": 87.8
+    },
+    {
+      "suite": "mobile_fuel",
+      "id": "mobile_liter_to_gallon",
+      "emissions_kg": 23.194317
+    },
+    {
+      "suite": "on_road_gasoline",
+      "id": "onroad_ch4_100mi",
+      "emissions_kg": 0.0019
+    },
+    {
+      "suite": "on_road_gasoline",
+      "id": "onroad_ch4_100km",
+      "emissions_kg": 0.0011806049000000001
+    },
+    {
+      "suite": "on_road_diesel",
+      "id": "diesel_ch4_explicit",
+      "emissions_kg": 0.00102
+    },
+    {
+      "suite": "non_road",
+      "id": "nonroad_gallon_ch4",
+      "emissions_kg": 0.01
+    },
+    {
+      "suite": "non_road",
+      "id": "nonroad_liter_ch4",
+      "emissions_kg": 0.0026417217685798895
+    },
+    {
+      "suite": "heat_steam",
+      "id": "heat_co2_mmbtu",
+      "emissions_kg": 530.6
+    },
+    {
+      "suite": "heat_steam",
+      "id": "heat_ch4_mmbtu",
+      "emissions_kg": 0.01
+    },
+    {
+      "suite": "heat_steam",
+      "id": "heat_mmscf_to_mmbtu",
+      "emissions_kg": 55023.22
+    },
+    {
+      "suite": "waste",
+      "id": "waste_explicit",
+      "emissions_kg": 5
+    },
+    {
+      "suite": "uk_passenger",
+      "id": "passenger_explicit",
+      "emissions_kg": 8.534
+    },
+    {
+      "suite": "uk_delivery",
+      "id": "delivery_explicit",
+      "emissions_kg": 88.246
+    },
+    {
+      "suite": "uk_refrigerant",
+      "id": "refrig_explicit",
+      "emissions_kg": 3575
+    },
+    {
+      "suite": "electricity",
+      "id": "elec_grid_only_uae",
+      "emissions_kg": 4041
+    },
+    {
+      "suite": "electricity",
+      "id": "elec_grid_50_pakistan",
+      "emissions_kg": 212.5
+    },
+    {
+      "suite": "electricity",
+      "id": "elec_grid_plus_other",
+      "emissions_kg": 423.28
+    },
+    {
+      "suite": "epa_refrigerant",
+      "id": "epa_refrig_leakage_record",
+      "emissions_kg": 3575,
+      "extra": {
+        "leakage_kg": 2.5
+      }
+    },
+    {
+      "suite": "epa_refrigerant",
+      "id": "epa_refrig_estimated",
+      "emissions_kg": 1961,
+      "extra": {
+        "leakage_kg": 0.5
+      }
+    },
+    {
+      "suite": "freight",
+      "id": "freight_basic",
+      "emissions_kg": 30
+    },
+    {
+      "suite": "freight",
+      "id": "freight_long_haul",
+      "emissions_kg": 1456.0509375000001
+    },
+    {
+      "suite": "business_travel",
+      "id": "bt_km_factor",
+      "emissions_kg": 78.39
+    },
+    {
+      "suite": "business_travel",
+      "id": "bt_mile_factor_converted",
+      "emissions_kg": 15.534318416245169
+    },
+    {
+      "suite": "employee_commuting",
+      "id": "commute_km",
+      "emissions_kg": 85.5
+    },
+    {
+      "suite": "employee_commuting",
+      "id": "commute_mile_factor",
+      "emissions_kg": 39.76785514558763
+    },
+    {
+      "suite": "spend_based",
+      "id": "spend_goods",
+      "emissions_kg": 10.5
+    },
+    {
+      "suite": "sold_products_qty",
+      "id": "sold_qty_round6",
+      "emissions_kg": 3.878506
+    },
+    {
+      "suite": "ipcc_stationary",
+      "id": "ipcc_stat_basic",
+      "emissions_kg": 206.27
+    },
+    {
+      "suite": "ipcc_stationary",
+      "id": "ipcc_stat_fractional",
+      "emissions_kg": 46.2962625
+    },
+    {
+      "suite": "ipcc_flaring",
+      "id": "flare_m3_ch4_co2",
+      "emissions_kg": 15537.583239855045
+    },
+    {
+      "suite": "ipcc_flaring",
+      "id": "flare_mmscf_mixed",
+      "emissions_kg": 211934.1214991876
+    },
+    {
+      "suite": "ipcc_flaring",
+      "id": "flare_m3_with_inert",
+      "emissions_kg": 5780.151664297035
+    },
+    {
+      "suite": "ipcc_flaring",
+      "id": "flare_m3_heavier",
+      "emissions_kg": 3468.960533905066
+    },
+    {
+      "suite": "ipcc_venting",
+      "id": "vent_m3_ch4_co2",
+      "emissions_kg": 16299.692964427253
+    },
+    {
+      "suite": "ipcc_venting",
+      "id": "vent_mmscf_multi",
+      "emissions_kg": 84888.90221202202
+    },
+    {
+      "suite": "ipcc_venting",
+      "id": "vent_m3_all_alkanes",
+      "emissions_kg": 10233.042917279654
+    },
+    {
+      "suite": "ipcc_vehicular",
+      "id": "ipcc_veh_both",
+      "emissions_kg": 651.5
+    },
+    {
+      "suite": "ipcc_vehicular",
+      "id": "ipcc_veh_diesel_only",
+      "emissions_kg": 1350
+    },
+    {
+      "suite": "ipcc_kitchen",
+      "id": "ipcc_kitchen_lpg_ng",
+      "emissions_kg": 87.6
+    },
+    {
+      "suite": "ipcc_kitchen",
+      "id": "ipcc_kitchen_lpg_only",
+      "emissions_kg": 181.2
+    },
+    {
+      "suite": "ipcc_power",
+      "id": "ipcc_power_mixed",
+      "emissions_kg": 279.2064
+    },
+    {
+      "suite": "ipcc_power",
+      "id": "ipcc_power_diesel_only",
+      "emissions_kg": 675
+    },
+    {
+      "suite": "ipcc_heating",
+      "id": "ipcc_heat_ng",
+      "emissions_kg": 70.51599999999999
+    },
+    {
+      "suite": "ipcc_heating",
+      "id": "ipcc_heat_default_factor",
+      "emissions_kg": 110046.44
+    },
+    {
+      "suite": "ipcc_road",
+      "id": "ipcc_road_basic",
+      "emissions_kg": 96
+    },
+    {
+      "suite": "ipcc_road_vehicle",
+      "id": "ipcc_rv_ch4",
+      "emissions_kg": 0.05
+    },
+    {
+      "suite": "ipcc_road_vehicle",
+      "id": "ipcc_rv_n2o",
+      "emissions_kg": 0.030000000000000002
+    },
+    {
+      "suite": "ipcc_usa_vehicles",
+      "id": "ipcc_usa_basic",
+      "emissions_kg": 2195
+    },
+    {
+      "suite": "ipcc_usa_vehicles",
+      "id": "ipcc_usa_fractional",
+      "emissions_kg": 433.925
+    },
+    {
+      "suite": "ipcc_alt_fuel",
+      "id": "ipcc_alt_ch4",
+      "emissions_kg": 0.12000000000000001
+    },
+    {
+      "suite": "ipcc_alt_fuel",
+      "id": "ipcc_alt_n2o",
+      "emissions_kg": 0.08
+    },
+    {
+      "suite": "ipcc_industry",
+      "id": "ipcc_ind_co2",
+      "emissions_kg": 946
+    },
+    {
+      "suite": "ipcc_industry",
+      "id": "ipcc_ind_ch4",
+      "emissions_kg": 10
+    },
+    {
+      "suite": "ipcc_industry",
+      "id": "ipcc_ind_n2o",
+      "emissions_kg": 1
+    }
+  ]
+}

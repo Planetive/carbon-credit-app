@@ -12,6 +12,19 @@ import { SupplierAutocomplete } from "./SupplierAutocomplete";
 import { Supplier } from "./types";
 import { getAllVehicleTypes, VehicleType } from "./vehicleTypes";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteScope3CategoryEntry,
+  fetchScope3CategoryEntries,
+  insertScope3CategoryEntries,
+  updateScope3CategoryEntry,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  resolveBusinessTravelEmissionsKg,
+  resolveEmployeeCommutingEmissionsKg,
+  resolveFreightEmissionsKg,
+  resolveWasteEmissionsKg,
+} from "@/api/calcConnection";
 import { WasteMaterial, getAvailableDisposalMethods, getEmissionFactor, DisposalMethod, getAllWasteMaterials } from "./wasteTypes";
 import { getAllBusinessTravelTypes, BusinessTravelType } from "./businessTravelTypes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -87,17 +100,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeUpstreamTransportRow = (id: string) => setUpstreamTransportRows(prev => prev.filter(r => r.id !== id));
   
   const updateUpstreamTransportRow = (id: string, patch: Partial<UpstreamTransportRow>) => {
+    let snapshot: UpstreamTransportRow | null = null;
+    let factor = 0;
     setUpstreamTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
       if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
+        factor = vehicleType.co2_factor;
         updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.distance === "number" &&
+      typeof snapshot.weight === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveFreightEmissionsKg({
+          distance: snap.distance!,
+          weight: snap.weight!,
+          co2_factor: factor,
+        });
+        setUpstreamTransportRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing Upstream Transportation entries
@@ -113,24 +155,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_upstream_transportation')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_upstream_transportation",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
         const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           vehicleTypeId: entry.vehicle_type_id || '',
           distance: entry.distance,
@@ -192,17 +226,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeDownstreamTransportRow = (id: string) => setDownstreamTransportRows(prev => prev.filter(r => r.id !== id));
   
   const updateDownstreamTransportRow = (id: string, patch: Partial<DownstreamTransportRow>) => {
+    let snapshot: DownstreamTransportRow | null = null;
+    let factor = 0;
     setDownstreamTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
       if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
+        factor = vehicleType.co2_factor;
         updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.distance === "number" &&
+      typeof snapshot.weight === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveFreightEmissionsKg({
+          distance: snap.distance!,
+          weight: snap.weight!,
+          co2_factor: factor,
+        });
+        setDownstreamTransportRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing Downstream Transportation entries
@@ -218,24 +281,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_downstream_transportation')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_downstream_transportation",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
         const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           vehicleTypeId: entry.vehicle_type_id || '',
           distance: entry.distance,
@@ -297,18 +352,50 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeWasteGeneratedRow = (id: string) => setWasteGeneratedRows(prev => prev.filter(r => r.id !== id));
   
   const updateWasteGeneratedRow = (id: string, patch: Partial<WasteGeneratedRow>) => {
+    let snapshot: WasteGeneratedRow | null = null;
+    let factorVal = 0;
+    let materialLabel = "";
     setWasteGeneratedRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const material = wasteMaterials.find(m => m.id === updated.materialId);
       if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
         const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
+        factorVal = factor ?? 0;
+        materialLabel = String(material[" Material "] || "");
         updated.emissions = factor !== null ? updated.volume * factor : undefined;
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.volume === "number" &&
+      snapshot.disposalMethod &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveWasteEmissionsKg({
+          volume: snap.volume!,
+          disposal_method: String(snap.disposalMethod),
+          factor: factorVal,
+          material: materialLabel || undefined,
+        });
+        setWasteGeneratedRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing Waste Generated entries
@@ -324,24 +411,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_waste_generated')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_waste_generated",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
         const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           materialId: entry.material_id || '',
           volume: entry.volume,
@@ -403,11 +482,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeBusinessTravelRow = (id: string) => setBusinessTravelRows(prev => prev.filter(r => r.id !== id));
   
   const updateBusinessTravelRow = (id: string, patch: Partial<BusinessTravelRow>) => {
+    let snapshot: BusinessTravelRow | null = null;
+    let co2Factor = 0;
+    let unit: string | undefined;
     setBusinessTravelRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
       if (travelType && typeof updated.distance === 'number' && updated.distance > 0) {
+        co2Factor = travelType.co2_factor;
+        unit = travelType.unit;
         let factorPerKm = travelType.co2_factor;
         if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
           factorPerKm = travelType.co2_factor / 1.60934;
@@ -416,8 +500,33 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.distance === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveBusinessTravelEmissionsKg({
+          distance: snap.distance!,
+          co2_factor: co2Factor,
+          unit,
+        });
+        setBusinessTravelRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.distance !== snap.distance || r.travelTypeId !== snap.travelTypeId) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing Business Travel entries
@@ -433,24 +542,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_business_travel')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_business_travel",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
         const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
@@ -511,12 +612,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeEmployeeCommutingRow = (id: string) => setEmployeeCommutingRows(prev => prev.filter(r => r.id !== id));
   
   const updateEmployeeCommutingRow = (id: string, patch: Partial<EmployeeCommutingRow>) => {
+    let snapshot: EmployeeCommutingRow | null = null;
+    let co2Factor = 0;
+    let unit: string | undefined;
     setEmployeeCommutingRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
       // Formula: employees * distance * emission_factor
       if (travelType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.employees === 'number' && updated.employees > 0) {
+        co2Factor = travelType.co2_factor;
+        unit = travelType.unit;
         let factorPerKm = travelType.co2_factor;
         if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
           factorPerKm = travelType.co2_factor / 1.60934;
@@ -525,8 +631,36 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.distance === "number" &&
+      typeof snapshot.employees === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveEmployeeCommutingEmissionsKg({
+          employees: snap.employees!,
+          distance: snap.distance!,
+          co2_factor: co2Factor,
+          unit,
+        });
+        setEmployeeCommutingRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.distance !== snap.distance || r.employees !== snap.employees) return r;
+            if (r.travelTypeId !== snap.travelTypeId) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing Employee Commuting entries
@@ -542,24 +676,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_employee_commuting')
-          .select('*')
-          .eq('user_id', user.id);
+        const data = await fetchScope3CategoryEntries(
+          "scope3_employee_commuting",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
@@ -616,18 +742,50 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   const removeEndOfLifeRow = (id: string) => setEndOfLifeRows(prev => prev.filter(r => r.id !== id));
   
   const updateEndOfLifeRow = (id: string, patch: Partial<EndOfLifeRow>) => {
+    let snapshot: EndOfLifeRow | null = null;
+    let factorVal = 0;
+    let materialLabel = "";
     setEndOfLifeRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const material = wasteMaterials.find(m => m.id === updated.materialId);
       if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
         const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
+        factorVal = factor ?? 0;
+        materialLabel = String(material[" Material "] || "");
         updated.emissions = factor !== null ? updated.volume * factor : undefined;
       } else {
         updated.emissions = undefined;
       }
+      snapshot = updated;
       return updated;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.volume === "number" &&
+      snapshot.disposalMethod &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveWasteEmissionsKg({
+          volume: snap.volume!,
+          disposal_method: String(snap.disposalMethod),
+          factor: factorVal,
+          material: materialLabel || undefined,
+        });
+        setEndOfLifeRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
   
   // Load existing End-of-Life Treatment entries
@@ -643,24 +801,16 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       }
 
       try {
-        let query = supabase
-          .from('scope3_end_of_life_treatment')
-          .select('*')
-          .eq('user_id', user.id);
+        const data = await fetchScope3CategoryEntries(
+          "scope3_end_of_life_treatment",
+          user.id,
+          companyContext,
+          counterpartyId,
+        );
 
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          query = query.is('counterparty_id', null);
-        }
-
-      const { data, error } = await (query as any).order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const loadedRows = (data || []).map((entry: any) => ({
+        const loadedRows = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           materialId: entry.material_id || '',
           volume: entry.volume,
@@ -846,28 +996,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_upstream_transportation').insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_upstream_transportation", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
-          return supabase
-            .from('scope3_upstream_transportation')
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const vehicleType = vehicleTypes.find((vt) => vt.id === r.vehicleTypeId);
+            return updateScope3CategoryEntry("scope3_upstream_transportation", r.dbId!, {
               vehicle_type_id: r.vehicleTypeId,
-              vehicle_type_name: vehicleType?.vehicle_type || '',
+              vehicle_type_name: vehicleType?.vehicle_type || "",
               distance: r.distance!,
               weight: r.weight!,
               emission_factor: vehicleType?.co2_factor || 0,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => r.error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -875,22 +1020,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshUpstreamQuery = supabase
-        .from('scope3_upstream_transportation')
-        .select('*')
-        .eq('user_id', user.id);
-      refreshUpstreamQuery =
-        companyContext && counterpartyId
-          ? refreshUpstreamQuery.eq('counterparty_id', counterpartyId)
-          : refreshUpstreamQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshUpstreamQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_upstream_transportation",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           vehicleTypeId: entry.vehicle_type_id || '',
           distance: entry.distance,
@@ -922,12 +1062,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingUpstreamTransport(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_upstream_transportation')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_upstream_transportation", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -989,29 +1124,24 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_waste_generated').insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_waste_generated", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const material = wasteMaterials.find(m => m.id === r.materialId);
-          const factor = material ? getEmissionFactor(material, r.disposalMethod as DisposalMethod) : 0;
-          return supabase
-            .from('scope3_waste_generated')
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const material = wasteMaterials.find((m) => m.id === r.materialId);
+            const factor = material ? getEmissionFactor(material, r.disposalMethod as DisposalMethod) : 0;
+            return updateScope3CategoryEntry("scope3_waste_generated", r.dbId!, {
               material_id: r.materialId,
-              material_name: material?.[" Material "] || '',
+              material_name: material?.[" Material "] || "",
               volume: r.volume!,
               disposal_method: r.disposalMethod,
               emission_factor: factor || 0,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => r.error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1019,22 +1149,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshWasteGeneratedQuery = supabase
-        .from('scope3_waste_generated')
-        .select('*')
-        .eq('user_id', user.id);
-      refreshWasteGeneratedQuery =
-        companyContext && counterpartyId
-          ? refreshWasteGeneratedQuery.eq('counterparty_id', counterpartyId)
-          : refreshWasteGeneratedQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshWasteGeneratedQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_waste_generated",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           materialId: entry.material_id || '',
           volume: entry.volume,
@@ -1066,12 +1191,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingWasteGenerated(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_waste_generated')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_waste_generated", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -1134,31 +1254,26 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_business_travel').insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_business_travel", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
-          let factorPerKm = travelType?.co2_factor || 0;
-          if (travelType?.unit && travelType.unit.toLowerCase().includes('mile')) {
-            factorPerKm = travelType.co2_factor / 1.60934;
-          }
-          return supabase
-            .from('scope3_business_travel')
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const travelType = businessTravelTypes.find((bt) => bt.id === r.travelTypeId);
+            let factorPerKm = travelType?.co2_factor || 0;
+            if (travelType?.unit && travelType.unit.toLowerCase().includes("mile")) {
+              factorPerKm = travelType.co2_factor / 1.60934;
+            }
+            return updateScope3CategoryEntry("scope3_business_travel", r.dbId!, {
               travel_type_id: r.travelTypeId,
-              travel_type_name: travelType?.vehicle_type || '',
+              travel_type_name: travelType?.vehicle_type || "",
               distance: r.distance!,
               emission_factor: factorPerKm,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => r.error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1166,22 +1281,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshBusinessTravelQuery = supabase
-        .from('scope3_business_travel')
-        .select('*')
-        .eq('user_id', user.id);
-      refreshBusinessTravelQuery =
-        companyContext && counterpartyId
-          ? refreshBusinessTravelQuery.eq('counterparty_id', counterpartyId)
-          : refreshBusinessTravelQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshBusinessTravelQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_business_travel",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
@@ -1212,12 +1322,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingBusinessTravel(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_business_travel')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_business_travel", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -1282,32 +1387,27 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_employee_commuting' as any).insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_employee_commuting", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
-          let factorPerKm = travelType?.co2_factor || 0;
-          if (travelType?.unit && travelType.unit.toLowerCase().includes('mile')) {
-            factorPerKm = travelType.co2_factor / 1.60934;
-          }
-          return supabase
-            .from('scope3_employee_commuting' as any)
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const travelType = businessTravelTypes.find((bt) => bt.id === r.travelTypeId);
+            let factorPerKm = travelType?.co2_factor || 0;
+            if (travelType?.unit && travelType.unit.toLowerCase().includes("mile")) {
+              factorPerKm = travelType.co2_factor / 1.60934;
+            }
+            return updateScope3CategoryEntry("scope3_employee_commuting", r.dbId!, {
               travel_type_id: r.travelTypeId,
-              travel_type_name: travelType?.vehicle_type || '',
+              travel_type_name: travelType?.vehicle_type || "",
               distance: r.distance!,
               employees: r.employees!,
               emission_factor: factorPerKm,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1315,22 +1415,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshEmployeeCommutingQuery = supabase
-        .from('scope3_employee_commuting' as any)
-        .select('*')
-        .eq('user_id', user.id);
-      refreshEmployeeCommutingQuery =
-        companyContext && counterpartyId
-          ? refreshEmployeeCommutingQuery.eq('counterparty_id', counterpartyId)
-          : refreshEmployeeCommutingQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshEmployeeCommutingQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_employee_commuting",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           travelTypeId: entry.travel_type_id || '',
           distance: entry.distance,
@@ -1361,12 +1456,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingEmployeeCommuting(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_employee_commuting' as any)
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_employee_commuting", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -1426,28 +1516,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_downstream_transportation').insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_downstream_transportation", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
-          return supabase
-            .from('scope3_downstream_transportation')
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const vehicleType = vehicleTypes.find((vt) => vt.id === r.vehicleTypeId);
+            return updateScope3CategoryEntry("scope3_downstream_transportation", r.dbId!, {
               vehicle_type_id: r.vehicleTypeId,
-              vehicle_type_name: vehicleType?.vehicle_type || '',
+              vehicle_type_name: vehicleType?.vehicle_type || "",
               distance: r.distance!,
               weight: r.weight!,
               emission_factor: vehicleType?.co2_factor || 0,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1455,22 +1540,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshDownstreamQuery = supabase
-        .from('scope3_downstream_transportation')
-        .select('*')
-        .eq('user_id', user.id);
-      refreshDownstreamQuery =
-        companyContext && counterpartyId
-          ? refreshDownstreamQuery.eq('counterparty_id', counterpartyId)
-          : refreshDownstreamQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshDownstreamQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_downstream_transportation",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           vehicleTypeId: entry.vehicle_type_id || '',
           distance: entry.distance,
@@ -1502,12 +1582,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingDownstreamTransport(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_downstream_transportation')
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_downstream_transportation", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       
@@ -1574,31 +1649,26 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
           };
         });
 
-        const { error } = await supabase.from('scope3_end_of_life_treatment' as any).insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_end_of_life_treatment", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map(r => {
-          const material = wasteMaterials.find(m => m.id === r.materialId);
-          const factor = material ? getEmissionFactor(material, r.disposalMethod as DisposalMethod) : 0;
-          return supabase
-            .from('scope3_end_of_life_treatment' as any)
-            .update({
+        await Promise.all(
+          changedExisting.map((r) => {
+            const material = wasteMaterials.find((m) => m.id === r.materialId);
+            const factor = material ? getEmissionFactor(material, r.disposalMethod as DisposalMethod) : 0;
+            return updateScope3CategoryEntry("scope3_end_of_life_treatment", r.dbId!, {
               material_id: r.materialId,
-              material_name: material?.[" Material "] || '',
+              material_name: material?.[" Material "] || "",
               volume: r.volume!,
               disposal_method: r.disposalMethod,
               recycle_percentage: r.recycle || 0,
-              composition: r.composition || '',
+              composition: r.composition || "",
               emission_factor: factor || 0,
               emissions: r.emissions!,
-            })
-            .eq('id', r.dbId!);
-        });
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1606,22 +1676,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
       });
 
-      let refreshEndOfLifeQuery = supabase
-        .from('scope3_end_of_life_treatment' as any)
-        .select('*')
-        .eq('user_id', user.id);
-      refreshEndOfLifeQuery =
-        companyContext && counterpartyId
-          ? refreshEndOfLifeQuery.eq('counterparty_id', counterpartyId)
-          : refreshEndOfLifeQuery.is('counterparty_id', null);
-      const { data: newData } = await refreshEndOfLifeQuery.order('created_at', {
-        ascending: false,
-      });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_end_of_life_treatment",
+        user.id,
+        companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
-        const updatedRows = newData.map((entry: any) => ({
+        const updatedRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           materialId: entry.material_id || '',
           volume: entry.volume,
@@ -1654,12 +1719,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
 
     setDeletingEndOfLife(prev => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from('scope3_end_of_life_treatment' as any)
-        .delete()
-        .eq('id', row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_end_of_life_treatment", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
       

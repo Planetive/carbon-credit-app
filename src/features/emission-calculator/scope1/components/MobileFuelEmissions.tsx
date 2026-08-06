@@ -6,7 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  companyScopedListFilters,
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  localMobileFuelEmissionsKg,
+  resolveEpaMobileFuelEmissionsKg,
+} from "@/api/calcConnection";
 import { formatDynamicEmission } from "./emissionFormatting";
 
 interface MobileFuelRow {
@@ -90,25 +102,17 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         return;
       }
       try {
-        let q = supabase
-          .from(tableName as any)
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-        if (companyContext && counterpartyId) {
-          q = q.eq("counterparty_id", counterpartyId);
-        } else {
-          q = q.is("counterparty_id", null);
-        }
-        const { data, error } = await q;
-        if (error) throw error;
-        const mapped: MobileFuelRow[] = (data || []).map((entry: any) => {
+        const data = await listLegacyTableEntries(
+          tableName,
+          companyScopedListFilters(userId, !!companyContext, counterpartyId),
+        );
+        const mapped: MobileFuelRow[] = (data || []).map((entry) => {
           const unit: string | undefined = entry.unit;
           const isGallonBase =
             typeof unit === "string" && unit.toLowerCase().includes("gallon");
           return {
             id: crypto.randomUUID(),
-            dbId: entry.id,
+            dbId: String(entry.id),
             isExisting: true,
             fuelType: entry.fuel_type,
             unit,
@@ -138,30 +142,18 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
     loadEntries();
   }, [userId, companyContext, counterpartyId]);
 
-  // Load reference data from "Mobile Combustion" table
+  // Load reference data from "Mobile Combustion" (API factor sheet → Supabase fallback)
   useEffect(() => {
     const loadMobileCombustion = async () => {
       setLoading(true);
       try {
-        let result = await supabase.from("Mobile Combustion" as any).select("*");
+        const loaded = await loadIpccFactorTableRows([
+          "Mobile Combustion",
+          "mobile_combustion",
+          "MobileCombustion",
+        ]);
+        const data = loaded.rows;
 
-        if (result.error) {
-          // Try a few common variants if the first name fails
-          result = await supabase.from("mobile_combustion" as any).select("*");
-        }
-
-        if (result.error) {
-          console.error("Error loading Mobile Combustion data:", result.error);
-          toast({
-            title: "Error",
-            description:
-              result.error.message || "Failed to load Mobile Combustion reference data.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const data = result.data || [];
         const mapped: MobileCombustionOption[] = data
           .map((row: any) => {
             const fuelType =
@@ -206,7 +198,8 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           toast({
             title: "No mobile combustion data",
             description:
-              'The "Mobile Combustion" table has no usable rows. Please add at least one row in Supabase.',
+              loaded.attemptErrors[0] ||
+              'The "Mobile Combustion" factor sheet has no usable rows.',
           });
         }
       } catch (error: any) {
@@ -302,8 +295,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
     const row = rows.find((r) => r.id === id);
     if (row?.dbId && user) {
       try {
-        const { error } = await supabase.from(tableName as any).delete().eq("id", row.dbId);
-        if (error) throw error;
+        await deleteLegacyTableEntry(tableName, row.dbId);
       } catch (e: any) {
         toast({ title: "Error", description: e?.message || "Failed to delete entry", variant: "destructive" });
         return;
@@ -313,6 +305,7 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
   };
 
   const updateRow = (id: string, patch: Partial<MobileFuelRow>) => {
+    let snapshot: MobileFuelRow | null = null;
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -332,7 +325,6 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
         }
 
         if (typeof next.quantity === "number" && typeof next.factor === "number") {
-          let effectiveQuantity = next.quantity;
           const baseUnit = next.unit;
           const isGallonBase =
             typeof baseUnit === "string" &&
@@ -340,20 +332,49 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           const inputUnit =
             next.inputUnit ?? (isGallonBase ? "gallon" : undefined);
 
-          // If the reference factor is per gallon but the user entered liters,
-          // convert liters -> gallons before multiplying by the factor.
-          if (isGallonBase && inputUnit === "liter") {
-            effectiveQuantity = next.quantity / 3.78541;
-          }
-
-          next.emissions = Number((effectiveQuantity * next.factor).toFixed(6));
+          next.emissions = localMobileFuelEmissionsKg(
+            next.quantity,
+            next.factor,
+            inputUnit ?? "gallon"
+          );
         } else {
           next.emissions = undefined;
         }
 
+        snapshot = next;
         return next;
       }),
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      const baseUnit = snap.unit;
+      const isGallonBase =
+        typeof baseUnit === "string" && baseUnit.toLowerCase().includes("gallon");
+      const inputUnit = snap.inputUnit ?? (isGallonBase ? "gallon" : "gallon");
+      void (async () => {
+        const kg = await resolveEpaMobileFuelEmissionsKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+          input_unit: inputUnit,
+          fuel_type: snap.fuelType,
+          unit: snap.unit,
+        });
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.quantity !== snap.quantity || r.factor !== snap.factor) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
@@ -461,31 +482,25 @@ const MobileFuelEmissions: React.FC<MobileFuelEmissionsProps> = ({
           emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
           emissions_output_unit: outputUnit,
         }));
-        const { error } = await supabase.from(tableName as any).insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries(tableName, payload);
       }
       const rowsToUpdate = unitChanged
         ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
         : changedExisting;
       if (rowsToUpdate.length > 0) {
-        const results = await Promise.all(
+        await Promise.all(
           rowsToUpdate.map((v) =>
-            supabase
-              .from(tableName as any)
-              .update({
-                fuel_type: v.fuelType!,
-                unit: v.unit!,
-                quantity: v.quantity!,
-                factor: v.factor!,
-                emissions: v.emissions!,
-                emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
-                emissions_output_unit: outputUnit,
-              })
-              .eq("id", v.dbId!)
+            updateLegacyTableEntry(tableName, v.dbId!, {
+              fuel_type: v.fuelType!,
+              unit: v.unit!,
+              quantity: v.quantity!,
+              factor: v.factor!,
+              emissions: v.emissions!,
+              emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+              emissions_output_unit: outputUnit,
+            })
           )
         );
-        const updateError = results.find((r: { error?: unknown }) => r.error)?.error;
-        if (updateError) throw updateError;
       }
       toast({
         title: "Saved",

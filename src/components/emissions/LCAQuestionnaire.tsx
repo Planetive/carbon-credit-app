@@ -9,7 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
 import { CheckCircle2, ArrowRight, ArrowLeft, Edit2, Factory, Zap, XCircle, ArrowUpDown, TrendingUp, Calculator, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  companyScopedListFilters,
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,46 +96,35 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
       }
 
       try {
-        let query = supabase
-          .from('scope3_lca_entries')
-          .select('*')
-          .eq('user_id', user.id);
-
-        // Filter by counterparty_id if in company context
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          // Only personal entries (no counterparty_id)
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data: lcaData, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const lcaData = await listLegacyTableEntries(
+          "scope3_lca_entries",
+          companyScopedListFilters(user.id, companyContext, counterpartyId),
+        );
 
         if (lcaData && lcaData.length > 0) {
           const dbIds: typeof lcaDbIds = {};
           
-          lcaData.forEach(entry => {
-            const scopeType = entry.scope_type;
+          lcaData.forEach((entry) => {
+            const scopeType = entry.scope_type as string;
+            const emissions = entry.emissions as number;
+            const entryId = String(entry.id);
             if (scopeType === 'scope1') {
-              setScope1Emissions(entry.emissions);
-              dbIds.scope1 = entry.id;
+              setScope1Emissions(emissions);
+              dbIds.scope1 = entryId;
             } else if (scopeType === 'scope2') {
-              setScope2Emissions(entry.emissions);
-              dbIds.scope2 = entry.id;
+              setScope2Emissions(emissions);
+              dbIds.scope2 = entryId;
             } else if (scopeType === 'scope3_upstream') {
-              setScope3Upstream(entry.emissions);
-              dbIds.scope3Upstream = entry.id;
+              setScope3Upstream(emissions);
+              dbIds.scope3Upstream = entryId;
             } else if (scopeType === 'scope3_downstream') {
-              setScope3Downstream(entry.emissions);
-              dbIds.scope3Downstream = entry.id;
+              setScope3Downstream(emissions);
+              dbIds.scope3Downstream = entryId;
             }
           });
 
           setLcaDbIds(dbIds);
 
-          // Also update emissionData
           setEmissionData(prev => ({
             ...prev,
             scope1: {
@@ -142,9 +137,9 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
             scope3: [
               ...prev.scope3.filter(r => !r.category?.startsWith('lca_')),
               ...lcaData.map(entry => ({
-                id: entry.id,
-                dbId: entry.id,
-                category: `lca_${entry.scope_type.replace('scope3_', '')}` as any,
+                id: String(entry.id),
+                dbId: String(entry.id),
+                category: `lca_${String(entry.scope_type).replace('scope3_', '')}` as any,
                 activity: `LCA: ${entry.scope_type === 'scope1' ? 'Scope 1' : entry.scope_type === 'scope2' ? 'Scope 2' : entry.scope_type === 'scope3_upstream' ? 'Scope 3 Upstream' : 'Scope 3 Downstream'} Emissions`,
                 unit: entry.unit,
                 quantity: entry.emissions,
@@ -281,37 +276,25 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
           calculation_mode: 'direct_lca',
         }));
 
-        const { data: insertedData, error: insertError } = await supabase
-          .from('scope3_lca_entries')
-          .insert(payload)
-          .select('id, scope_type');
+        const insertedData = await insertLegacyTableEntries("scope3_lca_entries", payload);
 
-        if (insertError) throw insertError;
-
-        // Update dbIds with newly inserted IDs
-        if (insertedData) {
-          const newDbIds = { ...lcaDbIds };
-          insertedData.forEach(entry => {
-            if (entry.scope_type === 'scope1') newDbIds.scope1 = entry.id;
-            else if (entry.scope_type === 'scope2') newDbIds.scope2 = entry.id;
-            else if (entry.scope_type === 'scope3_upstream') newDbIds.scope3Upstream = entry.id;
-            else if (entry.scope_type === 'scope3_downstream') newDbIds.scope3Downstream = entry.id;
-          });
-          setLcaDbIds(newDbIds);
-        }
+        const newDbIds = { ...lcaDbIds };
+        insertedData.forEach((row, index) => {
+          const scopeType = newEntries[index]?.scope_type;
+          if (scopeType === "scope1") newDbIds.scope1 = row.id;
+          else if (scopeType === "scope2") newDbIds.scope2 = row.id;
+          else if (scopeType === "scope3_upstream") newDbIds.scope3Upstream = row.id;
+          else if (scopeType === "scope3_downstream") newDbIds.scope3Downstream = row.id;
+        });
+        setLcaDbIds(newDbIds);
       }
 
-      // Update existing entries
       if (existingEntries.length > 0) {
-        const updates = existingEntries.map(e => 
-          supabase
-            .from('scope3_lca_entries')
-            .update({ emissions: e.emissions })
-            .eq('id', e.dbId!)
+        await Promise.all(
+          existingEntries.map((e) =>
+            updateLegacyTableEntry("scope3_lca_entries", e.dbId!, { emissions: e.emissions })
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => r.error)?.error;
-        if (updateError) throw updateError;
       }
 
       // Update emissionData
@@ -359,20 +342,13 @@ const LCAQuestionnaire: React.FC<LCAQuestionnaireProps> = ({
 
     setSaving(true);
     try {
-      // Delete all LCA entries from database
-      let deleteQuery = supabase
-        .from('scope3_lca_entries')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (companyContext && counterpartyId) {
-        deleteQuery = deleteQuery.eq('counterparty_id', counterpartyId);
-      } else {
-        deleteQuery = deleteQuery.is('counterparty_id', null);
-      }
-
-      const { error } = await deleteQuery;
-      if (error) throw error;
+      const entries = await listLegacyTableEntries(
+        "scope3_lca_entries",
+        companyScopedListFilters(user.id, companyContext, counterpartyId),
+      );
+      await Promise.all(
+        entries.map((entry) => deleteLegacyTableEntry("scope3_lca_entries", String(entry.id))),
+      );
 
       // Reset all state
       setScope1Emissions('');

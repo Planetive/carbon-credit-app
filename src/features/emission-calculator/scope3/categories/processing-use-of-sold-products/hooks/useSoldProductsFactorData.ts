@@ -1,23 +1,11 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
 import type {
   HeatSteamRow,
   MobileCombustionRow,
   StationaryCombustionRow,
 } from "../types";
-
-async function queryFirstAvailableTable(tableNames: string[]) {
-  let result = await supabase.from(tableNames[0] as any).select("*", { count: "exact" });
-
-  for (let index = 1; result.error && index < tableNames.length; index += 1) {
-    result = await supabase
-      .from(tableNames[index] as any)
-      .select("*", { count: "exact" });
-  }
-
-  return result;
-}
 
 function formatStationaryCombustionRows(data: any[]): StationaryCombustionRow[] {
   return (data || [])
@@ -132,79 +120,39 @@ export function useSoldProductsFactorData() {
   useEffect(() => {
     const loadCombustionData = async () => {
       try {
-        const stationaryResult = await queryFirstAvailableTable([
+        const stationary = await loadIpccFactorTableRows([
           "Stationary Combustion",
-          '"Stationary Combustion"',
           "stationary_combustion",
           "StationaryCombustion",
         ]);
-
-        if (!stationaryResult.error && (!stationaryResult.data || stationaryResult.data.length === 0)) {
-          const countResult = await supabase
-            .from("Stationary Combustion" as any)
-            .select("*", { count: "exact", head: true });
-
-          if (countResult.count !== null && countResult.count > 0) {
-            toast({
-              title: "RLS Policy Issue",
-              description: `Table has ${countResult.count} rows but RLS is blocking access. Please check Supabase RLS policies for "Stationary Combustion" table.`,
-              variant: "destructive",
-            });
-          } else if (countResult.count === 0) {
-            toast({
-              title: "Empty Table",
-              description:
-                "The Stationary Combustion table is empty. Please add data to the table.",
-              variant: "default",
-            });
-          }
-        }
-
-        if (stationaryResult.error) {
+        const stationaryRows = formatStationaryCombustionRows(stationary.rows);
+        setStationaryCombustionData(stationaryRows);
+        if (stationaryRows.length === 0) {
           toast({
             title: "Warning",
-            description: `Could not load Stationary Combustion data: ${stationaryResult.error.message || "Unknown error"}. Check if table has data and RLS policies.`,
+            description:
+              stationary.attemptErrors[0] ||
+              "Could not load Stationary Combustion factor data.",
             variant: "destructive",
           });
         }
 
-        setStationaryCombustionData(
-          formatStationaryCombustionRows(stationaryResult.data || []),
-        );
-
-        const mobileResult = await queryFirstAvailableTable([
+        const mobile = await loadIpccFactorTableRows([
           "Mobile Combustion",
-          '"Mobile Combustion"',
           "mobile_combustion",
           "MobileCombustion",
         ]);
-
-        if (!mobileResult.error && (!mobileResult.data || mobileResult.data.length === 0)) {
-          if (mobileResult.count === 0) {
-            toast({
-              title: "Empty Table",
-              description:
-                'The Mobile Combustion table is empty. Please add at least one row with data in Supabase.',
-              variant: "default",
-            });
-          } else if (mobileResult.count !== null && mobileResult.count > 0) {
-            toast({
-              title: "Data Access Issue",
-              description: `Table has ${mobileResult.count} rows but cannot retrieve them. Check table permissions.`,
-              variant: "destructive",
-            });
-          }
-        }
-
-        if (mobileResult.error) {
+        const mobileRows = formatMobileCombustionRows(mobile.rows);
+        setMobileCombustionData(mobileRows);
+        if (mobileRows.length === 0) {
           toast({
             title: "Warning",
-            description: `Could not load Mobile Combustion data: ${mobileResult.error.message || "Unknown error"}. Check if table has data and RLS policies.`,
+            description:
+              mobile.attemptErrors[0] ||
+              "Could not load Mobile Combustion factor data.",
             variant: "destructive",
           });
         }
-
-        setMobileCombustionData(formatMobileCombustionRows(mobileResult.data || []));
       } catch (error: any) {
         toast({
           title: "Error",
@@ -220,28 +168,24 @@ export function useSoldProductsFactorData() {
   useEffect(() => {
     const loadHeatSteamData = async () => {
       try {
-        const { data: ukData, error: ukError } = await supabase
-          .from("heat and steam" as any)
-          .select("*", { count: "exact" });
-
-        if (ukError) {
-          console.error("Heat and Steam (UK) error:", ukError);
-        } else if (ukData && ukData.length > 0) {
-          setHeatSteamDataUK(formatHeatSteamRows(ukData));
+        const uk = await loadIpccFactorTableRows([
+          "heat and steam",
+          "heat_and_steam",
+        ]);
+        if (uk.rows.length > 0) {
+          setHeatSteamDataUK(formatHeatSteamRows(uk.rows));
         }
       } catch (error: any) {
         console.error("Error loading UK heat and steam data:", error);
       }
 
       try {
-        const { data: ebtData, error: ebtError } = await supabase
-          .from("heat and steam EBT" as any)
-          .select("*", { count: "exact" });
-
-        if (ebtError) {
-          console.error("Heat and Steam (EBT) error:", ebtError);
-        } else if (ebtData && ebtData.length > 0) {
-          setHeatSteamDataEBT(formatHeatSteamRows(ebtData));
+        const ebt = await loadIpccFactorTableRows([
+          "heat and steam EBT",
+          "heat_and_steam_ebt",
+        ]);
+        if (ebt.rows.length > 0) {
+          setHeatSteamDataEBT(formatHeatSteamRows(ebt.rows));
         }
       } catch (error: any) {
         console.error("Error loading EBT heat and steam data:", error);

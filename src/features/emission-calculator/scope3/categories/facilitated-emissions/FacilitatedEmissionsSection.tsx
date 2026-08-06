@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Save, Trash2, ChevronRight, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMyProfileDual } from "@/api/profileDualRead";
 import { useEmissionSync } from "@/components/emissions/scope3/hooks/useEmissionSync";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import {
@@ -175,11 +176,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
   useEffect(() => {
     const loadUserType = async () => {
       try {
-        const { data } = (await supabase
-          .from("profiles")
-          .select("user_type")
-          .eq("id", user.id)
-          .single()) as { data: { user_type?: string } | null };
+        const data = await fetchMyProfileDual(user.id);
         if (data?.user_type) {
           setUserType(data.user_type);
         }

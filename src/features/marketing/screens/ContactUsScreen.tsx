@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+import { submitContactForm } from "@/integrations/supabase/contactClient";
 import { sendContactNotificationEmail } from "@/utils/emailService";
 
 const ContactUsScreen = () => {
@@ -145,53 +145,43 @@ const ContactUsScreen = () => {
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase
-        .from("contact_submissions")
-        .insert([
-          {
-            name: formData.name,
-            email: formData.email,
-            company: formData.company || null,
-            phone: formData.phone || null,
-            subject: formData.subject,
-            message: formData.message,
-            status: "new",
-          },
-        ])
-        .select();
+      await submitContactForm({
+        name: formData.name,
+        email: formData.email,
+        company: formData.company || null,
+        phone: formData.phone || null,
+        subject: formData.subject,
+        message: formData.message,
+        status: "new",
+      });
 
-      if (error) {
-        console.error("Error storing contact submission:", error);
-        setErrorMessage(error.message || "Failed to store submission");
-        setSubmitStatus("error");
-      } else {
-        const emailResult = await sendContactNotificationEmail({
-          name: formData.name,
-          email: formData.email,
-          company: formData.company || undefined,
-          phone: formData.phone || undefined,
-          subject: formData.subject,
-          message: formData.message,
-        });
+      const emailResult = await sendContactNotificationEmail({
+        name: formData.name,
+        email: formData.email,
+        company: formData.company || undefined,
+        phone: formData.phone || undefined,
+        subject: formData.subject,
+        message: formData.message,
+      });
 
-        if (!emailResult.success) {
-          console.warn("Contact submission saved but email notification failed:", emailResult.error);
-        }
-
-        console.log("Submission successful:", data);
-        setSubmitStatus("success");
-        setFormData({
-          name: "",
-          email: "",
-          company: "",
-          phone: "",
-          subject: "",
-          message: "",
-        });
+      if (!emailResult.success) {
+        console.warn("Contact submission saved but email notification failed:", emailResult.error);
       }
+
+      setSubmitStatus("success");
+      setFormData({
+        name: "",
+        email: "",
+        company: "",
+        phone: "",
+        subject: "",
+        message: "",
+      });
     } catch (error) {
       console.error("Contact submission failed:", error);
-      setErrorMessage("Network error or database connection failed");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Network error or database connection failed"
+      );
       setSubmitStatus("error");
     } finally {
       setIsSubmitting(false);

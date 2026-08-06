@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { listProjectReports } from "@/integrations/supabase/projectInputsClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,13 +37,8 @@ const ProjectReportsScreen = () => {
       }
       setLoading(true);
       try {
-        const { data, error: fetchError } = await (supabase as any)
-          .from("project_reports")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        if (fetchError) console.warn("Could not load reports:", fetchError.message);
-        else setReports(data ?? []);
+        const data = await listProjectReports(user.id);
+        setReports(data ?? []);
       } catch (err) {
         console.warn("Could not load reports:", err);
         setReports([]);

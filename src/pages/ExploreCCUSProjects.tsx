@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import {
   Card,
   CardContent,
@@ -137,6 +138,17 @@ const ExploreCCUSProjects = () => {
 
   // Helper function to fetch all unique values for a column in batches
   async function fetchAllUniqueColumnValues(column: string): Promise<string[]> {
+    const apiRows = await tryLoadCatalogViaApi("ccus");
+    if (apiRows) {
+      return Array.from(
+        new Set(
+          apiRows
+            .map((p: any) => String(p[column] || "").trim())
+            .filter((val: string) => val.length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+    }
+
     const BATCH_SIZE = 1000;
     let allRows: any[] = [];
     let from = 0;
@@ -192,6 +204,25 @@ const ExploreCCUSProjects = () => {
       fates?: string[];
     } = {}
   ) {
+    const apiRows = await tryLoadCatalogViaApi("ccus");
+    if (apiRows) {
+      return apiRows.filter((row: any) => {
+        if (filters.countries?.length && !filters.countries.includes(row["Country or economy"])) {
+          return false;
+        }
+        if (filters.statuses?.length && !filters.statuses.includes(row["Project Status"])) {
+          return false;
+        }
+        if (filters.sectors?.length && !filters.sectors.includes(row["Sector"])) {
+          return false;
+        }
+        if (filters.fates?.length && !filters.fates.includes(row["Fate of carbon"])) {
+          return false;
+        }
+        return true;
+      });
+    }
+
     const BATCH_SIZE = 1000;
     let allRows: any[] = [];
     let from = 0;

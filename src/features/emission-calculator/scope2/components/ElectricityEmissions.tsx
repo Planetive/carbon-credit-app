@@ -6,7 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  localElectricityEmissionsKg,
+  resolveElectricityEmissionsKg,
+} from "@/api/calcConnection";
 import { FACTORS, SCOPE2_FACTORS } from "@/components/emissions/shared/EmissionFactors";
 import { formatDynamicEmission } from "@/features/emission-calculator/scope1/components/emissionFormatting";
 
@@ -100,55 +110,52 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       }
       try {
         // Load latest main row
-        const { data: mainData, error: mainError } = await (supabase as any)
-          .from('scope2_electricity_main')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (mainError) throw mainError;
+        const mains = await listLegacyTableEntries("scope2_electricity_main", {
+          user_id: userId,
+          order: { column: "created_at", ascending: false },
+        });
+        const mainData = mains[0];
 
         if (mainData) {
-          setMainId(mainData.id);
-          setTotalKwh(mainData.total_kwh ?? undefined);
-          setGridPct(mainData.grid_pct ?? undefined);
-          setRenewablePct(mainData.renewable_pct ?? undefined);
-          setOtherPct(mainData.other_pct ?? undefined);
+          setMainId(String(mainData.id));
+          setTotalKwh((mainData.total_kwh as number) ?? undefined);
+          setGridPct((mainData.grid_pct as number) ?? undefined);
+          setRenewablePct((mainData.renewable_pct as number) ?? undefined);
+          setOtherPct((mainData.other_pct as number) ?? undefined);
         } else {
           setMainId(null);
         }
 
-        // Load subanswers for this main row
         if (mainData?.id) {
-          const { data: subData, error: subError } = await (supabase as any)
-            .from('scope2_electricity_subanswers')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('main_id', mainData.id)
-            .order('created_at', { ascending: true });
-          if (subError) throw subError;
+          const allSubs = await listLegacyTableEntries("scope2_electricity_subanswers", {
+            user_id: userId,
+            order: { column: "created_at", ascending: true },
+          });
+          const mainLegacyId = String(mainData.legacy_id || mainData.id);
+          const subData = allSubs.filter((r) => {
+            const mid = String(r.main_id ?? "");
+            return mid === mainLegacyId || mid === String(mainData.id);
+          });
 
-          const grid = (subData || []).find(r => r.type === 'grid');
+          const grid = subData.find((r) => r.type === "grid");
           if (grid) {
-            setGridSubId(grid.id);
-            setGridCountry(grid.provider_country as 'UAE' | 'Pakistan');
+            setGridSubId(String(grid.id));
+            setGridCountry(grid.provider_country as "UAE" | "Pakistan");
           } else {
             setGridSubId(undefined);
             setGridCountry(undefined);
           }
 
-          const others = (subData || []).filter(r => r.type === 'other');
-          setOtherRows(others.map(r => ({
+          const others = subData.filter((r) => r.type === "other");
+          setOtherRows(others.map((r) => ({
             id: crypto.randomUUID(),
-            dbId: r.id,
+            dbId: String(r.id),
             type: r.other_sources_type as FuelType | undefined,
-            fuel: r.other_sources_fuel ?? undefined,
-            unit: r.other_sources_unit ?? undefined,
-            quantity: r.other_sources_quantity ?? undefined,
-            factor: r.other_sources_factor ?? undefined,
-            emissions: r.other_sources_emissions ?? undefined,
+            fuel: (r.other_sources_fuel as string) ?? undefined,
+            unit: (r.other_sources_unit as string) ?? undefined,
+            quantity: (r.other_sources_quantity as number) ?? undefined,
+            factor: (r.other_sources_factor as number) ?? undefined,
+            emissions: (r.other_sources_emissions as number) ?? undefined,
           })));
         } else {
           setOtherRows([]);
@@ -279,11 +286,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
     if (!confirm('Delete this other-source entry?')) return;
     setDeletingIds(prev => new Set(prev).add(id));
     try {
-      const { error } = await (supabase as any)
-        .from('scope2_electricity_subanswers')
-        .delete()
-        .eq('id', row.dbId);
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope2_electricity_subanswers", row.dbId);
       setOtherRows(prev => prev.filter(r => r.id !== id));
       toast({ title: "Deleted", description: "Entry deleted." });
     } catch (e: any) {
@@ -297,15 +300,46 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
 
   const computedElectricityEmissions = useMemo(() => {
     if (!totalKwh) return 0;
-    const gridPart = gridPct && gridCountry && gridFactor ? (gridPct / 100) * totalKwh * gridFactor : 0;
-    const renewablePart = renewablePct ? 0 : 0; // zero by definition
-    let otherPart = 0;
-    if (otherPct && otherPct > 0 && otherRows.length > 0) {
-      const sumOtherEmissions = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
-      otherPart = (otherPct / 100) * totalKwh * sumOtherEmissions;
-    }
-    return Number((gridPart + renewablePart + otherPart).toFixed(6));
+    const sumOtherEmissions = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    return localElectricityEmissionsKg({
+      total_kwh: totalKwh,
+      grid_pct: gridPct,
+      grid_factor: gridFactor,
+      other_pct: otherPct,
+      other_row_emissions_sum: sumOtherEmissions,
+    });
   }, [totalKwh, gridPct, gridCountry, gridFactor, renewablePct, otherPct, otherRows]);
+
+  const [apiElectricityKg, setApiElectricityKg] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!USE_JWT_AUTH) {
+      setApiElectricityKg(null);
+      return;
+    }
+    if (!totalKwh) {
+      setApiElectricityKg(null);
+      return;
+    }
+    const sumOther = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    let cancelled = false;
+    void (async () => {
+      const kg = await resolveElectricityEmissionsKg({
+        total_kwh: totalKwh,
+        grid_pct: gridPct,
+        grid_factor: gridFactor,
+        other_pct: otherPct,
+        other_row_emissions_sum: sumOther,
+        renewable_pct: renewablePct,
+      });
+      if (!cancelled) setApiElectricityKg(kg);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [totalKwh, gridPct, gridFactor, otherPct, renewablePct, otherRows]);
+
+  const displayElectricityEmissions = apiElectricityKg ?? computedElectricityEmissions;
 
   const gridEmissions = useMemo(() => {
     if (!totalKwh || !gridPct || !gridFactor) return 0;
@@ -342,66 +376,45 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
     }
     setSaving(true);
     try {
-      // Upsert main row
       let currentMainId = mainId;
       if (!currentMainId) {
-        const { data, error } = await (supabase as any)
-          .from('scope2_electricity_main')
-          .insert({
-            user_id: user.id,
-            total_kwh: totalKwh,
-            grid_pct: gridPct ?? null,
-            renewable_pct: renewablePct ?? null,
-            other_pct: otherPct ?? null,
-          })
-          .select('id')
-          .single();
-        if (error) throw error;
-        currentMainId = data.id;
+        const created = await insertLegacyTableEntries("scope2_electricity_main", [{
+          user_id: user.id,
+          total_kwh: totalKwh,
+          grid_pct: gridPct ?? null,
+          renewable_pct: renewablePct ?? null,
+          other_pct: otherPct ?? null,
+        }]);
+        currentMainId = created[0]?.id ?? null;
         setMainId(currentMainId);
       } else {
-        const { error } = await (supabase as any)
-          .from('scope2_electricity_main')
-          .update({
-            total_kwh: totalKwh,
-            grid_pct: gridPct ?? null,
-            renewable_pct: renewablePct ?? null,
-            other_pct: otherPct ?? null,
-          })
-          .eq('id', currentMainId);
-        if (error) throw error;
+        await updateLegacyTableEntry("scope2_electricity_main", currentMainId, {
+          total_kwh: totalKwh,
+          grid_pct: gridPct ?? null,
+          renewable_pct: renewablePct ?? null,
+          other_pct: otherPct ?? null,
+        });
       }
 
-      // Upsert grid subanswer (single)
       if (gridPct && gridPct > 0 && gridCountry && gridFactor) {
         if (gridSubId) {
-          const { error } = await (supabase as any)
-            .from('scope2_electricity_subanswers')
-            .update({
-              type: 'grid',
-              provider_country: gridCountry,
-              grid_emission_factor: gridFactor,
-            })
-            .eq('id', gridSubId);
-          if (error) throw error;
+          await updateLegacyTableEntry("scope2_electricity_subanswers", gridSubId, {
+            type: "grid",
+            provider_country: gridCountry,
+            grid_emission_factor: gridFactor,
+          });
         } else {
-          const { data, error } = await (supabase as any)
-            .from('scope2_electricity_subanswers')
-            .insert({
-              user_id: user.id,
-              main_id: currentMainId,
-              type: 'grid',
-              provider_country: gridCountry,
-              grid_emission_factor: gridFactor,
-            })
-            .select('id')
-            .single();
-          if (error) throw error;
-          setGridSubId(data.id);
+          const created = await insertLegacyTableEntries("scope2_electricity_subanswers", [{
+            user_id: user.id,
+            main_id: currentMainId,
+            type: "grid",
+            provider_country: gridCountry,
+            grid_emission_factor: gridFactor,
+          }]);
+          setGridSubId(created[0]?.id);
         }
       }
 
-      // Insert/update other subanswers
       const newOthers = otherRows.filter(r => !r.dbId && r.type && r.fuel && r.unit && typeof r.quantity === 'number' && typeof r.factor === 'number' && typeof r.emissions === 'number');
       const updateOthers = otherRows.filter(r => r.dbId && (r.type || r.fuel || r.unit || typeof r.quantity === 'number' || typeof r.factor === 'number' || typeof r.emissions === 'number'));
 
@@ -417,15 +430,13 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
           other_sources_factor: r.factor!,
           other_sources_emissions: r.emissions!,
         }));
-        const { error } = await (supabase as any).from('scope2_electricity_subanswers').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope2_electricity_subanswers", payload);
       }
 
       if (updateOthers.length > 0) {
-        const results = await Promise.all(updateOthers.map(r => (
-          (supabase as any)           
-            .from('scope2_electricity_subanswers')
-            .update({
+        await Promise.all(
+          updateOthers.map((r) =>
+            updateLegacyTableEntry("scope2_electricity_subanswers", r.dbId!, {
               other_sources_type: r.type ?? null,
               other_sources_fuel: r.fuel ?? null,
               other_sources_unit: r.unit ?? null,
@@ -433,10 +444,8 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
               other_sources_factor: r.factor ?? null,
               other_sources_emissions: r.emissions ?? null,
             })
-            .eq('id', r.dbId!)
-        )));
-        const updateError = (results as any[]).find(x => x.error)?.error;
-        if (updateError) throw updateError;
+          )
+        );
       }
 
       toast({ title: "Saved", description: "Scope 2 electricity data saved." });
@@ -455,8 +464,8 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
   const totalOtherEmissions = otherRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
   useEffect(() => {
-    if (onTotalChange) onTotalChange(computedElectricityEmissions);
-  }, [onTotalChange, computedElectricityEmissions]);
+    if (onTotalChange) onTotalChange(displayElectricityEmissions);
+  }, [onTotalChange, displayElectricityEmissions]);
 
   return (
     <div className="space-y-6">
@@ -694,7 +703,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-900 font-medium">
-          Total electricity emissions: <span className="font-semibold">{formatEmission(computedElectricityEmissions)} kg CO2e</span>
+          Total electricity emissions: <span className="font-semibold">{formatEmission(displayElectricityEmissions)} kg CO2e</span>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={saveAll} disabled={saving} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">

@@ -1,4 +1,81 @@
 import { supabase } from './client';
+import { USE_JWT_AUTH } from '@/api/config';
+import {
+  createCounterpartyApi,
+  createExposureApi,
+  deleteCounterpartyApi,
+  getCounterpartyApi,
+  getCounterpartyQuestionnaireApi,
+  listCompanyEmissions,
+  listCounterparties,
+  listExposures,
+  patchCompanyEmissionApi,
+  patchCounterpartyApi,
+  patchExposureApi,
+  patchQuestionnaireApi,
+  upsertCounterpartyQuestionnaireApi,
+  type QuestionnaireOut,
+} from '@/api/portfolio';
+import {
+  createFinancedEmission,
+  deleteFinancedEmission,
+  listFinancedEmissions,
+  patchFinancedEmission,
+  type FinancedEmission,
+} from '@/api/financed';
+import { resolveFinancedCalculation } from '@/api/financedConnection';
+
+function financedToEmissionCalculation(row: FinancedEmission): EmissionCalculation {
+  const calcType =
+    row.calc_kind === 'facilitated' ? 'facilitated' : 'finance';
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    counterparty_id: row.counterparty_id ?? null,
+    exposure_id: row.exposure_id ?? null,
+    questionnaire_id: row.questionnaire_id ?? null,
+    calculation_type: calcType,
+    company_type: row.company_type || '',
+    formula_id: row.formula_id || '',
+    inputs: (row.inputs || {}) as Record<string, unknown>,
+    results: (row.results || {}) as Record<string, unknown>,
+    financed_emissions: Number(row.financed_emissions ?? 0),
+    attribution_factor:
+      row.attribution_factor == null ? null : Number(row.attribution_factor),
+    data_quality_score:
+      row.data_quality_score == null ? null : Number(row.data_quality_score),
+    evic: null,
+    total_equity_plus_debt: null,
+    status: (row.status as EmissionCalculation['status']) || 'completed',
+    created_at: row.created_at || '',
+    updated_at: row.updated_at || '',
+  };
+}
+
+function apiToQuestionnaire(row: QuestionnaireOut): CounterpartyQuestionnaire {
+  return {
+    id: String(row.id),
+    user_id: String(row.user_id),
+    counterparty_id: String(row.counterparty_id),
+    corporate_structure: row.corporate_structure || 'unlisted',
+    has_emissions: Boolean(row.has_emissions),
+    scope1_emissions: row.scope1_emissions ?? null,
+    scope2_emissions: row.scope2_emissions ?? null,
+    scope3_emissions: row.scope3_emissions ?? null,
+    verification_status: row.verification_status || 'unverified',
+    verifier_name: row.verifier_name ?? null,
+    evic: row.evic ?? null,
+    total_equity_plus_debt: row.total_equity_plus_debt ?? null,
+    share_price: row.share_price ?? null,
+    outstanding_shares: row.outstanding_shares ?? null,
+    total_debt: row.total_debt ?? null,
+    minority_interest: row.minority_interest ?? null,
+    preferred_stock: row.preferred_stock ?? null,
+    total_equity: row.total_equity ?? null,
+    created_at: row.created_at || '',
+    updated_at: row.updated_at || '',
+  };
+}
 
 // Types matching our database schema
 export interface Counterparty {
@@ -99,6 +176,15 @@ export interface PortfolioTotals {
 export class PortfolioClient {
   // Counterparties
   static async createCounterparty(counterpartyData: Omit<Counterparty, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+    if (USE_JWT_AUTH) {
+      return (await createCounterpartyApi({
+        name: counterpartyData.name,
+        sector: counterpartyData.sector,
+        geography: counterpartyData.geography,
+        counterparty_type: counterpartyData.counterparty_type,
+      })) as Counterparty;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -116,6 +202,10 @@ export class PortfolioClient {
   }
 
   static async getCounterparties(): Promise<Counterparty[]> {
+    if (USE_JWT_AUTH) {
+      return (await listCounterparties()) as Counterparty[];
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -130,6 +220,15 @@ export class PortfolioClient {
   }
 
   static async getCounterparty(id: string): Promise<Counterparty | null> {
+    if (USE_JWT_AUTH) {
+      try {
+        return (await getCounterpartyApi(id)) as Counterparty;
+      } catch (err: any) {
+        if (err?.status === 404) return null;
+        throw err;
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -148,6 +247,15 @@ export class PortfolioClient {
   }
 
   static async updateCounterparty(id: string, updateData: Partial<Counterparty>) {
+    if (USE_JWT_AUTH) {
+      return (await patchCounterpartyApi(id, {
+        name: updateData.name,
+        sector: updateData.sector,
+        geography: updateData.geography,
+        counterparty_type: updateData.counterparty_type,
+      })) as Counterparty;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -163,8 +271,34 @@ export class PortfolioClient {
     return result as Counterparty;
   }
 
+  static async deleteCounterparty(id: string) {
+    if (USE_JWT_AUTH) {
+      await deleteCounterpartyApi(id);
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    const { error } = await supabase
+      .from('counterparties')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
+  }
+
   // Exposures
   static async createExposure(exposureData: Omit<Exposure, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+    if (USE_JWT_AUTH) {
+      return (await createExposureApi({
+        counterparty_id: exposureData.counterparty_id,
+        exposure_id: exposureData.exposure_id,
+        amount_pkr: exposureData.amount_pkr,
+        probability_of_default: exposureData.probability_of_default,
+        loss_given_default: exposureData.loss_given_default,
+        tenor_months: exposureData.tenor_months,
+      })) as Exposure;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -182,6 +316,10 @@ export class PortfolioClient {
   }
 
   static async getExposures(): Promise<Exposure[]> {
+    if (USE_JWT_AUTH) {
+      return (await listExposures()) as Exposure[];
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -196,6 +334,16 @@ export class PortfolioClient {
   }
 
   static async updateExposure(id: string, updateData: Partial<Exposure>) {
+    if (USE_JWT_AUTH) {
+      return (await patchExposureApi(id, {
+        exposure_id: updateData.exposure_id,
+        amount_pkr: updateData.amount_pkr,
+        probability_of_default: updateData.probability_of_default,
+        loss_given_default: updateData.loss_given_default,
+        tenor_months: updateData.tenor_months,
+      })) as Exposure;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -212,6 +360,21 @@ export class PortfolioClient {
   }
 
   static async updateExposureAmountForCounterparty(counterpartyId: string, amountPkr: number) {
+    if (USE_JWT_AUTH) {
+      const existing = await listExposures(counterpartyId);
+      if (!existing.length) {
+        return (await createExposureApi({
+          counterparty_id: counterpartyId,
+          exposure_id: '0001',
+          amount_pkr: amountPkr,
+          probability_of_default: 0,
+          loss_given_default: 0,
+          tenor_months: 0,
+        })) as Exposure;
+      }
+      return (await patchExposureApi(existing[0].id, { amount_pkr: amountPkr })) as Exposure;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -261,6 +424,12 @@ export class PortfolioClient {
 
   // Questionnaires
   static async createQuestionnaire(questionnaireData: Omit<CounterpartyQuestionnaire, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+    if (USE_JWT_AUTH) {
+      const { counterparty_id, ...body } = questionnaireData;
+      const row = await upsertCounterpartyQuestionnaireApi(counterparty_id, body);
+      return apiToQuestionnaire(row);
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -278,6 +447,11 @@ export class PortfolioClient {
   }
 
   static async getQuestionnaire(counterpartyId: string): Promise<CounterpartyQuestionnaire | null> {
+    if (USE_JWT_AUTH) {
+      const row = await getCounterpartyQuestionnaireApi(counterpartyId);
+      return row ? apiToQuestionnaire(row) : null;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -296,6 +470,19 @@ export class PortfolioClient {
   }
 
   static async updateQuestionnaire(id: string, updateData: Partial<CounterpartyQuestionnaire>) {
+    if (USE_JWT_AUTH) {
+      const {
+        id: _id,
+        user_id: _userId,
+        counterparty_id: _cp,
+        created_at: _created,
+        updated_at: _updated,
+        ...body
+      } = updateData;
+      const row = await patchQuestionnaireApi(id, body);
+      return apiToQuestionnaire(row);
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -313,6 +500,28 @@ export class PortfolioClient {
 
   // Emission Calculations
   static async createEmissionCalculation(calculationData: Omit<EmissionCalculation, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+    if (USE_JWT_AUTH) {
+      const calcKind =
+        calculationData.calculation_type === 'facilitated'
+          ? 'facilitated'
+          : 'finance';
+      const row = await createFinancedEmission({
+        calc_kind: calcKind,
+        company_type: calculationData.company_type,
+        formula_id: calculationData.formula_id,
+        inputs: calculationData.inputs,
+        results: calculationData.results,
+        financed_emissions: calculationData.financed_emissions,
+        attribution_factor: calculationData.attribution_factor,
+        data_quality_score: calculationData.data_quality_score,
+        counterparty_id: calculationData.counterparty_id,
+        exposure_id: calculationData.exposure_id,
+        questionnaire_id: calculationData.questionnaire_id,
+        status: calculationData.status || 'completed',
+      });
+      return financedToEmissionCalculation(row);
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -330,6 +539,13 @@ export class PortfolioClient {
   }
 
   static async getEmissionCalculations(counterpartyId?: string): Promise<EmissionCalculation[]> {
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions({
+        counterparty_id: counterpartyId,
+      });
+      return rows.map(financedToEmissionCalculation);
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -440,6 +656,27 @@ export class PortfolioClient {
     counterpartyData: Omit<Counterparty, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
     exposureData: Omit<Exposure, 'id' | 'user_id' | 'counterparty_id' | 'created_at' | 'updated_at'>
   ) {
+    if (USE_JWT_AUTH) {
+      const counterparty = await createCounterpartyApi({
+        name: counterpartyData.name,
+        sector: counterpartyData.sector,
+        geography: counterpartyData.geography,
+        counterparty_type: counterpartyData.counterparty_type,
+        exposure: {
+          exposure_id: exposureData.exposure_id,
+          amount_pkr: exposureData.amount_pkr,
+          probability_of_default: exposureData.probability_of_default,
+          loss_given_default: exposureData.loss_given_default,
+          tenor_months: exposureData.tenor_months,
+        },
+      });
+      const exposures = await listExposures(counterparty.id);
+      return {
+        counterparty: counterparty as Counterparty,
+        exposure: (exposures[0] || null) as Exposure,
+      };
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -473,6 +710,12 @@ export class PortfolioClient {
 
   // Upsert questionnaire data (update if exists, insert if not)
   static async upsertCounterpartyQuestionnaire(data: Omit<CounterpartyQuestionnaire, 'id' | 'created_at' | 'updated_at' | 'user_id'>): Promise<CounterpartyQuestionnaire> {
+    if (USE_JWT_AUTH) {
+      const { counterparty_id, ...body } = data;
+      const row = await upsertCounterpartyQuestionnaireApi(counterparty_id, body);
+      return apiToQuestionnaire(row);
+    }
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('User not authenticated');
 
@@ -521,6 +764,37 @@ export class PortfolioClient {
 
   // Upsert emission calculation (update if exists, insert if not)
   static async upsertEmissionCalculation(data: Omit<EmissionCalculation, 'id' | 'created_at' | 'updated_at' | 'user_id'>): Promise<EmissionCalculation> {
+    if (USE_JWT_AUTH) {
+      const calcKind =
+        data.calculation_type === 'facilitated' ? 'facilitated' : 'finance';
+      const existing = await listFinancedEmissions({
+        counterparty_id: data.counterparty_id || undefined,
+        calc_kind: calcKind,
+      });
+      const match = existing.find(
+        (r) =>
+          r.formula_id === data.formula_id &&
+          (r.counterparty_id || null) === (data.counterparty_id || null)
+      );
+      if (match) {
+        const updated = await patchFinancedEmission(match.id, {
+          company_type: data.company_type,
+          formula_id: data.formula_id,
+          inputs: data.inputs,
+          results: data.results,
+          financed_emissions: data.financed_emissions,
+          attribution_factor: data.attribution_factor,
+          data_quality_score: data.data_quality_score,
+          counterparty_id: data.counterparty_id,
+          exposure_id: data.exposure_id,
+          questionnaire_id: data.questionnaire_id,
+          status: data.status || 'completed',
+        });
+        return financedToEmissionCalculation(updated);
+      }
+      return PortfolioClient.createEmissionCalculation(data);
+    }
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error('User not authenticated');
 
@@ -594,6 +868,21 @@ export class PortfolioClient {
 
   // Company Emissions Methods
   static async getCompanyEmissions(counterpartyId: string | null, isBankEmissions: boolean = false): Promise<CompanyEmissions | null> {
+    if (USE_JWT_AUTH) {
+      const rows = await listCompanyEmissions({
+        counterparty_id: counterpartyId || undefined,
+        status: 'active',
+      });
+      const match = rows.find(
+        (r) =>
+          Boolean(r.is_bank_emissions) === isBankEmissions &&
+          (counterpartyId
+            ? r.counterparty_id === counterpartyId
+            : r.counterparty_id == null)
+      );
+      return (match as CompanyEmissions) || null;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -619,6 +908,29 @@ export class PortfolioClient {
     calculation_source?: 'emission_calculator' | 'questionnaire' | 'manual';
     notes?: string;
   }): Promise<CompanyEmissions> {
+    if (USE_JWT_AUTH) {
+      const { counterparty_id, is_bank_emissions = false, ...data } = emissionsData;
+      const total_emissions =
+        data.scope1_emissions + data.scope2_emissions + data.scope3_emissions;
+      const existing = await PortfolioClient.getCompanyEmissions(
+        counterparty_id ?? null,
+        is_bank_emissions
+      );
+      if (!existing) {
+        throw new Error(
+          'Creating company_emissions via API is not available yet (PATCH-only). Existing rows can be updated.'
+        );
+      }
+      return (await patchCompanyEmissionApi(existing.id, {
+        scope1_emissions: data.scope1_emissions,
+        scope2_emissions: data.scope2_emissions,
+        scope3_emissions: data.scope3_emissions,
+        total_emissions,
+        notes: data.notes ?? null,
+        status: 'active',
+      })) as CompanyEmissions;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -649,6 +961,14 @@ export class PortfolioClient {
   }
 
   static async deleteCompanyEmissions(counterpartyId: string | null, isBankEmissions: boolean = false): Promise<void> {
+    if (USE_JWT_AUTH) {
+      const existing = await PortfolioClient.getCompanyEmissions(counterpartyId, isBankEmissions);
+      if (existing) {
+        await patchCompanyEmissionApi(existing.id, { status: 'archived' });
+      }
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -753,6 +1073,97 @@ export class PortfolioClient {
     data_quality_score?: number | null;
     [key: string]: unknown;
   }): Promise<void> {
+    const calcKind =
+      data.calculation_type === 'facilitated_emission' ? 'facilitated' : 'finance';
+    const financedEmissions = Number(data.financed_emissions ?? 0) || 0;
+    const attributionFactor =
+      data.attribution_factor == null ? null : Number(data.attribution_factor);
+    const dataQualityScore =
+      data.data_quality_score == null ? null : Number(data.data_quality_score);
+
+    if (USE_JWT_AUTH) {
+      let financedEmissionsFinal = financedEmissions;
+      let attributionFactorFinal = attributionFactor;
+      let dataQualityScoreFinal = dataQualityScore;
+
+      const pcafFormulaId =
+        typeof data.pcaf_formula_id === 'string' ? data.pcaf_formula_id : null;
+      const pcafInputs =
+        data.pcaf_inputs && typeof data.pcaf_inputs === 'object'
+          ? (data.pcaf_inputs as Record<string, unknown>)
+          : null;
+      const companyTypeForCalc =
+        typeof data.company_type === 'string' ? data.company_type : 'unlisted';
+
+      if (pcafFormulaId && pcafInputs) {
+        const confirmed = await resolveFinancedCalculation({
+          calc_kind: calcKind,
+          formula_id: pcafFormulaId,
+          company_type: companyTypeForCalc,
+          inputs: pcafInputs,
+          counterparty_id: data.counterparty_id,
+          persist: false,
+          local: {
+            attributionFactor: attributionFactor ?? 0,
+            financedEmissions,
+            dataQualityScore: dataQualityScore ?? undefined,
+          },
+        });
+        financedEmissionsFinal = confirmed.financedEmissions;
+        attributionFactorFinal = confirmed.attributionFactor;
+        dataQualityScoreFinal =
+          confirmed.dataQualityScore == null
+            ? null
+            : confirmed.dataQualityScore;
+      }
+
+      const existing = await listFinancedEmissions({
+        counterparty_id: data.counterparty_id,
+        calc_kind: calcKind,
+      });
+      const match = existing.find(
+        (r) =>
+          r.formula_id === data.formula_id &&
+          (r.counterparty_id || null) === data.counterparty_id
+      );
+      const payload = {
+        calc_kind: calcKind,
+        company_type: data.company_type,
+        formula_id: data.formula_id,
+        formula_name: data.formula_name,
+        inputs: {
+          outstanding_amount: data.outstanding_amount,
+          total_assets: data.total_assets,
+          share_price: data.share_price,
+          outstanding_shares: data.outstanding_shares,
+          total_debt: data.total_debt,
+          total_equity: data.total_equity,
+          minority_interest: data.minority_interest,
+          preferred_stock: data.preferred_stock,
+          evic: data.evic,
+          total_equity_plus_debt: data.total_equity_plus_debt,
+          ...(pcafInputs || {}),
+          pcaf_formula_id: pcafFormulaId,
+        },
+        results: {
+          financed_emissions: financedEmissionsFinal,
+          attribution_factor: attributionFactorFinal,
+          data_quality_score: dataQualityScoreFinal,
+        },
+        financed_emissions: financedEmissionsFinal,
+        attribution_factor: attributionFactorFinal,
+        data_quality_score: dataQualityScoreFinal,
+        counterparty_id: data.counterparty_id,
+        status: (data.status as string) || 'completed',
+      };
+      if (match) {
+        await patchFinancedEmission(match.id, payload);
+      } else {
+        await createFinancedEmission(payload);
+      }
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -815,6 +1226,112 @@ export class PortfolioClient {
         throw createError;
       }
       console.log('✅ PortfolioClient - Record created successfully:', created);
+    }
+  }
+
+  /** Delete all finance/facilitated calcs for a counterparty+mode (fresh start). */
+  static async deleteAllEmissionCalculationsForMode(
+    counterpartyId: string,
+    calculationMode: 'finance' | 'facilitated'
+  ): Promise<void> {
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions({
+        counterparty_id: counterpartyId,
+        calc_kind: calculationMode,
+      });
+      await Promise.all(rows.map((r) => deleteFinancedEmission(r.id)));
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const financeType =
+      calculationMode === 'finance' ? 'finance_emission' : 'facilitated_emission';
+
+    const { error: financeError } = await supabase
+      .from('finance_emission_calculations')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('counterparty_id', counterpartyId)
+      .eq('calculation_type', financeType);
+    if (financeError) {
+      console.warn('Error deleting all finance emission calculations:', financeError);
+    }
+
+    const { error: emissionError } = await supabase
+      .from('emission_calculations')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('counterparty_id', counterpartyId)
+      .eq('calculation_type', calculationMode);
+    if (emissionError) {
+      console.warn('Error deleting all emission calculations:', emissionError);
+    }
+  }
+
+  /**
+   * Remove stale per-formula rows that are no longer in the current results.
+   * Never deletes formula_id === 'aggregate'.
+   */
+  static async cleanupStaleEmissionCalculations(
+    counterpartyId: string,
+    calculationMode: 'finance' | 'facilitated',
+    keepFormulaIds: string[]
+  ): Promise<void> {
+    const keep = new Set(keepFormulaIds.filter(Boolean));
+    keep.add('aggregate');
+
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions({
+        counterparty_id: counterpartyId,
+        calc_kind: calculationMode,
+      });
+      const stale = rows.filter((r) => r.formula_id && !keep.has(r.formula_id));
+      await Promise.all(stale.map((r) => deleteFinancedEmission(r.id)));
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const financeType =
+      calculationMode === 'finance' ? 'finance_emission' : 'facilitated_emission';
+
+    const { data: financeRows } = await supabase
+      .from('finance_emission_calculations')
+      .select('id, formula_id')
+      .eq('user_id', user.id)
+      .eq('counterparty_id', counterpartyId)
+      .eq('calculation_type', financeType);
+
+    const financeStaleIds = (financeRows || [])
+      .filter((r: { formula_id?: string }) => r.formula_id && !keep.has(r.formula_id))
+      .map((r: { id: string }) => r.id);
+    if (financeStaleIds.length > 0) {
+      const { error } = await supabase
+        .from('finance_emission_calculations')
+        .delete()
+        .in('id', financeStaleIds);
+      if (error) console.warn('Error cleaning up old finance emission calculations:', error);
+    }
+
+    const { data: emissionRows } = await supabase
+      .from('emission_calculations')
+      .select('id, formula_id')
+      .eq('user_id', user.id)
+      .eq('counterparty_id', counterpartyId)
+      .eq('calculation_type', calculationMode);
+
+    const emissionStaleIds = (emissionRows || [])
+      .filter((r: { formula_id?: string }) => r.formula_id && !keep.has(r.formula_id))
+      .map((r: { id: string }) => r.id);
+    if (emissionStaleIds.length > 0) {
+      const { error } = await supabase
+        .from('emission_calculations')
+        .delete()
+        .in('id', emissionStaleIds);
+      if (error) console.warn('Error cleaning up old emission calculations:', error);
     }
   }
 }

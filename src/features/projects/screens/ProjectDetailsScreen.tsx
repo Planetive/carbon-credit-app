@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getProjectInput } from "@/integrations/supabase/projectInputsClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,23 +19,17 @@ const ProjectDetailsScreen = () => {
       if (!user || !id) return;
       setLoading(true);
       setError(null);
-      // const { data, error } = await supabase
-      //   .from("project_inputs")
-      //   .select("*")
-      //   .eq("id", id)
-      //   .eq("user_id", user.id)
-      //   .single();
-      const { data, error } = await supabase
-        .from("project_inputs" as any)
-        .select("*")
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .single();
-      if (error || !data) {
+      try {
+        const data = await getProjectInput(user.id, id);
+        if (!data) {
+          setError("Project not found or you do not have access.");
+          setProject(null);
+        } else {
+          setProject(data);
+        }
+      } catch {
         setError("Project not found or you do not have access.");
         setProject(null);
-      } else {
-        setProject(data);
       }
       setLoading(false);
     };

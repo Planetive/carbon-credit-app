@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteContactSubmission,
+  listContactSubmissions,
+  updateContactSubmissionStatus,
+  type ContactSubmission,
+} from "@/integrations/supabase/contactClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,19 +48,6 @@ import {
   Calendar,
 } from "lucide-react";
 
-interface ContactSubmission {
-  id: string;
-  name: string;
-  email: string;
-  company: string | null;
-  phone: string | null;
-  subject: string;
-  message: string;
-  status: 'new' | 'in_progress' | 'completed' | 'spam';
-  created_at: string;
-  updated_at: string;
-}
-
 const ContactSubmissionsScreen = () => {
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,16 +61,8 @@ const ContactSubmissionsScreen = () => {
 
   const fetchSubmissions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('contact_submissions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching submissions:', error);
-      } else {
-        setSubmissions(data || []);
-      }
+      const data = await listContactSubmissions();
+      setSubmissions(data || []);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -88,16 +72,8 @@ const ContactSubmissionsScreen = () => {
 
   const updateSubmissionStatus = async (id: string, status: string) => {
     try {
-      const { error } = await (supabase as any)
-        .from('contact_submissions')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating submission:', error);
-      } else {
-        fetchSubmissions(); // Refresh the list
-      }
+      await updateContactSubmissionStatus(id, status);
+      fetchSubmissions();
     } catch (error) {
       console.error('Error:', error);
     }
@@ -105,16 +81,8 @@ const ContactSubmissionsScreen = () => {
 
   const deleteSubmission = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_submissions')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting submission:', error);
-      } else {
-        fetchSubmissions(); // Refresh the list
-      }
+      await deleteContactSubmission(id);
+      fetchSubmissions();
     } catch (error) {
       console.error('Error:', error);
     }

@@ -7,6 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  localRound6Multiply,
+  resolveUkRefrigerantEmissionsKg,
+} from "@/api/calcConnection";
 import { RefrigerantRow, UkRefrigerantBasis } from "@/components/emissions/shared/types";
 import { newRefrigerantRow, refrigerantRowChanged } from "@/components/emissions/shared/utils";
 
@@ -147,15 +159,24 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
       try {
         let data: any[] | null = null;
         let error: any = null;
-        const primary = await (supabase as any).from("UK_refrigerant_factors").select("*");
-        if (!primary.error && primary.data?.length) {
-          data = primary.data;
+
+        const apiRows = await tryLoadFactorSheetViaApi({
+          datasetCodes: ["uk_refrigerant_factors"],
+          nameHints: ["refrigerant", "UK_refrigerant"],
+        });
+        if (apiRows) {
+          data = apiRows;
         } else {
-          const fallback = await (supabase as any).from("uk_refrigerant_factors").select("*");
-          if (!fallback.error && fallback.data?.length) {
-            data = fallback.data;
+          const primary = await (supabase as any).from("UK_refrigerant_factors").select("*");
+          if (!primary.error && primary.data?.length) {
+            data = primary.data;
           } else {
-            error = primary.error || fallback.error;
+            const fallback = await (supabase as any).from("uk_refrigerant_factors").select("*");
+            if (!fallback.error && fallback.data?.length) {
+              data = fallback.data;
+            } else {
+              error = primary.error || fallback.error;
+            }
           }
         }
         if (error) {
@@ -225,16 +246,13 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
       }
 
       try {
-        const { data: refrigerantData, error: refrigerantError } = await supabase
-          .from("scope1_refrigerant_entries")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("emission_framework", storageFramework)
-          .order("created_at", { ascending: false });
+        const refrigerantData = await listLegacyTableEntries("scope1_refrigerant_entries", {
+          user_id: userId,
+          emission_framework: storageFramework as "uk" | "epa",
+          order: { column: "created_at", ascending: false },
+        });
 
-        if (refrigerantError) throw refrigerantError;
-
-        const existingRefrigerantRows = (refrigerantData || []).map((entry: any) => ({
+        const existingRefrigerantRows = (refrigerantData || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           activity: entry.activity ?? undefined,
@@ -337,6 +355,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
   const updateRow = (id: string, patch: Partial<RefrigerantRow>) => {
+    let snapshot: RefrigerantRow | null = null;
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
@@ -360,13 +379,37 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
 
         next.factor = factor;
         if (typeof next.quantity === "number" && typeof next.factor === "number") {
-          next.emissions = Number((next.quantity * next.factor).toFixed(6));
+          next.emissions = localRound6Multiply(next.quantity, next.factor);
         } else {
           next.emissions = undefined;
         }
+        snapshot = next;
         return next;
       })
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number"
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveUkRefrigerantEmissionsKg({
+          quantity: snap.quantity!,
+          factor: snap.factor!,
+        });
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.quantity !== snap.quantity || r.factor !== snap.factor) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
   const deleteExistingRow = async (id: string) => {
@@ -379,9 +422,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
 
     setDeletingRows((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase.from("scope1_refrigerant_entries").delete().eq("id", row.dbId);
-
-      if (error) throw error;
+      await deleteLegacyTableEntry("scope1_refrigerant_entries", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 
@@ -448,15 +489,13 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
       }));
 
       if (payload.length > 0) {
-        const { error } = await (supabase as any).from("scope1_refrigerant_entries").insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((v) =>
-          (supabase as any)
-            .from("scope1_refrigerant_entries")
-            .update({
+        await Promise.all(
+          changedExisting.map((v) =>
+            updateLegacyTableEntry("scope1_refrigerant_entries", v.dbId!, {
               emission_framework: storageFramework,
               refrigerant_type: v.refrigerantType!,
               quantity: v.quantity!,
@@ -466,11 +505,8 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
               quantity_unit: v.quantityUnit!,
               uk_refrigerant_basis: v.ukRefrigerantBasis || "total",
             })
-            .eq("id", v.dbId!)
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find((r) => (r as any).error)?.error;
-        if (updateError) throw updateError;
       }
 
       toast({
@@ -482,12 +518,11 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         sessionStorage.removeItem(getDraftKey());
       } catch {}
 
-      const { data: newData } = await supabase
-        .from("scope1_refrigerant_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("emission_framework", storageFramework)
-        .order("created_at", { ascending: false });
+      const newData = await listLegacyTableEntries("scope1_refrigerant_entries", {
+        user_id: user.id,
+        emission_framework: storageFramework as "uk" | "epa",
+        order: { column: "created_at", ascending: false },
+      });
 
       if (newData) {
         const updatedExistingRows = newData.map(mapEntryFromDb);

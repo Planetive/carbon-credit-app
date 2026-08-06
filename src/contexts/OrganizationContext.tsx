@@ -1,6 +1,16 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { USE_JWT_AUTH } from '@/api/config';
+import {
+  createOrganizationApi,
+  createOrganizationInvitation,
+  listOrganizationInvitations,
+  listOrganizationMembers,
+  listOrganizations,
+} from '@/api/organizations';
+import { getMyProfile, patchMyProfile } from '@/api/profile';
+import { fetchMyProfileDual } from '@/api/profileDualRead';
 
 // Permission types
 export interface Permissions {
@@ -95,6 +105,80 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const apiOrgs = await listOrganizations();
+        const profile = await getMyProfile();
+        const orgs: Organization[] = (apiOrgs || [])
+          .filter((o) => o.is_active !== false)
+          .map((o) => ({
+            id: String(o.id),
+            name: String(o.name),
+            parent_organization_id: o.parent_organization_id
+              ? String(o.parent_organization_id)
+              : null,
+            description: o.description ? String(o.description) : null,
+            role: (o.role || 'viewer') as Organization['role'],
+            permissions: {},
+            status: 'active' as const,
+            is_active: o.is_active !== false,
+            is_original: o.is_original === true,
+          }));
+
+        if (orgs.length === 0 && profile.organization_name) {
+          const created = await createOrganizationApi({
+            name: profile.organization_name,
+            description: null,
+            is_original: true,
+          });
+          const org: Organization = {
+            id: String(created.id),
+            name: String(created.name),
+            parent_organization_id: created.parent_organization_id
+              ? String(created.parent_organization_id)
+              : null,
+            description: created.description ? String(created.description) : null,
+            role: 'admin',
+            permissions: {
+              can_create_projects: true,
+              can_edit_projects: true,
+              can_delete_projects: true,
+              can_view_reports: true,
+              can_manage_users: true,
+              can_manage_organizations: true,
+              can_invite_users: true,
+              can_remove_users: true,
+              can_edit_permissions: true,
+            },
+            status: 'active',
+            is_active: true,
+            is_original: true,
+          };
+          setOrganizations([org]);
+          setCurrentOrganization(org);
+          localStorage.setItem(`current_org_${user.id}`, org.id);
+          return;
+        }
+
+        setOrganizations(orgs);
+        const storedOrgId = localStorage.getItem(`current_org_${user.id}`);
+        const currentOrgId =
+          storedOrgId || profile.current_organization_id || null;
+        const currentOrg =
+          (currentOrgId && orgs.find((o) => o.id === currentOrgId)) ||
+          orgs[0] ||
+          null;
+        setCurrentOrganization(currentOrg);
+        if (currentOrg) {
+          localStorage.setItem(`current_org_${user.id}`, currentOrg.id);
+          if (profile.current_organization_id !== currentOrg.id) {
+            await patchMyProfile({ current_organization_id: currentOrg.id });
+          }
+        } else {
+          localStorage.removeItem(`current_org_${user.id}`);
+        }
+        return;
+      }
+
       // Fetch user's active organizations with their roles and permissions
       const { data: userOrgs, error: userOrgsError } = await (supabase as any)
         .from('user_organizations')
@@ -270,6 +354,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        await patchMyProfile({ current_organization_id: organizationId });
+        localStorage.setItem(`current_org_${user.id}`, organizationId);
+        setCurrentOrganization(org);
+        window.location.reload();
+        return;
+      }
+
       // Update in database
       const { error } = await (supabase as any)
         .from('profiles')
@@ -297,6 +389,30 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const created = await createOrganizationApi({
+          name,
+          description: description || null,
+          parent_organization_id: parentId || null,
+        });
+        localStorage.setItem(`current_org_${user.id}`, String(created.id));
+        await fetchOrganizations();
+        const org: Organization = {
+          id: String(created.id),
+          name: String(created.name),
+          parent_organization_id: created.parent_organization_id
+            ? String(created.parent_organization_id)
+            : null,
+          description: created.description ? String(created.description) : null,
+          role: 'admin',
+          permissions: {},
+          status: 'active',
+          is_active: true,
+          is_original: created.is_original === true,
+        };
+        return { data: org, error: null };
+      }
+
       const { data: newOrg, error: orgError } = await (supabase as any)
         .from('organizations')
         .insert([
@@ -463,6 +579,27 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const members = await listOrganizationMembers(organizationId);
+        const users: OrganizationUser[] = (members || []).map((m) => ({
+          id: String(m.id),
+          user_id: String(m.user_id),
+          organization_id: String(m.organization_id),
+          role: (m.role || 'viewer') as OrganizationUser['role'],
+          permissions: (m.permissions || {}) as Permissions,
+          status: (m.status || 'active') as OrganizationUser['status'],
+          joined_at: m.joined_at ?? null,
+          invited_by: m.invited_by ?? null,
+          invited_at: m.invited_at ?? null,
+          email:
+            m.email ||
+            (m.user_id === user.id ? user.email || 'N/A' : 'N/A'),
+          display_name: m.display_name ?? null,
+          avatar_url: m.avatar_url ?? null,
+        }));
+        return { data: users, error: null };
+      }
+
       // First, get user_organizations
       const { data: userOrgs, error: userOrgsError } = await (supabase as any)
         .from('user_organizations')
@@ -566,6 +703,39 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const created = await createOrganizationInvitation(currentOrganization.id, {
+          email,
+          role,
+          permissions: permissions as Record<string, boolean> | undefined,
+        });
+
+        const { sendInvitationEmail, generateInvitationLink } = await import('@/utils/emailService');
+        const invitationLink = generateInvitationLink(created.token);
+        const expiresAt = created.expires_at
+          ? new Date(created.expires_at)
+          : (() => {
+              const d = new Date();
+              d.setDate(d.getDate() + 7);
+              return d;
+            })();
+
+        const inviterProfile = await fetchMyProfileDual(user.id);
+        await sendInvitationEmail({
+          email,
+          organizationName: currentOrganization.name,
+          inviterName:
+            inviterProfile?.display_name ||
+            user.email?.split('@')[0] ||
+            'Team',
+          role,
+          invitationLink,
+          expiresAt,
+        });
+
+        return { data: created, error: null };
+      }
+
       // Get default permissions if not provided
       let finalPermissions = permissions;
       if (!finalPermissions) {
@@ -727,6 +897,27 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const pending = await listOrganizationInvitations(organizationId, 'pending');
+        const invitations: OrganizationInvitation[] = (pending || []).map((inv) => ({
+          id: String(inv.id),
+          email: String(inv.email),
+          organization_id: String(inv.organization_id),
+          role: (inv.role || 'viewer') as OrganizationInvitation['role'],
+          status: (inv.status || 'pending') as OrganizationInvitation['status'],
+          token: String(inv.token),
+          invited_by: String(inv.invited_by || ''),
+          created_at: inv.created_at || '',
+          expires_at: inv.expires_at || '',
+          accepted_at: null,
+          inviter_name:
+            inv.invited_by === user.id
+              ? user.email?.split('@')[0] || 'Team'
+              : 'Team',
+        }));
+        return { data: invitations, error: null };
+      }
+
       const { data, error } = await (supabase as any)
         .from('organization_invitations')
         .select(`
@@ -787,6 +978,16 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       return { data: null, error: { message: 'User not authenticated or no organization selected' } };
     }
 
+    if (USE_JWT_AUTH) {
+      return {
+        data: null,
+        error: {
+          message:
+            'Cancel invitation is not yet available via API. Ask backend for DELETE/PATCH cancel route.',
+        },
+      };
+    }
+
     try {
       const { data, error } = await (supabase as any)
         .from('organization_invitations')
@@ -811,6 +1012,46 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (USE_JWT_AUTH) {
+        const pending = await listOrganizationInvitations(
+          currentOrganization.id,
+          'pending'
+        );
+        const invitation = (pending || []).find((i) => i.id === invitationId);
+        if (!invitation) {
+          throw new Error('Invitation not found');
+        }
+
+        const expiresAt = invitation.expires_at
+          ? new Date(invitation.expires_at)
+          : null;
+        if (expiresAt && expiresAt < new Date()) {
+          throw new Error(
+            'Invitation expired. Create a new invitation (token refresh not yet on API).'
+          );
+        }
+
+        const { sendInvitationEmail, generateInvitationLink } = await import(
+          '@/utils/emailService'
+        );
+        const invitationLink = generateInvitationLink(invitation.token);
+        const inviterProfile = await fetchMyProfileDual(user.id);
+
+        await sendInvitationEmail({
+          email: invitation.email,
+          organizationName: currentOrganization.name,
+          inviterName:
+            inviterProfile?.display_name ||
+            user.email?.split('@')[0] ||
+            'Team',
+          role: invitation.role,
+          invitationLink,
+          expiresAt: expiresAt || new Date(Date.now() + 7 * 86400000),
+        });
+
+        return { data: { success: true }, error: null };
+      }
+
       // Get invitation details
       const { data: invitation, error: fetchError } = await (supabase as any)
         .from('organization_invitations')

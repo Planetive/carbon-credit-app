@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePermission } from '@/hooks/usePermission';
+import { USE_JWT_AUTH } from '@/api/config';
+import { patchOrganization } from '@/api/organizations';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,15 +91,22 @@ export default function OrganizationSettings() {
 
     setIsSaving(true);
     try {
-      const { error } = await (supabase as any)
-        .from('organizations')
-        .update({
+      if (USE_JWT_AUTH) {
+        await patchOrganization(orgToEdit.id, {
           name: name.trim(),
           description: description.trim() || null,
-        })
-        .eq('id', orgToEdit.id);
+        });
+      } else {
+        const { error } = await (supabase as any)
+          .from('organizations')
+          .update({
+            name: name.trim(),
+            description: description.trim() || null,
+          })
+          .eq('id', orgToEdit.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: 'Success',

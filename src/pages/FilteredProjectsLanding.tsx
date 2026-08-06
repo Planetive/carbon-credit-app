@@ -5,6 +5,8 @@ import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMyProfileDual } from "@/api/profileDualRead";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 
 const FilteredProjectsLanding = () => {
   const location = useLocation();
@@ -18,16 +20,8 @@ const FilteredProjectsLanding = () => {
   useEffect(() => {
     const fetchDisplayName = async () => {
       if (!user) return;
-      const { data } = await (supabase as any)
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", user.id)
-        .single();
-      if (data && data.display_name) {
-        setDisplayName(data.display_name);
-      } else {
-        setDisplayName("");
-      }
+      const data = await fetchMyProfileDual(user.id);
+      setDisplayName(data?.display_name || "");
     };
     fetchDisplayName();
   }, [user]);
@@ -43,6 +37,17 @@ const FilteredProjectsLanding = () => {
     const checkProjects = async () => {
       if (!areaOfInterest || !type || !goal) {
         setNoProjectsFound(null);
+        return;
+      }
+      const apiRows = await tryLoadCatalogViaApi("global-projects");
+      if (apiRows) {
+        const matches = apiRows.filter(
+          (r) =>
+            String(r["Area of Interest"] ?? "") === areaOfInterest &&
+            String(r["Type"] ?? "") === type &&
+            String(r["End Goal"] ?? "") === goal
+        );
+        if (!cancelled) setNoProjectsFound(matches.length === 0);
         return;
       }
       const { data } = await (supabase as any)
@@ -67,6 +72,14 @@ const FilteredProjectsLanding = () => {
     const checkCCUSProjects = async () => {
       if (!type) {
         setHasCCUSProjects(false);
+        return;
+      }
+      const apiRows = await tryLoadCatalogViaApi("ccus");
+      if (apiRows) {
+        const matches = apiRows.filter(
+          (r) => String(r["Project type"] ?? "") === type
+        );
+        if (!cancelled) setHasCCUSProjects(matches.length > 0);
         return;
       }
       const { data } = await (supabase as any)

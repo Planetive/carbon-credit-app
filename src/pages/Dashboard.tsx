@@ -111,13 +111,8 @@ const Dashboard = () => {
           .maybeSingle();
           
         if (!scoresError && scoresData) {
-          const updatedAtMs = esgData?.updated_at ? new Date(esgData.updated_at).getTime() : 0;
-          const scoredAtMs = scoresData?.scored_at ? new Date(scoresData.scored_at).getTime() : 0;
-          if (scoredAtMs >= updatedAtMs) {
-            setEsgScores(scoresData);
-          } else {
-            setEsgScores(null);
-          }
+          // Keep scores even if assessment updated_at was bumped by migration/ETL.
+          setEsgScores(scoresData);
         } else {
           setEsgScores(null);
         }

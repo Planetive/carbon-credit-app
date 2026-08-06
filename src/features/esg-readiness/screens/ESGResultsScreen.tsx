@@ -7,7 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getEsgScoreByAssessment,
+  getLatestEsgAssessment,
+  isEsgApiEnabled,
+} from "@/api/esg";
+import { getMyProfile } from "@/api/profile";
 import { computeReadiness, sanitizeReadinessAnswers, type ReadinessComputation } from "@/features/esg-readiness/scoring";
 import { type ReadinessAnswers } from "@/features/esg-readiness/config";
 import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
@@ -20,9 +27,32 @@ const severityBadgeClass = (severity: string) => {
   return "bg-[#EAF7F1] text-[#0F6E56]";
 };
 
+function parseReadinessSnapshot(raw: unknown): ReadinessComputation | null {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return parseReadinessSnapshot(parsed);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== "object") return null;
+  const obj = raw as Partial<ReadinessComputation>;
+  if (
+    typeof obj.overallReadinessPercent !== "number" ||
+    !Array.isArray(obj.pillarSummary) ||
+    !Array.isArray(obj.findings)
+  ) {
+    return null;
+  }
+  return obj as ReadinessComputation;
+}
+
 const ESGResultsScreen = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -36,48 +66,93 @@ const ESGResultsScreen = () => {
       if (!user) return;
       setLoading(true);
       try {
-        const { data: assessment, error } = await supabase
-          .from("esg_assessments")
-          .select("id, readiness_answers, submitted_at, status, assessment_type")
-          .eq("user_id", user.id)
-          .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
-          .eq("status", "submitted")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let assessmentId: string | null = null;
+        let answers: ReadinessAnswers = {};
+        let submitted: string | null = null;
+        let profileOrgName: string | null = null;
+        let profileDisplayName: string | null = null;
 
-        if (error) throw error;
-        if (!assessment) {
-          setResultData(null);
-          return;
+        if (isEsgApiEnabled()) {
+          const assessment = await getLatestEsgAssessment(ESG_READINESS_ASSESSMENT_TYPE, {
+            status: "submitted",
+          });
+          if (!assessment) {
+            setResultData(null);
+            return;
+          }
+          assessmentId = assessment.id;
+          answers = sanitizeReadinessAnswers(
+            (assessment.readiness_answers as ReadinessAnswers) ?? {}
+          );
+          submitted = assessment.submitted_at ?? null;
+          setSubmittedAt(submitted);
+
+          let snapshot: ReadinessComputation | null = null;
+          try {
+            const scoreData = await getEsgScoreByAssessment(assessmentId);
+            snapshot = parseReadinessSnapshot(scoreData?.readiness_results);
+          } catch (scoreError) {
+            console.warn("ESG score fetch failed; recomputing from answers:", scoreError);
+          }
+          setResultData(snapshot ?? computeReadiness(answers));
+
+          try {
+            const profile = await getMyProfile();
+            profileOrgName = profile.organization_name?.trim() || null;
+            profileDisplayName = profile.display_name?.trim() || null;
+          } catch (profileError) {
+            console.warn("Profile fetch for ESG PDF failed:", profileError);
+          }
+        } else {
+          const { data: assessment, error } = await supabase
+            .from("esg_assessments")
+            .select("id, readiness_answers, submitted_at, status, assessment_type")
+            .eq("user_id", user.id)
+            .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
+            .eq("status", "submitted")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (error) throw error;
+          if (!assessment) {
+            setResultData(null);
+            return;
+          }
+
+          assessmentId = (assessment as any).id as string;
+          answers = sanitizeReadinessAnswers((assessment as any).readiness_answers ?? {}) as ReadinessAnswers;
+          setSubmittedAt((assessment as any).submitted_at ?? null);
+
+          const { data: scoreData } = await supabase
+            .from("esg_scores")
+            .select("readiness_results")
+            .eq("assessment_id", assessmentId)
+            .maybeSingle();
+
+          const snapshot = parseReadinessSnapshot((scoreData as any)?.readiness_results);
+          setResultData(snapshot ?? computeReadiness(answers));
+
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name, organization_name")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          profileOrgName =
+            (profile as { organization_name?: string } | null)?.organization_name?.trim() || null;
+          profileDisplayName =
+            (profile as { display_name?: string } | null)?.display_name?.trim() || null;
         }
 
-        const assessmentId = (assessment as any).id as string;
-        const answers = sanitizeReadinessAnswers((assessment as any).readiness_answers ?? {}) as ReadinessAnswers;
-        setSubmittedAt((assessment as any).submitted_at ?? null);
-
-        const { data: scoreData } = await supabase
-          .from("esg_scores")
-          .select("readiness_results")
-          .eq("assessment_id", assessmentId)
-          .single();
-
-        const snapshot = (scoreData as any)?.readiness_results as ReadinessComputation | null;
-        setResultData(snapshot ?? computeReadiness(answers));
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name, organization_name")
-          .eq("id", user.id)
-          .maybeSingle();
-
         setOrganizationName(
-          (profile as { organization_name?: string } | null)?.organization_name?.trim() ||
+          profileOrgName ||
+            currentOrganization?.name?.trim() ||
             user.user_metadata?.organization_name?.trim() ||
             "Organization"
         );
         setUserName(
-          (profile as { display_name?: string } | null)?.display_name?.trim() ||
+          profileDisplayName ||
             user.user_metadata?.display_name?.trim() ||
             user.email?.split("@")[0] ||
             "User"
@@ -90,7 +165,7 @@ const ESGResultsScreen = () => {
       }
     };
     loadResults();
-  }, [user]);
+  }, [user, currentOrganization?.name]);
 
   const redFlagFinding = useMemo(
     () => resultData?.findings.find((finding) => finding.finding.toLowerCase().includes("red flag")),

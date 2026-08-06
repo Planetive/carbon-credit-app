@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { USE_JWT_AUTH } from '@/api/config';
+import { acceptInvitationApi, peekInvitationByToken } from '@/api/organizations';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -64,85 +66,123 @@ export default function AcceptInvitationScreen() {
     }
 
     try {
-      // Fetch invitation details
-      const { data: invitationData, error: invitationError } = await (supabase as any)
-        .from('organization_invitations')
-        .select(`
-          id,
-          email,
-          organization_id,
-          role,
-          expires_at,
-          status,
-          invited_by,
-          organizations (
-            name
-          )
-        `)
-        .eq('token', token)
-        .single();
+      let invitationDetails: InvitationDetails;
 
-      if (invitationError || !invitationData) {
-        setError('Invalid or expired invitation link.');
-        setLoading(false);
-        return;
-      }
+      if (USE_JWT_AUTH) {
+        const peek = await peekInvitationByToken(token);
 
-      // Check if invitation is expired
-      const expiresAt = new Date(invitationData.expires_at);
-      if (expiresAt < new Date()) {
-        setError('This invitation has expired.');
-        setLoading(false);
-        return;
-      }
+        if (!peek.expires_at || new Date(peek.expires_at) < new Date()) {
+          setError('This invitation has expired.');
+          setLoading(false);
+          return;
+        }
 
-      // Check if invitation is already accepted
-      if (invitationData.status !== 'pending') {
-        setError(
-          invitationData.status === 'accepted'
-            ? 'This invitation has already been accepted.'
-            : 'This invitation is no longer valid.'
-        );
-        setLoading(false);
-        return;
-      }
+        if (peek.status !== 'pending') {
+          setError(
+            peek.status === 'accepted'
+              ? 'This invitation has already been accepted.'
+              : 'This invitation is no longer valid.'
+          );
+          setLoading(false);
+          return;
+        }
 
-      // Get inviter's name
-      let inviterName = 'Team';
-      if (invitationData.invited_by) {
-        const { data: inviterProfile } = await (supabase as any)
-          .from('profiles')
-          .select('display_name')
-          .eq('user_id', invitationData.invited_by)
+        invitationDetails = {
+          id: peek.id,
+          email: peek.email,
+          organization_id: peek.organization_id,
+          organization_name: peek.organization_name || 'Organization',
+          role: peek.role,
+          expires_at: peek.expires_at,
+          status: peek.status,
+          invited_by: peek.invited_by || '',
+          inviter_name: peek.inviter_name || 'Team',
+        };
+      } else {
+        // Fetch invitation details
+        const { data: invitationData, error: invitationError } = await (supabase as any)
+          .from('organization_invitations')
+          .select(`
+            id,
+            email,
+            organization_id,
+            role,
+            expires_at,
+            status,
+            invited_by,
+            organizations (
+              name
+            )
+          `)
+          .eq('token', token)
           .single();
-        inviterName = inviterProfile?.display_name || 'Team';
-      }
 
-      const invitationDetails: InvitationDetails = {
-        id: invitationData.id,
-        email: invitationData.email,
-        organization_id: invitationData.organizations.id,
-        organization_name: invitationData.organizations.name,
-        role: invitationData.role,
-        expires_at: invitationData.expires_at,
-        status: invitationData.status,
-        invited_by: invitationData.invited_by,
-        inviter_name: inviterName,
-      };
+        if (invitationError || !invitationData) {
+          setError('Invalid or expired invitation link.');
+          setLoading(false);
+          return;
+        }
+
+        // Check if invitation is expired
+        const expiresAt = new Date(invitationData.expires_at);
+        if (expiresAt < new Date()) {
+          setError('This invitation has expired.');
+          setLoading(false);
+          return;
+        }
+
+        // Check if invitation is already accepted
+        if (invitationData.status !== 'pending') {
+          setError(
+            invitationData.status === 'accepted'
+              ? 'This invitation has already been accepted.'
+              : 'This invitation is no longer valid.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        // Get inviter's name
+        let inviterName = 'Team';
+        if (invitationData.invited_by) {
+          const { data: inviterProfile } = await (supabase as any)
+            .from('profiles')
+            .select('display_name')
+            .eq('user_id', invitationData.invited_by)
+            .single();
+          inviterName = inviterProfile?.display_name || 'Team';
+        }
+
+        invitationDetails = {
+          id: invitationData.id,
+          email: invitationData.email,
+          organization_id: invitationData.organizations.id,
+          organization_name: invitationData.organizations.name,
+          role: invitationData.role,
+          expires_at: invitationData.expires_at,
+          status: invitationData.status,
+          invited_by: invitationData.invited_by,
+          inviter_name: inviterName,
+        };
+      }
 
       setInvitation(invitationDetails);
 
       // Check if user is logged in and email matches
       if (user) {
         const userEmail = user.email?.toLowerCase();
-        const invitationEmail = invitationData.email.toLowerCase();
+        const invitationEmail = invitationDetails.email.toLowerCase();
         setEmailMatch(userEmail === invitationEmail);
       }
 
       setLoading(false);
     } catch (err: any) {
       console.error('Error validating invitation:', err);
-      setError('Failed to validate invitation. Please try again.');
+      setError(
+        err?.status === 404
+          ? 'Invalid or expired invitation link.'
+          : 'Failed to validate invitation. Please try again.'
+      );
       setLoading(false);
     }
   };
@@ -162,18 +202,25 @@ export default function AcceptInvitationScreen() {
     setError(null);
 
     try {
-      // Call the RPC function to accept the invitation
-      const { data, error: acceptError } = await (supabase as any)
-        .rpc('accept_organization_invitation', {
-          invitation_token: token,
-        });
+      if (USE_JWT_AUTH) {
+        const result = await acceptInvitationApi(token);
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to accept invitation');
+        }
+      } else {
+        // Call the RPC function to accept the invitation
+        const { data, error: acceptError } = await (supabase as any)
+          .rpc('accept_organization_invitation', {
+            invitation_token: token,
+          });
 
-      if (acceptError) {
-        throw acceptError;
-      }
+        if (acceptError) {
+          throw acceptError;
+        }
 
-      if (!data || data.length === 0 || !data[0].success) {
-        throw new Error(data?.[0]?.message || 'Failed to accept invitation');
+        if (!data || data.length === 0 || !data[0].success) {
+          throw new Error(data?.[0]?.message || 'Failed to accept invitation');
+        }
       }
 
       // Refresh organizations to get the new one

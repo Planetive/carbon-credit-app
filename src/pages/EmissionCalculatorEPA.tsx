@@ -37,7 +37,11 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { EmissionData, ScopeTotals } from "@/components/emissions/shared/types";
-import { supabase } from "@/integrations/supabase/client";
+import { loadEpaIpccResults } from "@/lib/epaIpccResults";
+import {
+  loadCalculatorPreferences,
+  saveCalculatorPreferences,
+} from "@/integrations/supabase/calculatorPreferencesClient";
 import FuelEmissions from "@/components/emissions/scope1/FuelEmissions";
 import MobileFuelEmissions from "@/components/emissions/scope1/MobileFuelEmissions";
 import OnRoadGasolineEmissions from "@/components/emissions/scope1/OnRoadGasolineEmissions";
@@ -430,111 +434,41 @@ const EmissionCalculatorEPA = () => {
       hasHydratedSummaryRef.current = true;
 
       try {
-        const { data: mainRow } = await (supabase as any)
-          .from("scope2_electricity_main")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let electricityTotal = 0;
-        if (mainRow) {
-          const totalKwh = Number(mainRow.total_kwh) || 0;
-          const gridPct = Number(mainRow.grid_pct) || 0;
-          const otherPct = Number(mainRow.other_pct) || 0;
-          const { data: subs } = await (supabase as any)
-            .from("scope2_electricity_subanswers")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("main_id", mainRow.id);
-          const gridRow = (subs || []).find((r: any) => r.type === "grid");
-          const gridFactor = Number(gridRow?.grid_emission_factor || 0);
-          const gridPart = totalKwh > 0 && gridPct > 0 && gridFactor > 0 ? (gridPct / 100) * totalKwh * gridFactor : 0;
-          const otherRows = (subs || []).filter((r: any) => r.type === "other");
-          const sumOtherEmissions = otherRows.reduce((s: number, r: any) => s + (Number(r.other_sources_emissions) || 0), 0);
-          const otherPart = totalKwh > 0 && otherPct > 0 ? (otherPct / 100) * totalKwh * sumOtherEmissions : 0;
-          electricityTotal = Number((gridPart + otherPart).toFixed(6));
-        }
-
-        const [{ data: heatRows }, { data: refrigerantRows }] = await Promise.all([
-          (supabase as any).from("scope2_heatsteam_entries_epa").select("emissions").eq("user_id", user.id),
-          (supabase as any)
-            .from("scope1_refrigerant_entries")
-            .select("emissions")
-            .eq("user_id", user.id)
-            .in("emission_framework", ["epa", "uk_epa"]),
-        ]);
+        const results = await loadEpaIpccResults(user.id);
+        const electricityTotal = Number(
+          (results.scope2.find((r) => r.key === "electricity")?.value ?? 0).toFixed(6)
+        );
         const heatTotal = Number(
-          ((heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
+          (results.scope2.find((r) => r.key === "heatsteam")?.value ?? 0).toFixed(6)
         );
         const refrigerantTotal = Number(
-          ((refrigerantRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0)).toFixed(6)
+          (results.scope1.find((r) => r.key === "uk_refrigerant")?.value ?? 0).toFixed(6)
         );
 
-        const sumEmissions = (rows: any[] | null | undefined) =>
-          (rows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        const sumRowDataEmissions = (rows: any[] | null | undefined) =>
-          (rows || []).reduce((s: number, r: any) => s + (Number(r?.row_data?.emissions) || 0), 0);
-        const sumInvestmentAttributed = (rows: any[] | null | undefined) =>
-          (rows || []).reduce((s: number, r: any) => {
-            const c = Number(r?.calculated_emissions);
-            if (Number.isFinite(c)) return s + c;
-            const inv = Number(r?.emissions) || 0;
-            const pct = Number(r?.ownership_percentage) || 0;
-            return s + (inv * pct) / 100;
-          }, 0);
-        const sumFacilitated = (rows: any[] | null | undefined) =>
-          (rows || []).reduce((s: number, r: any) => s + (Number(r?.emissions) || 0), 0);
+        const scope3CategoryByKey: Record<string, string> = {
+          purchased_goods: "purchased_goods_services",
+          capital_goods: "capital_goods",
+          fuel_energy: "fuel_energy_activities",
+          upstream_transport: "upstream_transportation",
+          waste: "waste_generated",
+          business_travel: "business_travel",
+          employee_commuting: "employee_commuting",
+          investments: "investments",
+          facilitated: "scope3_facilitated_emissions",
+          facilitated: "facilitated_emissions",
+          downstream_transport: "downstream_transportation",
+          end_of_life: "end_of_life_treatment",
+          processing_sold: "processing_use_of_sold_products",
+          use_of_sold: "processing_use_of_sold_products",
+        };
 
-        const [
-          purchasedGoodsRes,
-          capitalGoodsRes,
-          fuelEnergyRes,
-          upstreamTransportRes,
-          wasteGeneratedRes,
-          businessTravelRes,
-          employeeCommutingRes,
-          investmentsRes,
-          facilitatedRes,
-          downstreamTransportRes,
-          endOfLifeRes,
-          processingSoldRes,
-          useOfSoldRes,
-        ] = await Promise.all([
-          (supabase as any).from("scope3_purchased_goods_services").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_capital_goods").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_fuel_energy_activities").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_upstream_transportation").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_waste_generated").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_business_travel").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_employee_commuting").select("emissions").eq("user_id", user.id),
-          (supabase as any)
-            .from("scope3_investments")
-            .select("calculated_emissions, emissions, ownership_percentage")
-            .eq("user_id", user.id),
-          (supabase as any).from("scope3_facilitated_emissions").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_downstream_transportation").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_end_of_life_treatment").select("emissions").eq("user_id", user.id),
-          (supabase as any).from("scope3_processing_sold_products").select("row_data").eq("user_id", user.id),
-          (supabase as any).from("scope3_use_of_sold_products").select("row_data").eq("user_id", user.id),
-        ]);
-
-        const hydratedScope3 = [
-          { id: "scope3-purchased-goods", category: "purchased_goods_services", emissions: sumEmissions(purchasedGoodsRes.data) },
-          { id: "scope3-capital-goods", category: "capital_goods", emissions: sumEmissions(capitalGoodsRes.data) },
-          { id: "scope3-fuel-energy", category: "fuel_energy_activities", emissions: sumEmissions(fuelEnergyRes.data) },
-          { id: "scope3-upstream-transport", category: "upstream_transportation", emissions: sumEmissions(upstreamTransportRes.data) },
-          { id: "scope3-waste-generated", category: "waste_generated", emissions: sumEmissions(wasteGeneratedRes.data) },
-          { id: "scope3-business-travel", category: "business_travel", emissions: sumEmissions(businessTravelRes.data) },
-          { id: "scope3-employee-commuting", category: "employee_commuting", emissions: sumEmissions(employeeCommutingRes.data) },
-          { id: "scope3-investments", category: "investments", emissions: sumInvestmentAttributed(investmentsRes.data) },
-          { id: "scope3-facilitated", category: "facilitated_emissions", emissions: sumFacilitated(facilitatedRes.data) },
-          { id: "scope3-downstream-transport", category: "downstream_transportation", emissions: sumEmissions(downstreamTransportRes.data) },
-          { id: "scope3-end-of-life", category: "end_of_life_treatment", emissions: sumEmissions(endOfLifeRes.data) },
-          { id: "scope3-processing-sold", category: "processing_use_of_sold_products", emissions: sumRowDataEmissions(processingSoldRes.data) },
-          { id: "scope3-use-of-sold", category: "processing_use_of_sold_products", emissions: sumRowDataEmissions(useOfSoldRes.data) },
-        ].filter((r) => (r.emissions || 0) > 0) as any[];
+        const hydratedScope3 = results.scope3
+          .filter((r) => r.value > 0)
+          .map((r) => ({
+            id: `scope3-${r.key}`,
+            category: scope3CategoryByKey[r.key] ?? r.key,
+            emissions: r.value,
+          })) as any[];
 
         setEmissionData((prev) => ({
           ...prev,
@@ -600,22 +534,13 @@ const EmissionCalculatorEPA = () => {
       }
 
       try {
-        const { data, error } = await (supabase as any)
-          .from("emission_calculator_preferences")
-          .select("has_lca_data, calculation_mode, initial_questionnaire_completed")
-          .eq("user_id", user.id)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          console.error("Error loading LCA preferences (EPA):", error);
-        } else if (data) {
-          if (data.initial_questionnaire_completed) {
-            setInitialQuestionnaireCompleted(true);
-            if (data.calculation_mode) {
-              setCalculationMode(data.calculation_mode as "lca" | "manual");
-            } else {
-              setCalculationMode(data.has_lca_data ? "lca" : "manual");
-            }
+        const data = await loadCalculatorPreferences(user.id);
+        if (data?.initial_questionnaire_completed) {
+          setInitialQuestionnaireCompleted(true);
+          if (data.calculation_mode === "lca" || data.calculation_mode === "manual") {
+            setCalculationMode(data.calculation_mode);
+          } else {
+            setCalculationMode(data.has_lca_data ? "lca" : "manual");
           }
         }
       } catch (error) {
@@ -633,30 +558,18 @@ const EmissionCalculatorEPA = () => {
     if (!user) return;
 
     try {
-      const { error } = await (supabase as any)
-        .from("emission_calculator_preferences")
-        .upsert(
-          {
-            user_id: user.id,
-            has_lca_data: hasLCA,
-            calculation_mode: mode,
-            initial_questionnaire_completed: true,
-          },
-          {
-            onConflict: "user_id",
-          },
-        );
-
-      if (error) {
-        console.error("Error saving LCA preferences (EPA):", error);
-        toast({
-          title: "Error",
-          description: "Failed to save preferences. Please try again.",
-          variant: "destructive",
-        });
-      }
+      await saveCalculatorPreferences(user.id, {
+        has_lca_data: hasLCA,
+        calculation_mode: mode,
+        initial_questionnaire_completed: true,
+      });
     } catch (error) {
       console.error("Error saving LCA preferences (EPA):", error);
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

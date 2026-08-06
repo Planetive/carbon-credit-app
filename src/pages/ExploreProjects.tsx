@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import { useQuery } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -250,6 +251,45 @@ const ExploreProjects = () => {
     countries?: string[];
     areasOfInterest?: string[];
   } = {}) {
+    const applyClientFilters = (rows: any[]) => {
+      let out = rows;
+      if (filters.regions?.length) {
+        out = out.filter((r) => filters.regions!.includes(String(r.Region ?? r["Region"] ?? "")));
+      }
+      if (filters.voluntaryStatuses?.length) {
+        out = out.filter((r) =>
+          filters.voluntaryStatuses!.includes(String(r["Voluntary Status"] ?? r.voluntary_status ?? ""))
+        );
+      }
+      if (filters.voluntaryRegistries?.length) {
+        out = out.filter((r) =>
+          filters.voluntaryRegistries!.includes(
+            String(r["Voluntary Registry"] ?? r.voluntary_registry ?? "")
+          )
+        );
+      }
+      if (filters.countries?.length) {
+        out = out.filter((r) => filters.countries!.includes(String(r.Country ?? r["Country"] ?? "")));
+      }
+      if (filters.areasOfInterest?.length) {
+        out = out.filter((r) =>
+          filters.areasOfInterest!.includes(String(r["Area of interest"] ?? r.area_of_interest ?? ""))
+        );
+      }
+      return out.map((r) => ({
+        Country: r.Country ?? r["Country"],
+        Region: r.Region ?? r["Region"],
+        "Voluntary Status": r["Voluntary Status"] ?? r.voluntary_status,
+      }));
+    };
+
+    const apiRows = await tryLoadCatalogViaApi("global-projects");
+    if (apiRows) {
+      const filtered = applyClientFilters(apiRows);
+      console.log(`Fetched ${filtered.length} projects via API (minimal columns) for dashboard`);
+      return filtered;
+    }
+
     const BATCH_SIZE = 1000; // Supabase's maximum rows per query
     let allRows: any[] = [];
     let from = 0;

@@ -7,6 +7,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  companyScopedListFilters,
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import {
+  tryLoadFactorSheetViaApi,
+  tryLoadFactorSheetsViaApi,
+} from "@/api/factorDualRead";
+import { USE_JWT_AUTH } from "@/api/config";
+import {
+  localEpaFuelEmissionsKg,
+  localUkFuelEmissionsKg,
+  resolveEpaFuelEmissionsKg,
+  resolveUkFuelEmissionsKg,
+} from "@/api/calcConnection";
 import { 
   FuelRow, 
   FuelType,
@@ -173,7 +191,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           const factor = ukBasisValue(cell, basis);
           const emissions =
             typeof r.quantity === "number" && factor !== undefined
-              ? Number((r.quantity * factor).toFixed(6))
+              ? localUkFuelEmissionsKg(r.quantity, factor)
               : undefined;
           return { ...r, ukFactorBasis: basis, factor, emissions };
         }
@@ -251,15 +269,24 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         try {
           let data: any[] | null = null;
           let error: any = null;
-          const primary = await (supabase as any).from("UK_Fuel_Factors").select("*");
-          if (!primary.error && primary.data?.length) {
-            data = primary.data;
+
+          const apiRows = await tryLoadFactorSheetViaApi({
+            datasetCodes: ["uk_fuel_factors"],
+            nameHints: ["UK_Fuel", "uk fuel"],
+          });
+          if (apiRows && apiRows.length > 0) {
+            data = apiRows;
           } else {
-            const fallback = await (supabase as any).from("uk_fuel_factors").select("*");
-            if (!fallback.error && fallback.data?.length) {
-              data = fallback.data;
+            const primary = await (supabase as any).from("UK_Fuel_Factors").select("*");
+            if (!primary.error && primary.data?.length) {
+              data = primary.data;
             } else {
-              error = primary.error || fallback.error;
+              const fallback = await (supabase as any).from("uk_fuel_factors").select("*");
+              if (!fallback.error && fallback.data?.length) {
+                data = fallback.data;
+              } else {
+                error = primary.error || fallback.error;
+              }
             }
           }
           if (error) {
@@ -340,16 +367,25 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     const loadFuelFactors = async () => {
       try {
         const tableNames = ["Fuel EPA 1", "Fuel EPA 2", "Fuel EPA 3"];
-        const allRows: any[] = [];
+        let allRows: any[] = [];
 
-        for (const table of tableNames) {
-          const { data, error } = await supabase.from(table as any).select("*");
-          if (error) {
-            console.error(`Error loading ${table} factors:`, error);
-            continue;
-          }
-          if (data && data.length > 0) {
-            allRows.push(...data);
+        const apiRows = await tryLoadFactorSheetsViaApi([
+          { datasetCodes: ["fuel_epa_1", "fuel_epa1"], nameHints: ["Fuel EPA 1", "Fuel EPA"] },
+          { datasetCodes: ["fuel_epa_2", "fuel_epa2"], nameHints: ["Fuel EPA 2"] },
+          { datasetCodes: ["fuel_epa_3", "fuel_epa3"], nameHints: ["Fuel EPA 3"] },
+        ]);
+        if (apiRows && apiRows.length > 0) {
+          allRows = apiRows;
+        } else {
+          for (const table of tableNames) {
+            const { data, error } = await supabase.from(table as any).select("*");
+            if (error) {
+              console.error(`Error loading ${table} factors:`, error);
+              continue;
+            }
+            if (data && data.length > 0) {
+              allRows.push(...data);
+            }
           }
         }
 
@@ -458,7 +494,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         });
 
         if (Object.keys(map).length > 0) {
-          console.log("Loaded Fuel EPA 1/2/3 factors from Supabase:", map);
+          console.log("Loaded Fuel EPA 1/2/3 factors:", map);
           setFuelFactors(map);
         }
       } catch (err) {
@@ -486,7 +522,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         const factor = ukBasisValue(cell, basis);
         let emissions: number | undefined;
         if (typeof r.quantity === "number" && factor !== undefined) {
-          emissions = Number((r.quantity * factor).toFixed(6));
+          emissions = localUkFuelEmissionsKg(r.quantity, factor);
         }
         return { ...r, ukFactorBasis: basis, factor, emissions };
       })
@@ -510,16 +546,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         }
 
         try {
-          let q = (supabase as any)
-            .from("scope1_heatsteam_entries_epa")
-            .select("*")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false });
-          if (companyContext && counterpartyId) q = q.eq("counterparty_id", counterpartyId);
-          else q = q.is("counterparty_id", null);
-          const { data: heatData, error: heatError } = await q;
-          if (heatError) throw heatError;
-          const heatRows = (heatData || []).map((entry: any) => ({
+          const heatData = await listLegacyTableEntries(
+            "scope1_heatsteam_entries_epa",
+            companyScopedListFilters(userId, companyContext, counterpartyId),
+          );
+          const heatRows = (heatData || []).map((entry) => ({
             id: crypto.randomUUID(),
             dbId: entry.id,
             type: entry.fuel_type_group as FuelType,
@@ -556,20 +587,12 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         console.log('Company context detected - loading company-specific fuel entries for:', counterpartyId);
         
         try {
-          // Load company-specific fuel entries (supabase cast to avoid TS "excessively deep" inference on schema)
-          const fuelQuery = applyFuelFrameworkFilter(
-            (supabase as any)
-              .from('scope1_fuel_entries')
-              .select('*')
-              .eq('user_id', userId)
-              .eq('counterparty_id', counterpartyId)
-          ).order('created_at', { ascending: false });
+          const fuelData = await listLegacyTableEntries("scope1_fuel_entries", {
+            ...companyScopedListFilters(userId, true, counterpartyId),
+            emission_framework: fuelFramework,
+          });
 
-          const { data: fuelData, error: fuelError } = await fuelQuery;
-
-          if (fuelError) throw fuelError;
-
-          const companyFuelRows = (fuelData || []).map((entry: any) => ({
+          const companyFuelRows = (fuelData || []).map((entry) => ({
             id: crypto.randomUUID(),
             dbId: entry.id,
             type: entry.fuel_type_group as FuelType,
@@ -619,19 +642,12 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       // Load personal data for individual use
       try {
-        const fuelQuery = applyFuelFrameworkFilter(
-          (supabase as any)
-            .from('scope1_fuel_entries')
-            .select('*')
-            .eq('user_id', userId)
-            .is('counterparty_id', null) // Only personal entries (no counterparty_id)
-        ).order('created_at', { ascending: false });
+        const fuelData = await listLegacyTableEntries("scope1_fuel_entries", {
+          ...companyScopedListFilters(userId, false, null),
+          emission_framework: fuelFramework,
+        });
 
-        const { data: fuelData, error: fuelError } = await fuelQuery;
-
-        if (fuelError) throw fuelError;
-
-        const existingFuelRows = (fuelData || []).map((entry: any) => ({
+        const existingFuelRows = (fuelData || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           type: entry.fuel_type_group as FuelType,
@@ -757,6 +773,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
    // Update functions
   const updateRow = (id: string, patch: Partial<FuelRow>) => {
+    let snapshot: FuelRow | null = null;
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const next: FuelRow = { ...r, ...patch };
@@ -782,19 +799,59 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
       next.factor = factor;
 
-      // UK factors are already kg CO2e (or kg CO2e per component) per activity unit; EPA CH4/N2O use g/unit → kg of that gas.
-      if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
-        const raw = next.quantity * next.factor;
-        const isGPerUnit =
-          !isUkActive &&
-          typeof next.unit === 'string' &&
-          (next.unit.startsWith('CH4') || next.unit.startsWith('N2O'));
-        next.emissions = Number((isGPerUnit ? raw / 1000 : raw).toFixed(6));
+      // Instant local math (unchanged). When JWT is on, API reconciles below.
+      if (typeof next.quantity === "number" && typeof next.factor === "number") {
+        next.emissions = isUkActive
+          ? localUkFuelEmissionsKg(next.quantity, next.factor)
+          : localEpaFuelEmissionsKg(next.quantity, next.factor, String(next.unit || ""));
       } else {
         next.emissions = undefined;
       }
+      snapshot = next;
       return next;
     }));
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.quantity === "number" &&
+      typeof snapshot.factor === "number" &&
+      snapshot.unit
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = isUkActive
+          ? await resolveUkFuelEmissionsKg({
+              quantity: snap.quantity!,
+              factor: snap.factor!,
+              activity: snap.type,
+              fuel: snap.fuel,
+              unit: snap.unit,
+              uk_factor_basis: snap.ukFactorBasis || "total",
+            })
+          : await resolveEpaFuelEmissionsKg({
+              quantity: snap.quantity!,
+              factor: snap.factor!,
+              unit: String(snap.unit),
+              category: snap.type,
+              fuel: snap.fuel,
+            });
+        setRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (
+              r.quantity !== snap.quantity ||
+              r.factor !== snap.factor ||
+              r.unit !== snap.unit
+            ) {
+              return r;
+            }
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          })
+        );
+      })();
+    }
   };
 
   // Delete functions
@@ -808,19 +865,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
     setDeletingRows(prev => new Set(prev).add(id));
     try {
-      let deleteQuery = (supabase as any)
-        .from(getScope1EntriesTable())
-        .delete()
-        .eq("id", row.dbId)
-        .select("id");
-      if (userId) deleteQuery = deleteQuery.eq("user_id", userId);
-
-      const { data: deletedRows, error } = await deleteQuery;
-
-      if (error) throw error;
-      if (!deletedRows?.length) {
-        throw new Error("Entry was not removed from the database. Refresh the page and try again.");
-      }
+      await deleteLegacyTableEntry(getScope1EntriesTable(), row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 
@@ -844,6 +889,29 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   };
 
   // Save functions
+  const resolveRowEmissionsForSave = async (v: FuelRow): Promise<number> => {
+    const q = v.quantity!;
+    const f = v.factor!;
+    const unit = String(v.unit || "");
+    if (isUkActive) {
+      return resolveUkFuelEmissionsKg({
+        quantity: q,
+        factor: f,
+        activity: v.type,
+        fuel: v.fuel,
+        unit: v.unit,
+        uk_factor_basis: v.ukFactorBasis || "total",
+      });
+    }
+    return resolveEpaFuelEmissionsKg({
+      quantity: q,
+      factor: f,
+      unit,
+      category: v.type,
+      fuel: v.fuel,
+    });
+  };
+
   const saveFuelEntries = async () => {
     if (variant === "scope1HeatSteam") {
       if (!user) {
@@ -892,20 +960,15 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           };
         });
         if (payload.length > 0) {
-          const { data: inserted, error } = await (supabase as any).from(table).insert(payload).select("id");
-          if (error) throw error;
-          if (!inserted?.length && payload.length > 0) {
-            console.warn("Scope 1 Heat and Steam insert returned no rows; table may not exist or RLS may block insert.");
-          }
+          await insertLegacyTableEntries(table, payload);
         }
         const rowsToUpdate = unitChanged
           ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
           : changedExisting;
         if (rowsToUpdate.length > 0) {
-          const updates = rowsToUpdate.map((v) =>
-            (supabase as any)
-              .from(table)
-              .update({
+          await Promise.all(
+            rowsToUpdate.map((v) =>
+              updateLegacyTableEntry(table, v.dbId!, {
                 fuel_type_group: v.type!,
                 fuel: v.fuel!,
                 unit: v.unit!,
@@ -915,11 +978,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
                 emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
                 emissions_output_unit: outputUnit,
               })
-              .eq("id", v.dbId!)
+            )
           );
-          const results = await Promise.all(updates);
-          const updateError = results.find((r: any) => r.error)?.error;
-          if (updateError) throw updateError;
         }
         toast({
           title: "Saved",
@@ -929,11 +989,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               : `Saved ${newEntries.length} new and updated ${changedExisting.length} Heat and Steam entries.`,
         });
         clearDraftStorage();
-        let reloadQ = (supabase as any).from(table).select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-        if (companyContext && counterpartyId) reloadQ = reloadQ.eq("counterparty_id", counterpartyId);
-        else reloadQ = reloadQ.is("counterparty_id", null);
-        const { data: newData } = await reloadQ;
-        const updatedRows = (newData || []).map((entry: any) => ({
+        const newData = await listLegacyTableEntries(
+          table,
+          companyScopedListFilters(user.id, companyContext, counterpartyId),
+        );
+        const updatedRows = (newData || []).map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           type: entry.fuel_type_group as FuelType,
@@ -980,26 +1040,30 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
     setSaving(true);
     try {
-      const payload = newEntries.map((v) => ({
-        user_id: user.id,
-        counterparty_id: companyContext ? counterpartyId : null, // Add counterparty_id for company entries
-        emission_framework: fuelFramework,
-        fuel_type_group: v.type!,
-        fuel: v.fuel!,
-        unit: v.unit!,
-        quantity: v.quantity!,
-        factor: v.factor!,
-        emissions: v.emissions!,
-        emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
-        emissions_output_unit: outputUnit,
-        ...(factorMode === "uk_supabase"
-          ? { uk_factor_basis: v.ukFactorBasis || "total" }
-          : {}),
-      }));
+      const payload = await Promise.all(
+        newEntries.map(async (v) => {
+          const emissions = await resolveRowEmissionsForSave(v);
+          return {
+            user_id: user.id,
+            counterparty_id: companyContext ? counterpartyId : null, // Add counterparty_id for company entries
+            emission_framework: fuelFramework,
+            fuel_type_group: v.type!,
+            fuel: v.fuel!,
+            unit: v.unit!,
+            quantity: v.quantity!,
+            factor: v.factor!,
+            emissions,
+            emissions_output: convertEmissionNumeric(emissions, outputUnit),
+            emissions_output_unit: outputUnit,
+            ...(factorMode === "uk_supabase"
+              ? { uk_factor_basis: v.ukFactorBasis || "total" }
+              : {}),
+          };
+        })
+      );
 
       if (payload.length > 0) {
-        const { error } = await (supabase as any).from('scope1_fuel_entries').insert(payload);
-        if (error) throw error;
+        await insertLegacyTableEntries("scope1_fuel_entries", payload);
       }
 
       // Rows that need updating in the DB
@@ -1008,28 +1072,25 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         : changedExisting;
 
       if (rowsToUpdate.length > 0) {
-        const updates = rowsToUpdate.map(v => (
-          (supabase as any)
-            .from('scope1_fuel_entries')
-            .update({
+        await Promise.all(
+          rowsToUpdate.map(async (v) => {
+            const emissions = await resolveRowEmissionsForSave(v);
+            return updateLegacyTableEntry("scope1_fuel_entries", v.dbId!, {
               emission_framework: fuelFramework,
               fuel_type_group: v.type!,
               fuel: v.fuel!,
               unit: v.unit!,
               quantity: v.quantity!,
               factor: v.factor!,
-              emissions: v.emissions!,
-              emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
+              emissions,
+              emissions_output: convertEmissionNumeric(emissions, outputUnit),
               emissions_output_unit: outputUnit,
               ...(factorMode === "uk_supabase"
                 ? { uk_factor_basis: v.ukFactorBasis || "total" }
                 : {}),
-            })
-            .eq('id', v.dbId!)
-        ));
-        const results = await Promise.all(updates);
-        const updateError = results.find(r => (r as any).error)?.error;
-        if (updateError) throw updateError;
+            });
+          })
+        );
       }
 
       toast({ 
@@ -1045,22 +1106,15 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         sessionStorage.removeItem(key);
       } catch {}
 
-      // Reload only the current context to avoid mixing personal/company rows.
-      let reloadQ = (supabase as any)
-        .from('scope1_fuel_entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (companyContext && counterpartyId) {
-        reloadQ = reloadQ.eq('counterparty_id', counterpartyId);
-      } else {
-        reloadQ = reloadQ.is('counterparty_id', null);
-      }
-      reloadQ = applyFuelFrameworkFilter(reloadQ);
-      const { data: newData } = await reloadQ;
+      const newData = await listLegacyTableEntries("scope1_fuel_entries", {
+        ...(companyContext && counterpartyId
+          ? companyScopedListFilters(user.id, true, counterpartyId)
+          : companyScopedListFilters(user.id, false, null)),
+        emission_framework: fuelFramework,
+      });
 
       if (newData) {
-        const updatedExistingRows = newData.map((entry: any) => ({
+        const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: entry.id,
           type: entry.fuel_type_group as FuelType,

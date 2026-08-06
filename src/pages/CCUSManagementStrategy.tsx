@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import type { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -134,7 +135,27 @@ const CCUSManagementStrategy = () => {
     const fetchData = async () => {
       setLoading(true);
       const norm = normalizeCountryName(country || "");
-      
+
+      const apiPolicies = await tryLoadCatalogViaApi("ccus-policies");
+      const apiStrategies = await tryLoadCatalogViaApi("ccus-management-strategies");
+
+      if (apiPolicies || apiStrategies) {
+        if (apiPolicies) {
+          const countryPolicies = apiPolicies.filter(
+            (p: any) => normalizeCountryName(p["Country"]) === norm
+          );
+          setPolicies(countryPolicies);
+        }
+        if (apiStrategies) {
+          const found = apiStrategies.find(
+            (s: any) => normalizeCountryName(s.country) === norm
+          );
+          setStrategy((found as any) || null);
+        }
+        setLoading(false);
+        return;
+      }
+
       const [{ data: policiesData, error: policiesError }, { data: strategiesData, error: strategiesError }] = await Promise.all([
         supabase.from("ccus_policies").select("*"),
         supabase.from("ccus_management_strategies").select("*")

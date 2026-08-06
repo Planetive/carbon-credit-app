@@ -8,13 +8,35 @@ import { Progress } from "@/components/ui/progress";
 import { adminSupabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminAuth } from "@/features/admin/hooks/useAdminAuth";
+import { getAdminEsgAssessment, isAdminEsgApiEnabled } from "@/api/esg";
 import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 import type { ReadinessComputation } from "@/features/esg-readiness/scoring";
 import { computeReadiness, sanitizeReadinessAnswers } from "@/features/esg-readiness/scoring";
 import type { ReadinessAnswers } from "@/features/esg-readiness/config";
 
+function parseSnapshot(raw: unknown): ReadinessComputation | null {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      return parseSnapshot(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw !== "object") return null;
+  const obj = raw as Partial<ReadinessComputation>;
+  if (
+    typeof obj.overallReadinessPercent !== "number" ||
+    !Array.isArray(obj.pillarSummary) ||
+    !Array.isArray(obj.findings)
+  ) {
+    return null;
+  }
+  return obj as ReadinessComputation;
+}
+
 const AdminScoringScreen = () => {
-  const { id } = useParams<{ id: string }>();
+  const { assessmentId: id } = useParams<{ assessmentId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { requireAuth } = useAdminAuth();
@@ -30,6 +52,23 @@ const AdminScoringScreen = () => {
 
     const load = async () => {
       try {
+        if (isAdminEsgApiEnabled()) {
+          const detail = await getAdminEsgAssessment(id);
+          if (detail.assessment_type !== ESG_READINESS_ASSESSMENT_TYPE) {
+            throw new Error("Unexpected assessment type");
+          }
+          setStatus((detail.status as "draft" | "submitted") || "draft");
+          setSubmittedAt(detail.submitted_at ?? null);
+          setUserName(detail.user_display_name || "Unknown User");
+          setOrgName(detail.organization_name || "Unknown Organization");
+          const answers = sanitizeReadinessAnswers(
+            (detail.readiness_answers as ReadinessAnswers) ?? {}
+          );
+          const snapshot = parseSnapshot(detail.score?.readiness_results);
+          setResults(snapshot ?? computeReadiness(answers));
+          return;
+        }
+
         const { data: assessment, error } = await (adminSupabase as any)
           .from("esg_assessments")
           .select("id, user_id, status, submitted_at, readiness_answers, assessment_type, total_completion")
@@ -59,7 +98,7 @@ const AdminScoringScreen = () => {
           .eq("assessment_id", id)
           .maybeSingle();
 
-        const snapshot = scoreRow?.readiness_results as ReadinessComputation | null;
+        const snapshot = parseSnapshot(scoreRow?.readiness_results);
         setResults(snapshot ?? computeReadiness(answers));
       } catch (e) {
         console.error(e);
@@ -68,7 +107,7 @@ const AdminScoringScreen = () => {
           description: "The readiness record may not exist.",
           variant: "destructive",
         });
-        navigate("/admin-dashboard");
+        navigate("/admin/dashboard");
       } finally {
         setLoading(false);
       }
@@ -93,7 +132,7 @@ const AdminScoringScreen = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate("/admin-dashboard")}>
+          <Button variant="ghost" onClick={() => navigate("/admin/dashboard")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to admin
           </Button>

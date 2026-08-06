@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 import type { UkFactorBasis } from "./types";
 
 /** Per reference row: total kg CO2e and/or gas components (all per activity unit), same shape as UK fuel factors. */
@@ -251,6 +252,15 @@ export async function fetchUkPassengerFactorsMap(): Promise<{
   typeDescriptions: UkPassengerTypeDescriptions;
   error: string | null;
 }> {
+  const apiRows = await tryLoadFactorSheetViaApi({
+    datasetCodes: ["uk_passenger_factors", "uk_passenger_factor"],
+    nameHints: ["passenger", "UK_Passenger"],
+  });
+  if (apiRows) {
+    const { map, typeDescriptions } = buildUkPassengerData(apiRows);
+    return { map, typeDescriptions, error: null };
+  }
+
   let lastErr: string | null = null;
   for (const table of TABLE_CANDIDATES) {
     const { data, error } = await (supabase as any).from(table).select("*");

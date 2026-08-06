@@ -8,6 +8,10 @@ export type EmissionResultRow = {
   denominatorLabel: string;
   denominatorValue: number;
   dataQualityScore?: number;
+  /** PCAF formula id for backend /calculate confirm on save */
+  pcafFormulaId?: string;
+  pcafInputs?: Record<string, unknown>;
+  companyType?: string;
 };
 
 export type CalculationStepDto = {
@@ -24,6 +28,9 @@ export type FacilitatedCalculationResult = {
   dataQualityScore?: number;
   methodology?: string;
   calculationSteps?: CalculationStepDto[];
+  pcafFormulaId?: string;
+  pcafInputs?: Record<string, unknown>;
+  companyType?: string;
 };
 
 export type WizardLocationState = {

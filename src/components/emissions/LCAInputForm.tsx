@@ -7,7 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import { EmissionData } from "@/components/emissions/shared/types";
 import { Edit2, Save, CheckCircle2, Factory, Zap, Globe, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  companyScopedListFilters,
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,22 +79,10 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
       }
 
       try {
-        let query = supabase
-          .from('scope3_lca_entries')
-          .select('*')
-          .eq('user_id', user.id);
-
-        // Filter by counterparty_id if in company context
-        if (companyContext && counterpartyId) {
-          query = query.eq('counterparty_id', counterpartyId);
-        } else {
-          // Only personal entries (no counterparty_id)
-          query = query.is('counterparty_id', null);
-        }
-
-        const { data: lcaData, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
+        const lcaData = await listLegacyTableEntries(
+          "scope3_lca_entries",
+          companyScopedListFilters(user.id, companyContext, counterpartyId),
+        );
 
         if (lcaData && lcaData.length > 0) {
           const dbIds: typeof lcaDbIds = {};
@@ -99,20 +93,21 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
             scope3Downstream: '',
           };
           
-          lcaData.forEach(entry => {
-            const scopeType = entry.scope_type;
+          lcaData.forEach((entry) => {
+            const scopeType = entry.scope_type as string;
+            const emissions = entry.emissions as number;
             if (scopeType === 'scope1') {
-              loadedData.scope1 = entry.emissions;
-              dbIds.scope1 = entry.id;
+              loadedData.scope1 = emissions;
+              dbIds.scope1 = String(entry.id);
             } else if (scopeType === 'scope2') {
-              loadedData.scope2 = entry.emissions;
-              dbIds.scope2 = entry.id;
+              loadedData.scope2 = emissions;
+              dbIds.scope2 = String(entry.id);
             } else if (scopeType === 'scope3_upstream') {
-              loadedData.scope3Upstream = entry.emissions;
-              dbIds.scope3Upstream = entry.id;
+              loadedData.scope3Upstream = emissions;
+              dbIds.scope3Upstream = String(entry.id);
             } else if (scopeType === 'scope3_downstream') {
-              loadedData.scope3Downstream = entry.emissions;
-              dbIds.scope3Downstream = entry.id;
+              loadedData.scope3Downstream = emissions;
+              dbIds.scope3Downstream = String(entry.id);
             }
           });
 
@@ -178,32 +173,17 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
       const dbId = lcaDbIds[scope as keyof typeof lcaDbIds];
 
       if (dbId) {
-        // Update existing entry
-        const { error } = await supabase
-          .from('scope3_lca_entries')
-          .update({ emissions: numValue })
-          .eq('id', dbId);
-
-        if (error) throw error;
+        await updateLegacyTableEntry("scope3_lca_entries", dbId, { emissions: numValue });
       } else if (numValue > 0) {
-        // Insert new entry
-        const { data, error } = await supabase
-          .from('scope3_lca_entries')
-          .insert({
-            user_id: user.id,
-            counterparty_id: companyContext ? counterpartyId : null,
-            scope_type: scopeType,
-            emissions: numValue,
-            unit: 'kg CO2e',
-            calculation_mode: 'direct_lca',
-          })
-          .select('id')
-          .single();
-
-        if (error) throw error;
-        
-        // Update dbIds
-        setLcaDbIds(prev => ({ ...prev, [scope]: data.id }));
+        const created = await insertLegacyTableEntries("scope3_lca_entries", [{
+          user_id: user.id,
+          counterparty_id: companyContext ? counterpartyId ?? null : null,
+          scope_type: scopeType,
+          emissions: numValue,
+          unit: "kg CO2e",
+          calculation_mode: "direct_lca",
+        }]);
+        setLcaDbIds((prev) => ({ ...prev, [scope]: created[0]?.id }));
       }
 
       // Update emissionData
@@ -266,20 +246,13 @@ const LCAInputForm: React.FC<LCAInputFormProps> = ({
 
     setSaving(true);
     try {
-      // Delete all LCA entries from database
-      let deleteQuery = supabase
-        .from('scope3_lca_entries')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (companyContext && counterpartyId) {
-        deleteQuery = deleteQuery.eq('counterparty_id', counterpartyId);
-      } else {
-        deleteQuery = deleteQuery.is('counterparty_id', null);
-      }
-
-      const { error } = await deleteQuery;
-      if (error) throw error;
+      const entries = await listLegacyTableEntries(
+        "scope3_lca_entries",
+        companyScopedListFilters(user.id, companyContext, counterpartyId),
+      );
+      await Promise.all(
+        entries.map((entry) => deleteLegacyTableEntry("scope3_lca_entries", String(entry.id))),
+      );
 
       // Reset all state
       setLcaData({

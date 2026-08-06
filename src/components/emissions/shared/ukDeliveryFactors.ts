@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 import type { UkFactorBasis } from "./types";
 import type { UkPassengerFactorCell } from "./ukPassengerFactors";
 import {
@@ -113,6 +114,29 @@ export async function fetchUkDeliveryFactorsMap(): Promise<{
   map: UkDeliveryFactorsMap;
   error: string | null;
 }> {
+  const apiRows = await tryLoadFactorSheetViaApi({
+    datasetCodes: ["uk_delivery_factors", "uk_delivery_factor"],
+    nameHints: ["delivery", "UK_delivery"],
+  });
+  if (apiRows) {
+    if (apiRows.length === 0) {
+      return {
+        map: {},
+        error:
+          "UK delivery factor dataset returned 0 rows from the API. Check ref.factor_rows ETL for delivery.",
+      };
+    }
+    const map = buildUkDeliveryData(apiRows);
+    if (Object.keys(map).length === 0) {
+      return {
+        map: {},
+        error:
+          "Rows were returned from the API delivery dataset but none could be used. Check activity/type/unit/fuel_type columns.",
+      };
+    }
+    return { map, error: null };
+  }
+
   let lastErr: string | null = null;
   let sawEmptyOk = false;
 

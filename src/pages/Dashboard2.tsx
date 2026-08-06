@@ -32,6 +32,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { listProjectInputs } from "@/integrations/supabase/projectInputsClient";
+import { USE_JWT_AUTH } from "@/api/config";
+import { getMyProfile, patchMyProfile } from "@/api/profile";
+import { patchOrganization } from "@/api/organizations";
+import {
+  getEsgScoreByAssessment,
+  getLatestEsgAssessment,
+  isEsgApiEnabled,
+  type EsgAssessment,
+  type EsgScore,
+} from "@/api/esg";
+import { ApiError } from "@/api/client";
+import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 import { loadEpaIpccResults } from "@/lib/epaIpccResults";
 import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
@@ -98,47 +111,86 @@ const Dashboard2 = () => {
       setProfileForm({ organizationName: "", displayName: "", phone: "" });
 
       try {
-        const { data, error } = await (supabase as any)
-          .from("profiles")
-          .select("id, user_type, organization_name, display_name, phone")
-          .eq("user_id", user.id)
-          .single();
-        if (!data || error) {
-          setProfileMissing(true);
-          setDisplayName("");
-        } else {
-          // Check if organization_name, display_name, or phone are missing or just default values
-          // If display_name is just the email prefix (from default), phone is null, or organization_name is missing, show the form
-          const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
-          const phoneIsMissing = !data.phone || data.phone.trim() === '';
-          const organizationNameIsMissing = !data.organization_name || data.organization_name.trim() === '' || data.organization_name === 'My Organization';
-          
-          // Show questionnaire if any required field is missing
-          setProfileMissing(displayNameIsDefault || phoneIsMissing || organizationNameIsMissing);
-          
-          // Pre-fill the form with existing data if available
+        if (USE_JWT_AUTH) {
+          const data = await getMyProfile();
+          const displayNameIsDefault =
+            !data.display_name || data.display_name === user.email?.split("@")[0];
+          const phoneIsMissing = !data.phone || data.phone.trim() === "";
+          const organizationNameIsMissing =
+            !data.organization_name ||
+            data.organization_name.trim() === "" ||
+            data.organization_name === "My Organization";
+
+          setProfileMissing(
+            displayNameIsDefault || phoneIsMissing || organizationNameIsMissing
+          );
+
           if (data.organization_name && !organizationNameIsMissing) {
-            setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
-            setOrganizationName(data.organization_name);
+            setProfileForm((prev) => ({
+              ...prev,
+              organizationName: data.organization_name || "",
+            }));
+            setOrganizationName(data.organization_name || "");
           } else {
             setOrganizationName("");
           }
           if (data.display_name && !displayNameIsDefault) {
-            setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
+            setProfileForm((prev) => ({
+              ...prev,
+              displayName: data.display_name,
+            }));
             setDisplayName(data.display_name);
           } else {
             setDisplayName("");
           }
           if (data.phone && !phoneIsMissing) {
-            setProfileForm(prev => ({ ...prev, phone: data.phone }));
+            setProfileForm((prev) => ({ ...prev, phone: data.phone || "" }));
           }
-        }
-        if (data && data.user_type) {
-          setUserType(data.user_type);
+          setUserType(data.user_type || "corporate");
+          setUserTypeResolved(true);
         } else {
-          setUserType("corporate"); // Default to corporate for safety
+          const { data, error } = await (supabase as any)
+            .from("profiles")
+            .select("id, user_type, organization_name, display_name, phone")
+            .eq("user_id", user.id)
+            .single();
+          if (!data || error) {
+            setProfileMissing(true);
+            setDisplayName("");
+          } else {
+            // Check if organization_name, display_name, or phone are missing or just default values
+            // If display_name is just the email prefix (from default), phone is null, or organization_name is missing, show the form
+            const displayNameIsDefault = !data.display_name || data.display_name === user.email?.split('@')[0];
+            const phoneIsMissing = !data.phone || data.phone.trim() === '';
+            const organizationNameIsMissing = !data.organization_name || data.organization_name.trim() === '' || data.organization_name === 'My Organization';
+            
+            // Show questionnaire if any required field is missing
+            setProfileMissing(displayNameIsDefault || phoneIsMissing || organizationNameIsMissing);
+            
+            // Pre-fill the form with existing data if available
+            if (data.organization_name && !organizationNameIsMissing) {
+              setProfileForm(prev => ({ ...prev, organizationName: data.organization_name }));
+              setOrganizationName(data.organization_name);
+            } else {
+              setOrganizationName("");
+            }
+            if (data.display_name && !displayNameIsDefault) {
+              setProfileForm(prev => ({ ...prev, displayName: data.display_name }));
+              setDisplayName(data.display_name);
+            } else {
+              setDisplayName("");
+            }
+            if (data.phone && !phoneIsMissing) {
+              setProfileForm(prev => ({ ...prev, phone: data.phone }));
+            }
+          }
+          if (data && data.user_type) {
+            setUserType(data.user_type);
+          } else {
+            setUserType("corporate"); // Default to corporate for safety
+          }
+          setUserTypeResolved(true);
         }
-        setUserTypeResolved(true);
       } finally {
         setProfileLoading(false);
       }
@@ -155,6 +207,41 @@ const Dashboard2 = () => {
       return;
     }
     setProfileSubmitting(true);
+
+    if (USE_JWT_AUTH) {
+      try {
+        const updated = await patchMyProfile({
+          organization_name: profileForm.organizationName,
+          display_name: profileForm.displayName,
+          phone: profileForm.phone || null,
+          user_type: userType,
+        });
+        if (updated.current_organization_id) {
+          try {
+            await patchOrganization(updated.current_organization_id, {
+              name: profileForm.organizationName,
+            });
+          } catch {
+            // Org rename is best-effort
+          }
+        }
+        setProfileMissing(false);
+        setDisplayName(profileForm.displayName);
+        setOrganizationName(profileForm.organizationName);
+        toast({ title: "Profile saved!", description: "Your profile has been saved." });
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Profile update failed";
+        toast({ title: "Profile error", description: message, variant: "destructive" });
+      } finally {
+        setProfileSubmitting(false);
+      }
+      return;
+    }
     
     // Use upsert to handle both insert and update
     const { error } = await (supabase as any)
@@ -202,48 +289,79 @@ const Dashboard2 = () => {
       setError(null);
       
       // Fetch projects
-      const { data: projectsData, error: projectsError } = await (supabase as any)
-        .from("project_inputs")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      
-      if (projectsError) {
+      try {
+        const projectsData = await listProjectInputs(user.id);
+        setProjects(projectsData || []);
+      } catch {
         setError("Failed to load projects");
         setProjects([]);
-      } else {
-        setProjects(projectsData || []);
       }
 
-      // Fetch ISSB readiness assessment
-      const { data: esgData, error: esgError } = await (supabase as any)
-        .from("esg_assessments")
-        .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
-        .eq("user_id", user.id)
-        .eq("assessment_type", "issb_readiness_v1")
-        .maybeSingle();
+      // Fetch ISSB readiness assessment + scores (API when JWT, else Supabase)
+      try {
+        let esgData: EsgAssessment | null = null;
+        let scoresData: EsgScore | null = null;
 
-      if (!esgError && esgData) {
-        setEsgAssessment(esgData);
-        
-        // Fetch admin scores if assessment exists
-        const { data: scoresData, error: scoresError } = await supabase
-          .from("esg_scores")
-          .select("readiness_overall_score, readiness_maturity_band, readiness_results, scored_at")
-          .eq("assessment_id", esgData.id)
-          .maybeSingle();
-          
-        if (!scoresError && scoresData) {
-          const updatedAtMs = esgData?.updated_at ? new Date(esgData.updated_at).getTime() : 0;
-          const scoredAtMs = scoresData?.scored_at ? new Date(scoresData.scored_at).getTime() : 0;
-          if (scoredAtMs >= updatedAtMs) {
-            setEsgScores(scoresData);
+        if (isEsgApiEnabled()) {
+          esgData = await getLatestEsgAssessment(ESG_READINESS_ASSESSMENT_TYPE);
+          if (esgData?.id) {
+            try {
+              scoresData = await getEsgScoreByAssessment(esgData.id);
+            } catch (scoreErr) {
+              console.warn("Dashboard ESG score fetch failed:", scoreErr);
+              scoresData = null;
+            }
+          }
+        } else {
+          const { data, error: esgError } = await (supabase as any)
+            .from("esg_assessments")
+            .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
+            .eq("user_id", user.id)
+            .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!esgError && data) {
+            esgData = data as EsgAssessment;
+            const { data: scoresRow, error: scoresError } = await supabase
+              .from("esg_scores")
+              .select(
+                "readiness_overall_score, readiness_maturity_band, readiness_results, scored_at"
+              )
+              .eq("assessment_id", esgData.id)
+              .maybeSingle();
+            if (!scoresError && scoresRow) {
+              scoresData = scoresRow as EsgScore;
+            }
+          }
+        }
+
+        if (esgData) {
+          setEsgAssessment(esgData);
+          if (scoresData) {
+            // Always show stored scores. Migration/ETL often bumps assessment
+            // updated_at without re-scoring; dropping scores left the dashboard at 0%.
+            let results = scoresData.readiness_results;
+            if (typeof results === "string") {
+              try {
+                results = JSON.parse(results);
+              } catch {
+                results = null;
+              }
+            }
+            setEsgScores({ ...scoresData, readiness_results: results });
           } else {
             setEsgScores(null);
           }
         } else {
+          setEsgAssessment(null);
           setEsgScores(null);
         }
+      } catch (esgLoadError) {
+        console.error("Dashboard ESG overview load failed:", esgLoadError);
+        setEsgAssessment(null);
+        setEsgScores(null);
       }
 
       // Fetch emission calculator data
@@ -561,18 +679,8 @@ const Dashboard2 = () => {
       const loadProjects = async () => {
         try {
           setLoading(true);
-          const { data: projectsData, error: projectsError } = await (supabase as any)
-            .from("project_inputs")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
-          
-          if (projectsError) {
-            console.error('Error loading projects:', projectsError);
-            setProjects([]);
-          } else {
-            setProjects(projectsData || []);
-          }
+          const projectsData = await listProjectInputs(user.id);
+          setProjects(projectsData || []);
         } catch (error) {
           console.error('Error loading projects:', error);
           setProjects([]);

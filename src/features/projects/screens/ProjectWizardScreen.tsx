@@ -19,10 +19,28 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
+import { createProjectInput } from "@/integrations/supabase/projectInputsClient";
 import { getNames } from 'country-list';
 import { useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+
+function pickField(row: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = row[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  // Case-insensitive fallback
+  const lower = Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k.toLowerCase(), v])
+  );
+  for (const k of keys) {
+    const v = lower[k.toLowerCase()];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
 
 const ProjectWizardScreen = () => {
   const navigate = useNavigate();
@@ -35,11 +53,24 @@ const ProjectWizardScreen = () => {
   useEffect(() => {
     async function fetchAreasOfInterest() {
       setLoadingAreasOfInterest(true);
-      let allRows: any[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      let keepFetching = true;
       try {
+        const apiRows = await tryLoadCatalogViaApi("global-projects");
+        if (apiRows) {
+          const uniqueAreas = Array.from(
+            new Set(
+              apiRows
+                .map((d) => pickField(d, ["Area of interest", "area_of_interest", "areaOfInterest"]))
+                .filter(Boolean)
+            )
+          );
+          setAreasOfInterest(uniqueAreas);
+          return;
+        }
+
+        let allRows: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let keepFetching = true;
         while (keepFetching) {
           const { data, error } = await supabase.from('global_projects_2025' as any).select('"Area of interest"').range(from, from + batchSize - 1);
           if (error) {
@@ -63,7 +94,6 @@ const ProjectWizardScreen = () => {
           }
         }
         const uniqueAreas = Array.from(new Set(allRows.map((d: any) => (d["Area of interest"] || '').trim()).filter(Boolean)));
-        console.log('Fetched areas of interest:', uniqueAreas.length, 'items');
         setAreasOfInterest(uniqueAreas);
       } catch (err: any) {
         console.error('Unexpected error fetching areas of interest:', err);
@@ -108,11 +138,24 @@ const ProjectWizardScreen = () => {
   useEffect(() => {
     async function fetchGoals() {
       setLoadingGoals(true);
-      let allRows: any[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      let keepFetching = true;
       try {
+        const apiRows = await tryLoadCatalogViaApi("global-projects");
+        if (apiRows) {
+          const uniqueGoals = Array.from(
+            new Set(
+              apiRows
+                .map((d) => pickField(d, ["End Goal", "end_goal", "endGoal", "goal"]))
+                .filter(Boolean)
+            )
+          );
+          setGoals(uniqueGoals);
+          return;
+        }
+
+        let allRows: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let keepFetching = true;
         while (keepFetching) {
           const { data, error } = await supabase.from('global_projects_2025' as any).select('"End Goal"').range(from, from + batchSize - 1);
           if (error) {
@@ -136,7 +179,6 @@ const ProjectWizardScreen = () => {
           }
         }
         const uniqueGoals = Array.from(new Set(allRows.map((d: any) => (d["End Goal"] || '').trim()).filter(Boolean)));
-        console.log('Fetched goals:', uniqueGoals.length, 'items');
         setGoals(uniqueGoals);
       } catch (err: any) {
         console.error('Unexpected error fetching goals:', err);
@@ -161,19 +203,38 @@ const ProjectWizardScreen = () => {
       return;
     }
 
-      setLoadingTypes(true);
+    setLoadingTypes(true);
+    try {
+      const apiRows = await tryLoadCatalogViaApi("global-projects");
+      if (apiRows) {
+        const uniqueTypes = Array.from(
+          new Set(
+            apiRows
+              .filter(
+                (d) =>
+                  pickField(d, ["Area of interest", "area_of_interest", "areaOfInterest"]) ===
+                  areaOfInterest
+              )
+              .map((d) => pickField(d, ["Type", "type"]))
+              .filter(Boolean)
+          )
+        );
+        setFilteredTypes(uniqueTypes);
+        return;
+      }
+
       let allRows: any[] = [];
       let from = 0;
       const batchSize = 1000;
       let keepFetching = true;
 
       while (keepFetching) {
-      const { data, error } = await supabase
-        .from("global_projects_2025" as any)
-        .select('"Type"')
-        .eq('"Area of interest"', areaOfInterest)
-        .range(from, from + batchSize - 1);
-      
+        const { data, error } = await supabase
+          .from("global_projects_2025" as any)
+          .select('"Type"')
+          .eq('"Area of interest"', areaOfInterest)
+          .range(from, from + batchSize - 1);
+
         if (error) break;
         if (data && data.length > 0) {
           allRows = allRows.concat(data);
@@ -188,8 +249,10 @@ const ProjectWizardScreen = () => {
       }
 
       const uniqueTypes = Array.from(new Set(allRows.map((d: any) => (d["Type"] || '').trim()).filter(Boolean)));
-    setFilteredTypes(uniqueTypes);
+      setFilteredTypes(uniqueTypes);
+    } finally {
       setLoadingTypes(false);
+    }
   };
 
   // Effect to fetch types when area of interest changes
@@ -230,10 +293,8 @@ const ProjectWizardScreen = () => {
       return;
     }
     setIsSubmitting(true);
-    const { error } = await supabase
-      .from("project_inputs" as any)
-      .insert([{
-        user_id: user.id,
+    try {
+      await createProjectInput(user.id, {
         current_industry: formData.currentIndustry,
         industry_size: formData.industrySize,
         has_emissions_knowledge: formData.hasEmissionsKnowledge,
@@ -251,24 +312,16 @@ const ProjectWizardScreen = () => {
         country: formData.country,
         area_of_interest: formData.areaOfInterest,
         type: formData.type,
+        subcategory: formData.type,
         goal: formData.goal,
         register_for_credits: formData.registerForCredits === "yes",
         development_strategy: formData.developmentStrategy,
         additional_info: formData.additionalInfo,
-      }]);
-    if (error) {
-      toast({
-        title: 'Error submitting project.',
-        description: error.message,
-        variant: 'destructive',
       });
-      setIsSubmitting(false);
-    } else {
       toast({
         title: 'Project submitted successfully!',
         description: 'Project submitted successfully!',
       });
-      // Simulate AI thinking and then navigate
       setTimeout(() => {
         navigate('/filtered-projects-landing', {
           state: {
@@ -278,7 +331,14 @@ const ProjectWizardScreen = () => {
             goal: formData.goal,
           },
         });
-      }, 3000); // 3 seconds
+      }, 3000);
+    } catch (err: unknown) {
+      toast({
+        title: 'Error submitting project.',
+        description: err instanceof Error ? err.message : 'Submit failed',
+        variant: 'destructive',
+      });
+      setIsSubmitting(false);
     }
   };
   return (

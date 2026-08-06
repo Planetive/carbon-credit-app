@@ -4,12 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteScope3CategoryEntry,
+  fetchScope3CategoryEntries,
+  insertScope3CategoryEntries,
+  updateScope3CategoryEntry,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import type { CapitalGoodsRow } from "@/components/emissions/scope3/types/scope3Types";
 import { SupplierAutocomplete } from "@/components/emissions/scope3/SupplierAutocomplete";
 import type { Supplier } from "@/components/emissions/scope3/types";
 import { useEmissionSync } from "@/components/emissions/scope3/hooks/useEmissionSync";
+import { USE_JWT_AUTH } from "@/api/config";
+import { resolveSpendBasedEmissionsKg } from "@/api/calcConnection";
 
 interface CapitalGoodsSectionProps {
   user: { id: string } | null;
@@ -48,19 +55,47 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
     setCapitalGoodsRows((prev) => prev.filter((r) => r.id !== id));
 
   const updateCapitalGoodsRow = (id: string, patch: Partial<CapitalGoodsRow>) => {
+    let snapshot: CapitalGoodsRow | null = null;
+    let factor = 0;
     setCapitalGoodsRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
         const updated: CapitalGoodsRow = { ...r, ...patch };
         const supplier: Supplier | null | undefined = updated.supplier;
         if (supplier && typeof updated.amount === "number" && updated.amount > 0) {
+          factor = supplier.emission_factor;
           updated.emissions = updated.amount * supplier.emission_factor;
         } else {
           updated.emissions = undefined;
         }
+        snapshot = updated;
         return updated;
       }),
     );
+
+    if (
+      USE_JWT_AUTH &&
+      snapshot &&
+      typeof snapshot.amount === "number" &&
+      snapshot.emissions != null
+    ) {
+      const snap = snapshot;
+      void (async () => {
+        const kg = await resolveSpendBasedEmissionsKg({
+          amount: snap.amount!,
+          emission_factor: factor,
+          category: "capital_goods",
+        });
+        setCapitalGoodsRows((prev) =>
+          prev.map((r) => {
+            if (r.id !== id) return r;
+            if (r.amount !== snap.amount) return r;
+            if (r.emissions === kg) return r;
+            return { ...r, emissions: kg };
+          }),
+        );
+      })();
+    }
   };
 
   // Load existing Capital Goods entries
@@ -76,22 +111,12 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
       }
 
       try {
-        let query = supabase
-          .from("scope3_capital_goods")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq("counterparty_id", counterpartyId);
-        } else {
-          query = query.is("counterparty_id", null);
-        }
-
-        const { data, error } = await query.order("created_at", {
-          ascending: false,
-        });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_capital_goods",
+          user.id,
+          !!companyContext,
+          counterpartyId,
+        );
 
         const loadedRows: CapitalGoodsRow[] = (data || []).map((raw) => {
           const supplier: Supplier | null =
@@ -203,17 +228,13 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
           emissions: r.emissions!,
         }));
 
-        const { error } = await supabase
-          .from("scope3_capital_goods")
-          .insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_capital_goods", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((r) =>
-          supabase
-            .from("scope3_capital_goods")
-            .update({
+        await Promise.all(
+          changedExisting.map((r) =>
+            updateScope3CategoryEntry("scope3_capital_goods", r.dbId!, {
               supplier_id: r.supplier!.id,
               supplier_name: r.supplier!.supplier_name,
               supplier_code: r.supplier!.code,
@@ -221,11 +242,8 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
               emission_factor: r.supplier!.emission_factor,
               emissions: r.emissions!,
             })
-            .eq("id", r.dbId!),
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find((r) => r.error)?.error;
-        if (updateError) throw updateError;
       }
 
       toast({
@@ -233,15 +251,12 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
       });
 
-      const { data: newData } = await supabase
-        .from("scope3_capital_goods")
-        .select("*")
-        .eq("user_id", user.id)
-        .is(
-          "counterparty_id",
-          companyContext && counterpartyId ? counterpartyId : null,
-        )
-        .order("created_at", { ascending: false });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_capital_goods",
+        user.id,
+        !!companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows: CapitalGoodsRow[] = newData.map((raw) => ({
@@ -292,12 +307,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
 
     setDeletingCapitalGoods((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from("scope3_capital_goods")
-        .delete()
-        .eq("id", row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_capital_goods", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 

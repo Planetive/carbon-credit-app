@@ -4,7 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteScope3CategoryEntry,
+  fetchScope3CategoryEntries,
+  insertScope3CategoryEntries,
+  updateScope3CategoryEntry,
+} from "@/features/scope3/adapters/scope3SupabaseAdapter";
 import type { EmissionData } from "@/components/emissions/shared/types";
 import type { FuelEnergyRow } from "@/components/emissions/scope3/types/scope3Types";
 import { useEmissionSync } from "@/components/emissions/scope3/hooks/useEmissionSync";
@@ -67,26 +72,16 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
       }
 
       try {
-        let query = supabase
-          .from("scope3_fuel_energy_activities")
-          .select("*")
-          .eq("user_id", user.id);
-
-        if (companyContext && counterpartyId) {
-          query = query.eq("counterparty_id", counterpartyId);
-        } else {
-          query = query.is("counterparty_id", null);
-        }
-
-        const { data, error } = await query.order("created_at", {
-          ascending: false,
-        });
-
-        if (error) throw error;
+        const data = await fetchScope3CategoryEntries(
+          "scope3_fuel_energy_activities",
+          user.id,
+          !!companyContext,
+          counterpartyId,
+        );
 
         const loadedRows: FuelEnergyRow[] = (data || []).map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           extraction: entry.extraction || "",
           distance: entry.distance || undefined,
@@ -184,27 +179,20 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           emissions: r.emissions || 0,
         }));
 
-        const { error } = await supabase
-          .from("scope3_fuel_energy_activities")
-          .insert(payload);
-        if (error) throw error;
+        await insertScope3CategoryEntries("scope3_fuel_energy_activities", payload);
       }
 
       if (changedExisting.length > 0) {
-        const updates = changedExisting.map((r) =>
-          supabase
-            .from("scope3_fuel_energy_activities")
-            .update({
+        await Promise.all(
+          changedExisting.map((r) =>
+            updateScope3CategoryEntry("scope3_fuel_energy_activities", r.dbId!, {
               extraction: r.extraction,
               distance: r.distance!,
               refining: r.refining,
               emissions: r.emissions || 0,
             })
-            .eq("id", r.dbId!),
+          )
         );
-        const results = await Promise.all(updates);
-        const updateError = results.find((r) => r.error)?.error;
-        if (updateError) throw updateError;
       }
 
       toast({
@@ -212,17 +200,17 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
         description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
       });
 
-      const { data: newData } = await supabase
-        .from("scope3_fuel_energy_activities")
-        .select("*")
-        .eq("user_id", user.id)
-        .is("counterparty_id", companyContext && counterpartyId ? counterpartyId : null)
-        .order("created_at", { ascending: false });
+      const newData = await fetchScope3CategoryEntries(
+        "scope3_fuel_energy_activities",
+        user.id,
+        !!companyContext,
+        counterpartyId,
+      );
 
       if (newData) {
         const updatedRows: FuelEnergyRow[] = newData.map((entry) => ({
           id: crypto.randomUUID(),
-          dbId: entry.id,
+          dbId: String(entry.id),
           isExisting: true,
           extraction: entry.extraction || "",
           distance: entry.distance || undefined,
@@ -261,12 +249,7 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
 
     setDeletingFuelEnergy((prev) => new Set(prev).add(id));
     try {
-      const { error } = await supabase
-        .from("scope3_fuel_energy_activities")
-        .delete()
-        .eq("id", row.dbId);
-
-      if (error) throw error;
+      await deleteScope3CategoryEntry("scope3_fuel_energy_activities", row.dbId);
 
       toast({ title: "Deleted", description: "Entry deleted successfully." });
 

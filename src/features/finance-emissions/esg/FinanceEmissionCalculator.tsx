@@ -31,6 +31,7 @@ import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChan
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import type { CalculationStepDto, EmissionResultRow, FinanceFormValue, FinanceMode } from "../types/contracts";
+import { resolveFinancedCalculation } from "@/api/financedConnection";
 
 
 
@@ -1193,7 +1194,12 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       financeEmission: pcafResult.financedEmissions,
       denominatorLabel,
       denominatorValue,
-      dataQualityScore: pcafResult.dataQualityScore
+      dataQualityScore: pcafResult.dataQualityScore,
+      methodology: pcafResult.methodology,
+      calculationSteps: pcafResult.calculationSteps,
+      pcafFormulaId: selectedId,
+      pcafInputs,
+      companyType,
     };
   };
 
@@ -1224,6 +1230,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     
     // Use setTimeout to allow UI to update before heavy calculation
     setTimeout(() => {
+      void (async () => {
       try {
       // Single-loan detailed calculation (kept for current view and validations)
       // Calculate total property value for mortgages and commercial real estate
@@ -1436,8 +1443,45 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       console.log('🔍 PCAF CALCULATION DEBUG - Loan Type:', loanType);
       console.log('🔍 PCAF CALCULATION DEBUG - Total Emission (for Options 1a, 1b, 2a):', (loanType === 'sovereign-debt' || (loanType === 'mortgage' && (selectedFormula === '1a-mortgage' || selectedFormula === '1b-mortgage' || selectedFormula === '2a-mortgage'))) ? pcafInputs.total_emission : 'N/A');
       
-      const pcafResult = calculationEngine.calculate(selectedFormula, pcafInputs, companyType);
-      console.log('🔍 PCAF CALCULATION DEBUG - Calculation Result:', pcafResult);
+      const pcafResultLocal = calculationEngine.calculate(selectedFormula, pcafInputs, companyType);
+      console.log('🔍 PCAF CALCULATION DEBUG - Calculation Result:', pcafResultLocal);
+
+      // Instant local preview
+      const localPreview: CalculationResult = {
+        attributionFactor: pcafResultLocal.attributionFactor,
+        financeEmission: pcafResultLocal.financedEmissions,
+        totalProductOutput: 0,
+        evic: 0,
+        dataQualityScore: pcafResultLocal.dataQualityScore,
+        methodology: pcafResultLocal.methodology,
+        calculationSteps: pcafResultLocal.calculationSteps,
+      };
+      setResult(localPreview);
+
+      const pcafConfirmed = await resolveFinancedCalculation({
+        calc_kind: "finance",
+        formula_id: selectedFormula,
+        company_type: companyType,
+        inputs: pcafInputs as Record<string, unknown>,
+        counterparty_id: propCounterpartyId ?? null,
+        persist: false,
+        local: {
+          attributionFactor: pcafResultLocal.attributionFactor,
+          financedEmissions: pcafResultLocal.financedEmissions,
+          dataQualityScore: pcafResultLocal.dataQualityScore,
+          methodology: pcafResultLocal.methodology,
+          calculationSteps: pcafResultLocal.calculationSteps,
+        },
+      });
+
+      const pcafResult = {
+        attributionFactor: pcafConfirmed.attributionFactor,
+        financedEmissions: pcafConfirmed.financedEmissions,
+        dataQualityScore: pcafConfirmed.dataQualityScore,
+        methodology: pcafConfirmed.methodology ?? pcafResultLocal.methodology,
+        calculationSteps:
+          pcafConfirmed.calculationSteps ?? pcafResultLocal.calculationSteps,
+      };
       
       // Calculate the appropriate denominator based on company type
       let denominatorValue: number;
@@ -1523,20 +1567,41 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           denominatorLabel: string;
           denominatorValue: number;
           dataQualityScore?: number;
+          pcafFormulaId?: string;
+          pcafInputs?: Record<string, unknown>;
+          companyType?: string;
         }> = [];
         for (const inst of expandedLoanTypes) {
           const ltKey = inst.type;
           const saved = perLoanFormData[inst.key] || formData; // fall back to current formData
           try {
             const r = calculateSingleLoan(ltKey, saved);
+            const confirmed = await resolveFinancedCalculation({
+              calc_kind: "finance",
+              formula_id: r.pcafFormulaId,
+              company_type: r.companyType,
+              inputs: r.pcafInputs as Record<string, unknown>,
+              counterparty_id: propCounterpartyId ?? null,
+              persist: false,
+              local: {
+                attributionFactor: r.attributionFactor,
+                financedEmissions: r.financeEmission,
+                dataQualityScore: r.dataQualityScore,
+                methodology: r.methodology,
+                calculationSteps: r.calculationSteps,
+              },
+            });
             results.push({
               type: ltKey,
               label: `${typeLabels[ltKey] || ltKey} #${inst.instance}`,
-              attributionFactor: r.attributionFactor,
-              financeEmission: r.financeEmission,
+              attributionFactor: confirmed.attributionFactor,
+              financeEmission: confirmed.financedEmissions,
               denominatorLabel: r.denominatorLabel,
               denominatorValue: r.denominatorValue,
-              dataQualityScore: r.dataQualityScore
+              dataQualityScore: confirmed.dataQualityScore,
+              pcafFormulaId: r.pcafFormulaId,
+              pcafInputs: r.pcafInputs as Record<string, unknown>,
+              companyType: r.companyType,
             });
           } catch (e) {
             console.warn('Failed to calculate for loan type', ltKey, e);
@@ -1563,7 +1628,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             financedEmissions: r.financeEmission,
             denominatorLabel: r.denominatorLabel,
             denominatorValue: r.denominatorValue,
-            dataQualityScore: r.dataQualityScore
+            dataQualityScore: r.dataQualityScore,
+            pcafFormulaId: r.pcafFormulaId,
+            pcafInputs: r.pcafInputs,
+            companyType: r.companyType,
           })), {
             outstandingLoan: formData.outstandingLoan,
             totalAssetsValue: formData.totalAssetsValue,
@@ -1572,7 +1640,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             totalDebt: sharedCompanyData.totalDebt,
             totalEquity: sharedCompanyData.totalEquity,
             minorityInterest: sharedCompanyData.minorityInterest,
-            preferredStock: sharedCompanyData.preferredStock
+            preferredStock: sharedCompanyData.preferredStock,
+            corporateStructure,
           });
         }
       } else {
@@ -1606,7 +1675,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               financedEmissions: calculationResult.financeEmission,
               denominatorLabel: (loanType === 'mortgage' ? 'Total Property Value at Origination' : loanType === 'sovereign-debt' ? 'PP-Adjusted GDP' : loanType === 'motor-vehicle-loan' ? 'Total Value at Origination' : loanType === 'commercial-real-estate' ? 'Property Value at Origination' : corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'),
               denominatorValue: calculationResult.evic,
-              dataQualityScore: calculationResult.dataQualityScore
+              dataQualityScore: calculationResult.dataQualityScore,
+              pcafFormulaId: selectedFormula,
+              pcafInputs: pcafInputs as Record<string, unknown>,
+              companyType,
             }
           ], {
             outstandingLoan: formData.outstandingLoan,
@@ -1616,7 +1688,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             totalDebt: sharedCompanyData.totalDebt,
             totalEquity: sharedCompanyData.totalEquity,
             minorityInterest: sharedCompanyData.minorityInterest,
-            preferredStock: sharedCompanyData.preferredStock
+            preferredStock: sharedCompanyData.preferredStock,
+            corporateStructure,
           });
           console.log('🔍 onResults callback completed');
         } else {
@@ -1638,6 +1711,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       } finally {
         setIsCalculating(false);
       }
+      })();
     }, 100);
   };
 
@@ -2376,7 +2450,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                 financedEmissions: result.facilitatedEmission,
                 denominatorLabel: denominatorLabel,
                 denominatorValue: denominatorValue,
-                dataQualityScore: result.dataQualityScore
+                dataQualityScore: result.dataQualityScore,
+                pcafFormulaId: result.pcafFormulaId,
+                pcafInputs: result.pcafInputs,
+                companyType: result.companyType,
               };
               onResults([formattedResult]);
             }

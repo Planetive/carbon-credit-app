@@ -11,6 +11,7 @@ import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, T
 import { useToast } from '@/hooks/use-toast';
 import { PortfolioClient, Counterparty, Exposure } from '@/integrations/supabase/portfolioClient';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchMyProfileDual } from '@/api/profileDualRead';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardSidebar from '@/components/DashboardSidebar';
@@ -73,14 +74,9 @@ const BankPortfolio: React.FC = () => {
   useEffect(() => {
     const fetchUserType = async () => {
       if (!user) return;
-      const { data } = await (supabase as any)
-        .from("profiles")
-        .select("user_type")
-        .eq("user_id", user.id)
-        .single();
+      const data = await fetchMyProfileDual(user.id);
       if (data?.user_type) {
         setUserType(data.user_type);
-        // Redirect corporate users to project wizard
         if (data.user_type === 'corporate') {
           navigate('/project-wizard');
           return;

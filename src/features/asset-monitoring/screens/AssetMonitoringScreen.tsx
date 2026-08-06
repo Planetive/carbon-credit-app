@@ -18,6 +18,12 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  createEsgAssessment,
+  getLatestEsgAssessment,
+  isEsgApiEnabled,
+  updateEsgAssessment,
+} from "@/api/esg";
 import { MRV_NEEDS_ASSESSMENT_TYPE } from "@/features/asset-monitoring/constants";
 import {
   MRV_PROFILES,
@@ -108,22 +114,36 @@ const AssetMonitoringScreen = () => {
     const load = async () => {
       if (!user) return;
       try {
-        const { data, error } = await supabase
-          .from("esg_assessments")
-          .select("id, readiness_answers, status")
-          .eq("user_id", user.id)
-          .eq("assessment_type", MRV_NEEDS_ASSESSMENT_TYPE)
-          .maybeSingle();
+        if (isEsgApiEnabled()) {
+          const data = await getLatestEsgAssessment(MRV_NEEDS_ASSESSMENT_TYPE);
+          if (data) {
+            setAssessmentId(data.id);
+            const stored = sanitizeAnswers(data.readiness_answers);
+            setAnswers(stored);
+            if (data.status === "submitted" && isQuestionnaireComplete(stored)) {
+              setSubmitted(true);
+            }
+          }
+        } else {
+          const { data, error } = await supabase
+            .from("esg_assessments")
+            .select("id, readiness_answers, status")
+            .eq("user_id", user.id)
+            .eq("assessment_type", MRV_NEEDS_ASSESSMENT_TYPE)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        if (error) throw error;
+          if (error) throw error;
 
-        if (data) {
-          setAssessmentId((data as { id: string }).id);
-          const status = (data as { status?: string }).status;
-          const stored = sanitizeAnswers((data as { readiness_answers?: unknown }).readiness_answers);
-          setAnswers(stored);
-          if (status === "submitted" && isQuestionnaireComplete(stored)) {
-            setSubmitted(true);
+          if (data) {
+            setAssessmentId((data as { id: string }).id);
+            const status = (data as { status?: string }).status;
+            const stored = sanitizeAnswers((data as { readiness_answers?: unknown }).readiness_answers);
+            setAnswers(stored);
+            if (status === "submitted" && isQuestionnaireComplete(stored)) {
+              setSubmitted(true);
+            }
           }
         }
       } catch (err) {
@@ -151,6 +171,23 @@ const AssetMonitoringScreen = () => {
       const completion = Math.round(
         (Object.keys(nextAnswers).length / MRV_QUESTIONS.length) * 100
       );
+
+      if (isEsgApiEnabled()) {
+        const apiBody = {
+          assessment_type: MRV_NEEDS_ASSESSMENT_TYPE,
+          status,
+          readiness_answers: nextAnswers as Record<string, unknown>,
+          total_completion: status === "submitted" ? 100 : completion,
+          readiness_version: 1,
+          submitted_at: status === "submitted" ? new Date().toISOString() : null,
+        };
+        const saved = assessmentId
+          ? await updateEsgAssessment(assessmentId, apiBody)
+          : await createEsgAssessment(apiBody);
+        setAssessmentId(saved.id);
+        return true;
+      }
+
       const payload = {
         user_id: user.id,
         assessment_type: MRV_NEEDS_ASSESSMENT_TYPE,

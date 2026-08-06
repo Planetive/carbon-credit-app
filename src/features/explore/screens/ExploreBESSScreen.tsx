@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import {
   Card,
   CardContent,
@@ -53,6 +54,11 @@ const ExploreBESSScreen = () => {
 
   // Helper function to fetch all BESS projects
   async function fetchAllBESSProjects() {
+    const apiRows = await tryLoadCatalogViaApi("bess");
+    if (apiRows) {
+      return apiRows.map(normalizeBESSRow);
+    }
+
     const { data, error } = await supabase
       .from("bess")
       .select("*");

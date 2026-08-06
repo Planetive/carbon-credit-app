@@ -6,7 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteLegacyTableEntry,
+  insertLegacyTableEntries,
+  listLegacyTableEntries,
+  updateLegacyTableEntry,
+} from "@/integrations/supabase/ghgEntryClient";
+import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
+import { USE_JWT_AUTH } from "@/api/config";
+import { resolveHeatSteamEmissionsKg } from "@/api/calcConnection";
 import { formatDynamicEmission } from "@/features/emission-calculator/scope1/components/emissionFormatting";
 
 interface HeatRow {
@@ -186,13 +194,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
-        // Load UK standard data
-        const { data: ukData } = await supabase
-          .from('heat and steam' as any)
-          .select('*');
-        
-        if (ukData && ukData.length > 0) {
-          const formatted = ukData.map((row: any) => {
+        const formatRows = (rows: Record<string, unknown>[]) =>
+          rows.map((row: any) => {
             const type =
               row["Type"] || row.type || row["type"] || row["Activity"] || row.activity;
             const unit = row["Unit"] || row.unit || row["unit"];
@@ -232,53 +235,21 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
               n2oFactor: n2oFactor ?? undefined,
             };
           });
-          setHeatSteamDataUK(formatted);
+
+        const uk = await loadIpccFactorTableRows([
+          "heat and steam",
+          "heat_and_steam",
+        ]);
+        if (uk.rows.length > 0) {
+          setHeatSteamDataUK(formatRows(uk.rows));
         }
 
-        // Load EBT standard data
-        const { data: ebtData } = await supabase
-          .from('heat and steam EBT' as any)
-          .select('*');
-        
-        if (ebtData && ebtData.length > 0) {
-          const formatted = ebtData.map((row: any) => {
-            const type =
-              row["Type"] || row.type || row["type"] || row["Activity"] || row.activity;
-            const unit = row["Unit"] || row.unit || row["unit"];
-
-            const co2Raw =
-              pickFirstValue(row, [/^kg\s*CO2\s*\/\s*mmBtu$/i, /CO2.*mmBtu/i]) ??
-              row["kg CO₂e"] ??
-              row["kg CO2e"] ??
-              row.kg_co2e;
-            const ch4Raw =
-              pickFirstValue(row, [/CH4.*mmBtu/i, /g\s*CH4.*mmBtu/i]) ??
-              row["CH4"] ??
-              row["CH₄"] ??
-              row.ch4 ??
-              row["CH4 Factor"] ??
-              row.ch4_factor;
-            const n2oRaw =
-              pickFirstValue(row, [/N2O.*mmBtu/i, /g\s*N2O.*mmBtu/i]) ??
-              row["N2O"] ??
-              row["N20"] ??
-              row.n2o ??
-              row["N2O Factor"] ??
-              row.n2o_factor;
-
-            const co2Factor = parseNumber(co2Raw);
-            const ch4Factor = parseNumber(ch4Raw);
-            const n2oFactor = parseNumber(n2oRaw);
-
-            return {
-              Type: type,
-              Unit: unit,
-              co2Factor: co2Factor ?? HEAT_DEFAULT_FACTOR,
-              ch4Factor: ch4Factor ?? undefined,
-              n2oFactor: n2oFactor ?? undefined,
-            };
-          });
-          setHeatSteamDataEBT(formatted);
+        const ebt = await loadIpccFactorTableRows([
+          "heat and steam EBT",
+          "heat_and_steam_ebt",
+        ]);
+        if (ebt.rows.length > 0) {
+          setHeatSteamDataEBT(formatRows(ebt.rows));
         }
       } catch (error: any) {
         console.error('Error loading heat and steam reference data:', error);
@@ -411,37 +382,36 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       }
       try {
         // Load Heat & Steam entries (UK table or EPA table per storageVariant)
-        const { data: heatData, error: heatError } = await (supabase as any)
-          .from(heatSteamTable)
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true });
-        if (heatError) throw heatError;
+        const heatData = await listLegacyTableEntries(heatSteamTable, {
+          user_id: userId,
+          order: { column: "created_at", ascending: true },
+        });
 
         // Load saved standard if available, unless forced (EPA)
-        if (!forcedStandard && heatData && heatData.length > 0 && heatData[0].standard) {
-          setHeatSteamStandard(heatData[0].standard);
+        if (!forcedStandard && heatData.length > 0 && heatData[0].standard) {
+          const std = String(heatData[0].standard);
+          if (std === "UK" || std === "EBT") setHeatSteamStandard(std);
         }
-        
+
         // Convert saved data to rows.
-        const savedRows: HeatRow[] = (heatData || []).map((row: any) => {
-          const unit: string | undefined = row.unit;
+        const savedRows: HeatRow[] = heatData.map((row) => {
+          const unit = row.unit as string | undefined;
           const supportsMMSCF =
             typeof unit === "string" && unit.toLowerCase().includes("mmbtu");
 
-          const displayEntryType = mapEntryTypeFromDb(row.entry_type);
+          const displayEntryType = mapEntryTypeFromDb(row.entry_type as string);
 
           return {
             id: crypto.randomUUID(),
-            dbId: row.id,
+            dbId: String(row.id),
             entryType: displayEntryType,
-            unit,
-            factor: row.emission_factor ?? HEAT_DEFAULT_FACTOR,
-            quantity: row.quantity ?? undefined,
-            emissions: row.emissions ?? undefined,
+            unit: unit ?? "",
+            factor: (row.emission_factor as number | undefined) ?? HEAT_DEFAULT_FACTOR,
+            quantity: (row.quantity as number | undefined) ?? undefined,
+            emissions: (row.emissions as number | undefined) ?? undefined,
             // Persisted rows historically only stored CO2; default gas & quantity unit.
-            gas: "co2",
-            quantityUnit: "base",
+            gas: "co2" as const,
+            quantityUnit: "base" as const,
             supportsMMSCF,
           };
         });
@@ -450,7 +420,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
         if (savedRows.length > 0) {
           setHeatRows(savedRows);
           setHasUserRows(true);
-          const u = String((heatData![0] as any).emissions_output_unit || "") as OutputUnit;
+          const u = String(heatData[0].emissions_output_unit || "") as OutputUnit;
           if (u === "kg" || u === "tonnes" || u === "g" || u === "short_ton") {
             setOutputUnit(u);
           }
@@ -533,7 +503,36 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
     }
   }, [forcedStandard]);
 
+  const reconcileHeatViaApi = (snap: HeatRow) => {
+    if (!USE_JWT_AUTH || typeof snap.quantity !== "number") return;
+    const gas: "co2" | "ch4" | "n2o" = snap.gas ?? "co2";
+    const quantityUnit: "base" | "mmscf" = snap.quantityUnit ?? "base";
+    void (async () => {
+      const kg = await resolveHeatSteamEmissionsKg({
+        quantity: snap.quantity!,
+        gas,
+        quantity_unit: quantityUnit === "mmscf" && snap.supportsMMSCF ? "mmscf" : "base",
+        entry_type: snap.entryType,
+        unit: snap.unit,
+        co2_factor: snap.co2Factor,
+        ch4_factor: snap.ch4Factor,
+        n2o_factor: snap.n2oFactor,
+        standard: heatSteamStandard === "UK" ? "uk" : "ebt",
+      });
+      setHeatRows((prev) =>
+        prev.map((r) => {
+          if (r.entryType !== snap.entryType) return r;
+          if (r.quantity !== snap.quantity || (r.gas ?? "co2") !== gas) return r;
+          if ((r.quantityUnit ?? "base") !== quantityUnit) return r;
+          if (r.emissions === kg) return r;
+          return { ...r, emissions: kg };
+        })
+      );
+    })();
+  };
+
   const updateHeatRowQty = (entryType: string, qty?: number) => {
+    let snapshot: HeatRow | null = null;
     setHeatRows((prev) =>
       prev.map((r) => {
         if (r.entryType !== entryType) return r;
@@ -562,9 +561,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
           next.emissions = undefined;
         }
 
+        snapshot = next;
         return next;
       })
     );
+    if (snapshot) reconcileHeatViaApi(snapshot);
   };
 
   const saveHeat = async () => {
@@ -607,29 +608,25 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
         emissions_output_unit: outputUnit,
       }));
       if (inserts.length > 0) {
-        const { error } = await (supabase as any).from(heatSteamTable).insert(inserts);
-        if (error) throw error;
+        await insertLegacyTableEntries(heatSteamTable, inserts);
       }
 
-      const updates = validRows.filter(r => r.dbId).map(r => (
-        (supabase as any)
-          .from(heatSteamTable)
-          .update({
-            entry_type: mapEntryTypeForDb(r.entryType),
-            unit: r.unit,
-            emission_factor: r.factor,
-            quantity: r.quantity!,
-            emissions: r.emissions!,
-            standard: heatSteamStandard,
-            emissions_output: convertEmissionNumeric(r.emissions, outputUnit),
-            emissions_output_unit: outputUnit,
-          })
-          .eq('id', r.dbId!)
-      ));
-      if (updates.length > 0) {
-        const results = await Promise.all(updates);
-        const updateError = (results as any[]).find(x => x.error)?.error;
-        if (updateError) throw updateError;
+      const rowsToUpdate = validRows.filter((r) => r.dbId);
+      if (rowsToUpdate.length > 0) {
+        await Promise.all(
+          rowsToUpdate.map((r) =>
+            updateLegacyTableEntry(heatSteamTable, r.dbId!, {
+              entry_type: mapEntryTypeForDb(r.entryType),
+              unit: r.unit,
+              emission_factor: r.factor,
+              quantity: r.quantity!,
+              emissions: r.emissions!,
+              standard: heatSteamStandard,
+              emissions_output: convertEmissionNumeric(r.emissions, outputUnit),
+              emissions_output_unit: outputUnit,
+            })
+          )
+        );
       }
 
       toast({ title: "Saved", description: "Heat & Steam saved." });
@@ -649,11 +646,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
     // If this row exists in the DB, delete it there as well.
     if (row.dbId) {
       try {
-        const { error } = await (supabase as any)
-          .from(heatSteamTable)
-          .delete()
-          .eq("id", row.dbId);
-        if (error) throw error;
+        await deleteLegacyTableEntry(heatSteamTable, row.dbId);
       } catch (e: any) {
         toast({
           title: "Error",
@@ -829,6 +822,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                       <Select
                         value={quantityUnit}
                         onValueChange={(value: "base" | "mmscf") => {
+                          let snapshot: HeatRow | null = null;
                           setHeatRows((prev) =>
                             prev.map((r) => {
                               if (r.entryType !== row.entryType) return r;
@@ -858,9 +852,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                               } else {
                                 next.emissions = undefined;
                               }
+                              snapshot = next;
                               return next;
                             })
                           );
+                          if (snapshot) reconcileHeatViaApi(snapshot);
                         }}
                       >
                         <SelectTrigger className="w-28">
@@ -923,6 +919,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                   <Select
                     value={gas}
                     onValueChange={(value: "co2" | "ch4" | "n2o") => {
+                      let snapshot: HeatRow | null = null;
                       setHeatRows((prev) =>
                         prev.map((r) => {
                           if (r.entryType !== row.entryType) return r;
@@ -946,9 +943,11 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
                           } else {
                             next.emissions = undefined;
                           }
+                          snapshot = next;
                           return next;
                         })
                       );
+                      if (snapshot) reconcileHeatViaApi(snapshot);
                     }}
                   >
                     <SelectTrigger>

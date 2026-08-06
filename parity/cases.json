@@ -1,0 +1,529 @@
+{
+  "_comment": "Parity cases: SPA spaMath computes frontend expected; API compare hits /api/v1/calc/*. Explicit-factor only (no DB sheet lookup) so both sides stay comparable offline. Never change formulas to pass.",
+  "uk_fuel": [
+    {
+      "id": "uk_qty10_factor_2_0627",
+      "quantity": 10,
+      "factor": 2.0627,
+      "expected_emissions_kg": 20.627
+    },
+    {
+      "id": "uk_qty1000_factor_0_18254",
+      "quantity": 1000,
+      "factor": 0.18254,
+      "expected_emissions_kg": 182.54
+    },
+    {
+      "id": "uk_round6_fractional",
+      "quantity": 3.141592,
+      "factor": 1.234567,
+      "expected_emissions_kg": 3.878506
+    }
+  ],
+  "epa_fuel": [
+    {
+      "id": "epa_co2_mmbtu",
+      "quantity": 100,
+      "factor": 53.06,
+      "unit": "CO2 (kg CO2 / mmBtu)",
+      "expected_emissions_kg": 5306.0
+    },
+    {
+      "id": "epa_ch4_g_per_mmbtu_div1000",
+      "quantity": 100,
+      "factor": 3.0,
+      "unit": "CH4 (g CH4 / mmBtu)",
+      "expected_emissions_kg": 0.3
+    },
+    {
+      "id": "epa_n2o_g_per_gallon_div1000",
+      "quantity": 50,
+      "factor": 0.2,
+      "unit": "N2O (g N2O / gallon)",
+      "expected_emissions_kg": 0.01
+    }
+  ],
+  "mobile_fuel": [
+    {
+      "id": "mobile_gallon",
+      "quantity": 10,
+      "factor": 8.78,
+      "input_unit": "gallon",
+      "expected_emissions_kg": 87.8
+    },
+    {
+      "id": "mobile_liter_to_gallon",
+      "quantity": 10,
+      "factor": 8.78,
+      "input_unit": "liter",
+      "expected_emissions_kg": 23.194317
+    }
+  ],
+  "on_road_gasoline": [
+    {
+      "id": "onroad_ch4_100mi",
+      "distance": 100,
+      "distance_unit": "mile",
+      "ch4_g_per_mile": 0.019,
+      "expected_emissions_kg": 0.0019
+    },
+    {
+      "id": "onroad_ch4_100km",
+      "distance": 100,
+      "distance_unit": "km",
+      "ch4_g_per_mile": 0.019,
+      "expected_emissions_kg": 0.0011806049
+    }
+  ],
+  "on_road_diesel": [
+    {
+      "id": "diesel_ch4_explicit",
+      "distance": 200,
+      "distance_unit": "mile",
+      "ch4_g_per_mile": 0.0051,
+      "expected_emissions_kg": 0.00102
+    }
+  ],
+  "non_road": [
+    {
+      "id": "nonroad_gallon_ch4",
+      "quantity": 10,
+      "unit": "gallon",
+      "ch4_g_per_gallon": 1.0,
+      "expected_emissions_kg": 0.01
+    },
+    {
+      "id": "nonroad_liter_ch4",
+      "quantity": 10,
+      "unit": "liter",
+      "ch4_g_per_gallon": 1.0,
+      "expected_emissions_kg": 0.0026417217685798895
+    }
+  ],
+  "heat_steam": [
+    {
+      "id": "heat_co2_mmbtu",
+      "quantity": 10,
+      "gas": "co2",
+      "co2_factor": 53.06,
+      "expected_emissions_kg": 530.6
+    },
+    {
+      "id": "heat_ch4_mmbtu",
+      "quantity": 10,
+      "gas": "ch4",
+      "ch4_factor": 1.0,
+      "expected_emissions_kg": 0.01
+    },
+    {
+      "id": "heat_mmscf_to_mmbtu",
+      "quantity": 1,
+      "quantity_unit": "mmscf",
+      "gas": "co2",
+      "co2_factor": 53.06,
+      "expected_emissions_kg": 55023.22
+    }
+  ],
+  "waste": [
+    {
+      "id": "waste_explicit",
+      "volume": 100,
+      "disposal_method": "Landfilled",
+      "factor": 0.05,
+      "expected_emissions_kg": 5.0
+    }
+  ],
+  "uk_passenger": [
+    {
+      "id": "passenger_explicit",
+      "distance": 50,
+      "factor": 0.17068,
+      "expected_emissions_kg": 8.534
+    }
+  ],
+  "uk_delivery": [
+    {
+      "id": "delivery_explicit",
+      "distance": 100,
+      "factor": 0.88246,
+      "expected_emissions_kg": 88.246
+    }
+  ],
+  "uk_refrigerant": [
+    {
+      "id": "refrig_explicit",
+      "quantity": 2.5,
+      "factor": 1430,
+      "expected_emissions_kg": 3575.0
+    }
+  ],
+  "electricity": [
+    {
+      "id": "elec_grid_only_uae",
+      "total_kwh": 10000,
+      "grid_pct": 100,
+      "grid_factor": 0.4041,
+      "expected_emissions_kg": 4041.0
+    },
+    {
+      "id": "elec_grid_50_pakistan",
+      "total_kwh": 1000,
+      "grid_pct": 50,
+      "grid_factor": 0.425,
+      "expected_emissions_kg": 212.5
+    },
+    {
+      "id": "elec_grid_plus_other",
+      "total_kwh": 1000,
+      "grid_pct": 80,
+      "grid_factor": 0.4041,
+      "other_pct": 20,
+      "other_row_emissions_sum": 0.5,
+      "expected_emissions_kg": 423.28
+    }
+  ],
+  "epa_refrigerant": [
+    {
+      "id": "epa_refrig_leakage_record",
+      "method": "leakage_record",
+      "gwp": 1430,
+      "leakage_kg": 2.5,
+      "expected_leakage_kg": 2.5,
+      "expected_emissions_kg": 3575.0
+    },
+    {
+      "id": "epa_refrig_estimated",
+      "method": "estimated_leakage",
+      "gwp": 3922,
+      "charge_kg": 10,
+      "leakage_rate_percent": 5,
+      "expected_leakage_kg": 0.5,
+      "expected_emissions_kg": 1961.0
+    }
+  ],
+  "freight": [
+    {
+      "id": "freight_basic",
+      "distance": 100,
+      "weight": 2.5,
+      "co2_factor": 0.12,
+      "expected_emissions_kg": 30.0
+    },
+    {
+      "id": "freight_long_haul",
+      "distance": 1250.5,
+      "weight": 18.75,
+      "co2_factor": 0.0621,
+      "expected_emissions_kg": 1456.0509375
+    }
+  ],
+  "business_travel": [
+    {
+      "id": "bt_km_factor",
+      "distance": 500,
+      "co2_factor": 0.15678,
+      "expected_emissions_kg": 78.39
+    },
+    {
+      "id": "bt_mile_factor_converted",
+      "distance": 100,
+      "co2_factor": 0.25,
+      "unit": "kg CO2 / mile",
+      "expected_emissions_kg": 15.534318416245169
+    }
+  ],
+  "employee_commuting": [
+    {
+      "id": "commute_km",
+      "employees": 40,
+      "distance": 12.5,
+      "co2_factor": 0.171,
+      "expected_emissions_kg": 85.5
+    },
+    {
+      "id": "commute_mile_factor",
+      "employees": 10,
+      "distance": 20,
+      "co2_factor": 0.32,
+      "unit": "kg CO2e / passenger-mile",
+      "expected_emissions_kg": 39.76785514558763
+    }
+  ],
+  "spend_based": [
+    {
+      "id": "spend_goods",
+      "amount": 25000,
+      "emission_factor": 0.00042,
+      "expected_emissions_kg": 10.5
+    }
+  ],
+  "sold_products_qty": [
+    {
+      "id": "sold_qty_round6",
+      "quantity": 3.141592,
+      "factor": 1.234567,
+      "expected_emissions_kg": 3.878506
+    }
+  ],
+  "ipcc_stationary": [
+    {
+      "id": "ipcc_stat_basic",
+      "quantity": 100,
+      "factor": 2.0627,
+      "expected_emissions_kg": 206.27
+    },
+    {
+      "id": "ipcc_stat_fractional",
+      "quantity": 37.5,
+      "factor": 1.234567,
+      "expected_emissions_kg": 46.2962625
+    }
+  ],
+  "ipcc_flaring": [
+    {
+      "id": "flare_m3_ch4_co2",
+      "volume": 1000,
+      "unit": "m3",
+      "composition": [
+        { "formula": "CH4", "percentage": 80 },
+        { "formula": "CO2", "percentage": 20 }
+      ],
+      "expected_emissions_kg": 15537.583239855045
+    },
+    {
+      "id": "flare_mmscf_mixed",
+      "volume": 0.5,
+      "unit": "MMSCF",
+      "composition": [
+        { "formula": "CH4", "percentage": 70 },
+        { "formula": "C2H6", "percentage": 15 },
+        { "formula": "C3H8", "percentage": 10 },
+        { "formula": "CO2", "percentage": 5 }
+      ],
+      "expected_emissions_kg": 211934.1214991876
+    },
+    {
+      "id": "flare_m3_with_inert",
+      "volume": 500,
+      "unit": "m3",
+      "composition": [
+        { "formula": "CH4", "percentage": 60 },
+        { "formula": "N2", "percentage": 30 },
+        { "formula": "CO2", "percentage": 10 }
+      ],
+      "expected_emissions_kg": 5780.151664297035
+    },
+    {
+      "id": "flare_m3_heavier",
+      "volume": 250,
+      "unit": "m3",
+      "composition": [
+        { "formula": "C4H10", "percentage": 25 },
+        { "formula": "C5H12", "percentage": 25 },
+        { "formula": "C6H14", "percentage": 25 },
+        { "formula": "CH4", "percentage": 25 }
+      ],
+      "expected_emissions_kg": 3468.960533905066
+    }
+  ],
+  "ipcc_venting": [
+    {
+      "id": "vent_m3_ch4_co2",
+      "volume": 1000,
+      "unit": "m3",
+      "composition": [
+        { "gas": "CH4", "percentage": 85 },
+        { "gas": "CO2", "percentage": 10 },
+        { "gas": "N2", "percentage": 5 }
+      ],
+      "expected_emissions_kg": 16299.692964427253
+    },
+    {
+      "id": "vent_mmscf_multi",
+      "volume": 0.25,
+      "unit": "MMSCF",
+      "composition": [
+        { "gas": "CH4", "percentage": 50 },
+        { "gas": "C2H6", "percentage": 20 },
+        { "gas": "C3H8", "percentage": 15 },
+        { "gas": "CO2", "percentage": 15 }
+      ],
+      "expected_emissions_kg": 84888.90221202202
+    },
+    {
+      "id": "vent_m3_all_alkanes",
+      "volume": 800,
+      "unit": "m3",
+      "composition": [
+        { "gas": "CH4", "percentage": 40 },
+        { "gas": "C2H6", "percentage": 20 },
+        { "gas": "C3H8", "percentage": 15 },
+        { "gas": "C4H10", "percentage": 10 },
+        { "gas": "C5H12", "percentage": 8 },
+        { "gas": "C6H14", "percentage": 7 }
+      ],
+      "expected_emissions_kg": 10233.042917279654
+    }
+  ],
+  "ipcc_vehicular": [
+    {
+      "id": "ipcc_veh_both",
+      "diesel_liters": 200,
+      "petrol_liters": 50,
+      "diesel_factor": 2.68,
+      "petrol_factor": 2.31,
+      "expected_emissions_kg": 651.5
+    },
+    {
+      "id": "ipcc_veh_diesel_only",
+      "diesel_liters": 500,
+      "petrol_liters": 0,
+      "diesel_factor": 2.7,
+      "petrol_factor": 2.32,
+      "expected_emissions_kg": 1350.0
+    }
+  ],
+  "ipcc_kitchen": [
+    {
+      "id": "ipcc_kitchen_lpg_ng",
+      "lpg_kg": 40,
+      "ng_mmscf": 0.5,
+      "ghv": 1000,
+      "lpg_factor": 1.51,
+      "natural_gas_co2": 0.0544,
+      "expected_emissions_kg": 87.6
+    },
+    {
+      "id": "ipcc_kitchen_lpg_only",
+      "lpg_kg": 120,
+      "ng_mmscf": 0,
+      "ghv": 1000,
+      "lpg_factor": 1.51,
+      "natural_gas_co2": 53.06,
+      "expected_emissions_kg": 181.2
+    }
+  ],
+  "ipcc_power": [
+    {
+      "id": "ipcc_power_mixed",
+      "diesel_liters": 100,
+      "ng_mmscf": 0.2,
+      "ghv": 1030,
+      "diesel_factor": 2.68,
+      "natural_gas_co2": 0.0544,
+      "expected_emissions_kg": 279.2064
+    },
+    {
+      "id": "ipcc_power_diesel_only",
+      "diesel_liters": 250,
+      "ng_mmscf": 0,
+      "ghv": 0,
+      "diesel_factor": 2.7,
+      "natural_gas_co2": 53.06,
+      "expected_emissions_kg": 675.0
+    }
+  ],
+  "ipcc_heating": [
+    {
+      "id": "ipcc_heat_ng",
+      "ng_mmscf": 1.25,
+      "ghv": 1037,
+      "natural_gas_co2": 0.0544,
+      "expected_emissions_kg": 70.516
+    },
+    {
+      "id": "ipcc_heat_default_factor",
+      "ng_mmscf": 2.0,
+      "ghv": 1037,
+      "natural_gas_co2": 53.06,
+      "expected_emissions_kg": 110046.44
+    }
+  ],
+  "ipcc_road": [
+    {
+      "id": "ipcc_road_basic",
+      "quantity": 500,
+      "factor": 0.192,
+      "expected_emissions_kg": 96.0
+    }
+  ],
+  "ipcc_road_vehicle": [
+    {
+      "id": "ipcc_rv_ch4",
+      "quantity": 1000,
+      "ch4_factor": 0.00005,
+      "n2o_factor": 0.00003,
+      "selected_factor": "CH4",
+      "expected_emissions_kg": 0.05
+    },
+    {
+      "id": "ipcc_rv_n2o",
+      "quantity": 1000,
+      "ch4_factor": 0.00005,
+      "n2o_factor": 0.00003,
+      "selected_factor": "NO2",
+      "expected_emissions_kg": 0.03
+    }
+  ],
+  "ipcc_usa_vehicles": [
+    {
+      "id": "ipcc_usa_basic",
+      "quantity": 250,
+      "factor": 8.78,
+      "expected_emissions_kg": 2195.0
+    },
+    {
+      "id": "ipcc_usa_fractional",
+      "quantity": 42.5,
+      "factor": 10.21,
+      "expected_emissions_kg": 433.925
+    }
+  ],
+  "ipcc_alt_fuel": [
+    {
+      "id": "ipcc_alt_ch4",
+      "quantity": 1000,
+      "ch4_factor": 0.00012,
+      "n2o_factor": 0.00008,
+      "selected_factor": "CH4",
+      "expected_emissions_kg": 0.12
+    },
+    {
+      "id": "ipcc_alt_n2o",
+      "quantity": 1000,
+      "ch4_factor": 0.00012,
+      "n2o_factor": 0.00008,
+      "selected_factor": "N2O",
+      "expected_emissions_kg": 0.08
+    }
+  ],
+  "ipcc_industry": [
+    {
+      "id": "ipcc_ind_co2",
+      "quantity": 10,
+      "ef_co2": 94.6,
+      "ef_ch4": 1.0,
+      "ef_n2o": 0.1,
+      "selected_factor": "CO2",
+      "expected_emissions_kg": 946.0
+    },
+    {
+      "id": "ipcc_ind_ch4",
+      "quantity": 10,
+      "ef_co2": 94.6,
+      "ef_ch4": 1.0,
+      "ef_n2o": 0.1,
+      "selected_factor": "CH4",
+      "expected_emissions_kg": 10.0
+    },
+    {
+      "id": "ipcc_ind_n2o",
+      "quantity": 10,
+      "ef_co2": 94.6,
+      "ef_ch4": 1.0,
+      "ef_n2o": 0.1,
+      "selected_factor": "N2O",
+      "expected_emissions_kg": 1.0
+    }
+  ]
+}

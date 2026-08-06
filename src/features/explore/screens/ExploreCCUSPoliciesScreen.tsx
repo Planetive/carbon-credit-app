@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -233,15 +234,33 @@ const ExploreCCUSPoliciesScreen = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [{ data: policiesData, error: policiesError }, { data: strategiesData, error: strategiesError }] = await Promise.all([
-        supabase.from("ccus_policies").select("*"),
-        supabase.from("ccus_management_strategies").select("*")
+      const [apiPolicies, apiStrategies] = await Promise.all([
+        tryLoadCatalogViaApi("ccus-policies"),
+        tryLoadCatalogViaApi("ccus-management-strategies"),
       ]);
-      if (!policiesError && policiesData) {
-        setPolicies(policiesData);
+
+      if (apiPolicies) {
+        setPolicies(apiPolicies);
+      } else {
+        const { data: policiesData, error: policiesError } = await supabase
+          .from("ccus_policies")
+          .select("*");
+        if (!policiesError && policiesData) {
+          setPolicies(policiesData);
+        }
       }
-      if (!strategiesError && strategiesData) {
-        setManagementStrategies(strategiesData);
+
+      if (apiStrategies) {
+        setManagementStrategies(
+          apiStrategies as Database["public"]["Tables"]["ccus_management_strategies"]["Row"][]
+        );
+      } else {
+        const { data: strategiesData, error: strategiesError } = await supabase
+          .from("ccus_management_strategies")
+          .select("*");
+        if (!strategiesError && strategiesData) {
+          setManagementStrategies(strategiesData);
+        }
       }
       setLoading(false);
     };

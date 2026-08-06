@@ -14,6 +14,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { createOrganizationApi } from "@/api/organizations";
+import { patchMyProfile } from "@/api/profile";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -27,6 +30,7 @@ const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const { signUp, useJwtAuth } = useAuth();
   
   // Get user_type from query params, default to 'corporate'
   const userType = searchParams.get('user_type') || 'corporate';
@@ -45,10 +49,11 @@ const Register = () => {
       });
       return;
     }
-    if (formData.password.length < 6) {
+    const minPasswordLength = useJwtAuth ? 8 : 6;
+    if (formData.password.length < minPasswordLength) {
       toast({
         title: "Password too short",
-        description: "Password must be at least 6 characters.",
+        description: `Password must be at least ${minPasswordLength} characters.`,
         variant: "destructive",
       });
       return;
@@ -62,6 +67,54 @@ const Register = () => {
       return;
     }
     setLoading(true);
+
+    // JWT / Railway path — signup creates profile; then set user_type + default org
+    if (useJwtAuth) {
+      try {
+        const displayName = formData.email.split("@")[0];
+        const { error } = await signUp(formData.email, formData.password, displayName);
+        if (error) {
+          setLoading(false);
+          toast({
+            title: "Error creating account",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        try {
+          await patchMyProfile({ user_type: userType });
+          const org = await createOrganizationApi({
+            name: "My Organization",
+            description: null,
+            parent_organization_id: null,
+            is_original: true,
+          });
+          if (org?.id) {
+            await patchMyProfile({ current_organization_id: org.id });
+          }
+        } catch (setupErr) {
+          console.error("Post-signup profile/org setup failed:", setupErr);
+          // Account exists; user can finish org setup from dashboard
+        }
+
+        setLoading(false);
+        toast({
+          title: "Account created!",
+          description: "You are signed in. Complete your organization setup next.",
+        });
+        navigate("/dashboard");
+      } catch (error: any) {
+        setLoading(false);
+        toast({
+          title: "Error",
+          description: error.message || "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     
     try {
       // Step 1: Sign up the user

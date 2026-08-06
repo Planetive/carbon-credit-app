@@ -7,6 +7,8 @@ import AppHeader from "@/components/layout/AppHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMyProfileDual } from "@/api/profileDualRead";
+import { tryLoadCatalogViaApi } from "@/api/catalogDualRead";
 
 interface CCUSProject {
   id: number;
@@ -40,16 +42,8 @@ const FilteredCCUSProjects = () => {
   useEffect(() => {
     const fetchDisplayName = async () => {
       if (!user) return;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", user.id)
-        .single();
-      if (data && data.display_name) {
-        setDisplayName(data.display_name);
-      } else {
-        setDisplayName("");
-      }
+      const data = await fetchMyProfileDual(user.id);
+      setDisplayName(data?.display_name || "");
     };
     fetchDisplayName();
   }, [user]);
@@ -66,6 +60,19 @@ const FilteredCCUSProjects = () => {
       setError(null);
 
       try {
+        const apiRows = await tryLoadCatalogViaApi("ccus");
+        if (apiRows) {
+          let filtered = apiRows as unknown as CCUSProject[];
+          if (type && type.trim()) {
+            filtered = filtered.filter(
+              (p) => String(p["Project type"] ?? "") === type
+            );
+          }
+          setProjects(filtered);
+          setLoading(false);
+          return;
+        }
+
         let query = supabase
           .from("ccus_projects")
           .select("*");
@@ -80,19 +87,16 @@ const FilteredCCUSProjects = () => {
         if (error) {
           throw error;
         }
-
-        setProjects(data || []);
-      } catch (err) {
-        // console.error("Error fetching CCUS projects:", err);
-        setError("Failed to load projects");
+        setProjects((data || []) as CCUSProject[]);
+      } catch (err: any) {
+        setError(err.message || String(err));
         setProjects([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchProjects();
-  }, [type]);
+  }, [type, areaOfInterest, goal]);
 
   const formatCapacity = (capacity: string | number) => {
     if (!capacity) return "N/A";

@@ -1,7 +1,26 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isJwtAuthEnabled } from "@/api/config";
+import { listCountryEmissions } from "@/api/catalog";
 import type { CountryEmissionRecord } from "./types";
 
 export async function fetchAllCountryEmissions(pageSize = 1000): Promise<CountryEmissionRecord[]> {
+  if (isJwtAuthEnabled()) {
+    const allRows: CountryEmissionRecord[] = [];
+    let offset = 0;
+    const maxPages = 200;
+    for (let page = 0; page < maxPages; page += 1) {
+      const chunk = (await listCountryEmissions({
+        limit: pageSize,
+        offset,
+      })) as CountryEmissionRecord[];
+      if (!chunk.length) break;
+      allRows.push(...chunk);
+      if (chunk.length < pageSize) break;
+      offset += pageSize;
+    }
+    return allRows;
+  }
+
   let from = 0;
   const allRows: CountryEmissionRecord[] = [];
   let previousPageSignature = "";
