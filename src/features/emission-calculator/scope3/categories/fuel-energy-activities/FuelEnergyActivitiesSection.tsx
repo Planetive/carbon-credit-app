@@ -105,7 +105,8 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
     };
 
     loadFuelEnergy();
-  }, [user, companyContext, counterpartyId, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [user, companyContext, counterpartyId]);
 
   // Sync to emissionData
   useEmissionSync({

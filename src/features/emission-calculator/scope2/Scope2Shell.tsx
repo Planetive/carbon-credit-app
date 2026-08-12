@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,8 @@ interface Scope2ShellProps { onTotalChange?: (total: number) => void }
 const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const onTotalChangeRef = useRef(onTotalChange);
+  onTotalChangeRef.current = onTotalChange;
 
   const [mainId, setMainId] = useState<string | null>(null);
   const [totalKwh, setTotalKwh] = useState<number | undefined>();
@@ -244,7 +246,8 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
       }
     };
     load();
-  }, [user, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [user]);
 
   const updateOtherRow = (id: string, patch: Partial<OtherSourceRow>) => {
     setOtherRows(prev => prev.map(r => {
@@ -397,8 +400,8 @@ const Scope2Shell: React.FC<Scope2ShellProps> = ({ onTotalChange }) => {
   const totalScope2 = useMemo(() => Number((computedElectricityEmissions + totalHeatEmissions).toFixed(6)), [computedElectricityEmissions, totalHeatEmissions]);
 
   useEffect(() => {
-    if (onTotalChange) onTotalChange(totalScope2);
-  }, [onTotalChange, totalScope2]);
+    onTotalChangeRef.current?.(totalScope2);
+  }, [totalScope2]);
 
   const updateHeatRowQty = (entryType: string, qty?: number) => {
     setHeatRows(prev => prev.map(r => {

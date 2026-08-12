@@ -106,9 +106,43 @@ function activityToLegacyRow(activity: EmissionActivity): Record<string, unknown
     ...raw,
     id: activity.id,
     legacy_id: legacyRowId,
+    legacy_source: activity.legacy_source,
     user_id: activity.user_id,
     counterparty_id: activity.counterparty_id ?? raw.counterparty_id ?? null,
+    // Prefer raw values; fall back to activity columns when calc/API omit them in raw.
+    quantity: raw.quantity ?? activity.quantity ?? null,
+    unit: raw.unit ?? activity.unit ?? null,
+    emissions:
+      raw.emissions ??
+      raw.emissions_tco2e ??
+      activity.emissions_tco2e ??
+      null,
   };
+}
+
+function activityMatchesLegacyTable(
+  activity: EmissionActivity,
+  tableName: string
+): boolean {
+  if (activity.legacy_source === tableName) return true;
+  const rawTable = activity.raw?._legacy_table;
+  if (rawTable != null && String(rawTable) === tableName) return true;
+  // Missing legacy_source: keep (legacy API). Explicit "api" from calc-persist
+  // is not a table-backed row — exclude unless raw still identifies the table.
+  if (!activity.legacy_source) return true;
+  if (activity.legacy_source === "api" && activity.raw) {
+    const raw = activity.raw;
+    if (tableName.includes("heatsteam") || tableName.includes("heat_steam")) {
+      if (tableName.startsWith("scope1_") && raw.fuel_type_group != null) return true;
+      if (tableName.startsWith("scope2_") && (raw.entry_type != null || raw.emission_factor != null)) {
+        const std = String(raw.standard ?? "");
+        const isEpaTable = tableName.includes("_epa");
+        if (isEpaTable) return std === "EBT" || std === "";
+        return std === "UK" || std === "";
+      }
+    }
+  }
+  return false;
 }
 
 function legacyPayloadToActivityFields(
@@ -191,7 +225,7 @@ export async function listLegacyTableEntries(
     });
     // Defense: some API builds ignore legacy_source query filtering.
     const rows = activities
-      .filter((a) => !a.legacy_source || a.legacy_source === tableName)
+      .filter((a) => activityMatchesLegacyTable(a, tableName))
       .map(activityToLegacyRow)
       .filter((row) => matchesFilters(row, filters));
     return sortRows(rows, filters.order);
@@ -277,6 +311,43 @@ export async function deleteLegacyTableEntry(tableName: string, id: string): Pro
 
   const { error } = await (supabase as any).from(tableName).delete().eq("id", id);
   if (error) throw error;
+}
+
+/** True when writes succeeded but the follow-up list came back empty (API filter quirks). */
+export function shouldKeepLocalRowsAfterReload(
+  reloadedCount: number,
+  wroteSomething: boolean
+): boolean {
+  return Boolean(wroteSomething) && reloadedCount === 0;
+}
+
+/** Assign insert ids onto newly created local rows.
+ * Prefer `savedNewRows` (the exact rows inserted, in insert order) so draft blanks are skipped.
+ */
+export function assignCreatedIdsToNewRows<T extends { id?: string; isExisting?: boolean; dbId?: string }>(
+  rows: T[],
+  created: { id: string }[],
+  savedNewRows?: T[]
+): T[] {
+  if (savedNewRows && savedNewRows.length > 0) {
+    const idToDb = new Map<string, string>();
+    savedNewRows.forEach((r, i) => {
+      if (i < created.length && r.id != null) idToDb.set(String(r.id), created[i].id);
+    });
+    return rows.map((r) => {
+      const dbId = r.id != null ? idToDb.get(String(r.id)) : undefined;
+      if (!dbId) return r;
+      return { ...r, dbId, isExisting: true as const };
+    });
+  }
+  let i = 0;
+  return rows.map((r) => {
+    if (r.isExisting && r.dbId) return { ...r, isExisting: true as const };
+    if (!r.isExisting && i < created.length) {
+      return { ...r, dbId: created[i++].id, isExisting: true as const };
+    }
+    return r;
+  });
 }
 
 /** List filters for personal vs company-scoped legacy rows. */

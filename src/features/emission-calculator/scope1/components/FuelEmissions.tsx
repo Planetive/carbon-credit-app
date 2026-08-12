@@ -8,10 +8,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  assignCreatedIdsToNewRows,
   companyScopedListFilters,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
+  shouldKeepLocalRowsAfterReload,
   updateLegacyTableEntry,
 } from "@/integrations/supabase/ghgEntryClient";
 import {
@@ -58,6 +60,12 @@ type UkFactorsMap = Record<string, Record<string, Record<string, UkFactorCell>>>
 /** Nested fuel map from EPA Supabase tables (Fuel EPA 1/2/3). */
 type EpaFuelFactorsMap = Record<string, Record<string, Record<string, number>>>;
 
+/** Session cache so Fuel ↔ Heat & Steam switches don't re-fetch / re-parse EPA sheets. */
+let epaFuelFactorsCache: EpaFuelFactorsMap | null = null;
+let epaFuelFactorsInflight: Promise<EpaFuelFactorsMap | null> | null = null;
+let ukFuelFactorsCache: UkFactorsMap | null = null;
+let ukFuelFactorsInflight: Promise<UkFactorsMap | null> | null = null;
+
 /** Order matches UK conversion tables: total, then CO2 / CH4 / N2O components (all per activity unit). */
 const UK_BASIS_ORDER: UkFactorBasis[] = ["total", "co2", "ch4", "n2o"];
 
@@ -85,6 +93,255 @@ function ukFactorBasisFromDb(raw: unknown): UkFactorBasis | undefined {
   return undefined;
 }
 
+function asOptionalString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  return String(value);
+}
+
+function asOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+  return undefined;
+}
+
+/** Map a legacy table / emission_activities row into a FuelRow for the form. */
+function legacyEntryToFuelRow(entry: Record<string, unknown>): FuelRow {
+  return {
+    id: crypto.randomUUID(),
+    dbId: entry.id != null ? String(entry.id) : undefined,
+    type: (entry.fuel_type_group as FuelType | undefined) ?? undefined,
+    fuel: asOptionalString(entry.fuel),
+    unit: asOptionalString(entry.unit),
+    quantity: asOptionalNumber(entry.quantity),
+    factor: asOptionalNumber(entry.factor),
+    emissions: asOptionalNumber(entry.emissions),
+    ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
+    isExisting: true,
+  };
+}
+
+function parseFactorNumber(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (value == null) return undefined;
+  const cleaned = String(value).replace(/,/g, "");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function buildEpaFuelFactorsMap(allRows: Record<string, unknown>[]): EpaFuelFactorsMap {
+  const map: EpaFuelFactorsMap = {};
+
+  for (const row of allRows) {
+    const category = String(
+      row.Category ?? row.category ?? row["Fuel Category"] ?? row.fuel_category ?? ""
+    ).trim();
+    const fuel = String(
+      row["Fuel Type"] ?? row.Fuel ?? row.fuel_type ?? row.fuel ?? ""
+    ).trim();
+    if (!category || !fuel) continue;
+
+    const hhv = parseFactorNumber(
+      row["Heat Content (HHV)"] ??
+        row["Heat Content"] ??
+        row.HeatContent ??
+        row.heat_content_hhv ??
+        row.hhv
+    );
+    const hhvUnitRaw =
+      row["HHV Unit"] ?? row["HIV Unit"] ?? row.hhv_unit ?? row.hiv_unit ?? row.heat_content_unit;
+    const hhvUnit = typeof hhvUnitRaw === "string" ? hhvUnitRaw.toLowerCase() : "";
+    const isScfBasedHHV = hhv != null && hhvUnit.includes("scf");
+
+    const co2Unit = String(row["CO2 Unit"] ?? "").toLowerCase();
+    const ch4Unit = String(row["CH4 Unit"] ?? "").toLowerCase();
+    const n2oUnitFirst = String(row["N20 Unit"] ?? row["N2O Unit"] ?? "").toLowerCase();
+    const useFirstSetMmbtu = co2Unit.includes("mmbtu");
+
+    const co2PerMmbtu = useFirstSetMmbtu ? parseFactorNumber(row["CO2 Factor"]) : undefined;
+    const ch4PerMmbtu = ch4Unit.includes("mmbtu") ? parseFactorNumber(row["CH4 Factor"]) : undefined;
+    const n2oPerMmbtu = n2oUnitFirst.includes("mmbtu") ? parseFactorNumber(row["N2O Factor"]) : undefined;
+
+    const co2Unit1 = String(row["CO2 Unit_1"] ?? "").toLowerCase();
+    const ch4Unit1 = String(row["CH4 Unit_1"] ?? "").toLowerCase();
+    const n2oUnit1 = String(row["N2O Unit_1"] ?? row["N2O Unit"] ?? "").toLowerCase();
+    const co2Factor1 = parseFactorNumber(row["CO2 Factor_1"]);
+    const ch4Factor1 = parseFactorNumber(row["CH4 Factor_1"]);
+    const n2oFactor1 = parseFactorNumber(row["N2O Factor_1"]);
+
+    if (!map[category]) map[category] = {};
+    if (!map[category][fuel]) map[category][fuel] = {};
+    const fuelMap = map[category][fuel];
+
+    if (co2PerMmbtu !== undefined) {
+      fuelMap["CO2 (kg CO2 / mmBtu)"] = co2PerMmbtu;
+      if (isScfBasedHHV) fuelMap["CO2 (kg CO2 / MMSCF)"] = co2PerMmbtu * hhv! * 1_000_000;
+    }
+    if (ch4PerMmbtu !== undefined) {
+      fuelMap["CH4 (g CH4 / mmBtu)"] = ch4PerMmbtu;
+      if (isScfBasedHHV) fuelMap["CH4 (g CH4 / MMSCF)"] = ch4PerMmbtu * hhv! * 1_000_000;
+    }
+    if (n2oPerMmbtu !== undefined) {
+      fuelMap["N2O (g N2O / mmBtu)"] = n2oPerMmbtu;
+      if (isScfBasedHHV) fuelMap["N2O (g N2O / MMSCF)"] = n2oPerMmbtu * hhv! * 1_000_000;
+    }
+
+    if (co2Unit1.includes("short ton") && co2Factor1 !== undefined) {
+      fuelMap["CO2 (kg CO2 / short ton)"] = co2Factor1;
+    }
+    if (ch4Unit1.includes("short ton") && ch4Factor1 !== undefined) {
+      fuelMap["CH4 (g CH4 / short ton)"] = ch4Factor1;
+    }
+    if (n2oUnit1.includes("short ton") && n2oFactor1 !== undefined) {
+      fuelMap["N2O (g N2O / short ton)"] = n2oFactor1;
+    }
+
+    if (co2Unit1.includes("scf") && co2Factor1 !== undefined && fuelMap["CO2 (kg CO2 / MMSCF)"] == null) {
+      fuelMap["CO2 (kg CO2 / MMSCF)"] = co2Factor1 * 1_000_000;
+    }
+    if (ch4Unit1.includes("scf") && ch4Factor1 !== undefined && fuelMap["CH4 (g CH4 / MMSCF)"] == null) {
+      fuelMap["CH4 (g CH4 / MMSCF)"] = ch4Factor1 * 1_000_000;
+    }
+    if (n2oUnit1.includes("scf") && n2oFactor1 !== undefined && fuelMap["N2O (g N2O / MMSCF)"] == null) {
+      fuelMap["N2O (g N2O / MMSCF)"] = n2oFactor1 * 1_000_000;
+    }
+
+    if (co2Unit1.includes("gallon") && co2Factor1 !== undefined) {
+      fuelMap["CO2 (kg CO2 / gallon)"] = co2Factor1;
+    }
+    if (ch4Unit1.includes("gallon") && ch4Factor1 !== undefined) {
+      fuelMap["CH4 (g CH4 / gallon)"] = ch4Factor1;
+    }
+    if (n2oUnit1.includes("gallon") && n2oFactor1 !== undefined) {
+      fuelMap["N2O (g N2O / gallon)"] = n2oFactor1;
+    }
+  }
+
+  return map;
+}
+
+async function ensureEpaFuelFactors(): Promise<EpaFuelFactorsMap | null> {
+  if (epaFuelFactorsCache) return epaFuelFactorsCache;
+  if (epaFuelFactorsInflight) return epaFuelFactorsInflight;
+
+  epaFuelFactorsInflight = (async () => {
+    try {
+      let allRows: Record<string, unknown>[] = [];
+      const apiRows = await tryLoadFactorSheetsViaApi([
+        { datasetCodes: ["fuel_epa_1", "fuel_epa1"], nameHints: ["Fuel EPA 1", "Fuel EPA"] },
+        { datasetCodes: ["fuel_epa_2", "fuel_epa2"], nameHints: ["Fuel EPA 2"] },
+        { datasetCodes: ["fuel_epa_3", "fuel_epa3"], nameHints: ["Fuel EPA 3"] },
+      ]);
+      if (apiRows && apiRows.length > 0) {
+        allRows = apiRows;
+      } else {
+        for (const table of ["Fuel EPA 1", "Fuel EPA 2", "Fuel EPA 3"]) {
+          const { data, error } = await supabase.from(table as any).select("*");
+          if (error) {
+            console.error(`Error loading ${table} factors:`, error);
+            continue;
+          }
+          if (data?.length) {
+            allRows.push(...(Array.isArray(data) ? (data as any[]) : []));
+          }
+        }
+      }
+      if (allRows.length === 0) {
+        console.warn("Fuel EPA 1/2/3 tables returned no rows");
+        return null;
+      }
+      const map = buildEpaFuelFactorsMap(allRows);
+      if (Object.keys(map).length === 0) return null;
+      epaFuelFactorsCache = map;
+      return map;
+    } finally {
+      epaFuelFactorsInflight = null;
+    }
+  })();
+
+  return epaFuelFactorsInflight;
+}
+
+async function ensureUkFuelFactors(): Promise<UkFactorsMap> {
+  if (ukFuelFactorsCache && Object.keys(ukFuelFactorsCache).length > 0) {
+    return ukFuelFactorsCache;
+  }
+  if (ukFuelFactorsInflight) return ukFuelFactorsInflight;
+
+  ukFuelFactorsInflight = (async () => {
+    try {
+      let data: any[] | null = null;
+      let error: any = null;
+
+      const apiRows = await tryLoadFactorSheetViaApi({
+        datasetCodes: ["uk_fuel_factors"],
+        nameHints: ["UK_Fuel", "uk fuel"],
+      });
+      if (apiRows && apiRows.length > 0) {
+        data = apiRows;
+      } else {
+        const primary = await (supabase as any).from("UK_Fuel_Factors").select("*");
+        if (!primary.error && primary.data?.length) {
+          data = primary.data;
+        } else {
+          const fallback = await (supabase as any).from("uk_fuel_factors").select("*");
+          if (!fallback.error && fallback.data?.length) {
+            data = fallback.data;
+          } else {
+            error = primary.error || fallback.error;
+          }
+        }
+      }
+      if (error) throw error;
+
+      const tableRows = data ?? [];
+      const map: UkFactorsMap = {};
+      for (const row of tableRows as any[]) {
+        const activity = String(row.Activity ?? row.activity ?? "").trim();
+        const fuel = String(row.Fuel ?? row.fuel ?? "").trim();
+        const unit = String(row.Unit ?? row.unit ?? "").trim();
+        if (!activity || !fuel || !unit) continue;
+
+        const total = parseFactorNumber(
+          row["kg CO2e"] ?? row.kg_co2e ?? row.kgCO2e ?? row["Kg CO2e"]
+        );
+        const co2 = parseFactorNumber(
+          row["kg CO2e of CO2 per unit"] ??
+            row.kg_co2e_of_co2_per_unit ??
+            row["kg_co2e_of_co2_per_unit"]
+        );
+        const ch4 = parseFactorNumber(
+          row["kg CO2e of CH4 per unit"] ??
+            row.kg_co2e_of_ch4_per_unit ??
+            row["kg_co2e_of_ch4_per_unit"]
+        );
+        const n2o = parseFactorNumber(
+          row["kg CO2e of N2O per unit"] ??
+            row.kg_co2e_of_n2o_per_unit ??
+            row["kg_co2e_of_n2o_per_unit"]
+        );
+
+        if (!map[activity]) map[activity] = {};
+        if (!map[activity][fuel]) map[activity][fuel] = {};
+        const prev = map[activity][fuel][unit] || {};
+        map[activity][fuel][unit] = {
+          ...prev,
+          ...(total !== undefined ? { total } : {}),
+          ...(co2 !== undefined ? { co2 } : {}),
+          ...(ch4 !== undefined ? { ch4 } : {}),
+          ...(n2o !== undefined ? { n2o } : {}),
+        };
+      }
+
+      ukFuelFactorsCache = map;
+      return map;
+    } finally {
+      ukFuelFactorsInflight = null;
+    }
+  })();
+
+  return ukFuelFactorsInflight;
+}
+
 const fuelRowFingerprint = (row: Pick<FuelRow, "type" | "fuel" | "unit" | "quantity" | "dbId">) =>
   `${row.dbId ?? ""}|${row.type ?? ""}|${row.fuel ?? ""}|${row.unit ?? ""}|${row.quantity ?? ""}`;
 
@@ -107,10 +364,21 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   const [saving, setSaving] = useState(false);
   const [deletingRows, setDeletingRows] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [fuelFactors, setFuelFactors] = useState<EpaFuelFactorsMap | null>(null);
-  const [ukFactorsMap, setUkFactorsMap] = useState<UkFactorsMap>({});
+  const [fuelFactors, setFuelFactors] = useState<EpaFuelFactorsMap | null>(
+    () => (factorMode === "epa" ? epaFuelFactorsCache : null)
+  );
+  const [ukFactorsMap, setUkFactorsMap] = useState<UkFactorsMap>(
+    () => (factorMode === "uk_supabase" && ukFuelFactorsCache ? ukFuelFactorsCache : {})
+  );
   /** UK mode only: false until Supabase UK reference fetch finishes (success or error). */
-  const [ukReferenceReady, setUkReferenceReady] = useState(factorMode !== "uk_supabase");
+  const [ukReferenceReady, setUkReferenceReady] = useState(
+    () =>
+      factorMode !== "uk_supabase" ||
+      (ukFuelFactorsCache != null && Object.keys(ukFuelFactorsCache).length > 0)
+  );
+  const [epaFactorsReady, setEpaFactorsReady] = useState(
+    () => factorMode !== "epa" || epaFuelFactorsCache != null
+  );
   const [outputUnit, setOutputUnit] = useState<OutputUnit>("kg");
   const [initialOutputUnit, setInitialOutputUnit] = useState<OutputUnit>("kg");
   const hasRestoredDraftRef = useRef(false);
@@ -258,253 +526,65 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     return Number(converted.toFixed(6));
   };
 
-  // Load fuel factor reference data:
-  // - uk_supabase: public.UK_Fuel_Factors (Activity, Fuel, Unit, kg CO2e columns)
-  // - epa: "Fuel EPA 1" / "Fuel EPA 2" / "Fuel EPA 3"
+  // Load fuel factor reference data (cached across Fuel ↔ Heat & Steam mounts).
   useEffect(() => {
+    let cancelled = false;
+
     if (factorMode === "uk_supabase") {
       setFuelFactors(null);
+      if (ukFuelFactorsCache && Object.keys(ukFuelFactorsCache).length > 0) {
+        setUkFactorsMap(ukFuelFactorsCache);
+        setUkReferenceReady(true);
+        return;
+      }
       setUkReferenceReady(false);
-      const loadUk = async () => {
+      void (async () => {
         try {
-          let data: any[] | null = null;
-          let error: any = null;
-
-          const apiRows = await tryLoadFactorSheetViaApi({
-            datasetCodes: ["uk_fuel_factors"],
-            nameHints: ["UK_Fuel", "uk fuel"],
-          });
-          if (apiRows && apiRows.length > 0) {
-            data = apiRows;
-          } else {
-            const primary = await (supabase as any).from("UK_Fuel_Factors").select("*");
-            if (!primary.error && primary.data?.length) {
-              data = primary.data;
-            } else {
-              const fallback = await (supabase as any).from("uk_fuel_factors").select("*");
-              if (!fallback.error && fallback.data?.length) {
-                data = fallback.data;
-              } else {
-                error = primary.error || fallback.error;
-              }
-            }
-          }
-          if (error) {
-            console.error("Error loading UK_Fuel_Factors:", error);
+          const map = await ensureUkFuelFactors();
+          if (cancelled) return;
+          setUkFactorsMap(map);
+        } catch (err: any) {
+          console.error("Unexpected error loading UK_Fuel_Factors:", err);
+          if (!cancelled) {
             toast({
               title: "UK fuel factors",
-              description: error.message || "Could not load UK_Fuel_Factors.",
+              description: err?.message || "Could not load UK_Fuel_Factors.",
               variant: "destructive",
             });
             setUkFactorsMap({});
-            return;
           }
-          const tableRows = data ?? [];
-          if (tableRows.length === 0) {
-            console.warn("UK_Fuel_Factors returned no rows");
-            setUkFactorsMap({});
-            return;
-          }
-
-          const map: UkFactorsMap = {};
-          for (const row of tableRows as any[]) {
-            const activity = String(row.Activity ?? row.activity ?? "").trim();
-            const fuel = String(row.Fuel ?? row.fuel ?? "").trim();
-            const unit = String(row.Unit ?? row.unit ?? "").trim();
-            if (!activity || !fuel || !unit) continue;
-
-            const total = parseNumber(
-              row["kg CO2e"] ?? row.kg_co2e ?? row.kgCO2e ?? row["Kg CO2e"]
-            );
-            const co2 = parseNumber(
-              row["kg CO2e of CO2 per unit"] ??
-                row.kg_co2e_of_co2_per_unit ??
-                row["kg_co2e_of_co2_per_unit"]
-            );
-            const ch4 = parseNumber(
-              row["kg CO2e of CH4 per unit"] ??
-                row.kg_co2e_of_ch4_per_unit ??
-                row["kg_co2e_of_ch4_per_unit"]
-            );
-            const n2o = parseNumber(
-              row["kg CO2e of N2O per unit"] ??
-                row.kg_co2e_of_n2o_per_unit ??
-                row["kg_co2e_of_n2o_per_unit"]
-            );
-
-            if (!map[activity]) map[activity] = {};
-            if (!map[activity][fuel]) map[activity][fuel] = {};
-            const prev = map[activity][fuel][unit] || {};
-            map[activity][fuel][unit] = {
-              ...prev,
-              ...(total !== undefined ? { total } : {}),
-              ...(co2 !== undefined ? { co2 } : {}),
-              ...(ch4 !== undefined ? { ch4 } : {}),
-              ...(n2o !== undefined ? { n2o } : {}),
-            };
-          }
-
-          if (Object.keys(map).length === 0) {
-            console.warn("UK_Fuel_Factors had no parseable rows");
-            setUkFactorsMap({});
-            return;
-          }
-
-          setUkFactorsMap(map);
-        } catch (err) {
-          console.error("Unexpected error loading UK_Fuel_Factors:", err);
-          setUkFactorsMap({});
         } finally {
-          setUkReferenceReady(true);
+          if (!cancelled) setUkReferenceReady(true);
         }
+      })();
+      return () => {
+        cancelled = true;
       };
-      void loadUk();
-      return;
     }
 
     setUkFactorsMap({});
     setUkReferenceReady(true);
-    const loadFuelFactors = async () => {
+    if (epaFuelFactorsCache) {
+      setFuelFactors(epaFuelFactorsCache);
+      setEpaFactorsReady(true);
+      return;
+    }
+    setEpaFactorsReady(false);
+    void (async () => {
       try {
-        const tableNames = ["Fuel EPA 1", "Fuel EPA 2", "Fuel EPA 3"];
-        let allRows: any[] = [];
-
-        const apiRows = await tryLoadFactorSheetsViaApi([
-          { datasetCodes: ["fuel_epa_1", "fuel_epa1"], nameHints: ["Fuel EPA 1", "Fuel EPA"] },
-          { datasetCodes: ["fuel_epa_2", "fuel_epa2"], nameHints: ["Fuel EPA 2"] },
-          { datasetCodes: ["fuel_epa_3", "fuel_epa3"], nameHints: ["Fuel EPA 3"] },
-        ]);
-        if (apiRows && apiRows.length > 0) {
-          allRows = apiRows;
-        } else {
-          for (const table of tableNames) {
-            const { data, error } = await supabase.from(table as any).select("*");
-            if (error) {
-              console.error(`Error loading ${table} factors:`, error);
-              continue;
-            }
-            if (data && data.length > 0) {
-              allRows.push(...data);
-            }
-          }
-        }
-
-        if (allRows.length === 0) {
-          console.warn("Fuel EPA 1/2/3 tables returned no rows");
-          return;
-        }
-
-        const map: EpaFuelFactorsMap = {};
-
-        allRows.forEach((row: any) => {
-          const category: string | undefined =
-            row.Category ?? row.category ?? row["Fuel Category"] ?? row.fuel_category;
-          const fuel: string | undefined =
-            row["Fuel Type"] ?? row.Fuel ?? row.fuel_type ?? row.fuel;
-          if (!category || !fuel) return;
-
-          // Heat content and unit (used to derive MMSCF from mmBtu when HHV is per scf)
-          const hhv = parseNumber(
-            row["Heat Content (HHV)"] ??
-              row["Heat Content"] ??
-              row.HeatContent ??
-              row.heat_content_hhv ??
-              row.hhv
-          );
-          const hhvUnitRaw =
-            row["HHV Unit"] ?? row["HIV Unit"] ?? row.hhv_unit ?? row.hiv_unit ?? row.heat_content_unit;
-          const hhvUnit = typeof hhvUnitRaw === "string" ? hhvUnitRaw.toLowerCase() : "";
-          const isScfBasedHHV = hhv != null && hhvUnit.includes("scf");
-
-          // First set: CO2/CH4/N2O Factor + Unit (Unit says "per mmBtu")
-          const co2Unit = String(row["CO2 Unit"] ?? "").toLowerCase();
-          const ch4Unit = String(row["CH4 Unit"] ?? "").toLowerCase();
-          const n2oUnitFirst = String(row["N20 Unit"] ?? row["N2O Unit"] ?? "").toLowerCase(); // N20 typo in Fuel EPA 1
-          const useFirstSetMmbtu = co2Unit.includes("mmbtu");
-
-          const co2PerMmbtu = useFirstSetMmbtu ? parseNumber(row["CO2 Factor"]) : undefined;
-          const ch4PerMmbtu = ch4Unit.includes("mmbtu") ? parseNumber(row["CH4 Factor"]) : undefined;
-          const n2oPerMmbtu = n2oUnitFirst.includes("mmbtu") ? parseNumber(row["N2O Factor"]) : undefined;
-
-          // Second set: Factor_1 + Unit_1 (Unit_1 can be "per short ton", "per scf", "per gallon")
-          const co2Unit1 = String(row["CO2 Unit_1"] ?? "").toLowerCase();
-          const ch4Unit1 = String(row["CH4 Unit_1"] ?? "").toLowerCase();
-          const n2oUnit1 = String(row["N2O Unit_1"] ?? row["N2O Unit"] ?? "").toLowerCase(); // EPA 1 has no N2O Unit_1
-          const co2Factor1 = parseNumber(row["CO2 Factor_1"]);
-          const ch4Factor1 = parseNumber(row["CH4 Factor_1"]);
-          const n2oFactor1 = parseNumber(row["N2O Factor_1"]);
-
-          if (!map[category]) map[category] = {};
-          if (!map[category][fuel]) map[category][fuel] = {};
-          const fuelMap = map[category][fuel];
-
-          // mmBtu factors (first set)
-          if (co2PerMmbtu !== undefined) {
-            fuelMap["CO2 (kg CO2 / mmBtu)"] = co2PerMmbtu;
-            if (isScfBasedHHV) {
-              const factorPerMMSCF = co2PerMmbtu * hhv! * 1_000_000;
-              fuelMap["CO2 (kg CO2 / MMSCF)"] = factorPerMMSCF;
-            }
-          }
-          if (ch4PerMmbtu !== undefined) {
-            fuelMap["CH4 (g CH4 / mmBtu)"] = ch4PerMmbtu;
-            if (isScfBasedHHV) {
-              fuelMap["CH4 (g CH4 / MMSCF)"] = ch4PerMmbtu * hhv! * 1_000_000;
-            }
-          }
-          if (n2oPerMmbtu !== undefined) {
-            fuelMap["N2O (g N2O / mmBtu)"] = n2oPerMmbtu;
-            if (isScfBasedHHV) {
-              fuelMap["N2O (g N2O / MMSCF)"] = n2oPerMmbtu * hhv! * 1_000_000;
-            }
-          }
-
-          // Second set: short ton (Factor_1 when Unit_1 contains "short ton")
-          if (co2Unit1.includes("short ton") && co2Factor1 !== undefined) {
-            fuelMap["CO2 (kg CO2 / short ton)"] = co2Factor1;
-          }
-          if (ch4Unit1.includes("short ton") && ch4Factor1 !== undefined) {
-            fuelMap["CH4 (g CH4 / short ton)"] = ch4Factor1;
-          }
-          if (n2oUnit1.includes("short ton") && n2oFactor1 !== undefined) {
-            fuelMap["N2O (g N2O / short ton)"] = n2oFactor1;
-          }
-
-          // Second set: per scf → derive MMSCF (factor per scf * 1e6 = per MMSCF), when not already set from mmBtu
-          if (co2Unit1.includes("scf") && co2Factor1 !== undefined && fuelMap["CO2 (kg CO2 / MMSCF)"] == null) {
-            fuelMap["CO2 (kg CO2 / MMSCF)"] = co2Factor1 * 1_000_000;
-          }
-          if (ch4Unit1.includes("scf") && ch4Factor1 !== undefined && fuelMap["CH4 (g CH4 / MMSCF)"] == null) {
-            fuelMap["CH4 (g CH4 / MMSCF)"] = ch4Factor1 * 1_000_000;
-          }
-          if (n2oUnit1.includes("scf") && n2oFactor1 !== undefined && fuelMap["N2O (g N2O / MMSCF)"] == null) {
-            fuelMap["N2O (g N2O / MMSCF)"] = n2oFactor1 * 1_000_000;
-          }
-
-          // Second set: per gallon (optional)
-          if (co2Unit1.includes("gallon") && co2Factor1 !== undefined) {
-            fuelMap["CO2 (kg CO2 / gallon)"] = co2Factor1;
-          }
-          if (ch4Unit1.includes("gallon") && ch4Factor1 !== undefined) {
-            fuelMap["CH4 (g CH4 / gallon)"] = ch4Factor1;
-          }
-          if (n2oUnit1.includes("gallon") && n2oFactor1 !== undefined) {
-            fuelMap["N2O (g N2O / gallon)"] = n2oFactor1;
-          }
-        });
-
-        if (Object.keys(map).length > 0) {
-          console.log("Loaded Fuel EPA 1/2/3 factors:", map);
-          setFuelFactors(map);
-        }
+        const map = await ensureEpaFuelFactors();
+        if (cancelled) return;
+        if (map) setFuelFactors(map);
       } catch (err) {
         console.error("Unexpected error loading Fuel EPA factors:", err);
+      } finally {
+        if (!cancelled) setEpaFactorsReady(true);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-
-    void loadFuelFactors();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per factorMode; toast stable enough
-  }, [factorMode]);
+  }, [factorMode, toast]);
 
   // When UK reference data loads, refresh factors/emissions on all rows
   useEffect(() => {
@@ -550,17 +630,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             "scope1_heatsteam_entries_epa",
             companyScopedListFilters(userId, companyContext, counterpartyId),
           );
-          const heatRows = (heatData || []).map((entry) => ({
-            id: crypto.randomUUID(),
-            dbId: entry.id,
-            type: entry.fuel_type_group as FuelType,
-            fuel: entry.fuel,
-            unit: entry.unit,
-            quantity: entry.quantity,
-            factor: entry.factor,
-            emissions: entry.emissions,
-            isExisting: true,
-          }));
+          const heatRows = (heatData || []).map(legacyEntryToFuelRow);
           setExistingEntries(heatRows);
           setRows(heatRows.length > 0 ? heatRows : []);
           onDataChange(heatRows);
@@ -592,18 +662,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             emission_framework: fuelFramework,
           });
 
-          const companyFuelRows = (fuelData || []).map((entry) => ({
-            id: crypto.randomUUID(),
-            dbId: entry.id,
-            type: entry.fuel_type_group as FuelType,
-            fuel: entry.fuel,
-            unit: entry.unit,
-            quantity: entry.quantity,
-            factor: entry.factor,
-            emissions: entry.emissions,
-            ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
-            isExisting: true,
-          }));
+          const companyFuelRows = (fuelData || []).map(legacyEntryToFuelRow);
 
           setExistingEntries(companyFuelRows);
           setRows(companyFuelRows.length > 0 ? companyFuelRows : []);
@@ -647,18 +706,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           emission_framework: fuelFramework,
         });
 
-        const existingFuelRows = (fuelData || []).map((entry) => ({
-          id: crypto.randomUUID(),
-          dbId: entry.id,
-          type: entry.fuel_type_group as FuelType,
-          fuel: entry.fuel,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
-          ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
-          isExisting: true,
-        }));
+        const existingFuelRows = (fuelData || []).map(legacyEntryToFuelRow);
 
         setExistingEntries(existingFuelRows);
         setRows(existingFuelRows.length > 0 ? existingFuelRows : []);
@@ -684,7 +732,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
     };
 
     loadExistingEntries();
-  }, [userId, toast, companyContext, counterpartyId, variant, factorMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [userId, companyContext, counterpartyId, variant, factorMode]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -959,8 +1008,13 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             emissions_output_unit: outputUnit,
           };
         });
+        let created: { id: string }[] = [];
         if (payload.length > 0) {
-          await insertLegacyTableEntries(table, payload);
+          created = await insertLegacyTableEntries(table, payload);
+          console.info(
+            `[HeatSteam EPA] inserted ${created.length} row(s) into ${table}`,
+            created.map((c) => c.id)
+          );
         }
         const rowsToUpdate = unitChanged
           ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")
@@ -981,32 +1035,35 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             )
           );
         }
-        toast({
-          title: "Saved",
-          description:
-            unitChanged && newEntries.length === 0 && changedExisting.length === 0
-              ? "Updated output unit for existing Heat and Steam entries."
-              : `Saved ${newEntries.length} new and updated ${changedExisting.length} Heat and Steam entries.`,
-        });
         clearDraftStorage();
         const newData = await listLegacyTableEntries(
           table,
           companyScopedListFilters(user.id, companyContext, counterpartyId),
         );
-        const updatedRows = (newData || []).map((entry) => ({
-          id: crypto.randomUUID(),
-          dbId: entry.id,
-          type: entry.fuel_type_group as FuelType,
-          fuel: entry.fuel,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
-          isExisting: true,
-        }));
-        setExistingEntries(updatedRows);
-        setRows(updatedRows);
-        onDataChange(updatedRows);
+        console.info(`[HeatSteam EPA] reloaded ${newData.length} row(s) from ${table}`);
+        if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || rowsToUpdate.length > 0)) {
+          // Insert/update succeeded but list came back empty (API filter quirks) — keep form data + ids.
+          const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+          setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+          setRows(kept);
+          onDataChange(kept);
+          toast({
+            title: "Saved",
+            description: `Saved ${newEntries.length} Heat and Steam entries.`,
+          });
+        } else {
+          const updatedRows = (newData || []).map(legacyEntryToFuelRow);
+          setExistingEntries(updatedRows);
+          setRows(updatedRows);
+          onDataChange(updatedRows);
+          toast({
+            title: "Saved",
+            description:
+              unitChanged && newEntries.length === 0 && changedExisting.length === 0
+                ? "Updated output unit for existing Heat and Steam entries."
+                : `Saved ${newEntries.length} new and updated ${changedExisting.length} Heat and Steam entries.`,
+          });
+        }
       } catch (e: any) {
         const msg = e?.message || e?.error_description || String(e);
         console.error("Scope 1 Heat and Steam save error:", e);
@@ -1062,8 +1119,9 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         })
       );
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_fuel_entries", payload);
+        created = await insertLegacyTableEntries("scope1_fuel_entries", payload);
       }
 
       // Rows that need updating in the DB
@@ -1093,13 +1151,6 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         );
       }
 
-      toast({ 
-        title: "Saved", 
-        description: unitChanged && newEntries.length === 0 && changedExisting.length === 0
-          ? "Updated output unit for existing fuel entries."
-          : `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
-      });
-
       // Clear any stale draft now that rows are persisted
       try {
         const key = getDraftKey();
@@ -1113,19 +1164,12 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         emission_framework: fuelFramework,
       });
 
-      if (newData) {
-        const updatedExistingRows = newData.map((entry) => ({
-          id: crypto.randomUUID(),
-          dbId: entry.id,
-          type: entry.fuel_type_group as FuelType,
-          fuel: entry.fuel,
-          unit: entry.unit,
-          quantity: entry.quantity,
-          factor: entry.factor,
-          emissions: entry.emissions,
-          ukFactorBasis: ukFactorBasisFromDb(entry.uk_factor_basis),
-          isExisting: true,
-        }));
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || rowsToUpdate.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+        setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRows(kept);
+      } else if (newData.length > 0) {
+        const updatedExistingRows = newData.map(legacyEntryToFuelRow);
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
 
@@ -1137,6 +1181,13 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           }
         }
       }
+
+      toast({ 
+        title: "Saved", 
+        description: unitChanged && newEntries.length === 0 && changedExisting.length === 0
+          ? "Updated output unit for existing fuel entries."
+          : `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -1148,6 +1199,8 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   const totalEmissions = rows.reduce((sum, r) => sum + (r.emissions || 0), 0);
   const gridCols = isUkActive ? "md:grid-cols-5" : "md:grid-cols-4";
   const ukInputsLocked = factorMode === "uk_supabase" && !ukReferenceReady;
+  const epaInputsLocked = factorMode === "epa" && !epaFactorsReady;
+  const factorsLoading = ukInputsLocked || epaInputsLocked;
 
   return (
     <div className="space-y-6">
@@ -1160,11 +1213,14 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
           {ukInputsLocked && (
             <p className="text-sm text-[#0F6E56] mt-1">Loading UK fuel factors…</p>
           )}
+          {epaInputsLocked && (
+            <p className="text-sm text-[#0F6E56] mt-1">Loading EPA fuel factors…</p>
+          )}
         </div>
         <Button
           onClick={addRow}
           className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
-          disabled={ukInputsLocked}
+          disabled={factorsLoading}
         >
           <Plus className="h-4 w-4 mr-2" />Add New Entry
         </Button>
@@ -1191,12 +1247,17 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
                 onValueChange={(v) =>
                   updateRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined, ukFactorBasis: undefined })
                 }
-                disabled={ukInputsLocked}
+                disabled={factorsLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={isUkActive ? "Select activity" : "Select type"} />
                 </SelectTrigger>
                 <SelectContent>
+                  {r.type && !types.includes(r.type) ? (
+                    <SelectItem key={`pending-type-${r.type}`} value={r.type}>
+                      {r.type}
+                    </SelectItem>
+                  ) : null}
                   {types.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -1204,12 +1265,17 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               <Select 
                 value={r.fuel} 
                 onValueChange={(v) => updateRow(r.id, { fuel: v, unit: undefined, ukFactorBasis: undefined })} 
-                disabled={ukInputsLocked || !r.type}
+                disabled={factorsLoading || !r.type}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select fuel" />
                 </SelectTrigger>
                 <SelectContent>
+                  {r.fuel && !fuelsFor(r.type).includes(r.fuel) ? (
+                    <SelectItem key={`pending-fuel-${r.fuel}`} value={r.fuel}>
+                      {r.fuel}
+                    </SelectItem>
+                  ) : null}
                   {fuelsFor(r.type).map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -1217,12 +1283,17 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               <Select 
                 value={r.unit} 
                 onValueChange={(v) => updateRow(r.id, { unit: v })} 
-                disabled={ukInputsLocked || !r.type || !r.fuel}
+                disabled={factorsLoading || !r.type || !r.fuel}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
+                  {r.unit && !unitsFor(r.type, r.fuel).includes(r.unit) ? (
+                    <SelectItem key={`pending-unit-${r.unit}`} value={r.unit}>
+                      {r.unit}
+                    </SelectItem>
+                  ) : null}
                   {unitsFor(r.type, r.fuel).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>

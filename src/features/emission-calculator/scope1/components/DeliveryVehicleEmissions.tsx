@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  assignCreatedIdsToNewRows,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
+  shouldKeepLocalRowsAfterReload,
   updateLegacyTableEntry,
 } from "@/integrations/supabase/ghgEntryClient";
 import { USE_JWT_AUTH } from "@/api/config";
@@ -88,7 +90,7 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [toast]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- omit toast (unstable)
 
   const deliveryActivities = Object.keys(ukDeliveryMap).sort((a, b) => a.localeCompare(b));
   const deliveryTypesFor = (activity?: string) =>
@@ -178,7 +180,8 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
     };
 
     loadExistingEntries();
-  }, [userId, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [userId]);
 
   useEffect(() => {
     if (!isInitialLoad) {
@@ -396,8 +399,9 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
         emissions: v.emissions!,
       }));
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
+        created = await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
       }
 
       if (changedExisting.length > 0) {
@@ -418,17 +422,23 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
         );
       }
 
-      toast({
-        title: "Saved",
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
-      });
+      try {
+        const key = getDraftKey();
+        sessionStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
 
       const newData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", {
         user_id: user.id,
         order: { column: "created_at", ascending: false },
       });
 
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+        setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
@@ -452,12 +462,11 @@ const DeliveryVehicleEmissions: React.FC<DeliveryVehicleEmissionsProps> = ({
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
       }
-      try {
-        const key = getDraftKey();
-        sessionStorage.removeItem(key);
-      } catch {
-        /* ignore */
-      }
+
+      toast({
+        title: "Saved",
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });

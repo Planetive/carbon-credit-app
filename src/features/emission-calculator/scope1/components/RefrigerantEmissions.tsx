@@ -8,9 +8,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  assignCreatedIdsToNewRows,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
+  shouldKeepLocalRowsAfterReload,
   updateLegacyTableEntry,
 } from "@/integrations/supabase/ghgEntryClient";
 import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
@@ -231,7 +233,7 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
       }
     };
     void loadUk();
-  }, [toast]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- omit toast (unstable)
 
   useEffect(() => {
     const loadExistingEntries = async () => {
@@ -279,7 +281,8 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
     };
 
     loadExistingEntries();
-  }, [userId, toast, companyContext, storageFramework]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [userId, companyContext, storageFramework]);
 
   useEffect(() => {
     if (!isInitialLoad) {
@@ -488,8 +491,9 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         uk_refrigerant_basis: v.ukRefrigerantBasis || "total",
       }));
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
+        created = await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
       }
 
       if (changedExisting.length > 0) {
@@ -509,11 +513,6 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         );
       }
 
-      toast({
-        title: "Saved",
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
-      });
-
       try {
         sessionStorage.removeItem(getDraftKey());
       } catch {}
@@ -524,11 +523,20 @@ const RefrigerantEmissions: React.FC<RefrigerantEmissionsProps> = ({
         order: { column: "created_at", ascending: false },
       });
 
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+        setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map(mapEntryFromDb);
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
       }
+
+      toast({
+        title: "Saved",
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.`,
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {

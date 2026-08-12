@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  companyScopedListFilters,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
@@ -150,6 +151,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   const heatSteamTable = storageVariant === "epa" ? HEATSTEAM_TABLE_EPA : HEATSTEAM_TABLE_UK;
   const { user } = useAuth();
   const { toast } = useToast();
+  const onTotalChangeRef = useRef(onTotalChange);
+  onTotalChangeRef.current = onTotalChange;
 
   const userId = user?.id || null;
   const [heatSteamStandard, setHeatSteamStandard] = useState<"UK" | "EBT">(forcedStandard ?? "UK");
@@ -374,7 +377,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   useEffect(() => {
     const load = async () => {
       if (!userId) return;
-      if (companyContext) {
+      if (companyContext && !counterpartyId) {
         setHeatRows([]);
         setHasUserRows(false);
         setIsInitialLoad(false);
@@ -382,10 +385,16 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       }
       try {
         // Load Heat & Steam entries (UK table or EPA table per storageVariant)
-        const heatData = await listLegacyTableEntries(heatSteamTable, {
-          user_id: userId,
-          order: { column: "created_at", ascending: true },
-        });
+        const heatData = await listLegacyTableEntries(
+          heatSteamTable,
+          companyContext
+            ? companyScopedListFilters(userId, true, counterpartyId)
+            : {
+                user_id: userId,
+                counterparty_id: null,
+                order: { column: "created_at", ascending: true },
+              }
+        );
 
         // Load saved standard if available, unless forced (EPA)
         if (!forcedStandard && heatData.length > 0 && heatData[0].standard) {
@@ -433,7 +442,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       }
     };
     load();
-  }, [userId, toast, forcedStandard, heatSteamTable, companyContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [userId, forcedStandard, heatSteamTable, companyContext, counterpartyId]);
 
   // Restore draft only when there are no user rows yet
   useEffect(() => {
@@ -578,26 +588,19 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
       toast({ title: "Nothing to save", description: "Enter quantities for heat & steam." }); 
       return; 
     }
-    if (companyContext) {
-      try {
-        const key = getDraftKey();
-        const payload = {
-          rows: heatRows,
-          outputUnit,
-          heatSteamStandard,
-          ts: Date.now(),
-        };
-        sessionStorage.setItem(key, JSON.stringify(payload));
-        toast({ title: "Saved", description: "Saved for this company context." });
-      } catch (e: any) {
-        toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
-      }
+    if (companyContext && !counterpartyId) {
+      toast({
+        title: "Missing company",
+        description: "Select a company before saving Heat & Steam.",
+        variant: "destructive",
+      });
       return;
     }
     setSavingHeat(true);
     try {
       const inserts = validRows.filter(r => !r.dbId).map(r => ({
         user_id: user.id,
+        counterparty_id: companyContext ? counterpartyId ?? null : null,
         entry_type: mapEntryTypeForDb(r.entryType),
         unit: r.unit,
         emission_factor: r.factor,
@@ -607,8 +610,13 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
         emissions_output: convertEmissionNumeric(r.emissions, outputUnit),
         emissions_output_unit: outputUnit,
       }));
+      let created: { id: string }[] = [];
       if (inserts.length > 0) {
-        await insertLegacyTableEntries(heatSteamTable, inserts);
+        created = await insertLegacyTableEntries(heatSteamTable, inserts);
+        console.info(
+          `[HeatSteam] inserted ${created.length} row(s) into ${heatSteamTable}`,
+          created.map((c) => c.id)
+        );
       }
 
       const rowsToUpdate = validRows.filter((r) => r.dbId);
@@ -616,6 +624,7 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
         await Promise.all(
           rowsToUpdate.map((r) =>
             updateLegacyTableEntry(heatSteamTable, r.dbId!, {
+              counterparty_id: companyContext ? counterpartyId ?? null : null,
               entry_type: mapEntryTypeForDb(r.entryType),
               unit: r.unit,
               emission_factor: r.factor,
@@ -629,13 +638,57 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
         );
       }
 
-      toast({ title: "Saved", description: "Heat & Steam saved." });
       // Clear draft after successful save
       try {
         const key = getDraftKey();
         sessionStorage.removeItem(key);
       } catch {}
+
+      const newData = await listLegacyTableEntries(
+        heatSteamTable,
+        companyContext
+          ? companyScopedListFilters(user.id, true, counterpartyId)
+          : { user_id: user.id, counterparty_id: null, order: { column: "created_at", ascending: true } }
+      );
+      console.info(`[HeatSteam] reloaded ${newData.length} row(s) from ${heatSteamTable}`);
+
+      if (newData.length === 0 && (created.length > 0 || rowsToUpdate.length > 0)) {
+        let createdIdx = 0;
+        setHeatRows((prev) =>
+          prev.map((r) => {
+            if (r.dbId) return r;
+            if (createdIdx < created.length) {
+              return { ...r, dbId: created[createdIdx++].id };
+            }
+            return r;
+          })
+        );
+        setHasUserRows(true);
+      } else if (newData.length > 0) {
+        const savedRows: HeatRow[] = newData.map((row) => {
+          const unit = row.unit as string | undefined;
+          const supportsMMSCF =
+            typeof unit === "string" && unit.toLowerCase().includes("mmbtu");
+          return {
+            id: crypto.randomUUID(),
+            dbId: String(row.id),
+            entryType: mapEntryTypeFromDb(row.entry_type as string),
+            unit: unit ?? "",
+            factor: (row.emission_factor as number | undefined) ?? HEAT_DEFAULT_FACTOR,
+            quantity: (row.quantity as number | undefined) ?? undefined,
+            emissions: (row.emissions as number | undefined) ?? undefined,
+            gas: "co2" as const,
+            quantityUnit: "base" as const,
+            supportsMMSCF,
+          };
+        });
+        setHeatRows(savedRows);
+        setHasUserRows(true);
+      }
+
+      toast({ title: "Saved", description: "Heat & Steam saved." });
     } catch (e: any) {
+      console.error("Heat & Steam save error:", e);
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
       setSavingHeat(false);
@@ -719,8 +772,8 @@ const HeatSteamEmissions: React.FC<HeatSteamEmissionsProps> = ({
   };
 
   useEffect(() => {
-    if (onTotalChange) onTotalChange(totalHeatEmissions);
-  }, [onTotalChange, totalHeatEmissions]);
+    onTotalChangeRef.current?.(totalHeatEmissions);
+  }, [totalHeatEmissions]);
 
   const addHeatRow = () => {
     const dataSource =

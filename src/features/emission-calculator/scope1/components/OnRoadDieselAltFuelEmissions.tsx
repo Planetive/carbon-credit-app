@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  assignCreatedIdsToNewRows,
   companyScopedListFilters,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
@@ -239,7 +240,8 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
     };
 
     load();
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, []);
 
   useEffect(() => {
     if (!isInitialLoad) onDataChange(rows);
@@ -535,7 +537,10 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
           emissions_output_unit: outputUnit,
         }));
-        await insertLegacyTableEntries(TABLE_NAME, payload);
+        const created = await insertLegacyTableEntries(TABLE_NAME, payload);
+        const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+        setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRows(kept);
       }
       const rowsToUpdate = unitChanged
         ? rows.filter((r) => r.isExisting && r.dbId && typeof r.emissions === "number")

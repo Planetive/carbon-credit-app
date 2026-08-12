@@ -139,17 +139,30 @@ const UKCalculatorScreen = () => {
   };
 
   const handleElectricityDataChange = (total: number) => {
-    setEmissionData(prev => ({
-      ...prev,
-      scope2: [{ id: 'electricity-total', emissions: total }] as any,
-    }));
+    setEmissionData((prev) => {
+      const existing = (prev.scope2 as any[])?.[0];
+      if (existing?.id === "electricity-total" && Number(existing.emissions) === Number(total) && prev.scope2.length === 1) {
+        return prev;
+      }
+      return {
+        ...prev,
+        scope2: [{ id: "electricity-total", emissions: total }] as any,
+      };
+    });
   };
 
   const handleHeatSteamDataChange = (total: number) => {
-    setEmissionData(prev => ({
-      ...prev,
-      scope2: [...prev.scope2.filter(item => item.id !== 'heat-total'), { id: 'heat-total', emissions: total }] as any,
-    }));
+    setEmissionData((prev) => {
+      const existing = (prev.scope2 as any[]).find((item: any) => item.id === "heat-total");
+      if (existing && Number(existing.emissions) === Number(total)) return prev;
+      return {
+        ...prev,
+        scope2: [
+          ...(prev.scope2 as any[]).filter((item: any) => item.id !== "heat-total"),
+          { id: "heat-total", emissions: total },
+        ] as any,
+      };
+    });
   };
 
   // Scope 3: Purchased Goods & Services - simple frontend data capture

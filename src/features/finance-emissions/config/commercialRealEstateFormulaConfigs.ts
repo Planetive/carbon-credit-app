@@ -25,9 +25,7 @@
 import { FormulaConfig } from '../types/formula';
 import { 
   COMMON_INPUTS, 
-  EMISSION_UNIT_OPTIONS,
   calculateAttributionFactorCommercialRealEstate,
-  calculateFinancedEmissions
 } from './sharedFormulaUtils';
 
 // ============================================================================
@@ -58,26 +56,31 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       description: 'Value of the commercial property at the time of loan origination'
     },
     {
-      name: 'total_emission',
-      label: 'Total Emission',
+      name: 'energy_consumption',
+      label: 'Actual building energy emissions',
       type: 'number',
       required: true,
       unit: 'tCO2e',
-      description: 'Total emissions from questionnaire (Scope 1 + Scope 2 + Scope 3)'
+      description: 'Actual energy × EPA/DEFRA factor from the electricity form'
+    },
+    {
+      name: 'emission_factor',
+      label: 'Emission Factor',
+      type: 'number',
+      required: true,
+      unit: 'tCO2e / unit',
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const propertyValueAtOrigination = inputs.property_value_at_origination;
-    const totalEmissions = inputs.total_emission; // Total emission = actual energy consumption × supplier specific emission factor
-
-    // Step 1: Calculate attribution factor using Property Value at Origination
+    const energyConsumption = Number(inputs.energy_consumption || 0);
+    const emissionFactor = Number(inputs.emission_factor || 0);
+    if (!energyConsumption || !emissionFactor) {
+      throw new Error('Actual energy consumption and emission factor must be greater than 0');
+    }
     const attributionFactor = calculateAttributionFactorCommercialRealEstate(outstandingAmount, propertyValueAtOrigination);
-
-    // Step 2: Use total emissions directly (already calculated from questionnaire: scope1 + scope2 + scope3)
-    // Total emissions = actual energy consumption × supplier specific emission factor
-
-    // Step 3: Calculate financed emissions
+    const totalEmissions = energyConsumption * emissionFactor;
     const financedEmissions = attributionFactor * totalEmissions;
 
     return {
@@ -90,7 +93,7 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         {
           step: 'Property Value at Origination',
           value: propertyValueAtOrigination,
-          formula: `Property Value at Origination = $${propertyValueAtOrigination.toFixed(2)}`
+          formula: `Property Value at Origination = ${propertyValueAtOrigination.toFixed(2)}`
         },
         {
           step: 'Attribution Factor',
@@ -98,14 +101,14 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
           formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Total Emissions',
+          step: 'Building energy emissions',
           value: totalEmissions,
-          formula: `Total Emission (from questionnaire) = ${totalEmissions.toFixed(2)} tCO2e`
+          formula: `${energyConsumption} × ${emissionFactor} = ${totalEmissions.toFixed(6)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(6)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -114,15 +117,14 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         category: 'commercial_real_estate',
         propertyValueAtOrigination,
         totalEmissions,
-        formula: 'Σ_p (Outstanding amount_p / Property value at origination_p) × Total emission_p'
+        formula: 'Σ (Outstanding / Property value) × Actual energy × Supplier-specific EF'
       }
     };
   },
   notes: [
     'Highest data quality score (1)',
-    'Uses total emission from questionnaire (Scope 1 + Scope 2 + Scope 3)',
-    'Total emission = actual energy consumption × supplier specific emission factor',
-    'Formula: Σ_p (Outstanding amount_p / Property value at origination_p) × Total emission_p'
+    'Actual building energy × EPA/DEFRA (supplier-specific) emission factor',
+    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF'
   ]
 };
 
@@ -150,26 +152,31 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       description: 'Value of the commercial property at the time of loan origination'
     },
     {
-      name: 'total_emission',
-      label: 'Total Emission',
+      name: 'energy_consumption',
+      label: 'Actual building energy emissions',
       type: 'number',
       required: true,
       unit: 'tCO2e',
-      description: 'Total emissions from questionnaire (Scope 1 + Scope 2 + Scope 3)'
+      description: 'Actual energy × EPA/DEFRA average factor from the electricity form'
+    },
+    {
+      name: 'emission_factor',
+      label: 'Emission Factor',
+      type: 'number',
+      required: true,
+      unit: 'tCO2e / unit',
     }
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = inputs.outstanding_amount;
     const propertyValueAtOrigination = inputs.property_value_at_origination;
-    const totalEmissions = inputs.total_emission; // Total emission = actual energy consumption × average emission factor
-
-    // Step 1: Calculate attribution factor using Property Value at Origination
+    const energyConsumption = Number(inputs.energy_consumption || 0);
+    const emissionFactor = Number(inputs.emission_factor || 0);
+    if (!energyConsumption || !emissionFactor) {
+      throw new Error('Actual energy consumption and emission factor must be greater than 0');
+    }
     const attributionFactor = calculateAttributionFactorCommercialRealEstate(outstandingAmount, propertyValueAtOrigination);
-
-    // Step 2: Use total emissions directly (already calculated from questionnaire: scope1 + scope2 + scope3)
-    // Total emissions = actual energy consumption × average emission factor
-
-    // Step 3: Calculate financed emissions
+    const totalEmissions = energyConsumption * emissionFactor;
     const financedEmissions = attributionFactor * totalEmissions;
 
     return {
@@ -182,7 +189,7 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         {
           step: 'Property Value at Origination',
           value: propertyValueAtOrigination,
-          formula: `Property Value at Origination = $${propertyValueAtOrigination.toFixed(2)}`
+          formula: `Property Value at Origination = ${propertyValueAtOrigination.toFixed(2)}`
         },
         {
           step: 'Attribution Factor',
@@ -190,14 +197,14 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
           formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
         },
         {
-          step: 'Total Emissions',
+          step: 'Building energy emissions',
           value: totalEmissions,
-          formula: `Total Emission (from questionnaire) = ${totalEmissions.toFixed(2)} tCO2e`
+          formula: `${energyConsumption} × ${emissionFactor} = ${totalEmissions.toFixed(6)} tCO2e`
         },
         {
           step: 'Financed Emissions',
           value: financedEmissions,
-          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(6)} = ${financedEmissions.toFixed(2)} tCO2e`
         }
       ],
       metadata: {
@@ -206,15 +213,14 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         category: 'commercial_real_estate',
         propertyValueAtOrigination,
         totalEmissions,
-        formula: 'Σ_p (Outstanding amount_p / Property value at origination_p) × Total emission_p'
+        formula: 'Σ (Outstanding / Property value) × Actual energy × Average EF'
       }
     };
   },
   notes: [
     'Good data quality score (2)',
-    'Uses total emission from questionnaire (Scope 1 + Scope 2 + Scope 3)',
-    'Total emission = actual energy consumption × average emission factor',
-    'Formula: Σ_p (Outstanding amount_p / Property value at origination_p) × Total emission_p'
+    'Actual building energy × EPA/DEFRA average emission factor',
+    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF'
   ]
 };
 
@@ -462,12 +468,119 @@ export const OPTION_2B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
   ]
 };
 
-// Export all commercial real estate loan formulas
+export const OPTION_3_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
+  id: '3-commercial-real-estate',
+  name: 'Option 3 - Estimated Energy from Statistics × Buildings (Commercial Real Estate)',
+  description: 'Estimated building energy consumption from statistics × number of buildings × average emission factor',
+  dataQualityScore: 5,
+  category: 'commercial_real_estate',
+  optionCode: '3',
+  inputs: [
+    COMMON_INPUTS.outstanding_amount,
+    {
+      name: 'property_value_at_origination',
+      label: 'Property Value at Origination',
+      type: 'number',
+      required: true,
+      unit: 'PKR',
+    },
+    {
+      name: 'estimated_energy_consumption_from_statistics',
+      label: 'Estimated Energy Consumption from Statistics',
+      type: 'number',
+      required: true,
+      unit: 'kWh/building',
+      description: 'Estimated energy consumption per building from statistics'
+    },
+    {
+      name: 'number_of_buildings',
+      label: 'Number of Buildings',
+      type: 'number',
+      required: true,
+      unit: 'buildings',
+    },
+    {
+      name: 'average_emission_factor',
+      label: 'Average Emission Factor',
+      type: 'number',
+      required: true,
+      unit: 'tCO2e/kWh',
+    }
+  ],
+  calculate: (inputs, companyType) => {
+    const outstandingAmount = inputs.outstanding_amount;
+    const propertyValueAtOrigination = inputs.property_value_at_origination;
+    const estimatedEnergyFromStats = Number(inputs.estimated_energy_consumption_from_statistics || 0);
+    const numberOfBuildings = Number(inputs.number_of_buildings || 0);
+    const averageEmissionFactor = Number(inputs.average_emission_factor || 0);
+    if (!estimatedEnergyFromStats || !numberOfBuildings || !averageEmissionFactor) {
+      throw new Error('Statistics energy, number of buildings, and average emission factor must be greater than 0');
+    }
+    const attributionFactor = calculateAttributionFactorCommercialRealEstate(outstandingAmount, propertyValueAtOrigination);
+    const totalEnergyConsumption = estimatedEnergyFromStats * numberOfBuildings;
+    const totalEmissions = totalEnergyConsumption * averageEmissionFactor;
+    const financedEmissions = attributionFactor * totalEmissions;
+
+    return {
+      attributionFactor,
+      emissionFactor: totalEmissions,
+      financedEmissions,
+      dataQualityScore: 5,
+      methodology: 'PCAF Option 3 - Estimated Energy from Statistics × Buildings (Commercial Real Estate)',
+      calculationSteps: [
+        {
+          step: 'Property Value at Origination',
+          value: propertyValueAtOrigination,
+          formula: `Property Value at Origination = ${propertyValueAtOrigination.toFixed(2)}`
+        },
+        {
+          step: 'Attribution Factor',
+          value: attributionFactor,
+          formula: `${outstandingAmount} / ${propertyValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+        },
+        {
+          step: 'Total Energy Consumption',
+          value: totalEnergyConsumption,
+          formula: `${estimatedEnergyFromStats.toFixed(2)} kWh/building × ${numberOfBuildings} = ${totalEnergyConsumption.toFixed(2)} kWh`
+        },
+        {
+          step: 'Total Emissions',
+          value: totalEmissions,
+          formula: `${totalEnergyConsumption.toFixed(2)} kWh × ${averageEmissionFactor} tCO2e/kWh = ${totalEmissions.toFixed(2)} tCO2e`
+        },
+        {
+          step: 'Financed Emissions',
+          value: financedEmissions,
+          formula: `${attributionFactor.toFixed(6)} × ${totalEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e`
+        }
+      ],
+      metadata: {
+        companyType,
+        optionCode: '3',
+        category: 'commercial_real_estate',
+        propertyValueAtOrigination,
+        estimatedEnergyFromStats,
+        numberOfBuildings,
+        averageEmissionFactor,
+        totalEnergyConsumption,
+        totalEmissions,
+        formula: 'Σ (Outstanding / Property value) × Energy from statistics × Number of buildings × Average EF'
+      }
+    };
+  },
+  notes: [
+    'Lowest data quality score (5)',
+    'Uses statistical energy per building and number of buildings financed',
+    'Formula: Σ (Outstanding / Property value at origination) × Energy from statistics × Buildings × EF'
+  ]
+};
+
 export const COMMERCIAL_REAL_ESTATE_FORMULAS = [
   OPTION_1A_COMMERCIAL_REAL_ESTATE,
   OPTION_1B_COMMERCIAL_REAL_ESTATE,
   OPTION_2A_COMMERCIAL_REAL_ESTATE,
-  OPTION_2B_COMMERCIAL_REAL_ESTATE
+  OPTION_2B_COMMERCIAL_REAL_ESTATE,
+  OPTION_3_COMMERCIAL_REAL_ESTATE,
 ];
 
 // Helper function to get commercial real estate loan formulas by category

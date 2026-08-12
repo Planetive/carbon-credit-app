@@ -152,7 +152,9 @@ export async function getOrCreateDraftAssessment(
     framework,
     status: "draft",
   });
-  if (existing.length > 0) return existing[0];
+  // Defense: some API builds ignore framework query filtering.
+  const matched = (existing || []).filter((a) => a.framework === framework);
+  if (matched.length > 0) return matched[0];
   return createEmissionAssessment({
     framework,
     reporting_period: reportingPeriod ?? null,

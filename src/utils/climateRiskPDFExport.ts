@@ -16,7 +16,7 @@ const BRAND_COLORS = {
   danger: '#EF4444', // red-500
 };
 
-// Emission Calculator (EPA) PDF palette — src/pages/EmissionCalculatorEPA.tsx
+// Emission Calculator (EPA) PDF palette — features/emission-calculator/methodologies/epa-ipcc/EpaCalculatorScreen.tsx
 const REPORT_GREEN = {
   frame: { r: 26, g: 61, b: 46 }, // #1a3d2e borders, headers, back cover
   coverInner: { r: 232, g: 240, b: 235 }, // #e8f0eb

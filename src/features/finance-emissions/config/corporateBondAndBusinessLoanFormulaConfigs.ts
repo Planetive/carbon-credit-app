@@ -219,13 +219,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       const outstandingAmount = inputs.outstanding_amount;
       const unverifiedEmissions = inputs.unverified_emissions;
       
-      // Step 1: Calculate attribution factor (consistent across all formulas)
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
-      
-      // Step 2: Calculate EVIC for listed companies
       const evic = calculateEVIC(inputs);
-      
-      // Step 3: Calculate financed emissions using EVIC as denominator
+      const attributionFactor = calculateAttributionFactorListed(outstandingAmount, evic);
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, evic, unverifiedEmissions);
       
       return {
@@ -236,14 +231,14 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         methodology: 'PCAF Option 1b - Unverified GHG Emissions (Listed)',
         calculationSteps: [
           {
-            step: 'Attribution Factor',
-            value: attributionFactor,
-            formula: `${outstandingAmount} / ${inputs.total_assets} = ${attributionFactor.toFixed(6)}`
-          },
-          {
             step: 'EVIC Calculation',
             value: evic,
             formula: `${inputs.sharePrice} × ${inputs.outstandingShares} + ${inputs.totalDebt} + ${inputs.minorityInterest} + ${inputs.preferredStock} = ${evic.toFixed(2)}`
+          },
+          {
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${evic.toFixed(2)} = ${attributionFactor.toFixed(6)}`
           },
           {
             step: 'Financed Emissions',
@@ -295,13 +290,20 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       COMMON_INPUTS.total_assets,        // Total assets for attribution factor
       COMMON_INPUTS.evic,                // EVIC for financed emissions calculation
       {
-        name: 'emissions',
-        label: 'Emissions',
+        name: 'energy_consumption',
+        label: 'Energy Consumption',
         type: 'number',
         required: true,
-        unit: 'tCO2e',
-        description: 'Total emissions (Energy Consumption × Emission Factor)',
-        tooltip: 'This represents the combined Energy Consumption × Emission Factor calculation'
+        unit: 'activity unit',
+        description: 'Primary physical activity data for energy or fuel consumption'
+      },
+      {
+        name: 'emission_factor',
+        label: 'Emission Factor',
+        type: 'number',
+        required: true,
+        unit: 'tCO2e / unit',
+        description: 'EPA or DEFRA emission factor for the selected energy source'
       }
     ],
     /**
@@ -319,18 +321,15 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
      */
     calculate: (inputs, companyType) => {
       const outstandingAmount = inputs.outstanding_amount;
-      const emissions = inputs.emissions; // This is already Energy Consumption × Emission Factor
-      
-      // Step 1: Calculate attribution factor (consistent across all formulas)
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
-      
-      // Step 2: Calculate EVIC for listed companies
+      const energyConsumption = inputs.energy_consumption;
+      const emissionFactor = inputs.emission_factor;
+      if (!energyConsumption || !emissionFactor) {
+        throw new Error('Energy consumption and emission factor must be greater than 0');
+      }
+      const processEmissions = Number(inputs.process_emissions || 0);
       const evic = calculateEVIC(inputs);
-      
-      // Step 3: Use the pre-calculated emissions (Energy Consumption × Emission Factor)
-      const energyEmissions = emissions;
-      
-      // Step 4: Calculate financed emissions using EVIC as denominator
+      const attributionFactor = calculateAttributionFactorListed(outstandingAmount, evic);
+      const energyEmissions = energyConsumption * emissionFactor + processEmissions;
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, evic, energyEmissions);
       
       return {
@@ -341,19 +340,19 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         methodology: 'PCAF Option 2a - Energy Consumption Data (Listed)',
         calculationSteps: [
           {
-            step: 'Attribution Factor',
-            value: attributionFactor,
-            formula: `${outstandingAmount} / ${inputs.total_assets} = ${attributionFactor.toFixed(6)}`
-          },
-          {
             step: 'EVIC Calculation',
             value: evic,
             formula: `${inputs.sharePrice} × ${inputs.outstandingShares} + ${inputs.totalDebt} + ${inputs.minorityInterest} + ${inputs.preferredStock} = ${evic.toFixed(2)}`
           },
           {
-            step: 'Emissions',
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${evic.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          },
+          {
+            step: 'Energy Emissions',
             value: energyEmissions,
-            formula: `Emissions (Energy Consumption × Emission Factor) = ${energyEmissions.toFixed(2)}`
+            formula: `${energyConsumption} × ${emissionFactor}${processEmissions ? ` + ${processEmissions}` : ''} = ${energyEmissions.toFixed(6)} tCO2e`
           },
           {
             step: 'Financed Emissions',
@@ -367,6 +366,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
           category: 'listed_equity',
           evic,
           energyEmissions,
+          energyConsumption,
+          emissionFactor,
           formula: 'Σ (Outstanding amount_c / EVIC_c) × Energy consumption_c × Emission factor'
         }
       };
@@ -434,10 +435,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       const outstandingAmount = inputs.outstanding_amount;
       const production = inputs.production;
       const emissionFactor = inputs.emission_factor;
-      
-      // Calculate common values
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
       const evic = calculateEVIC(inputs);
+      const attributionFactor = calculateAttributionFactorListed(outstandingAmount, evic);
       const productionEmissions = production * emissionFactor;
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, evic, productionEmissions);
       
@@ -449,14 +448,14 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         methodology: 'PCAF Option 2b - Production Data (Listed)',
         calculationSteps: [
           {
-            step: 'Attribution Factor',
-            value: attributionFactor,
-            formula: `${outstandingAmount} / ${inputs.total_assets} = ${attributionFactor.toFixed(6)}`
-          },
-          {
             step: 'EVIC Calculation',
             value: evic,
             formula: `${inputs.sharePrice} × ${inputs.outstandingShares} + ${inputs.totalDebt} + ${inputs.minorityInterest} + ${inputs.preferredStock} = ${evic.toFixed(2)}`
+          },
+          {
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${evic.toFixed(2)} = ${attributionFactor.toFixed(6)}`
           },
           {
             step: 'Production Emissions',
@@ -637,12 +636,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
     calculate: (inputs, companyType) => {
       const outstandingAmount = inputs.outstanding_amount;
       const unverifiedEmissions = inputs.unverified_emissions;
-      
-      // Step 1: Calculate attribution factor (consistent across all formulas)
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
-      
-      // Step 2: Calculate Total Equity + Debt for unlisted companies
       const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
+      const attributionFactor = calculateAttributionFactorUnlisted(outstandingAmount, totalEquityPlusDebt);
       
       // Step 3: Calculate financed emissions using Total Equity + Debt as denominator
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, totalEquityPlusDebt, unverifiedEmissions);
@@ -653,16 +648,23 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         financedEmissions,
         dataQualityScore: 2, // Good quality score
         methodology: 'PCAF Option 1b - Unverified GHG Emissions (Unlisted/Private)',
-        calculationSteps: createCommonCalculationSteps(
-          outstandingAmount,
-          inputs.total_assets,
-          totalEquityPlusDebt,
-          'Total Equity + Debt Calculation',
-          `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`,
-          unverifiedEmissions,
-          'Unverified Emissions',
-          financedEmissions
-        ),
+        calculationSteps: [
+          {
+            step: 'Total Equity + Debt Calculation',
+            value: totalEquityPlusDebt,
+            formula: `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`
+          },
+          {
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          },
+          {
+            step: 'Financed Emissions',
+            value: financedEmissions,
+            formula: `(${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)}) × ${unverifiedEmissions} = ${financedEmissions.toFixed(2)}`
+          }
+        ],
         metadata: {
           companyType,
           optionCode: '1b',
@@ -707,13 +709,20 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       COMMON_INPUTS.total_assets,        // Total assets for attribution factor
       COMMON_INPUTS.total_equity_plus_debt, // Total Equity + Debt for financed emissions calculation
       {
-        name: 'emissions',
-        label: 'Emissions',
+        name: 'energy_consumption',
+        label: 'Energy Consumption',
         type: 'number',
         required: true,
-        unit: 'tCO2e',
-        description: 'Total emissions (Energy Consumption × Emission Factor)',
-        tooltip: 'This represents the combined Energy Consumption × Emission Factor calculation'
+        unit: 'activity unit',
+        description: 'Primary physical activity data for energy or fuel consumption'
+      },
+      {
+        name: 'emission_factor',
+        label: 'Emission Factor',
+        type: 'number',
+        required: true,
+        unit: 'tCO2e / unit',
+        description: 'EPA or DEFRA emission factor for the selected energy source'
       }
     ],
     /**
@@ -731,16 +740,15 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
      */
     calculate: (inputs, companyType) => {
       const outstandingAmount = inputs.outstanding_amount;
-      const emissions = inputs.emissions; // This is already Energy Consumption × Emission Factor
-      
-      // Step 1: Calculate attribution factor (consistent across all formulas)
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
-      
-      // Step 2: Calculate Total Equity + Debt for unlisted companies
+      const energyConsumption = inputs.energy_consumption;
+      const emissionFactor = inputs.emission_factor;
+      if (!energyConsumption || !emissionFactor) {
+        throw new Error('Energy consumption and emission factor must be greater than 0');
+      }
+      const processEmissions = Number(inputs.process_emissions || 0);
       const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
-      
-      // Step 3: Use the pre-calculated emissions (Energy Consumption × Emission Factor)
-      const energyEmissions = emissions;
+      const attributionFactor = calculateAttributionFactorUnlisted(outstandingAmount, totalEquityPlusDebt);
+      const energyEmissions = energyConsumption * emissionFactor + processEmissions;
       
       // Step 4: Calculate financed emissions using Total Equity + Debt as denominator
       const financedEmissions = calculateFinancedEmissions(outstandingAmount, totalEquityPlusDebt, energyEmissions);
@@ -751,22 +759,36 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         financedEmissions,
         dataQualityScore: 3,
         methodology: 'PCAF Option 2a - Energy Consumption Data (Unlisted/Private)',
-        calculationSteps: createCommonCalculationSteps(
-          outstandingAmount,
-          inputs.total_assets,
-          totalEquityPlusDebt,
-          'Total Equity + Debt Calculation',
-          `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`,
-          energyEmissions,
-          'Emissions',
-          financedEmissions
-        ),
+        calculationSteps: [
+          {
+            step: 'Total Equity + Debt Calculation',
+            value: totalEquityPlusDebt,
+            formula: `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`
+          },
+          {
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          },
+          {
+            step: 'Energy Emissions',
+            value: energyEmissions,
+            formula: `${energyConsumption} × ${emissionFactor}${processEmissions ? ` + ${processEmissions}` : ''} = ${energyEmissions.toFixed(6)} tCO2e`
+          },
+          {
+            step: 'Financed Emissions',
+            value: financedEmissions,
+            formula: `(${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)}) × ${energyEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          }
+        ],
         metadata: {
           companyType,
           optionCode: '2a',
           category: 'listed_equity',
           totalEquityPlusDebt,
           energyEmissions,
+          energyConsumption,
+          emissionFactor,
           formula: 'Σ (Outstanding amount_c / (Total equity + debt)_c) × Energy consumption_c × Emission factor'
         }
       };
@@ -838,14 +860,8 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       const outstandingAmount = inputs.outstanding_amount;
       const production = inputs.production;
       const emissionFactor = inputs.emission_factor;
-      
-      // Step 1: Calculate attribution factor (consistent across all formulas)
-      const attributionFactor = calculateAttributionFactor(outstandingAmount, inputs.total_assets);
-      
-      // Step 2: Calculate Total Equity + Debt for unlisted companies
       const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
-      
-      // Step 3: Calculate production-based emissions
+      const attributionFactor = calculateAttributionFactorUnlisted(outstandingAmount, totalEquityPlusDebt);
       const productionEmissions = production * emissionFactor;
       
       // Step 4: Calculate financed emissions using Total Equity + Debt as denominator
@@ -857,16 +873,28 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         financedEmissions,
         dataQualityScore: 3,
         methodology: 'PCAF Option 2b - Production Data (Unlisted/Private)',
-        calculationSteps: createCommonCalculationSteps(
-          outstandingAmount,
-          inputs.total_assets,
-          totalEquityPlusDebt,
-          'Total Equity + Debt Calculation',
-          `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`,
-          productionEmissions,
-          'Production Emissions',
-          financedEmissions
-        ),
+        calculationSteps: [
+          {
+            step: 'Total Equity + Debt Calculation',
+            value: totalEquityPlusDebt,
+            formula: `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}`
+          },
+          {
+            step: 'Attribution Factor',
+            value: attributionFactor,
+            formula: `${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}`
+          },
+          {
+            step: 'Production Emissions',
+            value: productionEmissions,
+            formula: `${production} × ${emissionFactor} = ${productionEmissions.toFixed(2)}`
+          },
+          {
+            step: 'Financed Emissions',
+            value: financedEmissions,
+            formula: `(${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)}) × ${productionEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)}`
+          }
+        ],
         metadata: {
           companyType,
           optionCode: '2b',
@@ -883,7 +911,252 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       'Based on production volume and emission factors',
       'Formula: Σ (Outstanding amount_c / (Total equity + debt)_c) × Production_c × Emission factor'
     ]
-  }
+  },
+
+  {
+    id: '3a-listed-equity',
+    name: 'Option 3a - Revenue-based (Listed)',
+    description: 'Company revenue × sector GHG intensity (emissions / revenue)',
+    category: 'listed_equity',
+    optionCode: '3a',
+    dataQualityScore: 4,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      COMMON_INPUTS.evic,
+      { name: 'company_revenue', label: 'Company Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue of the borrower / investee' },
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const companyRevenue = Number(inputs.company_revenue || 0);
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorRevenue = Number(inputs.sector_revenue || 0);
+      if (!companyRevenue || !sectorRevenue || !sectorEmissions) {
+        throw new Error('Company revenue, sector emissions, and sector revenue must be greater than 0');
+      }
+      const evic = calculateEVIC(inputs);
+      const attributionFactor = calculateAttributionFactorListed(outstandingAmount, evic);
+      const intensity = sectorEmissions / sectorRevenue;
+      const estimatedEmissions = companyRevenue * intensity;
+      const financedEmissions = calculateFinancedEmissions(outstandingAmount, evic, estimatedEmissions);
+      return {
+        attributionFactor,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 4,
+        methodology: 'PCAF Option 3a - Revenue-based (Listed)',
+        calculationSteps: [
+          { step: 'EVIC', value: evic, formula: `EVIC = ${evic.toFixed(2)}` },
+          { step: 'Attribution Factor', value: attributionFactor, formula: `${outstandingAmount} / ${evic.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
+          { step: 'Sector intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
+          { step: 'Estimated company emissions', value: estimatedEmissions, formula: `${companyRevenue} × ${intensity.toFixed(8)} = ${estimatedEmissions.toFixed(4)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `(${outstandingAmount} / ${evic.toFixed(2)}) × ${estimatedEmissions.toFixed(4)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3a', category: 'listed_equity', evic, estimatedEmissions, formula: 'Σ (Outstanding / EVIC) × Revenue_c × (GHG_s / Revenue_s)' },
+      };
+    },
+    notes: ['Data quality score: 4', 'Sector intensity is entered manually until sector tables are configured'],
+  },
+  {
+    id: '3a-unlisted-equity',
+    name: 'Option 3a - Revenue-based (Unlisted/Private)',
+    description: 'Company revenue × sector GHG intensity (emissions / revenue)',
+    category: 'listed_equity',
+    optionCode: '3a',
+    dataQualityScore: 4,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      COMMON_INPUTS.total_equity_plus_debt,
+      { name: 'company_revenue', label: 'Company Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue of the borrower / investee' },
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const companyRevenue = Number(inputs.company_revenue || 0);
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorRevenue = Number(inputs.sector_revenue || 0);
+      if (!companyRevenue || !sectorRevenue || !sectorEmissions) {
+        throw new Error('Company revenue, sector emissions, and sector revenue must be greater than 0');
+      }
+      const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
+      const attributionFactor = calculateAttributionFactorUnlisted(outstandingAmount, totalEquityPlusDebt);
+      const intensity = sectorEmissions / sectorRevenue;
+      const estimatedEmissions = companyRevenue * intensity;
+      const financedEmissions = calculateFinancedEmissions(outstandingAmount, totalEquityPlusDebt, estimatedEmissions);
+      return {
+        attributionFactor,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 4,
+        methodology: 'PCAF Option 3a - Revenue-based (Unlisted/Private)',
+        calculationSteps: [
+          { step: 'Total Equity + Debt', value: totalEquityPlusDebt, formula: `${inputs.totalEquity} + ${inputs.totalDebt} = ${totalEquityPlusDebt.toFixed(2)}` },
+          { step: 'Attribution Factor', value: attributionFactor, formula: `${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
+          { step: 'Sector intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
+          { step: 'Estimated company emissions', value: estimatedEmissions, formula: `${companyRevenue} × ${intensity.toFixed(8)} = ${estimatedEmissions.toFixed(4)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `(${outstandingAmount} / ${totalEquityPlusDebt.toFixed(2)}) × ${estimatedEmissions.toFixed(4)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3a', category: 'listed_equity', totalEquityPlusDebt, estimatedEmissions, formula: 'Σ (Outstanding / (Equity+Debt)) × Revenue_c × (GHG_s / Revenue_s)' },
+      };
+    },
+    notes: ['Data quality score: 4', 'Sector intensity is entered manually until sector tables are configured'],
+  },
+  {
+    id: '3b-listed-equity',
+    name: 'Option 3b - Asset-based (Listed)',
+    description: 'Outstanding amount × sector GHG / sector assets (no attribution factor)',
+    category: 'listed_equity',
+    optionCode: '3b',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_assets', label: 'Sector Assets', type: 'number', required: true, unit: 'PKR', description: 'Assets for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorAssets = Number(inputs.sector_assets || 0);
+      if (!outstandingAmount || !sectorEmissions || !sectorAssets) {
+        throw new Error('Outstanding amount, sector emissions, and sector assets must be greater than 0');
+      }
+      const intensity = sectorEmissions / sectorAssets;
+      const financedEmissions = outstandingAmount * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 5,
+        methodology: 'PCAF Option 3b - Asset-based (Listed)',
+        calculationSteps: [
+          { step: 'Sector asset intensity', value: intensity, formula: `${sectorEmissions} / ${sectorAssets} = ${intensity.toFixed(8)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3b', category: 'listed_equity', formula: 'Σ Outstanding_c × (GHG_s / Assets_s)' },
+      };
+    },
+    notes: ['Data quality score: 5', 'No EVIC attribution — outstanding is applied directly'],
+  },
+  {
+    id: '3b-unlisted-equity',
+    name: 'Option 3b - Asset-based (Unlisted/Private)',
+    description: 'Outstanding amount × sector GHG / sector assets (no attribution factor)',
+    category: 'listed_equity',
+    optionCode: '3b',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_assets', label: 'Sector Assets', type: 'number', required: true, unit: 'PKR', description: 'Assets for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorAssets = Number(inputs.sector_assets || 0);
+      if (!outstandingAmount || !sectorEmissions || !sectorAssets) {
+        throw new Error('Outstanding amount, sector emissions, and sector assets must be greater than 0');
+      }
+      const intensity = sectorEmissions / sectorAssets;
+      const financedEmissions = outstandingAmount * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 5,
+        methodology: 'PCAF Option 3b - Asset-based (Unlisted/Private)',
+        calculationSteps: [
+          { step: 'Sector asset intensity', value: intensity, formula: `${sectorEmissions} / ${sectorAssets} = ${intensity.toFixed(8)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3b', category: 'listed_equity', formula: 'Σ Outstanding_c × (GHG_s / Assets_s)' },
+      };
+    },
+    notes: ['Data quality score: 5', 'No equity+debt attribution — outstanding is applied directly'],
+  },
+  {
+    id: '3c-listed-equity',
+    name: 'Option 3c - Asset Turnover Ratio (Listed)',
+    description: 'Outstanding × sector ATR × sector GHG / sector revenue',
+    category: 'listed_equity',
+    optionCode: '3c',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      { name: 'asset_turnover_ratio', label: 'Asset Turnover Ratio', type: 'number', required: true, unit: 'ratio', description: 'Asset turnover ratio for the sector' },
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const atr = Number(inputs.asset_turnover_ratio || 0);
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorRevenue = Number(inputs.sector_revenue || 0);
+      if (!outstandingAmount || !atr || !sectorEmissions || !sectorRevenue) {
+        throw new Error('Outstanding amount, ATR, sector emissions, and sector revenue must be greater than 0');
+      }
+      const intensity = sectorEmissions / sectorRevenue;
+      const financedEmissions = outstandingAmount * atr * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 5,
+        methodology: 'PCAF Option 3c - Asset Turnover Ratio (Listed)',
+        calculationSteps: [
+          { step: 'Sector revenue intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${atr} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3c', category: 'listed_equity', formula: 'Σ Outstanding_c × ATR_s × (GHG_s / Revenue_s)' },
+      };
+    },
+    notes: ['Data quality score: 5', 'No EVIC attribution — outstanding is applied directly'],
+  },
+  {
+    id: '3c-unlisted-equity',
+    name: 'Option 3c - Asset Turnover Ratio (Unlisted/Private)',
+    description: 'Outstanding × sector ATR × sector GHG / sector revenue',
+    category: 'listed_equity',
+    optionCode: '3c',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      COMMON_INPUTS.outstanding_amount,
+      { name: 'asset_turnover_ratio', label: 'Asset Turnover Ratio', type: 'number', required: true, unit: 'ratio', description: 'Asset turnover ratio for the sector' },
+      { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e', description: 'GHG emissions for the sector' },
+      { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR', description: 'Revenue for the sector' },
+    ],
+    calculate: (inputs, companyType) => {
+      const outstandingAmount = inputs.outstanding_amount;
+      const atr = Number(inputs.asset_turnover_ratio || 0);
+      const sectorEmissions = Number(inputs.sector_emissions || 0);
+      const sectorRevenue = Number(inputs.sector_revenue || 0);
+      if (!outstandingAmount || !atr || !sectorEmissions || !sectorRevenue) {
+        throw new Error('Outstanding amount, ATR, sector emissions, and sector revenue must be greater than 0');
+      }
+      const intensity = sectorEmissions / sectorRevenue;
+      const financedEmissions = outstandingAmount * atr * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions,
+        dataQualityScore: 5,
+        methodology: 'PCAF Option 3c - Asset Turnover Ratio (Unlisted/Private)',
+        calculationSteps: [
+          { step: 'Sector revenue intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
+          { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${atr} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
+        ],
+        metadata: { companyType, optionCode: '3c', category: 'listed_equity', formula: 'Σ Outstanding_c × ATR_s × (GHG_s / Revenue_s)' },
+      };
+    },
+    notes: ['Data quality score: 5', 'No equity+debt attribution — outstanding is applied directly'],
+  },
 ];
 
 // ============================================================================

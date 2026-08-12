@@ -1,22 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Building2, Users, CheckCircle, TrendingUp, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Building2, CheckCircle, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save, Car, Landmark, Minus, Home } from 'lucide-react';
 import { FinanceEmissionCalculator } from './FinanceEmissionCalculator';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import type { EmissionResultRow, FinanceMode, WizardLocationState, WizardResumePayload } from "../types/contracts";
+import type { LucideIcon } from 'lucide-react';
 
 type RefreshPortfolioWindow = Window & {
   refreshPortfolioData?: () => Promise<void>;
@@ -27,6 +22,140 @@ interface WizardStep {
   title: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
+}
+
+const LOAN_TYPE_OPTIONS: Array<{
+  value: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  { value: 'corporate-bond', label: 'Corporate Bond', description: 'Debt securities issued by corporations', icon: Landmark },
+  { value: 'business-loan', label: 'Business Loan', description: 'Loans to businesses for operations', icon: Building2 },
+  { value: 'project-finance', label: 'Project Finance', description: 'Financing for a specific project', icon: BarChart3 },
+  { value: 'mortgage', label: 'Mortgage', description: 'Loans secured by residential property', icon: Home },
+  { value: 'sovereign-debt', label: 'Sovereign Debt', description: 'Bonds or loans issued by governments', icon: FileText },
+  { value: 'motor-vehicle-loan', label: 'Motor Vehicle Loan', description: 'Loans for cars, trucks, and other vehicles', icon: Car },
+  { value: 'commercial-real-estate', label: 'Commercial Real Estate', description: 'Loans for offices, retail, and industrial buildings', icon: Building },
+];
+
+const loanTypeLabel = (type: string) =>
+  LOAN_TYPE_OPTIONS.find((o) => o.value === type)?.label || type;
+
+const BOND_FAMILY = ['corporate-bond', 'business-loan', 'project-finance'];
+const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
+
+const VEHICLE_METHODS = [
+  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'Primary fuel use × fuel-specific emission factor' },
+  { id: '1b', title: 'Actual distance + make/model efficiency', score: 'Score 1', description: 'Actual distance × make/model efficiency × fuel emission factor' },
+  { id: '2a', title: 'Local distance statistics', score: 'Score 2', description: 'Local statistical distance × make/model efficiency × fuel emission factor' },
+  { id: '2b', title: 'Regional distance statistics', score: 'Score 3', description: 'Regional statistical distance × make/model efficiency × fuel emission factor' },
+  { id: '3a', title: 'Vehicle-type efficiency', score: 'Score 4', description: 'Statistical distance × vehicle-type efficiency × fuel emission factor' },
+  { id: '3b', title: 'Average vehicle efficiency', score: 'Score 5', description: 'Statistical distance × average-vehicle efficiency × fuel emission factor' },
+];
+
+const PROPERTY_METHODS = [
+  { id: '1a', title: 'Actual energy + supplier factor', score: 'Score 1', description: 'Actual building electricity × EPA/DEFRA supplier-specific factor' },
+  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building electricity × EPA/DEFRA average factor' },
+  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy from labels × floor area × EPA/DEFRA average factor' },
+  { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'Energy from statistics × floor area × EPA/DEFRA average factor' },
+  { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'Energy from statistics × number of buildings × EPA/DEFRA average factor' },
+];
+
+const SOVEREIGN_METHODS = [
+  { id: '1a', title: 'Verified country GHG', score: 'Score 1', description: 'UNFCCC-reported verified country emissions' },
+  { id: '1b', title: 'Unverified country GHG', score: 'Score 2', description: 'Unverified country GHG emissions' },
+  { id: '2a', title: 'Country energy consumption', score: 'Score 3', description: 'Country energy × EPA/DEFRA factor (+ process emissions)' },
+  { id: '3a', title: 'Country sector intensity', score: 'Score 4', description: 'PPP-GDP × sector intensity from the reference table' },
+  { id: '3b', title: 'Proxy country intensity', score: 'Score 5', description: 'Target PPP-GDP × (proxy GHG / proxy PPP-GDP)' },
+];
+
+const BOND_NO_GHG_METHODS = [
+  { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+  { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
+  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
+  { id: '3b', title: 'Asset-based', score: 'Score 5', description: 'Outstanding amount × sector GHG / sector assets' },
+  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
+];
+
+const TILE =
+  'w-full text-left rounded-[14px] border p-4 transition-all duration-200';
+const TILE_ON = 'border-[#0F6E56] bg-[#EAF7F1]/70 shadow-[0_8px_20px_rgba(15,110,86,0.08)]';
+const TILE_OFF = 'border-[#E8EEF0] bg-white hover:border-[#BFE3D3] hover:shadow-[0_8px_20px_rgba(15,23,42,0.04)]';
+
+function MethodOptionGrid({
+  methods,
+  selectedId,
+  onSelect,
+  error,
+}: {
+  methods: Array<{ id: string; title: string; score: string; description: string }>;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  error?: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {methods.map((method) => {
+          const selected = selectedId === method.id;
+          return (
+            <button
+              key={method.id}
+              type="button"
+              onClick={() => onSelect(method.id)}
+              className={cn(TILE, selected ? TILE_ON : TILE_OFF)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-[#0F172A] tracking-[-0.01em]">{method.title}</p>
+                <span className="shrink-0 text-[11px] font-semibold text-[#0F6E56] bg-[#EAF7F1] px-2 py-0.5 rounded-full">
+                  {method.score}
+                </span>
+              </div>
+              <p className="text-sm text-[#64748B] mt-1.5 leading-relaxed">{method.description}</p>
+            </button>
+          );
+        })}
+      </div>
+      {error && (
+        <p className="text-sm text-red-600 flex items-center gap-1.5">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ChoiceTile({
+  selected,
+  title,
+  description,
+  onClick,
+}: {
+  selected: boolean;
+  title: string;
+  description?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" onClick={onClick} className={cn(TILE, selected ? TILE_ON : TILE_OFF)}>
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
+            selected ? 'border-[#0F6E56] bg-[#0F6E56]' : 'border-slate-300 bg-white'
+          )}
+        >
+          {selected && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+        </span>
+        <div>
+          <p className="font-semibold text-[#0F172A]">{title}</p>
+          {description && <p className="text-sm text-[#64748B] mt-1 leading-relaxed">{description}</p>}
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export const ESGWizard: React.FC = () => {
@@ -84,6 +213,7 @@ export const ESGWizard: React.FC = () => {
         hasEmissions: '',
         verificationStatus: '',
         calculationMethod: '',
+        calculationMethods: {} as Record<string, string>,
         score: 0,
         scope1Emissions: 0,
         scope2Emissions: 0,
@@ -209,6 +339,7 @@ export const ESGWizard: React.FC = () => {
             hasEmissions: questionnaire.has_emissions ? 'yes' : 'no',
             verificationStatus: questionnaire.verification_status || '',
             calculationMethod: '',
+            calculationMethods: {} as Record<string, string>,
             score: 0,
             scope1Emissions,
             scope2Emissions,
@@ -235,27 +366,21 @@ export const ESGWizard: React.FC = () => {
           // This allows users to see and potentially modify their selections
           // Only do this if we haven't already restored (handled by the other useEffect)
           // AND we're not already on the results step (don't override results page)
-          if (!hasRestoredRef.current && steps[currentStep]?.id !== 'results') {
+          if (!hasRestoredRef.current) {
             try {
               const saved = sessionStorage.getItem('esgWizardState');
               if (saved) {
                 const parsed = JSON.parse(saved);
-                // Only skip if resumeAtCalculation is true AND mode matches AND we haven't restored yet
                 if (parsed.resumeAtCalculation === true && parsed.mode === mode) {
-                  const hasRequiredData = mode === 'finance' 
-                    ? (questionnaire.corporate_structure && loanTypes.length > 0 && questionnaire.has_emissions !== null)
-                    : (questionnaire.corporate_structure && questionnaire.has_emissions !== null);
-                  
+                  const hasRequiredData = mode === 'finance'
+                    ? loanTypes.length > 0
+                    : !!questionnaire.corporate_structure;
                   if (hasRequiredData) {
-                    const emissionStepIndex = steps.findIndex(s => s.id === 'emission-calculation');
-                    if (emissionStepIndex >= 0 && currentStep !== emissionStepIndex) {
-                      setCurrentStep(emissionStepIndex);
-                    }
+                    pendingStepIdRef.current = 'emission-calculation';
                   }
                 }
               }
             } catch (e) {
-              // If no sessionStorage or error, don't skip - start from beginning
               console.log('Not skipping to calculation step - no resume flag');
             }
           }
@@ -306,26 +431,24 @@ export const ESGWizard: React.FC = () => {
 
   const sharedPrefill = loadSharedAnswers();
 
-  // Build steps dynamically: remove 'loan-type' for facilitated mode
-  // Always show all steps - no skipping logic
-  const baseStepsFinance: WizardStep[] = [
-    { id: 'corporate-structure', title: 'Corporate Structure', description: 'Is the company listed or unlisted?', icon: Building2 },
-    { id: 'loan-type', title: 'Loan Type', description: 'Select your loan classification', icon: FileText },
-    { id: 'emission-status', title: 'Emission Status', description: 'Do you have emissions calculated?', icon: AlertCircle },
+  const catalogFinance: WizardStep[] = [
+    { id: 'loan-type', title: 'Loan type', description: 'What are you financing?', icon: FileText },
+    { id: 'corporate-structure', title: 'Listed or unlisted', description: 'Needed for EVIC vs equity + debt', icon: Building2 },
+    { id: 'emission-status', title: 'Company GHG', description: 'Do you have company emissions data?', icon: AlertCircle },
     { id: 'verification', title: 'Verification', description: 'Verification details', icon: Shield },
-    { id: 'emission-calculation', title: 'Finance Emission', description: 'Calculate your finance emissions', icon: Calculator },
-    { id: 'results', title: 'Results', description: 'Per-loan emission results', icon: CheckCircle }
+    { id: 'emission-calculation', title: 'Inputs', description: 'Enter the data for this option', icon: Calculator },
+    { id: 'results', title: 'Results', description: 'Financed emissions', icon: CheckCircle }
   ];
-  const baseStepsFacilitated: WizardStep[] = [
-    { id: 'corporate-structure', title: 'Corporate Structure', description: 'Is the company listed or unlisted?', icon: Building2 },
-    { id: 'emission-status', title: 'Emission Status', description: 'Do you have emissions calculated?', icon: AlertCircle },
+  const catalogFacilitated: WizardStep[] = [
+    { id: 'corporate-structure', title: 'Listed or unlisted', description: 'Is the company listed or unlisted?', icon: Building2 },
+    { id: 'emission-status', title: 'Company GHG', description: 'Do you have company emissions data?', icon: AlertCircle },
     { id: 'verification', title: 'Verification', description: 'Verification details', icon: Shield },
-    { id: 'emission-calculation', title: 'Facilitated Emission', description: 'Calculate your facilitated emissions', icon: Calculator },
-    { id: 'results', title: 'Results', description: 'Per-loan emission results', icon: CheckCircle }
+    { id: 'emission-calculation', title: 'Inputs', description: 'Calculate facilitated emissions', icon: Calculator },
+    { id: 'results', title: 'Results', description: 'Facilitated emissions', icon: CheckCircle }
   ];
 
-  const steps: WizardStep[] = mode === 'finance' ? baseStepsFinance : baseStepsFacilitated;
-  
+  const pendingStepIdRef = useRef<string | null>(null);
+  const lastStepIdRef = useRef(mode === 'finance' ? 'loan-type' : 'corporate-structure');
   const [currentStep, setCurrentStep] = useState(0);
 
   // Check if we should resume at calculation step (coming back from emission calculator)
@@ -371,16 +494,8 @@ export const ESGWizard: React.FC = () => {
             console.log('ESGWizard - Restored form data from sessionStorage for mode:', mode, parsed.formData);
           }
           
-          // Navigate to emission-calculation step (only if not already on results step)
-          const currentStepId = steps[currentStep]?.id;
-          if (currentStepId !== 'results') {
-            const emissionStepIndex = steps.findIndex(s => s.id === 'emission-calculation');
-            if (emissionStepIndex >= 0 && currentStep !== emissionStepIndex) {
-              setCurrentStep(emissionStepIndex);
-              console.log('ESGWizard - Resuming at emission-calculation step for mode:', mode);
-            }
-          } else {
-            console.log('ESGWizard - Already on results step, not overriding');
+          if (lastStepIdRef.current !== 'results') {
+            pendingStepIdRef.current = 'emission-calculation';
           }
           
           // Clear sessionStorage after restoring to prevent it from running again
@@ -401,18 +516,13 @@ export const ESGWizard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startFresh, mode]); // Removed 'steps' from dependencies to prevent infinite loops
 
-  // Safety check: ensure currentStep is within bounds
-  useEffect(() => {
-    if (currentStep >= steps.length && steps.length > 0) {
-      setCurrentStep(0);
-    }
-  }, [steps.length, currentStep]);
   const [formData, setFormData] = useState({
     corporateStructure: '', // 'listed' or 'unlisted'
     loanTypes: [], // Array of loan type objects with quantity
     hasEmissions: '',
     verificationStatus: '',
     calculationMethod: '',
+    calculationMethods: {} as Record<string, string>,
     score: 0,
     // Emission scopes (tCO2e)
     scope1Emissions: 0,
@@ -425,6 +535,110 @@ export const ESGWizard: React.FC = () => {
     unverified_emissions: 0
   });
 
+  const PROPERTY_DIRECT_TYPES = ['commercial-real-estate', 'mortgage'];
+  const LISTING_TYPES = ['corporate-bond', 'business-loan'];
+  const isPropertyDirect =
+    mode === 'finance' &&
+    formData.loanTypes.length > 0 &&
+    formData.loanTypes.every((item) => PROPERTY_DIRECT_TYPES.includes(item.type));
+  const isVehicleDirect =
+    mode === 'finance' &&
+    formData.loanTypes.length > 0 &&
+    formData.loanTypes.every((item) => item.type === 'motor-vehicle-loan');
+  const isSovereignDirect =
+    mode === 'finance' &&
+    formData.loanTypes.length > 0 &&
+    formData.loanTypes.every((item) => item.type === 'sovereign-debt');
+  const isDirectMethod = isPropertyDirect || isVehicleDirect || isSovereignDirect;
+  const needsListing =
+    mode === 'finance' &&
+    formData.loanTypes.some((item) => LISTING_TYPES.includes(item.type));
+  const selectedTypeIds = formData.loanTypes.map((item) => item.type);
+  const hasBondFamily = selectedTypeIds.some((t) => BOND_FAMILY.includes(t));
+  const hasVehicleFamily = selectedTypeIds.includes('motor-vehicle-loan');
+  const hasPropertyFamily = selectedTypeIds.some((t) => PROPERTY_FAMILY.includes(t));
+  const hasSovereignFamily = selectedTypeIds.includes('sovereign-debt');
+  const isMixedFamilies =
+    [hasBondFamily, hasVehicleFamily, hasPropertyFamily, hasSovereignFamily].filter(Boolean).length > 1;
+  const skipCompanyGhg = isDirectMethod || (isMixedFamilies && !hasBondFamily);
+  const methodFor = (type: string) => formData.calculationMethods?.[type] || '';
+  const methodForFamily = (types: string[]) => types.map(methodFor).find(Boolean) || '';
+  const activityMixLabels = [
+    hasVehicleFamily && 'motor vehicle',
+    hasPropertyFamily && 'property',
+    hasSovereignFamily && 'sovereign',
+  ].filter(Boolean) as string[];
+  const activityMixPhrase =
+    activityMixLabels.length === 0
+      ? 'activity loans'
+      : activityMixLabels.length === 1
+        ? activityMixLabels[0]
+        : `${activityMixLabels.slice(0, -1).join(', ')} and ${activityMixLabels[activityMixLabels.length - 1]}`;
+
+  const steps = (() => {
+    let next = mode === 'finance' ? [...catalogFinance] : [...catalogFacilitated];
+    if (mode === 'finance' && !needsListing) {
+      next = next.filter((s) => s.id !== 'corporate-structure');
+    }
+    if (skipCompanyGhg) {
+      next = next
+        .filter((s) => s.id !== 'emission-status')
+        .map((s) =>
+          s.id === 'verification'
+            ? isMixedFamilies
+              ? { ...s, title: 'Methods by loan', description: 'Each asset class has its own PCAF options' }
+              : { ...s, title: 'Calculation method', description: 'Select the PCAF data-quality option' }
+            : s
+        );
+    } else if (isMixedFamilies) {
+      next = next.map((s) => {
+        if (s.id === 'emission-status') {
+          return {
+            ...s,
+            title: 'Bond company GHG',
+            description: `Only for the corporate bond / business loan — not ${activityMixPhrase}`,
+          };
+        }
+        if (s.id === 'verification') {
+          return {
+            ...s,
+            title: 'Methods by loan',
+            description: `Bond can use company GHG; ${activityMixPhrase} always use activity data`,
+          };
+        }
+        return s;
+      });
+    }
+    return next;
+  })();
+
+  useEffect(() => {
+    if (mode !== 'finance' || formData.loanTypes.length === 0) return;
+    if (!needsListing && formData.corporateStructure !== 'unlisted') {
+      setFormData((prev) => ({ ...prev, corporateStructure: 'unlisted' }));
+    }
+  }, [mode, needsListing, formData.loanTypes.length, formData.corporateStructure]);
+
+  useEffect(() => {
+    const currentId = steps[currentStep]?.id;
+    if (currentId) {
+      lastStepIdRef.current = currentId;
+      return;
+    }
+    const mapped = steps.findIndex((s) => s.id === lastStepIdRef.current);
+    setCurrentStep(mapped >= 0 ? mapped : 0);
+  }, [steps, currentStep]);
+
+  useEffect(() => {
+    const target = pendingStepIdRef.current;
+    if (!target) return;
+    const idx = steps.findIndex((s) => s.id === target);
+    if (idx >= 0) {
+      setCurrentStep(idx);
+      pendingStepIdRef.current = null;
+    }
+  }, [steps]);
+
   // Track completed steps for visual indicators
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   
@@ -436,9 +650,6 @@ export const ESGWizard: React.FC = () => {
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [results, setResults] = useState<EmissionResultRow[]>([]);
-
-  // Track per-loan-type quantity inputs before adding
-  const [pendingQuantities, setPendingQuantities] = useState<Record<string, number>>({});
 
   // Helper function to sanitize numeric values for database storage
   const sanitizeNumericValue = (value: number | null): number | null => {
@@ -1033,6 +1244,33 @@ export const ESGWizard: React.FC = () => {
         }
         break;
       case 'verification':
+        if (isMixedFamilies) {
+          if (hasBondFamily && dataToValidate.hasEmissions === 'yes' && !dataToValidate.verificationStatus) {
+            errors.verificationStatus = 'Please select verification status for the bond / loan';
+          }
+          if (hasBondFamily && dataToValidate.hasEmissions === 'yes' && dataToValidate.verificationStatus === 'verified' && !dataToValidate.verifierName.trim()) {
+            errors.verifierName = 'Please enter the verifier name';
+          }
+          if (hasBondFamily && dataToValidate.hasEmissions === 'no' && !BOND_FAMILY.some((t) => dataToValidate.calculationMethods?.[t])) {
+            errors.calculationMethod = 'Select a PCAF option for the corporate bond / business loan';
+          }
+          if (hasVehicleFamily && !dataToValidate.calculationMethods?.['motor-vehicle-loan']) {
+            errors.vehicleMethod = 'Select a PCAF option for the motor vehicle loan';
+          }
+          if (hasPropertyFamily && !PROPERTY_FAMILY.some((t) => dataToValidate.calculationMethods?.[t])) {
+            errors.propertyMethod = 'Select a PCAF option for the property loan';
+          }
+          if (hasSovereignFamily && !dataToValidate.calculationMethods?.['sovereign-debt']) {
+            errors.sovereignMethod = 'Select a PCAF option for sovereign debt';
+          }
+          break;
+        }
+        if (isDirectMethod) {
+          if (!dataToValidate.calculationMethod) {
+            errors.calculationMethod = 'Please select a calculation method';
+          }
+          break;
+        }
         if (dataToValidate.hasEmissions === 'yes' && !dataToValidate.verificationStatus) {
           errors.verificationStatus = 'Please select verification status';
         } else if (dataToValidate.hasEmissions === 'yes' && dataToValidate.verificationStatus === 'verified' && !dataToValidate.verifierName.trim()) {
@@ -1078,6 +1316,20 @@ export const ESGWizard: React.FC = () => {
       // Update validation errors immediately - replace all errors for current step
       setValidationErrors(errors);
       
+      return updated;
+    });
+  };
+
+  const applyMethods = (types: string[], method: string) => {
+    setFormData((prev) => {
+      const calculationMethods = { ...(prev.calculationMethods || {}) };
+      types.forEach((type) => {
+        if (prev.loanTypes.some((item) => item.type === type)) {
+          calculationMethods[type] = method;
+        }
+      });
+      const updated = { ...prev, calculationMethod: method, calculationMethods };
+      setValidationErrors(validateCurrentStep(updated));
       return updated;
     });
   };
@@ -1136,226 +1388,112 @@ export const ESGWizard: React.FC = () => {
     }
     
     switch (steps[currentStep].id) {
-      case 'corporate-structure':
+      case 'corporate-structure': {
         return (
-          <div className="space-y-6">
-            <div>
-              <Label htmlFor="corporate-structure" className="text-base font-semibold text-gray-900 block mb-3">
-                Corporate Structure <span className="text-red-500">*</span>
-              </Label>
-              <Select 
-                value={formData.corporateStructure} 
-                onValueChange={(value) => updateFormData('corporateStructure', value)}
-              >
-                <SelectTrigger 
-                  className={`h-12 text-base border-2 ${validationErrors.corporateStructure ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-[#1D9E75]'}`}
-                >
-                  <SelectValue placeholder="Select corporate structure" />
-                </SelectTrigger>
-                  <SelectContent className="w-full">
-                    <SelectItem 
-                      value="listed"
-                      className="group relative cursor-pointer"
-                      title="Company whose shares are traded on a public stock exchange. Uses EVIC (Enterprise Value Including Cash) calculation method."
-                    >
-                      <span>Listed Company</span>
-                      <div className="absolute left-full ml-3 top-0 hidden group-hover:block z-[100] pointer-events-none">
-                        <div className="bg-slate-800 text-white text-sm rounded-lg px-4 py-3 w-72 shadow-2xl backdrop-blur-sm">
-                          <p className="leading-relaxed">
-                            Company whose shares are traded on a public stock exchange. Uses EVIC (Enterprise Value Including Cash) calculation method.
-                          </p>
-                          <div className="absolute right-full top-4 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[6px] border-r-slate-800"></div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem 
-                      value="unlisted"
-                      className="group relative cursor-pointer"
-                      title="Private company not traded on public exchanges. Uses Total Debt + Total Equity calculation method."
-                    >
-                      <span>Unlisted Company</span>
-                      <div className="absolute left-full ml-3 top-0 hidden group-hover:block z-[100] pointer-events-none">
-                        <div className="bg-slate-800 text-white text-sm rounded-lg px-4 py-3 w-72 shadow-2xl backdrop-blur-sm">
-                          <p className="leading-relaxed">
-                            Private company not traded on public exchanges. Uses Total Debt + Total Equity calculation method.
-                          </p>
-                          <div className="absolute right-full top-4 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[6px] border-r-slate-800"></div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-              </Select>
-              {validationErrors.corporateStructure && (
-                <p className="text-sm text-red-500 mt-2 flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {validationErrors.corporateStructure}
-                </p>
-              )}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ChoiceTile
+                selected={formData.corporateStructure === 'listed'}
+                title="Listed company"
+                description="Shares trade on a public exchange. Attribution uses EVIC."
+                onClick={() => updateFormData('corporateStructure', 'listed')}
+              />
+              <ChoiceTile
+                selected={formData.corporateStructure === 'unlisted'}
+                title="Unlisted company"
+                description="Private company. Attribution uses total equity + debt."
+                onClick={() => updateFormData('corporateStructure', 'unlisted')}
+              />
             </div>
+            {validationErrors.corporateStructure && (
+              <p className="text-sm text-red-600 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {validationErrors.corporateStructure}
+              </p>
+            )}
           </div>
         );
+      }
 
       case 'loan-type': {
         if (mode === 'facilitated') {
-          // Skip rendering loan-type step entirely for facilitated mode (defensive)
           return null;
         }
-        const loanTypeOptions = [
-          { value: 'corporate-bond', label: 'Corporate Bond', description: 'Debt securities issued by corporations' },
-          { value: 'business-loan', label: 'Business Loan', description: 'Traditional loans to businesses for operations' },
-          { value: 'project-finance', label: 'Project Finance', description: 'Financing for specific infrastructure or development projects' },
-          { value: 'mortgage', label: 'Mortgage', description: 'Loans secured by real estate property' },
-          { value: 'sovereign-debt', label: 'Sovereign Debt', description: 'Loans or bonds issued by national governments' },
-          { value: 'motor-vehicle-loan', label: 'Motor Vehicle Loan', description: 'Loans for purchasing cars, trucks, motorcycles, and other vehicles' },
-          { value: 'commercial-real-estate', label: 'Commercial Real Estate', description: 'Loans for commercial properties like offices, retail, and industrial buildings' }
-        ];
 
         return (
-          <div className="space-y-8">
-            <div className="text-center">
-              <p className="text-sm text-gray-500">
-                Select one or more loan types for your {mode === 'finance' ? 'finance' : 'facilitated'} emission calculation
-              </p>
-            </div>
-
-            {/* Selected Loan Types - Show at top if any selected */}
-            {formData.loanTypes.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="h-px flex-1 bg-gray-200"></div>
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide px-3">
-                    {formData.loanTypes.length} Selected
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200"></div>
-                </div>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {formData.loanTypes.map((loanTypeItem) => {
-                    const option = loanTypeOptions.find(opt => opt.value === loanTypeItem.type);
-                    return (
-                      <div key={loanTypeItem.type} className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-gray-200 bg-white shadow-sm">
-                        <span className="text-sm font-medium text-gray-900">{option?.label}</span>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            id={`quantity-${loanTypeItem.type}`}
-                            type="number"
-                            min="1"
-                            value={loanTypeItem.quantity}
-                            onChange={(e) => updateLoanTypeQuantity(loanTypeItem.type, parseInt(e.target.value) || 1)}
-                            className="w-16 h-8 text-center text-sm border-gray-200"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeLoanType(loanTypeItem.type)}
-                            className="h-8 w-8 p-0 hover:bg-red-50 text-gray-400 hover:text-red-600"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Available Loan Types */}
-            <div className="grid grid-cols-1 gap-3">
-              {loanTypeOptions.map((option) => {
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {LOAN_TYPE_OPTIONS.map((option) => {
+                const Icon = option.icon;
                 const isSelected = formData.loanTypes.some(item => item.type === option.value);
                 const selectedItem = formData.loanTypes.find(item => item.type === option.value);
-                
+
                 return (
-                  <div 
-                    key={option.value} 
-                    className={`p-4 rounded-lg border transition-all duration-200 ${
-                      isSelected 
-                        ? 'border-gray-300 bg-white shadow-sm' 
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                    }`}
+                  <div
+                    key={option.value}
+                    className={cn(TILE, isSelected ? TILE_ON : TILE_OFF, 'relative')}
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 mb-1">{option.label}</div>
-                        <div className="text-sm text-gray-500">{option.description}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) removeLoanType(option.value);
+                        else addLoanType(option.value, 1);
+                      }}
+                      className="w-full text-left"
+                    >
+                      <div className="flex gap-3">
+                        <div
+                          className={cn(
+                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                            isSelected ? 'bg-[#0F6E56] text-white' : 'bg-[#F1F5F9] text-[#64748B]'
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 pr-6">
+                          <p className="font-semibold text-[#0F172A] tracking-[-0.01em]">{option.label}</p>
+                          <p className="text-sm text-[#64748B] mt-1 leading-relaxed">{option.description}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {isSelected ? (
-                          <>
-                            <div className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md">
-                              Qty: {selectedItem?.quantity}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addLoanType(option.value, 1)}
-                              className="h-9 px-3"
-                            >
-                              +1
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeLoanType(option.value)}
-                              className="h-9 px-3 text-red-600 hover:bg-red-50"
-                            >
-                              Remove
-                            </Button>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              min="1"
-                              placeholder="1"
-                              className="w-16 h-9 text-center text-sm border-gray-200"
-                              value={pendingQuantities[option.value] ?? 1}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setPendingQuantities(prev => ({ ...prev, [option.value]: isNaN(val) ? 1 : Math.max(1, val) }));
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const quantity = pendingQuantities[option.value] ?? 1;
-                                  addLoanType(option.value, quantity);
-                                  setPendingQuantities(prev => ({ ...prev, [option.value]: 1 }));
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={() => {
-                                const quantity = pendingQuantities[option.value] ?? 1;
-                                addLoanType(option.value, quantity);
-                                setPendingQuantities(prev => ({ ...prev, [option.value]: 1 }));
-                              }}
-                              className="h-9 px-4"
-                            >
-                              Add
-                            </Button>
-                          </div>
-                        )}
+                    </button>
+                    {isSelected && (
+                      <div className="mt-3 ml-[52px] flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs font-medium text-[#64748B]">Quantity</span>
+                        <div className="inline-flex items-center rounded-lg border border-[#E2E8F0] bg-white">
+                          <button
+                            type="button"
+                            className="h-8 w-8 flex items-center justify-center text-[#64748B] hover:text-[#0F172A]"
+                            onClick={() => updateLoanTypeQuantity(option.value, (selectedItem?.quantity || 1) - 1)}
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="w-8 text-center text-sm font-semibold text-[#0F172A]">
+                            {selectedItem?.quantity || 1}
+                          </span>
+                          <button
+                            type="button"
+                            className="h-8 w-8 flex items-center justify-center text-[#64748B] hover:text-[#0F172A]"
+                            onClick={() => updateLoanTypeQuantity(option.value, (selectedItem?.quantity || 1) + 1)}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-
-            {formData.loanTypes.length === 0 && (
-              <div className={`text-center py-8 ${validationErrors.loanTypes ? 'text-red-600' : 'text-gray-400'}`}>
-                <p className="flex items-center justify-center gap-2">
-                  {validationErrors.loanTypes && <AlertCircle className="w-5 h-5" />}
-                  <span className="text-sm">
-                    {validationErrors.loanTypes || 'Select at least one loan type to continue'}
-                  </span>
-                </p>
-              </div>
+            {isMixedFamilies && (
+              <p className="text-sm text-[#64748B]">
+                Mixed asset classes each use their own PCAF table. You will pick a method for each on the next steps.
+              </p>
+            )}
+            {validationErrors.loanTypes && (
+              <p className="text-sm text-red-600 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {validationErrors.loanTypes}
+              </p>
             )}
           </div>
         );
@@ -1364,94 +1502,87 @@ export const ESGWizard: React.FC = () => {
       case 'emission-status':
         return (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <Label className="text-base font-semibold text-gray-900 block">
-                Do you have your emissions calculated? <span className="text-red-500">*</span>
-              </Label>
-              <RadioGroup
-                value={formData.hasEmissions}
-                onValueChange={(value) => updateFormData('hasEmissions', value)}
-                className="space-y-3"
-              >
-                <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                  <RadioGroupItem value="yes" id="yes" />
-                  <Label htmlFor="yes" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
-                    Yes
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                  <RadioGroupItem value="no" id="no" />
-                  <Label htmlFor="no" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
-                    No
-                  </Label>
-                </div>
-              </RadioGroup>
-              {validationErrors.hasEmissions && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700 flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    {validationErrors.hasEmissions}
-                  </p>
-                </div>
-              )}
+            {isMixedFamilies && (
+              <div className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 space-y-2">
+                <p className="text-sm font-semibold text-[#0F172A]">This question is only for the bond / business loan</p>
+                <p className="text-sm text-[#64748B]">
+                  {activityMixPhrase.charAt(0).toUpperCase() + activityMixPhrase.slice(1)} never use company GHG.
+                  They get their own PCAF options on the next step.
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ChoiceTile
+                selected={formData.hasEmissions === 'yes'}
+                title={isMixedFamilies ? 'Yes — the company has GHG data' : 'Yes — we have company GHG data'}
+                description={
+                  isMixedFamilies
+                    ? 'Used for the corporate bond / business loan only (Option 1a / 1b).'
+                    : 'Enter Scope 1, 2 and 3 totals in tCO₂e.'
+                }
+                onClick={() => updateFormData('hasEmissions', 'yes')}
+              />
+              <ChoiceTile
+                selected={formData.hasEmissions === 'no'}
+                title={isMixedFamilies ? 'No — estimate the bond from activity' : 'No — estimate from activity'}
+                description={
+                  isMixedFamilies
+                    ? `Bond uses energy, production, or sector proxies. ${activityMixPhrase.charAt(0).toUpperCase() + activityMixPhrase.slice(1)} still use their own activity methods.`
+                    : 'Use energy, production, or sector proxies.'
+                }
+                onClick={() => updateFormData('hasEmissions', 'no')}
+              />
             </div>
+            {validationErrors.hasEmissions && (
+              <p className="text-sm text-red-600 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {validationErrors.hasEmissions}
+              </p>
+            )}
 
             {formData.hasEmissions === 'yes' && (
-              <div className="space-y-6 mt-6">
+              <div className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 sm:p-5 space-y-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Enter Emissions by Scope</h3>
-                  <p className="text-sm text-gray-500">
-                    Values are in tCO₂e (tonnes of carbon dioxide equivalent)
-                  </p>
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Emissions by scope</h3>
+                  <p className="text-sm text-[#64748B] mt-0.5">Values in tCO₂e</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="scope1" className="text-sm font-medium text-gray-700 block">
-                      Scope 1 Emissions
-                      <span className="text-xs text-gray-400 font-normal ml-1">(tCO₂e)</span>
-                    </Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="scope1" className="text-sm font-medium text-[#334155]">Scope 1</Label>
                     <FormattedNumberInput
                       id="scope1"
-                      placeholder="Enter value"
+                      placeholder="0"
                       value={formData.scope1Emissions || 0}
                       onChange={(value) => updateFormData('scope1Emissions', value)}
-                      className={`h-12 text-base ${validationErrors.scopeEmissions ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-gray-400 focus:ring-gray-100'}`}
+                      className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="scope2" className="text-sm font-medium text-gray-700 block">
-                      Scope 2 Emissions
-                      <span className="text-xs text-gray-400 font-normal ml-1">(tCO₂e)</span>
-                    </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="scope2" className="text-sm font-medium text-[#334155]">Scope 2</Label>
                     <FormattedNumberInput
                       id="scope2"
-                      placeholder="Enter value"
+                      placeholder="0"
                       value={formData.scope2Emissions || 0}
                       onChange={(value) => updateFormData('scope2Emissions', value)}
-                      className={`h-12 text-base ${validationErrors.scopeEmissions ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-gray-400 focus:ring-gray-100'}`}
+                      className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="scope3" className="text-sm font-medium text-gray-700 block">
-                      Scope 3 Emissions
-                      <span className="text-xs text-gray-400 font-normal ml-1">(tCO₂e)</span>
-                    </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="scope3" className="text-sm font-medium text-[#334155]">Scope 3</Label>
                     <FormattedNumberInput
                       id="scope3"
-                      placeholder="Enter value"
+                      placeholder="0"
                       value={formData.scope3Emissions || 0}
                       onChange={(value) => updateFormData('scope3Emissions', value)}
-                      className={`h-12 text-base ${validationErrors.scopeEmissions ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-gray-400 focus:ring-gray-100'}`}
+                      className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
                 </div>
                 {validationErrors.scopeEmissions && (
-                  <div className="pt-2">
-                    <p className="text-sm text-red-600 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      {validationErrors.scopeEmissions}
-                    </p>
-                  </div>
+                  <p className="text-sm text-red-600 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {validationErrors.scopeEmissions}
+                  </p>
                 )}
               </div>
             )}
@@ -1459,64 +1590,213 @@ export const ESGWizard: React.FC = () => {
         );
 
       case 'verification':
-        if (formData.hasEmissions === 'yes') {
+        if (isMixedFamilies) {
           return (
             <div className="space-y-6">
-              <div className="space-y-6">
-                <div>
-                  <Label className="text-base font-medium text-gray-900 block mb-4">
-                    Is it verified by a third party? <span className="text-red-500">*</span>
-                  </Label>
-                  <RadioGroup
-                    value={formData.verificationStatus}
-                    onValueChange={(value) => updateFormData('verificationStatus', value)}
-                    className="space-y-3"
-                  >
-                    <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                      <RadioGroupItem value="verified" id="verified" />
-                      <Label htmlFor="verified" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
-                        Yes
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                      <RadioGroupItem value="unverified" id="unverified" />
-                      <Label htmlFor="unverified" className="text-base font-medium text-gray-900 cursor-pointer flex-1">
-                        No
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                  {validationErrors.verificationStatus && (
-                    <p className="text-sm text-red-600 mt-3 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      {validationErrors.verificationStatus}
-                    </p>
-                  )}
-                </div>
-
-                {formData.verificationStatus === 'verified' && (
-                  <div className="space-y-3 pt-2">
-                    <Label htmlFor="verifier-name" className="text-sm font-medium text-gray-900 block">
-                      Verified by (Organization/Agency Name) <span className="text-red-500">*</span>
-                    </Label>
+              <p className="text-sm text-[#64748B]">
+                {hasBondFamily && formData.hasEmissions === 'yes'
+                  ? `Bond uses the company GHG you just entered. ${activityMixPhrase.charAt(0).toUpperCase() + activityMixPhrase.slice(1)} still need their own activity option.`
+                  : 'Each asset class has its own PCAF table. Pick an option for every group below.'}
+              </p>
+              {hasBondFamily && formData.hasEmissions === 'yes' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Corporate bond / business loan</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <ChoiceTile
+                      selected={formData.verificationStatus === 'verified'}
+                      title="Verified by a third party"
+                      description="Company GHG is independently verified (Option 1a)."
+                      onClick={() => updateFormData('verificationStatus', 'verified')}
+                    />
+                    <ChoiceTile
+                      selected={formData.verificationStatus === 'unverified'}
+                      title="Not verified"
+                      description="Use unverified company GHG (Option 1b)."
+                      onClick={() => updateFormData('verificationStatus', 'unverified')}
+                    />
+                  </div>
+                  {formData.verificationStatus === 'verified' && (
                     <Input
-                      id="verifier-name"
+                      id="verifier-name-mixed"
                       placeholder="e.g., SGS, DNV, Bureau Veritas"
-                      className={`h-12 text-base ${validationErrors.verifierName ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-gray-200 focus:border-gray-400 focus:ring-gray-100'}`}
+                      className="h-11 bg-white border-[#E2E8F0]"
                       value={formData.verifierName}
                       onChange={(e) => updateFormData('verifierName', e.target.value)}
                     />
-                    {validationErrors.verifierName && (
-                      <p className="text-sm text-red-600 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        {validationErrors.verifierName}
-                      </p>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {validationErrors.verificationStatus && (
+                    <p className="text-sm text-red-600">{validationErrors.verificationStatus}</p>
+                  )}
+                </div>
+              )}
+              {hasBondFamily && formData.hasEmissions === 'no' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Corporate bond / business loan</h3>
+                  <MethodOptionGrid
+                    methods={BOND_NO_GHG_METHODS}
+                    selectedId={methodForFamily(BOND_FAMILY)}
+                    onSelect={(id) => applyMethods(BOND_FAMILY, id)}
+                    error={validationErrors.calculationMethod}
+                  />
+                </div>
+              )}
+              {hasVehicleFamily && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Motor vehicle loan — activity data</h3>
+                  <p className="text-xs text-[#64748B]">Not company GHG. Choose how you know fuel or distance.</p>
+                  <MethodOptionGrid
+                    methods={VEHICLE_METHODS}
+                    selectedId={methodFor('motor-vehicle-loan')}
+                    onSelect={(id) => applyMethods(['motor-vehicle-loan'], id)}
+                    error={validationErrors.vehicleMethod}
+                  />
+                </div>
+              )}
+              {hasPropertyFamily && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Property loan — activity data</h3>
+                  <p className="text-xs text-[#64748B]">Not company GHG. Choose how you know building energy.</p>
+                  <MethodOptionGrid
+                    methods={PROPERTY_METHODS}
+                    selectedId={methodForFamily(PROPERTY_FAMILY)}
+                    onSelect={(id) => applyMethods(PROPERTY_FAMILY, id)}
+                    error={validationErrors.propertyMethod}
+                  />
+                </div>
+              )}
+              {hasSovereignFamily && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Sovereign debt — country data</h3>
+                  <p className="text-xs text-[#64748B]">Not company GHG. Choose the country data-quality option.</p>
+                  <MethodOptionGrid
+                    methods={SOVEREIGN_METHODS}
+                    selectedId={methodFor('sovereign-debt')}
+                    onSelect={(id) => applyMethods(['sovereign-debt'], id)}
+                    error={validationErrors.sovereignMethod}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (isSovereignDirect) {
+          return (
+            <MethodOptionGrid
+              methods={SOVEREIGN_METHODS}
+              selectedId={formData.calculationMethod}
+              onSelect={(id) => applyMethods(['sovereign-debt'], id)}
+              error={validationErrors.calculationMethod}
+            />
+          );
+        }
+        if (isVehicleDirect) {
+          return (
+            <MethodOptionGrid
+              methods={VEHICLE_METHODS}
+              selectedId={formData.calculationMethod}
+              onSelect={(id) => applyMethods(['motor-vehicle-loan'], id)}
+              error={validationErrors.calculationMethod}
+            />
+          );
+        }
+        if (isPropertyDirect) {
+          return (
+            <MethodOptionGrid
+              methods={PROPERTY_METHODS}
+              selectedId={formData.calculationMethod}
+              onSelect={(id) => applyMethods(PROPERTY_FAMILY, id)}
+              error={validationErrors.calculationMethod}
+            />
+          );
+        }
+        if (formData.hasEmissions === 'yes') {
+          return (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <ChoiceTile
+                  selected={formData.verificationStatus === 'verified'}
+                  title="Verified by a third party"
+                  description="Reported GHG has been independently verified."
+                  onClick={() => updateFormData('verificationStatus', 'verified')}
+                />
+                <ChoiceTile
+                  selected={formData.verificationStatus === 'unverified'}
+                  title="Not verified"
+                  description="Use unverified company GHG totals."
+                  onClick={() => updateFormData('verificationStatus', 'unverified')}
+                />
               </div>
+              {validationErrors.verificationStatus && (
+                <p className="text-sm text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {validationErrors.verificationStatus}
+                </p>
+              )}
+
+              {formData.verificationStatus === 'verified' && (
+                <div className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 space-y-2">
+                  <Label htmlFor="verifier-name" className="text-sm font-medium text-[#334155]">
+                    Verified by
+                  </Label>
+                  <Input
+                    id="verifier-name"
+                    placeholder="e.g., SGS, DNV, Bureau Veritas"
+                    className={`h-11 bg-white ${validationErrors.verifierName ? 'border-red-400' : 'border-[#E2E8F0]'}`}
+                    value={formData.verifierName}
+                    onChange={(e) => updateFormData('verifierName', e.target.value)}
+                  />
+                  {validationErrors.verifierName && (
+                    <p className="text-sm text-red-600 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {validationErrors.verifierName}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           );
         } else if (formData.hasEmissions === 'no') {
+          const hasCommercialRealEstate = formData.loanTypes.some(
+            (item) => item.type === 'commercial-real-estate'
+          );
+          const usesBondLoanMethods = formData.loanTypes.some(
+            (item) =>
+              item.type === 'corporate-bond' ||
+              item.type === 'business-loan' ||
+              item.type === 'project-finance'
+          );
+          const creMethods: Array<{ id: string; title: string; score: string; description: string }> = [
+            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy from labels × floor area × EPA/DEFRA average factor' },
+            { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'Energy from statistics × floor area × EPA/DEFRA average factor' },
+            { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'Energy from statistics × number of buildings × EPA/DEFRA average factor' },
+          ];
+          if (hasCommercialRealEstate) {
+            return (
+              <MethodOptionGrid
+                methods={creMethods}
+                selectedId={formData.calculationMethod}
+                onSelect={(id) => applyMethods(PROPERTY_FAMILY, id)}
+                error={validationErrors.calculationMethod}
+              />
+            );
+          }
+          const corporateBondMethods: Array<{ id: string; title: string; score: string; description: string }> = [
+            { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+            { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
+            { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
+            { id: '3b', title: 'Asset-based', score: 'Score 5', description: 'Outstanding amount × sector GHG / sector assets' },
+            { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
+          ];
+          if (usesBondLoanMethods) {
+            return (
+              <MethodOptionGrid
+                methods={corporateBondMethods}
+                selectedId={formData.calculationMethod}
+                onSelect={(id) => applyMethods(BOND_FAMILY, id)}
+                error={validationErrors.calculationMethod}
+              />
+            );
+          }
           return (
             <div className="space-y-6">
               <div className="space-y-4">
@@ -1580,6 +1860,8 @@ export const ESGWizard: React.FC = () => {
           verificationStatus={formData.verificationStatus}
           corporateStructure={formData.corporateStructure}
           loanTypes={formData.loanTypes}
+          calculationMethod={formData.calculationMethod}
+          calculationMethods={formData.calculationMethods}
           counterpartyId={counterpartyId}
           scope1Emissions={formData.scope1Emissions}
           scope2Emissions={formData.scope2Emissions}
@@ -1645,208 +1927,87 @@ export const ESGWizard: React.FC = () => {
             maximumFractionDigits: 2,
           }).format(Number.isFinite(value) ? value : 0);
 
-        const valueClassName =
-          "text-xl md:text-2xl font-bold leading-tight text-wrap break-all";
+        const metricCard =
+          "rounded-[16px] border border-[rgba(15,23,42,0.06)] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_10px_22px_rgba(15,23,42,0.025)]";
 
         return (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {!results || results.length === 0 ? (
-              <Card className="border-gray-200">
-                <CardContent className="py-16">
-                  <div className="text-center space-y-4">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                      <Calculator className="h-8 w-8 text-gray-400" />
-                    </div>
-                    <div className="text-gray-600 text-lg font-medium">No results yet</div>
-                    <p className="text-gray-500">Please run a calculation to see results.</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="py-14 text-center">
+                <div className="w-12 h-12 bg-[#F1F5F9] rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <Calculator className="h-6 w-6 text-[#94A3B8]" />
+                </div>
+                <p className="text-[#0F172A] font-medium">No results yet</p>
+                <p className="text-sm text-[#64748B] mt-1">Run a calculation to see financed emissions.</p>
+              </div>
             ) : (
               <>
-                {/* Header with Summary */}
-                <motion.div 
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center space-y-4"
-                >
-                  <div className="flex items-center justify-center space-x-3">
-                    <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <CheckCircle className="h-7 w-7 text-white" />
-                    </div>
-                    <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent">
-                      {mode === 'finance' ? 'Finance Emissions' : 'Facilitated Emissions'} Calculated
-                    </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className={metricCard}>
+                    <p className="text-[13px] font-medium text-[#64748B]">Total emissions</p>
+                    <p className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-[#0F172A]" title={formatWithSeparators(totalEmissions, 2)}>
+                      {formatCompact(totalEmissions)} <span className="text-sm font-medium text-[#64748B]">tCO₂e</span>
+                    </p>
+                    <p className="text-xs text-[#94A3B8] mt-1">{formatWithSeparators(totalEmissions, 2)} tCO₂e</p>
                   </div>
-                  <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto font-medium">
-                    Your {mode === 'finance' ? 'finance' : 'facilitated'} emissions have been successfully calculated. 
-                    Review the detailed results below.
-                  </p>
-                </motion.div>
-
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <motion.div
-                    className="h-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <Card className="h-full bg-gradient-to-br from-blue-50 via-blue-100 to-[#EDF8F3] border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                            <TrendingUp className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-blue-700 mb-1">Total Emissions</div>
-                            <div className={`${valueClassName} text-blue-900`} title={formatWithSeparators(totalEmissions, 2)}>
-                              {formatCompact(totalEmissions)} <span className="text-base text-blue-700">tCO₂e</span>
-                            </div>
-                            <div className="text-xs text-blue-700/80 mt-1">
-                              {formatWithSeparators(totalEmissions, 2)} tCO₂e
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div
-                    className="h-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <Card className="h-full bg-gradient-to-br from-green-50 via-emerald-100 to-teal-50 border-green-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
-                            <BarChart3 className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-green-700 mb-1">Average Attribution</div>
-                            <div className={`${valueClassName} text-green-900`} title={`${formatWithSeparators(averageAttributionFactor * 100, 2)}%`}>
-                              {formatWithSeparators(averageAttributionFactor * 100, 2)}%
-                            </div>
-                            <div className="text-xs text-green-700/80 mt-1">
-                              {formatWithSeparators(averageAttributionFactor * 100, 2)}%
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div
-                    className="h-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <Card className="h-full bg-gradient-to-br from-purple-50 via-purple-100 to-indigo-50 border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6 min-h-[136px] h-full flex items-center">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                            <Building className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-purple-700 mb-1">
-                              {formData.corporateStructure === 'listed' ? 'EVIC' : 'Total Equity + Debt'}
-                            </div>
-                            <div className={`${valueClassName} text-purple-900`} title={`${formatWithSeparators(sharedEVIC, 0)} PKR`}>
-                              {formatCompact(sharedEVIC)} <span className="text-base text-purple-700">PKR</span>
-                            </div>
-                            <div className="text-xs text-purple-700/80 mt-1">
-                              {formatWithSeparators(sharedEVIC, 0)} PKR
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
+                  <div className={metricCard}>
+                    <p className="text-[13px] font-medium text-[#64748B]">Average attribution</p>
+                    <p className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-[#0F172A]">
+                      {formatWithSeparators(averageAttributionFactor * 100, 2)}%
+                    </p>
+                  </div>
+                  <div className={metricCard}>
+                    <p className="text-[13px] font-medium text-[#64748B]">
+                      {formData.corporateStructure === 'listed' ? 'EVIC' : 'Total equity + debt'}
+                    </p>
+                    <p className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-[#0F172A]" title={`${formatWithSeparators(sharedEVIC, 0)} PKR`}>
+                      {formatCompact(sharedEVIC)} <span className="text-sm font-medium text-[#64748B]">PKR</span>
+                    </p>
+                  </div>
                 </div>
 
-                {/* Detailed Results Table */}
                 {validResults.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <Card className="border-gray-200 shadow-lg">
-                      <CardHeader>
-                        <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <BarChart3 className="w-5 h-5 text-[#1D9E75]" />
-                          Detailed Results by Loan Type
-                        </CardTitle>
-                        <CardDescription className="text-base">
-                          Breakdown of emissions for each loan type in your portfolio
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b-2 border-gray-200">
-                                <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Loan Type</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Attribution Factor</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Financed Emissions</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Denominator</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {validResults.map((result, index) => (
-                                <motion.tr
-                                  key={index}
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: 0.5 + index * 0.1 }}
-                                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                                >
-                                  <td className="py-4 px-4">
-                                    <div className="font-semibold text-gray-900">{result.label}</div>
-                                  </td>
-                                  <td className="py-4 px-4 text-right">
-                                    <span className="font-semibold text-[#0F6E56]">
-                                      {formatWithSeparators(result.attributionFactor * 100, 2)}%
-                                    </span>
-                                  </td>
-                                  <td className="py-4 px-4 text-right">
-                                    <span className="font-bold text-blue-700">
-                                      {formatWithSeparators(result.financedEmissions, 2)} <span className="text-sm font-normal text-gray-600">tCO₂e</span>
-                                    </span>
-                                  </td>
-                                  <td className="py-4 px-4 text-right">
-                                    <div className="text-sm text-gray-600">
-                                      <div className="font-medium">{result.denominatorLabel}</div>
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        {formatWithSeparators(result.denominatorValue, 0)} PKR
-                                      </div>
-                                    </div>
-                                  </td>
-                                </motion.tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                  <div className="rounded-[16px] border border-[rgba(15,23,42,0.06)] overflow-hidden">
+                    <div className="px-5 py-3 border-b border-[#E8EEF0]">
+                      <p className="text-sm font-semibold text-[#0F172A]">By loan type</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-[#E8EEF0] bg-[#F8FAFC]">
+                            <th className="text-left py-2.5 px-5 text-xs font-semibold uppercase tracking-wide text-[#64748B]">Loan type</th>
+                            <th className="text-right py-2.5 px-5 text-xs font-semibold uppercase tracking-wide text-[#64748B]">Attribution</th>
+                            <th className="text-right py-2.5 px-5 text-xs font-semibold uppercase tracking-wide text-[#64748B]">Emissions</th>
+                            <th className="text-right py-2.5 px-5 text-xs font-semibold uppercase tracking-wide text-[#64748B]">Denominator</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {validResults.map((result, index) => (
+                            <tr key={index} className="border-b border-[#F1F5F9] last:border-0">
+                              <td className="py-3.5 px-5 font-medium text-[#0F172A]">{result.label}</td>
+                              <td className="py-3.5 px-5 text-right text-[#0F6E56] font-medium">
+                                {formatWithSeparators(result.attributionFactor * 100, 2)}%
+                              </td>
+                              <td className="py-3.5 px-5 text-right font-semibold text-[#0F172A]">
+                                {formatWithSeparators(result.financedEmissions, 2)} <span className="text-xs font-normal text-[#64748B]">tCO₂e</span>
+                              </td>
+                              <td className="py-3.5 px-5 text-right text-sm text-[#64748B]">
+                                <div className="font-medium text-[#334155]">{result.denominatorLabel}</div>
+                                <div className="text-xs">{formatWithSeparators(result.denominatorValue, 0)} PKR</div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
 
-                {/* Action Buttons */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6"
-                >
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
                   <Button 
                     onClick={() => setCurrentStep(steps.findIndex(s => s.id === 'emission-calculation'))}
                     variant="outline" 
-                    className="w-full sm:w-auto min-w-[160px] h-11 text-base font-semibold border-2 border-gray-300 hover:border-[#9ECFB8] hover:bg-[#EAF7F1]"
+                    className="w-full sm:w-auto h-10 border-[#E2E8F0] text-[#334155]"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Recalculate
@@ -1861,10 +2022,9 @@ export const ESGWizard: React.FC = () => {
                           returnUrl
                         } 
                       })}
-                      className="w-full sm:w-auto min-w-[220px] h-11 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
+                      className="w-full sm:w-auto h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white"
                     >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Next: Facilitated Emission
+                      Next: Facilitated emission
                     </Button>
                   ) : (
                     <Button 
@@ -1876,14 +2036,13 @@ export const ESGWizard: React.FC = () => {
                           navigate(target);
                         }
                       }}
-                      className="w-full sm:w-auto min-w-[200px] h-11 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg"
+                      className="w-full sm:w-auto h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white"
                     >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Complete & Return
+                      Complete & return
                     </Button>
                   )}
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => {
                       const target = resolvedReturnUrl;
                       if (hasPortfolioState && returnUrl) {
@@ -1892,11 +2051,11 @@ export const ESGWizard: React.FC = () => {
                         navigate(target);
                       }
                     }}
-                    className="w-full sm:w-auto min-w-[140px] h-11 text-base font-semibold border-gray-300 text-gray-800 hover:bg-gray-50"
+                    className="w-full sm:w-auto h-10 text-[#64748B]"
                   >
                     Return
                   </Button>
-                </motion.div>
+                </div>
               </>
             )}
           </div>
@@ -1917,6 +2076,20 @@ export const ESGWizard: React.FC = () => {
       case 'emission-status':
         return formData.hasEmissions !== '';
       case 'verification':
+        if (isMixedFamilies) {
+          const bondOk = !hasBondFamily || (
+            formData.hasEmissions === 'yes'
+              ? formData.verificationStatus !== ''
+              : !!methodForFamily(BOND_FAMILY)
+          );
+          const vehicleOk = !hasVehicleFamily || !!methodFor('motor-vehicle-loan');
+          const propertyOk = !hasPropertyFamily || !!methodForFamily(PROPERTY_FAMILY);
+          const sovereignOk = !hasSovereignFamily || !!methodFor('sovereign-debt');
+          return bondOk && vehicleOk && propertyOk && sovereignOk;
+        }
+        if (isDirectMethod) {
+          return formData.calculationMethod !== '';
+        }
         if (formData.hasEmissions === 'yes') {
           return formData.verificationStatus !== '';
         } else if (formData.hasEmissions === 'no') {
@@ -1928,219 +2101,242 @@ export const ESGWizard: React.FC = () => {
     }
   };
 
+  const progressPct = steps.length > 1 ? Math.round((currentStep / (steps.length - 1)) * 100) : 0;
+  const isResultsStep = steps[currentStep]?.id === 'results';
+  const isEmissionStep = steps[currentStep]?.id === 'emission-calculation';
+  const listingLabel =
+    formData.corporateStructure === 'listed'
+      ? 'Listed'
+      : formData.corporateStructure === 'unlisted'
+        ? 'Unlisted'
+        : null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br bg-[var(--gradient-subtle)] p-4 sm:p-6 overflow-visible">
-      <div className="max-w-4xl mx-auto overflow-visible">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="outline"
+    <div className="relative min-h-screen bg-[#F8FAF8]">
+      <div className="mx-auto max-w-[1200px] px-4 pb-28 pt-6 md:px-6 md:pt-8">
+        <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <button
+              type="button"
               onClick={() => navigate(-1)}
-              className="flex items-center space-x-2"
+              className="inline-flex items-center gap-1.5 text-sm text-[#64748B] hover:text-[#0F172A] mb-3"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Go Back</span>
-            </Button>
-            <div className="flex-1"></div>
+              Back
+            </button>
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-[#0F172A] sm:text-[32px]">
+              {mode === 'finance' ? 'Financed emissions' : 'Facilitated emissions'}
+            </h1>
+            <p className="mt-1.5 text-sm text-[#64748B]">
+              {mode === 'finance'
+                ? 'PCAF calculation for this counterparty'
+                : 'PCAF facilitated emissions for this counterparty'}
+            </p>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-teal-700 to-cyan-700 bg-clip-text text-transparent mb-3">
-            {mode === 'finance' ? 'ESG Finance Assessment' : 'ESG Facilitated Assessment'}
-          </h1>
-          <p className="text-base md:text-lg text-gray-600 font-medium">
-            {mode === 'finance' ? 'Loan Risk Assessment & Finance Emission Calculator' : 'Facilitated Emission Calculator'}
-          </p>
-        </div>
-
-        {/* Enhanced Progress Steps */}
-        <div className="mb-6 sm:mb-8 py-6 overflow-visible">
-          <div className="flex justify-between items-start relative overflow-x-auto overflow-y-visible">
-            {/* Progress bar background */}
-            <div className="absolute top-8 left-0 right-0 h-1 bg-gray-200 rounded-full -z-10 hidden sm:block">
-              <div 
-                className="h-full bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] rounded-full transition-all duration-500"
-                style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+          <div className="w-full shrink-0 sm:w-[220px] sm:pt-10">
+            <div className="mb-1.5 flex items-center justify-between text-xs text-[#64748B]">
+              <span>
+                Step <span className="font-semibold text-[#0F172A]">{currentStep + 1}</span> of {steps.length}
+              </span>
+              <span className="font-medium text-[#0F6E56]">{progressPct}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+              <div
+                className="h-full rounded-full bg-[#0F6E56] transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
               />
             </div>
+            {counterpartyId && !startFresh && (
+              <p className="mt-1.5 text-[11px] text-[#94A3B8] text-right">
+                {autoSaveStatus === 'saving' && 'Saving…'}
+                {autoSaveStatus === 'saved' && 'Saved'}
+                {autoSaveStatus === 'error' && 'Save failed'}
+                {autoSaveStatus === 'idle' && 'Auto-save on'}
+              </p>
+            )}
+          </div>
+        </header>
 
-            {steps.map((step, index) => {
-              const isCompleted = completedSteps.has(index);
-              const isCurrent = index === currentStep;
-              const isPast = index < currentStep;
-              const StepIcon = step.icon || Building2;
-
+        <nav aria-label="Calculation steps" className="mb-8">
+          <ol className="flex items-start justify-between gap-1">
+            {steps.map((s, i) => {
+              const active = i === currentStep;
+              const done = i < currentStep;
               return (
-                <div key={step.id} className="flex flex-col items-center flex-1 relative z-10 min-w-[60px] sm:min-w-[80px]">
-                  <div className="relative w-16 h-16 sm:w-18 sm:h-18 flex items-center justify-center mb-2">
-                    <button
-                      onClick={() => handleStepClick(index)}
-                      disabled={index > currentStep && !canProceed()}
-                      className={`
-                        group relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center transition-all duration-300 touch-manipulation
-                        ${isCompleted || isPast
-                          ? 'bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] border-[#1D9E75] text-white shadow-lg shadow-[0_10px_24px_-8px_rgba(29,158,117,0.35)]'
-                          : isCurrent
-                          ? 'bg-white border-[#1D9E75] text-[#1D9E75] shadow-lg border-[3px]'
-                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
-                        }
-                        ${index <= currentStep || canProceed() ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-not-allowed opacity-50'}
-                      `}
-                      title={step.description}
+                <li key={s.id} className="relative flex min-w-0 flex-1 flex-col items-center">
+                  {i < steps.length - 1 ? (
+                    <div
+                      className={cn(
+                        'absolute left-[calc(50%+18px)] right-[calc(-50%+18px)] top-[15px] h-0.5',
+                        done || active ? 'bg-[#0F6E56]' : 'bg-[#E2E8F0]'
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleStepClick(i)}
+                    className="relative z-[1] flex flex-col items-center gap-2"
+                  >
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                        active || done
+                          ? 'bg-[#0F6E56] text-white'
+                          : 'border-2 border-[#E2E8F0] bg-white text-[#94A3B8]'
+                      )}
                     >
-                      {isCompleted ? (
-                        <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                      ) : (
-                        <StepIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                      {done ? <CheckCircle className="h-4 w-4" /> : i + 1}
+                    </span>
+                    <span
+                      className={cn(
+                        'max-w-[7.5rem] text-center text-[11px] font-medium leading-snug sm:text-xs',
+                        active ? 'text-[#0F6E56]' : 'text-[#94A3B8]'
                       )}
-                      {isCurrent && (
-                        <span className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-[#1D9E75] rounded-full border-2 border-white animate-pulse" />
-                      )}
-                    </button>
-                  </div>
-                  
-                  {/* Step label */}
-                  <div className="mt-2 text-center w-full px-1">
-                    <div className={`
-                      text-[10px] sm:text-xs font-medium break-words leading-tight
-                      ${isCurrent ? 'text-[#1D9E75] font-semibold' : isPast || isCompleted ? 'text-gray-600' : 'text-gray-400'}
-                    `}>
-                      {step.title}
-                    </div>
-                  </div>
-                </div>
+                    >
+                      {s.title}
+                    </span>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ol>
+        </nav>
 
-          {/* Auto-save status indicator */}
-          {counterpartyId && !startFresh && (
-            <div className="flex items-center justify-center gap-2 mt-4 text-sm">
-              {autoSaveStatus === 'saving' && (
-                <>
-                  <div className="w-3 h-3 border-2 border-[#1D9E75] border-t-transparent rounded-full animate-spin" />
-                  <span className="text-gray-600">Saving...</span>
-                </>
-              )}
-              {autoSaveStatus === 'saved' && (
-                <>
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="text-green-600">Saved</span>
-                </>
-              )}
-              {autoSaveStatus === 'error' && (
-                <>
-                  <AlertCircle className="w-4 h-4 text-red-500" />
-                  <span className="text-red-600">Save failed</span>
-                </>
-              )}
-              {autoSaveStatus === 'idle' && (
-                <>
-                  <Save className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-500">Auto-save enabled</span>
-                </>
-              )}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+          <div className="rounded-2xl border border-[#E8EEF0] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-7">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-[#0F172A] tracking-[-0.02em]">
+                {steps[currentStep]?.title || 'Loading...'}
+              </h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                {steps[currentStep]?.description || 'Please wait...'}
+              </p>
             </div>
-          )}
-        </div>
-
-        {/* Step Content */}
-        <Card className="shadow-lg border-gray-200 bg-white">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-2xl font-bold text-gray-900 text-center">
-              {steps[currentStep]?.title || 'Loading...'}
-            </CardTitle>
-            <CardDescription className="text-base text-gray-600 mt-2 text-center">
-              {steps[currentStep]?.description || 'Please wait...'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22 }}
               >
                 {renderStepContent()}
               </motion.div>
             </AnimatePresence>
-            
-            {/* Navigation - only show for non-results steps */}
-            {steps[currentStep] && steps[currentStep].id !== 'results' && (
-              <>
-                <Separator className="my-6" />
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={handlePrevious}
-                        disabled={currentStep === 0}
-                        className="w-full sm:w-auto sm:min-w-[120px] h-11"
-                      >
-                        <ChevronLeft className="w-4 h-4 mr-2" />
-                        Previous
-                      </Button>
-                      
-                      {counterpartyId && !startFresh && (
-                        <Button
-                          variant="ghost"
-                          onClick={async () => {
-                            try {
-                              await saveQuestionnaireData();
-                              toast({
-                                title: "Progress Saved",
-                                description: "Your progress has been saved. You can continue later.",
-                                variant: "default"
-                              });
-                            } catch (error) {
-                              toast({
-                                title: "Save Failed",
-                                description: "Failed to save progress. Please try again.",
-                                variant: "destructive"
-                              });
-                            }
-                          }}
-                          className="w-full sm:w-auto h-11"
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Save & Continue Later
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {(() => {
-                      const isEmissionStep = steps[currentStep].id === 'emission-calculation';
-                      if (currentStep >= steps.length - 1) {
-                        return (
-                          <Button variant="default" onClick={handleNext} className="w-full sm:w-auto sm:min-w-[180px] h-11">
-                            Complete Assessment
-                          </Button>
-                        );
-                      }
-                      
-                      if (isEmissionStep) {
-                        return null; // Hide Next on emission calculation step to avoid double CTA with calculate button
-                      }
-                      
-                      return (
-                        <Button 
-                          onClick={handleNext} 
-                          disabled={!canProceed() || Object.keys(validationErrors).length > 0}
-                          className="w-full sm:w-auto sm:min-w-[120px] h-11"
-                        >
-                          Next
-                          <ChevronRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      );
-                    })()}
-                  </div>
+
+            {!isResultsStep && (
+              <div className="mt-8 flex flex-col gap-3 border-t border-[#E8EEF0] pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handlePrevious}
+                    disabled={currentStep === 0}
+                    className="h-10 border-[#E2E8F0] text-[#334155]"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Previous
+                  </Button>
+                  {counterpartyId && !startFresh && (
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await saveQuestionnaireData();
+                          toast({
+                            title: 'Progress Saved',
+                            description: 'Your progress has been saved. You can continue later.',
+                            variant: 'default'
+                          });
+                        } catch {
+                          toast({
+                            title: 'Save Failed',
+                            description: 'Failed to save progress. Please try again.',
+                            variant: 'destructive'
+                          });
+                        }
+                      }}
+                      className="h-10 text-[#64748B]"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </Button>
+                  )}
                 </div>
-              </>
+                {!isEmissionStep && currentStep < steps.length - 1 && (
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canProceed() || Object.keys(validationErrors).length > 0}
+                    className="h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white disabled:opacity-40"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                )}
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+
+          <aside className="lg:sticky lg:top-6 rounded-2xl border border-[#E8EEF0] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">This calculation</p>
+            <dl className="mt-4 space-y-3">
+              {formData.loanTypes.length > 0 && (
+                <div>
+                  <dt className="text-xs text-[#64748B]">Loan type</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">
+                    {formData.loanTypes.map((lt) => `${loanTypeLabel(lt.type)}${lt.quantity > 1 ? ` × ${lt.quantity}` : ''}`).join(', ')}
+                  </dd>
+                </div>
+              )}
+              {needsListing && listingLabel && (
+                <div>
+                  <dt className="text-xs text-[#64748B]">Structure</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">{listingLabel}</dd>
+                </div>
+              )}
+              {formData.hasEmissions && (
+                <div>
+                  <dt className="text-xs text-[#64748B]">
+                    {hasBondFamily && isMixedFamilies ? 'Bond company GHG' : 'Company GHG'}
+                  </dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">
+                    {formData.hasEmissions === 'yes' ? 'Available' : 'Estimate from activity'}
+                  </dd>
+                </div>
+              )}
+              {Object.keys(formData.calculationMethods || {}).length > 0 ? (
+                <div>
+                  <dt className="text-xs text-[#64748B]">Method</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A] space-y-0.5">
+                    {formData.loanTypes.map((lt) => {
+                      const method = formData.calculationMethods?.[lt.type] || formData.calculationMethod;
+                      if (!method) return null;
+                      return (
+                        <div key={lt.type}>
+                          {loanTypeLabel(lt.type)} · {method.toUpperCase()}
+                        </div>
+                      );
+                    })}
+                  </dd>
+                </div>
+              ) : formData.calculationMethod ? (
+                <div>
+                  <dt className="text-xs text-[#64748B]">Method</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">{formData.calculationMethod.toUpperCase()}</dd>
+                </div>
+              ) : null}
+              {formData.verificationStatus && (
+                <div>
+                  <dt className="text-xs text-[#64748B]">Verification</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A] capitalize">{formData.verificationStatus}</dd>
+                </div>
+              )}
+            </dl>
+            {formData.loanTypes.length === 0 && !formData.calculationMethod && (
+              <p className="mt-4 text-sm text-[#94A3B8]">Selections will appear here as you go.</p>
+            )}
+          </aside>
+        </div>
       </div>
     </div>
   );

@@ -1,12 +1,10 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
-import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { FormulaConfig } from '../types/formula';
+import { FIELD_INPUT, FieldGrid, FormField, InputSection } from "./InputLayout";
 
 export interface Property {
   id: string;
@@ -23,7 +21,7 @@ export interface Property {
   estimatedEnergyConsumptionFromStatistics: number;
   estimatedEnergyConsumptionFromStatisticsUnit: string;
   floorArea: number;
-  totalEmission?: number; // For Option 2a: Total emission = Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor
+  totalEmission?: number;
 }
 
 interface MortgageFormProps {
@@ -41,176 +39,61 @@ export const MortgageForm: React.FC<MortgageFormProps> = ({
   onRemoveProperty,
   onUpdateProperty
 }) => {
-  // Render dynamic property fields based on selected formula
-  const renderPropertyFields = (property: Property) => {
-    if (!selectedFormula) return null;
-    
-    // Fields that are always shown for properties
-    const commonFields = ['property_value_at_origination'];
-    
-    // Get formula-specific fields (excluding outstanding_amount and common fields)
-    const formulaFields = selectedFormula.inputs
-      .filter(input => !['outstanding_amount', ...commonFields].includes(input.name))
-      .map(input => input.name);
-
-    const allFields = [...commonFields, ...formulaFields];
-
-    return allFields.map(fieldName => {
-      const input = selectedFormula.inputs.find(i => i.name === fieldName);
-      if (!input) return null;
-
-      // Map formula field names to Property interface field names
-      const propertyFieldMap: Record<string, keyof Property> = {
-        'property_value_at_origination': 'propertyValueAtOrigination',
-        'actual_energy_consumption': 'actualEnergyConsumption',
-        'supplier_specific_emission_factor': 'supplierSpecificEmissionFactor',
-        'average_emission_factor': 'averageEmissionFactor',
-        'estimated_energy_consumption_from_labels': 'estimatedEnergyConsumptionFromLabels',
-        'estimated_energy_consumption_from_statistics': 'estimatedEnergyConsumptionFromStatistics',
-        'floor_area': 'floorArea',
-        'total_emission': 'totalEmission'
-      };
-      
-      // For Option 1a, 1b, and 2a, filter out the old fields and only show total_emission
-      const isOption1a = selectedFormula.optionCode === '1a' && selectedFormula.category === 'mortgage';
-      const isOption1b = selectedFormula.optionCode === '1b' && selectedFormula.category === 'mortgage';
-      const isOption2a = selectedFormula.optionCode === '2a' && selectedFormula.category === 'mortgage';
-      
-      const fieldsToExclude1a1b = (isOption1a || isOption1b) ? 
-        ['actual_energy_consumption', 'supplier_specific_emission_factor', 'average_emission_factor'] : 
-        [];
-      const fieldsToExclude2a = isOption2a ? 
-        ['estimated_energy_consumption_from_labels', 'floor_area', 'average_emission_factor'] : 
-        [];
-      const fieldsToExclude = [...fieldsToExclude1a1b, ...fieldsToExclude2a];
-      
-      if (fieldsToExclude.includes(fieldName)) {
-        return null; // Don't render the old fields for Option 1a, 1b, or 2a
-      }
-
-      const propertyFieldName = propertyFieldMap[fieldName] || fieldName as keyof Property;
-      const fieldValue = property[propertyFieldName] || '';
-      const fieldId = `${fieldName}-${property.id}`;
-
-      // Check if this field has unit options
-      const hasUnitOptions = input.unitOptions && input.unitOptions.length > 0;
-      const unitFieldName = `${propertyFieldName}Unit` as keyof Property;
-      const unitValue = property[unitFieldName] || input.unit || '';
-
-      // For total_emission in Options 1a, 1b, and 2a, mark it as auto-filled (read-only)
-      const isTotalEmissionField = fieldName === 'total_emission';
-      const isAutoFilled = isTotalEmissionField && (selectedFormula.optionCode === '1a' || selectedFormula.optionCode === '1b' || selectedFormula.optionCode === '2a');
-
-      return (
-        <div key={fieldName} className="space-y-2">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Label htmlFor={fieldId}>
-                  {input.label} {input.required && <span className="text-red-500">*</span>}
-                </Label>
-                {input.description && (
-                  <FieldTooltip content={input.description} />
-                )}
-              </div>
-              <Input
-                id={fieldId}
-                type="number"
-                placeholder="0"
-                value={fieldValue}
-                onChange={(e) => onUpdateProperty(property.id, propertyFieldName, parseFloat(e.target.value) || 0)}
-                className="mt-1"
-                required={input.required}
-                disabled={isAutoFilled}
-                title={isAutoFilled ? input.description : undefined}
-              />
-            </div>
-            {hasUnitOptions && (
-              <div className="w-48">
-                <Label htmlFor={`${fieldId}-unit`}>Unit</Label>
-                <Select 
-                  value={String(unitValue)} 
-                  onValueChange={(value) => onUpdateProperty(property.id, unitFieldName, value)}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {input.unitOptions!.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }).filter(Boolean);
-  };
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Properties & Energy Data</CardTitle>
-        <CardDescription>
-          Add properties and their energy consumption data for mortgage calculations
-        </CardDescription>
-        {selectedFormula && (
-          <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
-            <strong>Selected Formula:</strong> {selectedFormula.name}
-            <br />
-            <strong>Required Fields:</strong> {selectedFormula.inputs.filter(i => i.name !== 'outstanding_amount').map(i => i.label).join(', ')}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Properties List */}
+    <InputSection
+      title="Properties"
+      description={selectedFormula?.name || "Value at origination for each mortgaged property"}
+      action={
+        <Button type="button" variant="outline" size="sm" onClick={onAddProperty} className="h-8 border-[#E2E8F0]">
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Add
+        </Button>
+      }
+    >
+      <div className="space-y-3">
         {properties.map((property, index) => (
-          <div key={property.id} className="border rounded-lg p-4 space-y-4">
+          <div key={property.id} className="rounded-xl border border-[#E8EEF0] bg-white p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium">Property {index + 1}</h4>
+              <p className="text-sm font-medium text-[#0F172A]">Property {index + 1}</p>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon"
                 onClick={() => onRemoveProperty(property.id)}
                 disabled={properties.length === 1}
+                className="h-8 w-8 text-[#94A3B8] hover:text-red-600"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor={`property-name-${property.id}`}>Property Name</Label>
+            <FieldGrid>
+              <FormField label="Name">
                 <Input
                   id={`property-name-${property.id}`}
                   value={property.name}
                   onChange={(e) => onUpdateProperty(property.id, 'name', e.target.value)}
-                  placeholder="e.g., Office Building A"
-                  className="mt-1"
+                  placeholder="e.g. Residence A"
+                  className={FIELD_INPUT}
                 />
-              </div>
-              
-              {/* Dynamic fields based on selected formula */}
-              {renderPropertyFields(property)}
-            </div>
+              </FormField>
+              <FormField
+                label="Value at origination"
+                unit="PKR"
+                required
+                tooltip="Property value at the time of mortgage origination"
+              >
+                <FormattedNumberInput
+                  id={`property-value-${property.id}`}
+                  placeholder="0"
+                  value={property.propertyValueAtOrigination || 0}
+                  onChange={(value) => onUpdateProperty(property.id, 'propertyValueAtOrigination', value)}
+                  className={FIELD_INPUT}
+                />
+              </FormField>
+            </FieldGrid>
           </div>
         ))}
-        
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onAddProperty}
-          className="w-full"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Property
-        </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </InputSection>
   );
 };

@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CalculationEngine } from '../engines/CalculationEngine';
+import { executePcafCalculation } from "../utils/executePcafCalculation";
 import { ALL_FORMULAS, getFormulasByCategory } from '../config/corporateBondAndBusinessLoanFormulaConfigs';
 import { PROJECT_FINANCE_FORMULAS } from '../config/projectFinanceFormulaConfigs';
 import { MORTGAGE_FORMULAS } from '../config/mortgageFormulaConfigs';
@@ -26,12 +26,14 @@ import { CommercialRealEstatePropertiesForm, CommercialRealEstateProperty as CRE
 import { CommercialRealEstateForm } from '../forms/CommercialRealEstateForm';
 import { CommercialRealEstateFinancialForm } from '../forms/CommercialRealEstateFinancialForm';
 import { FacilitatedEmissionForm } from '../forms/FacilitatedEmissionForm';
+import EnergyEmissionInputs from '../forms/EnergyEmissionInputs';
+import SectorProxyInputs from '../forms/SectorProxyInputs';
 import { smartConvertUnit } from '../utils/unitConversions';
 import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChange } from '../utils/numberFormatting';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import { ComputedBox, FIELD_INPUT, FieldGrid, FormField, InputSection } from "../forms/InputLayout";
 import type { CalculationStepDto, EmissionResultRow, FinanceFormValue, FinanceMode } from "../types/contracts";
-import { resolveFinancedCalculation } from "@/api/financedConnection";
 
 
 
@@ -50,6 +52,8 @@ interface FinanceEmissionCalculatorProps {
   verificationStatus?: string;
   corporateStructure?: string; // 'listed' or 'unlisted'
   loanTypes?: Array<{ type: string; quantity: number }>; // Array of loan type objects with quantity
+  calculationMethod?: string;
+  calculationMethods?: Record<string, string>;
   counterpartyId?: string; // Prefer this when provided
   scope1Emissions?: number;
   scope2Emissions?: number;
@@ -69,6 +73,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   verificationStatus: propVerificationStatus,
   corporateStructure: propCorporateStructure,
   loanTypes: propLoanTypes = [],
+  calculationMethod: propCalculationMethod = '',
+  calculationMethods: propCalculationMethods = {},
   counterpartyId: propCounterpartyId,
   scope1Emissions: propScope1,
   scope2Emissions: propScope2,
@@ -80,7 +86,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   onResults
 }) => {
   const { toast } = useToast();
-  const calculationEngine = new CalculationEngine();
   
   // Build expanded loan instances from quantities (e.g., 2 mortgages => [mortgage#1, mortgage#2])
   const expandedLoanTypes = React.useMemo(() => {
@@ -181,15 +186,48 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     sectorRevenue: 0,
     sectorAssets: 0,
     assetTurnoverRatio: 0,
+    companyRevenue: 0,
+    process_emissions: 0,
+    energy_entry_mode: 'enter',
     // Sovereign debt specific fields
+    sovereign_country_name: '',
     pp_adjusted_gdp: 0,
+    ppp_gdp_year: 0,
+    ppp_gdp_used_fallback: false,
     verified_country_emissions: 0,
+    verified_emissions_country_name: '',
     unverified_country_emissions: 0,
+    proxy_country_emissions: 0,
+    proxy_sovereign_country_name: '',
+    proxy_pp_adjusted_gdp: 0,
+    proxy_ppp_gdp_year: 0,
+    proxy_ppp_gdp_used_fallback: false,
+    sector_key: '',
+    sector_code: '',
+    sector_name: '',
+    sector_intensity: 0,
+    sector_intensity_unit: '',
     energy_consumption: 0,
+    energy_consumption_unit: 'kWh',
     emission_factor: 0,
+    energy_type: 'electricity',
+    factor_library: 'EPA',
+    electricity_mode: 'grid',
+    factor_activity: '',
+    factor_fuel: '',
+    factor_unit: '',
+    factor_grid_country: '',
+    factor_dataset: '',
+    factor_raw_kg: 0,
+    electricity_total_kwh: 0,
+    electricity_grid_pct: 0,
+    electricity_renewable_pct: 0,
+    electricity_other_pct: 0,
+    electricity_grid_factor: 0,
+    electricity_other_sources: [] as Array<Record<string, unknown>>,
     // Motor vehicle loan specific fields
     total_value_at_origination: 0,
-    total_vehicle_emissions: 0, // Auto-calculated from vehicle details (in kg CO2e)
+    total_vehicle_emissions: 0, // Auto-calculated from vehicle details (tCO2e)
     fuel_consumption: 0,
     fuel_consumption_unit: 'L',
     distance_traveled: 0,
@@ -206,6 +244,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     estimated_energy_consumption_from_statistics: 0,
     estimated_energy_consumption_from_statistics_unit: 'kWh',
     floor_area: 0,
+    number_of_buildings: 0,
     // Project finance specific fields
     totalProjectEquity: 0,
     totalProjectDebt: 0,
@@ -486,66 +525,12 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
   // No auto-filling - always start fresh
 
-  // Auto-fill total_emission from questionnaire scope emissions for commercial real estate and sovereign debt
-  useEffect(() => {
-    if (propScope1 === undefined && propScope2 === undefined && propScope3 === undefined) return;
-    
-    const totalEmission = (propScope1 || 0) + (propScope2 || 0) + (propScope3 || 0);
-    
-    // Auto-fill for commercial real estate and mortgage loan types (Options 1a, 1b)
-    if (loanType === 'commercial-real-estate') {
-      setFormData(prev => {
-        // Only update if value has changed to prevent infinite loops
-        if (prev.total_emission === totalEmission) return prev;
-        return {
-          ...prev,
-          total_emission: totalEmission
-        };
-      });
-    }
-    
-    // Auto-fill for mortgage loan type (Options 1a and 1b use total_emission from questionnaire)
-    if (loanType === 'mortgage') {
-      const isOption1a1b = selectedFormula === '1a-mortgage' || selectedFormula === '1b-mortgage';
-      if (isOption1a1b) {
-        // Update total_emission for all properties (aggregate from scope emissions)
-        setProperties(prevProperties => 
-          prevProperties.map(property => ({
-            ...property,
-            totalEmission: totalEmission // Auto-fill from questionnaire (Scope 1 + Scope 2 + Scope 3)
-          }))
-        );
-      }
-    }
-    
-    // Auto-fill for sovereign debt loan type
-    // For Option 1a/1b: verified/unverified country emissions (auto-filled from questionnaire)
-    // For Option 2a: total_emission (user enters manually - Energy Consumption × Emission Factor)
-    if (loanType === 'sovereign-debt') {
-      // Only auto-fill verified/unverified for Options 1a/1b (not Option 2a)
-      // Option 2a uses total_emission which is entered manually
-      const isOption2a = selectedFormula?.includes('2a-sovereign-debt');
-      
-      if (!isOption2a) {
-        // For Options 1a/1b, auto-fill verified and unverified country emissions
-        setFormData(prev => {
-          // Only update if values have changed to prevent infinite loops
-          if (prev.verified_country_emissions === totalEmission && prev.unverified_country_emissions === totalEmission) {
-            return prev;
-          }
-          return {
-            ...prev,
-            verified_country_emissions: totalEmission,
-            unverified_country_emissions: totalEmission
-          };
-        });
-      }
-    }
-  }, [propScope1, propScope2, propScope3, loanType, selectedFormula]);
-
   // Always start fresh - no auto-filling from database
 
   // No auto-saving - data is only saved when user completes the form
+
+  const methodForLoan = (loanTypeParam: string) =>
+    propCalculationMethods?.[loanTypeParam] || propCalculationMethod;
 
   // Get available formulas based on questionnaire answers for a given loan type
   const getAvailableFormulasForLoan = (loanTypeParam: string) => {
@@ -555,52 +540,33 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     const isSovereignDebt = loanTypeParam === 'sovereign-debt';
     const isMotorVehicleLoan = loanTypeParam === 'motor-vehicle-loan';
     const isCommercialRealEstate = loanTypeParam === 'commercial-real-estate';
+    const propCalculationMethod = methodForLoan(loanTypeParam);
     
-    // Handle Commercial Real Estate formulas
+    // Handle Commercial Real Estate formulas — always by method card (no emissions questionnaire)
     if (isCommercialRealEstate) {
-      if (hasEmissions === 'yes') {
-        if (verificationStatus === 'verified') {
-          return COMMERCIAL_REAL_ESTATE_FORMULAS.filter(f => f.id === '1a-commercial-real-estate');
-        } else if (verificationStatus === 'unverified') {
-          return COMMERCIAL_REAL_ESTATE_FORMULAS.filter(f => f.id === '1b-commercial-real-estate');
-        }
-      } else if (hasEmissions === 'no') {
-        if (verificationStatus === 'verified') {
-          return COMMERCIAL_REAL_ESTATE_FORMULAS.filter(f => f.id === '2a-commercial-real-estate');
-        } else if (verificationStatus === 'unverified') {
-          return COMMERCIAL_REAL_ESTATE_FORMULAS.filter(f => f.id === '2b-commercial-real-estate');
-        }
-      }
+      const allowed = ['1a', '1b', '2a', '2b', '3'];
+      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+      return COMMERCIAL_REAL_ESTATE_FORMULAS.filter(
+        (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
+      );
     }
     
-    // Handle Motor Vehicle Loan formulas
+    // Handle Motor Vehicle Loan formulas — always by method card (Table 10.1-6)
     if (isMotorVehicleLoan) {
-      if (hasEmissions === 'yes') {
-        if (verificationStatus === 'verified') {
-          return MOTOR_VEHICLE_LOAN_FORMULAS.filter(f => f.id === '1a-motor-vehicle');
-        } else if (verificationStatus === 'unverified') {
-          return MOTOR_VEHICLE_LOAN_FORMULAS.filter(f => f.id === '1b-motor-vehicle');
-        }
-      } else if (hasEmissions === 'no') {
-        if (verificationStatus === 'verified') {
-          return MOTOR_VEHICLE_LOAN_FORMULAS.filter(f => f.id === '2a-motor-vehicle');
-        } else if (verificationStatus === 'unverified') {
-          return MOTOR_VEHICLE_LOAN_FORMULAS.filter(f => f.id === '2b-motor-vehicle');
-        }
-      }
+      const allowed = ['1a', '1b', '2a', '2b', '3a', '3b'];
+      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+      return MOTOR_VEHICLE_LOAN_FORMULAS.filter(
+        (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
+      );
     }
     
-    // Handle Sovereign Debt formulas
+    // Handle Sovereign Debt formulas — always by method card (Table 10.1-7)
     if (isSovereignDebt) {
-      if (hasEmissions === 'yes') {
-        if (verificationStatus === 'verified') {
-          return SOVEREIGN_DEBT_FORMULAS.filter(f => f.id === '1a-sovereign-debt');
-        } else if (verificationStatus === 'unverified') {
-          return SOVEREIGN_DEBT_FORMULAS.filter(f => f.id === '1b-sovereign-debt');
-        }
-      } else if (hasEmissions === 'no') {
-        return SOVEREIGN_DEBT_FORMULAS.filter(f => f.id === '2a-sovereign-debt');
-      }
+      const allowed = ['1a', '1b', '2a', '3a', '3b'];
+      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+      return SOVEREIGN_DEBT_FORMULAS.filter(
+        (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
+      );
     }
     
     // Handle Project Finance formulas
@@ -612,26 +578,45 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           return PROJECT_FINANCE_FORMULAS.filter(f => f.id === '1b-project-finance');
         }
       } else if (hasEmissions === 'no') {
-        // Show all available formulas for projects without emissions data (Options 2a and 2b)
-        return PROJECT_FINANCE_FORMULAS.filter(f => f.optionCode === '2a' || f.optionCode === '2b');
+        const allowed = ['2a', '2b', '3a', '3b', '3c'];
+        const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+        return PROJECT_FINANCE_FORMULAS.filter(
+          (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
+        );
       }
     }
     
-    // Handle Mortgage formulas
+    // Handle Mortgage formulas — always by method card (no emissions questionnaire)
     if (isMortgage) {
+      const allowed = ['1a', '1b', '2a', '2b', '3'];
+      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+      return MORTGAGE_FORMULAS.filter(
+        (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
+      );
+    }
+    
+    const matchListing = (id: string) =>
+      isListed ? id.endsWith('-listed-equity') : id.includes('unlisted-equity');
+
+    // Corporate Bond & Business Loan: 1a/1b from questionnaire, or the method picked when there is no company GHG
+    if (loanTypeParam === 'corporate-bond' || loanTypeParam === 'business-loan') {
       if (hasEmissions === 'yes') {
         if (verificationStatus === 'verified') {
-          return MORTGAGE_FORMULAS.filter(f => f.id === '1a-mortgage');
-        } else if (verificationStatus === 'unverified') {
-          return MORTGAGE_FORMULAS.filter(f => f.id === '1b-mortgage');
+          return ALL_FORMULAS.filter((f) => f.id === (isListed ? '1a-listed-equity' : '1a-unlisted-equity'));
+        }
+        if (verificationStatus === 'unverified') {
+          return ALL_FORMULAS.filter((f) => f.id === (isListed ? '1b-listed-equity' : '1b-unlisted-equity'));
         }
       } else if (hasEmissions === 'no') {
-        // Show all available formulas for mortgages without emissions data (Options 2a and 2b)
-        return MORTGAGE_FORMULAS.filter(f => f.optionCode === '2a' || f.optionCode === '2b');
+        const allowed = ['2a', '2b', '3a', '3b', '3c'];
+        const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+        return ALL_FORMULAS.filter(
+          (f) => matchListing(f.id) && (method ? f.optionCode === method : allowed.includes(f.optionCode))
+        );
       }
+      return [];
     }
-    
-    // Handle Corporate Bonds and Business Loans (same logic)
+
     if (hasEmissions === 'yes') {
       if (verificationStatus === 'verified') {
         return isListed ? 
@@ -643,10 +628,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           ALL_FORMULAS.filter(f => f.id === '1b-unlisted-equity');
       }
     } else if (hasEmissions === 'no') {
-      // Show all available formulas for companies without emissions data (Options 2a and 2b)
-      return isListed ? 
-        ALL_FORMULAS.filter(f => f.category === 'listed_equity' && (f.optionCode === '2a' || f.optionCode === '2b') && f.id.includes('listed')) :
-        ALL_FORMULAS.filter(f => f.category === 'listed_equity' && (f.optionCode === '2a' || f.optionCode === '2b') && f.id.includes('unlisted'));
+      return ALL_FORMULAS.filter(
+        (f) => matchListing(f.id) && (f.optionCode === '2a' || f.optionCode === '2b')
+      );
     }
     
     return [];
@@ -675,7 +659,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       setSelectedFormula(availableFormulas[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loanType, hasEmissions, verificationStatus]); // Only depend on props that affect formula availability
+  }, [loanType, hasEmissions, verificationStatus, propCalculationMethod, propCalculationMethods]);
 
 
 
@@ -895,6 +879,19 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             error: `At least one property with value is required for ${loanLabel}`
           });
         }
+        const mortgageOpt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
+        if ((mortgageOpt === '1a' || mortgageOpt === '1b') && (!loanData.energy_consumption || !loanData.emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building electricity (EPA/DEFRA) is required for ${loanLabel}` });
+        }
+        if (mortgageOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Energy labels, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2a)` });
+        }
+        if (mortgageOpt === '2b' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2b)` });
+        }
+        if (mortgageOpt === '3' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, number of buildings, and EPA/DEFRA factor are required for ${loanLabel} (Option 3)` });
+        }
       } else if (loanType === 'commercial-real-estate') {
         if (loanData.outstandingLoan === 0 || !loanData.outstandingLoan) {
           errors.push({
@@ -911,6 +908,19 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             loanLabel,
             error: `At least one property with value at origination is required for ${loanLabel}`
           });
+        }
+        const creOpt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
+        if ((creOpt === '1a' || creOpt === '1b') && (!loanData.energy_consumption || !loanData.emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building electricity (EPA/DEFRA) is required for ${loanLabel}` });
+        }
+        if (creOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Energy labels, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2a)` });
+        }
+        if (creOpt === '2b' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2b)` });
+        }
+        if (creOpt === '3' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, number of buildings, and EPA/DEFRA factor are required for ${loanLabel} (Option 3)` });
         }
       } else if (loanType === 'motor-vehicle-loan') {
         if (loanData.outstandingLoan === 0 || !loanData.outstandingLoan) {
@@ -942,11 +952,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             error: `Outstanding loan amount is required for ${loanLabel}`
           });
         }
-        if (loanData.pp_adjusted_gdp === 0 || !loanData.pp_adjusted_gdp) {
+        if (!loanData.sovereign_country_name && (!loanData.pp_adjusted_gdp || loanData.pp_adjusted_gdp === 0)) {
           errors.push({
             loanKey: inst.key,
             loanLabel,
-            error: `PP-Adjusted GDP is required for ${loanLabel}`
+            error: `Select a sovereign country with PPP-adjusted GDP for ${loanLabel}`
           });
         }
         
@@ -970,11 +980,34 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             });
           }
         } else if (formula?.optionCode === '2a') {
-          if (loanData.total_emission === 0 || !loanData.total_emission) {
+          if (!loanData.energy_consumption || !loanData.emission_factor) {
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Total Emission is required for ${loanLabel}`
+              error: `Country energy (EPA/DEFRA) is required for ${loanLabel} (Option 2a)`
+            });
+          }
+        } else if (formula?.optionCode === '3a') {
+          if (!loanData.sector_intensity || !loanData.sector_key) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Select a sector with intensity data for ${loanLabel} (Option 3a)`
+            });
+          }
+        } else if (formula?.optionCode === '3b') {
+          if (!loanData.proxy_country_emissions) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Proxy country GHG is required for ${loanLabel} (Option 3b)`
+            });
+          }
+          if (!loanData.proxy_sovereign_country_name && !loanData.proxy_pp_adjusted_gdp) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Select a proxy country with PPP-adjusted GDP for ${loanLabel} (Option 3b)`
             });
           }
         }
@@ -986,13 +1019,43 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             error: `Outstanding loan amount is required for ${loanLabel}`
           });
         }
+        const pfFormula = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId);
+        const pfOpt = pfFormula?.optionCode;
         const totalProjectEquityPlusDebt = (loanData.totalProjectEquity || 0) + (loanData.totalProjectDebt || 0);
-        if (totalProjectEquityPlusDebt === 0) {
+        if (pfOpt !== '3b' && pfOpt !== '3c' && totalProjectEquityPlusDebt === 0) {
           errors.push({
             loanKey: inst.key,
             loanLabel,
             error: `Total Project Equity + Debt is required for ${loanLabel}`
           });
+        }
+        if (pfOpt === '2a') {
+          if (!loanData.energy_consumption || loanData.energy_consumption === 0) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Energy consumption is required for ${loanLabel} (Option 2a)`
+            });
+          }
+          if (!loanData.emission_factor || loanData.emission_factor === 0) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Emission factor is required for ${loanLabel} (Option 2a)`
+            });
+          }
+        }
+        if (pfOpt === '2b' && (!loanData.production || !loanData.emission_factor)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
+        }
+        if (pfOpt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
+        }
+        if (pfOpt === '3b' && (!loanData.sectorEmissions || !loanData.sectorAssets)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Sector GHG and sector assets are required for ${loanLabel} (Option 3b)` });
+        }
+        if (pfOpt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
         }
       } else {
         // For corporate-bond, business-loan, etc.
@@ -1035,6 +1098,42 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             });
           }
         }
+
+        if (
+          (loanType === 'corporate-bond' || loanType === 'business-loan') &&
+          isEnergyEfOption2a(loanType, selectedId)
+        ) {
+          if (!loanData.energy_consumption || loanData.energy_consumption === 0) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Energy consumption is required for ${loanLabel} (Option 2a)`
+            });
+          }
+          if (!loanData.emission_factor || loanData.emission_factor === 0) {
+            errors.push({
+              loanKey: inst.key,
+              loanLabel,
+              error: `Emission factor is required for ${loanLabel} (Option 2a)`
+            });
+          }
+        }
+
+        if (loanType === 'corporate-bond' || loanType === 'business-loan') {
+          const opt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
+          if (opt === '2b' && (!loanData.production || !loanData.emission_factor)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
+          }
+          if (opt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
+          }
+          if (opt === '3b' && (!loanData.sectorEmissions || !loanData.sectorAssets)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `Sector GHG and sector assets are required for ${loanLabel} (Option 3b)` });
+          }
+          if (opt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
+          }
+        }
       }
     }
 
@@ -1044,7 +1143,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     };
   };
 
-  const calculateSingleLoan = (loanTypeKey: string, loanFormData: typeof formData) => {
+  const calculateSingleLoan = async (loanTypeKey: string, loanFormData: typeof formData) => {
     const useShared = expandedLoanTypes.length > 1;
     const formulas = getAvailableFormulasForLoan(loanTypeKey);
     const selectedId = formulas.length === 1 ? formulas[0].id : selectedFormula; // fallback to current selection if multiple
@@ -1061,15 +1160,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     const totalActualEnergyConsumption = loanTypeKey === 'mortgage'
       ? properties.reduce((sum, property) => sum + smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit), 0)
       : 0;
-    const totalFloorArea = loanTypeKey === 'mortgage'
-      ? properties.reduce((sum, property) => sum + property.floorArea, 0)
-      : 0;
-    const totalEstimatedEnergyFromLabels = loanTypeKey === 'mortgage'
-      ? properties.reduce((sum, property) => sum + smartConvertUnit(property.estimatedEnergyConsumptionFromLabels, property.estimatedEnergyConsumptionFromLabelsUnit), 0)
-      : 0;
-    const totalEstimatedEnergyFromStatistics = loanTypeKey === 'mortgage'
-      ? properties.reduce((sum, property) => sum + smartConvertUnit(property.estimatedEnergyConsumptionFromStatistics, property.estimatedEnergyConsumptionFromStatisticsUnit), 0)
-      : 0;
 
     const weightedAverageSupplierEmissionFactor = loanTypeKey === 'mortgage' && totalActualEnergyConsumption > 0 ? 
       properties.reduce((sum, property) => {
@@ -1078,17 +1168,37 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         return sum + (convertedEnergy * convertedEmissionFactor);
       }, 0) / totalActualEnergyConsumption : 0;
 
-    const weightedAverageEmissionFactor = loanTypeKey === 'mortgage' && totalActualEnergyConsumption > 0 ? 
-      properties.reduce((sum, property) => {
-        const convertedEnergy = smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit);
-        const convertedEmissionFactor = smartConvertUnit(property.averageEmissionFactor, property.averageEmissionFactorUnit);
-        return sum + (convertedEnergy * convertedEmissionFactor);
-      }, 0) / totalActualEnergyConsumption : 0;
-
     // Validate minimal fields per type (keep existing validations brief here)
     if (loanTypeKey === 'mortgage') {
       if (totalPropertyValueAtOrigination === 0) throw new Error('Property value at origination must be greater than 0.');
       if ((loanFormData.outstandingLoan || 0) === 0) throw new Error('Outstanding loan amount must be greater than 0.');
+    }
+
+    if (isCreActualEnergyOption(loanTypeKey, selectedId)) {
+      if (!loanFormData.energy_consumption || !loanFormData.emission_factor) {
+        throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
+      }
+    }
+    const propertyOpt = formulas.find((f) => f.id === selectedId)?.optionCode;
+    if (loanTypeKey === 'mortgage' || loanTypeKey === 'commercial-real-estate') {
+      if (propertyOpt === '2a' && (!loanFormData.estimated_energy_consumption_from_labels || !loanFormData.floor_area || !loanFormData.average_emission_factor)) {
+        throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
+      }
+      if (propertyOpt === '2b' && (!loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.floor_area || !loanFormData.average_emission_factor)) {
+        throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+      }
+      if (propertyOpt === '3' && (!loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.number_of_buildings || !loanFormData.average_emission_factor)) {
+        throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
+      }
+    }
+
+    if (isEnergyEfOption2a(loanTypeKey, selectedId)) {
+      if (!loanFormData.energy_consumption) {
+        throw new Error('Energy consumption must be greater than 0 for Option 2a.');
+      }
+      if (!loanFormData.emission_factor) {
+        throw new Error('Emission factor must be greater than 0 for Option 2a. Select an EPA or DEFRA factor.');
+      }
     }
 
     // Calculate total assets value based on corporate structure (use shared when multi)
@@ -1111,39 +1221,64 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       totalProjectEquity: loanFormData.totalProjectEquity || 0,
       totalProjectDebt: loanFormData.totalProjectDebt || 0,
       pp_adjusted_gdp: loanFormData.pp_adjusted_gdp || 0,
-      verified_country_emissions: loanFormData.verified_country_emissions || 0, // Always tCO2e (auto-filled from questionnaire)
-      unverified_country_emissions: loanFormData.unverified_country_emissions || 0, // Always tCO2e (auto-filled from questionnaire)
+      sovereign_country_name: loanFormData.sovereign_country_name || '',
+      ppp_gdp_year: loanFormData.ppp_gdp_year || 0,
+      ppp_gdp_used_fallback: loanFormData.ppp_gdp_used_fallback || false,
+      verified_country_emissions: loanFormData.verified_country_emissions || 0,
+      verified_emissions_country_name: loanFormData.verified_emissions_country_name || '',
+      unverified_country_emissions: loanFormData.unverified_country_emissions || 0,
+      proxy_country_emissions: loanFormData.proxy_country_emissions || 0,
+      proxy_sovereign_country_name: loanFormData.proxy_sovereign_country_name || '',
+      proxy_pp_adjusted_gdp: loanFormData.proxy_pp_adjusted_gdp || 0,
+      proxy_ppp_gdp_year: loanFormData.proxy_ppp_gdp_year || 0,
+      proxy_ppp_gdp_used_fallback: loanFormData.proxy_ppp_gdp_used_fallback || false,
+      sector_key: loanFormData.sector_key || '',
+      sector_code: loanFormData.sector_code || '',
+      sector_name: loanFormData.sector_name || '',
+      sector_intensity: loanFormData.sector_intensity || 0,
+      sector_intensity_unit: loanFormData.sector_intensity_unit || '',
       total_value_at_origination: loanFormData.total_value_at_origination || 0,
-      total_vehicle_emissions: loanFormData.total_vehicle_emissions ? loanFormData.total_vehicle_emissions / 1000 : 0, // Convert from kg CO2e to tCO2e
+      total_vehicle_emissions: loanFormData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
       fuel_consumption: smartConvertUnit(loanFormData.fuel_consumption || 0, loanFormData.fuel_consumption_unit),
       distance_traveled: loanFormData.distance_traveled || 0,
       efficiency: loanFormData.efficiency || 0,
       vehicle_emission_factor: smartConvertUnit(loanFormData.vehicle_emission_factor || 0, loanFormData.vehicle_emission_factor_unit),
       verified_emissions: smartConvertUnit(loanFormData.verified_emissions || 0, loanFormData.verified_emissionsUnit),
       unverified_emissions: smartConvertUnit(loanFormData.unverified_emissions || 0, loanFormData.unverified_emissionsUnit),
-      energy_consumption: loanFormData.emissions || 0, // Use combined emissions field
-      emission_factor: 1, // Always 1 since emissions already includes the multiplication
+      ...buildEnergyPcafFields(loanFormData, loanTypeKey, selectedId),
       production: loanFormData.production || 0,
+      process_emissions: loanFormData.process_emissions || 0,
+      company_revenue: loanFormData.companyRevenue || 0,
       sector_emissions: loanFormData.sectorEmissions || 0,
       sector_revenue: loanFormData.sectorRevenue || 0,
       sector_assets: loanFormData.sectorAssets || 0,
       asset_turnover_ratio: loanFormData.assetTurnoverRatio || 0,
+      calculation_method: propCalculationMethod || '',
       property_value: loanFormData.property_value || 0,
         property_value_at_origination: loanTypeKey === 'mortgage' ? totalPropertyValueAtOrigination : 
           loanTypeKey === 'commercial-real-estate' ? totalPropertyValueAtOrigination : 
           (loanFormData.property_value_at_origination || 0),
-        total_emission: loanTypeKey === 'commercial-real-estate' ? (loanFormData.total_emission || 0) : 
-          loanTypeKey === 'sovereign-debt' ? (loanFormData.total_emission || 0) : 
-          loanTypeKey === 'mortgage' && (selectedId === '1a-mortgage' || selectedId === '1b-mortgage' || selectedId === '2a-mortgage') ? (properties.reduce((sum, p) => sum + (p.totalEmission || 0), 0)) : 0, // For commercial real estate, sovereign debt Option 2a, and mortgage Options 1a, 1b, 2a, use total_emission
-        actual_energy_consumption: loanTypeKey === 'mortgage' ? totalActualEnergyConsumption : 0, // Only for mortgage
-        supplier_specific_emission_factor: loanTypeKey === 'mortgage' ? weightedAverageSupplierEmissionFactor : 0, // Only for mortgage
-        average_emission_factor: loanTypeKey === 'mortgage' ? weightedAverageEmissionFactor : smartConvertUnit(loanFormData.average_emission_factor || 0, loanFormData.average_emission_factor_unit),
-      estimated_energy_consumption_from_labels: loanTypeKey === 'mortgage' ? totalEstimatedEnergyFromLabels : smartConvertUnit(loanFormData.estimated_energy_consumption_from_labels || 0, loanFormData.estimated_energy_consumption_from_labels_unit),
-      estimated_energy_consumption_from_statistics: loanTypeKey === 'mortgage' ? totalEstimatedEnergyFromStatistics : smartConvertUnit(loanFormData.estimated_energy_consumption_from_statistics || 0, loanFormData.estimated_energy_consumption_from_statistics_unit),
-      floor_area: loanTypeKey === 'mortgage' ? totalFloorArea : (loanFormData.floor_area || 0)
+        total_emission: loanTypeKey === 'sovereign-debt' ? (loanFormData.total_emission || 0) : (loanFormData.total_emission || 0),
+        actual_energy_consumption: loanTypeKey === 'mortgage' ? totalActualEnergyConsumption : 0,
+        supplier_specific_emission_factor: loanTypeKey === 'mortgage' ? weightedAverageSupplierEmissionFactor : 0,
+        average_emission_factor: smartConvertUnit(loanFormData.average_emission_factor || 0, loanFormData.average_emission_factor_unit) || loanFormData.average_emission_factor || 0,
+      estimated_energy_consumption_from_labels: loanFormData.estimated_energy_consumption_from_labels || 0,
+      estimated_energy_consumption_from_statistics: loanFormData.estimated_energy_consumption_from_statistics || 0,
+      floor_area: loanFormData.floor_area || 0,
+      number_of_buildings: loanFormData.number_of_buildings || 0,
+      factor_library: loanFormData.factor_library || 'EPA',
+      factor_grid_country: loanFormData.factor_grid_country || '',
+      factor_dataset: loanFormData.factor_dataset || '',
     } as Record<string, unknown>;
 
-    const pcafResult = calculationEngine.calculate(selectedId, pcafInputs, companyType);
+    const pcafResult = await executePcafCalculation({
+      loanTypeKey,
+      formulaId: selectedId,
+      pcafInputs,
+      companyType,
+      counterparty_id: propCounterpartyId ?? null,
+      persist: false,
+    });
 
     let denominatorValue: number;
     let denominatorLabel: string;
@@ -1241,24 +1376,12 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         : 0;
       const totalActualEnergyConsumption = properties.reduce((sum, property) => 
         sum + smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit), 0);
-      const totalFloorArea = properties.reduce((sum, property) => sum + property.floorArea, 0);
-      const totalEstimatedEnergyFromLabels = properties.reduce((sum, property) => 
-        sum + smartConvertUnit(property.estimatedEnergyConsumptionFromLabels, property.estimatedEnergyConsumptionFromLabelsUnit), 0);
-      const totalEstimatedEnergyFromStatistics = properties.reduce((sum, property) => 
-        sum + smartConvertUnit(property.estimatedEnergyConsumptionFromStatistics, property.estimatedEnergyConsumptionFromStatisticsUnit), 0);
       
       // Calculate weighted average emission factors for multiple properties with unit conversion
       const weightedAverageSupplierEmissionFactor = totalActualEnergyConsumption > 0 ? 
         properties.reduce((sum, property) => {
           const convertedEnergy = smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit);
           const convertedEmissionFactor = smartConvertUnit(property.supplierSpecificEmissionFactor, property.supplierSpecificEmissionFactorUnit);
-          return sum + (convertedEnergy * convertedEmissionFactor);
-        }, 0) / totalActualEnergyConsumption : 0;
-      
-      const weightedAverageEmissionFactor = totalActualEnergyConsumption > 0 ? 
-        properties.reduce((sum, property) => {
-          const convertedEnergy = smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit);
-          const convertedEmissionFactor = smartConvertUnit(property.averageEmissionFactor, property.averageEmissionFactorUnit);
           return sum + (convertedEnergy * convertedEmissionFactor);
         }, 0) / totalActualEnergyConsumption : 0;
 
@@ -1271,24 +1394,25 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           throw new Error('Outstanding loan amount must be greater than 0. Please enter the loan amount.');
         }
         
-        // Check for required data based on selected formula
         const formula = getCurrentFormula();
         if (formula?.optionCode === '1a' || formula?.optionCode === '1b') {
-          // For mortgage Options 1a and 1b, validate total_emission instead of actual energy consumption
-          const totalEmission = properties.reduce((sum, p) => sum + (p.totalEmission || 0), 0);
-          if (totalEmission === 0) {
-            throw new Error('Total Emission must be greater than 0. Please complete the questionnaire to set scope emissions (Scope 1 + Scope 2 + Scope 3).');
+          if (!formData.energy_consumption || !formData.emission_factor) {
+            throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
           }
         }
         if (formula?.optionCode === '2a') {
-          // For mortgage Option 2a, validate total_emission instead of floor_area
-          const totalEmission = properties.reduce((sum, p) => sum + (p.totalEmission || 0), 0);
-          if (totalEmission === 0) {
-            throw new Error('Total Emission must be greater than 0. Please enter the total emission (Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor).');
+          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor) {
+            throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
           }
-        } else if (formula?.optionCode === '2b') {
-          if (totalFloorArea === 0) {
-            throw new Error('Floor area must be greater than 0. Please enter floor area data for your properties.');
+        }
+        if (formula?.optionCode === '2b') {
+          if (!formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor) {
+            throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+          }
+        }
+        if (formula?.optionCode === '3') {
+          if (!formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor) {
+            throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
           }
         }
       } else if (loanType === 'commercial-real-estate') {
@@ -1303,13 +1427,23 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         
         const formula = getCurrentFormula();
         if (formula?.optionCode === '1a' || formula?.optionCode === '1b') {
-          if (formData.total_emission === 0) {
-            throw new Error('Total emission must be greater than 0. Please complete the questionnaire to set scope emissions.');
+          if (!formData.energy_consumption || !formData.emission_factor) {
+            throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
           }
         }
-        if (formula?.optionCode === '2a' || formula?.optionCode === '2b') {
-          if (formData.floor_area === 0) {
-            throw new Error('Floor area must be greater than 0. Please enter the floor area.');
+        if (formula?.optionCode === '2a') {
+          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor) {
+            throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
+          }
+        }
+        if (formula?.optionCode === '2b') {
+          if (!formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor) {
+            throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+          }
+        }
+        if (formula?.optionCode === '3') {
+          if (!formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor) {
+            throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
           }
         }
       } else if (loanType === 'motor-vehicle-loan') {
@@ -1347,9 +1481,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         console.log('🔍 SOVEREIGN DEBT DEBUG - Selected Formula:', getCurrentFormula()?.name);
         console.log('🔍 SOVEREIGN DEBT DEBUG - Full Form Data:', formData);
         
-        if (formData.pp_adjusted_gdp === 0) {
-          console.log('❌ SOVEREIGN DEBT VALIDATION - PP-Adjusted GDP validation failed!');
-          throw new Error('PP-Adjusted GDP must be greater than 0. Please enter the PP-Adjusted GDP.');
+        if (!formData.sovereign_country_name && !formData.pp_adjusted_gdp) {
+          console.log('❌ SOVEREIGN DEBT VALIDATION - Country / PPP-GDP validation failed!');
+          throw new Error('Select a sovereign country with PPP-adjusted GDP data.');
         }
         if (formData.outstandingLoan === 0) {
           console.log('❌ SOVEREIGN DEBT VALIDATION - Outstanding Loan validation failed!');
@@ -1358,19 +1492,67 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         
         const formula = getCurrentFormula();
         if (formula?.optionCode === '1a') {
-          if (formData.verified_country_emissions === 0) {
-            throw new Error('Verified Country Emissions must be greater than 0. Please complete the questionnaire to set scope emissions.');
+          if (!formData.verified_country_emissions) {
+            throw new Error('Verified country emissions must be greater than 0.');
           }
         }
         if (formula?.optionCode === '1b') {
-          if (formData.unverified_country_emissions === 0) {
-            throw new Error('Unverified Country Emissions must be greater than 0. Please complete the questionnaire to set scope emissions.');
+          if (!formData.unverified_country_emissions) {
+            throw new Error('Unverified country emissions must be greater than 0.');
           }
         }
         if (formula?.optionCode === '2a') {
-          if (formData.total_emission === 0) {
-            throw new Error('Total Emission must be greater than 0. Please enter the total emission (Energy Consumption × Emission Factor).');
+          if (!formData.energy_consumption || !formData.emission_factor) {
+            throw new Error('Enter country energy using the EPA/DEFRA form for Option 2a.');
           }
+        }
+        if (formula?.optionCode === '3a') {
+          if (!formData.sector_intensity || !formData.sector_key) {
+            throw new Error('Select a sector with intensity data for Option 3a.');
+          }
+        }
+        if (formula?.optionCode === '3b') {
+          if (!formData.proxy_country_emissions) {
+            throw new Error('Proxy country GHG is required for Option 3b.');
+          }
+          if (!formData.proxy_sovereign_country_name && !formData.proxy_pp_adjusted_gdp) {
+            throw new Error('Select a proxy country with PPP-adjusted GDP for Option 3b.');
+          }
+        }
+      }
+
+      if (isEnergyEfOption2a(loanType, selectedFormula) || isCreActualEnergyOption(loanType, selectedFormula)) {
+        if (!formData.energy_consumption || formData.energy_consumption === 0) {
+          throw new Error('Energy consumption must be greater than 0. Please enter energy or fuel consumption.');
+        }
+        if (!formData.emission_factor || formData.emission_factor === 0) {
+          throw new Error('Emission factor must be greater than 0. Select an EPA or DEFRA factor (or enter one manually).');
+        }
+      }
+
+      if (loanType === 'corporate-bond' || loanType === 'business-loan' || loanType === 'project-finance') {
+        const opt = getCurrentFormula()?.optionCode;
+        if (loanType === 'project-finance' && opt !== '3b' && opt !== '3c') {
+          const projectDenom = (formData.totalProjectEquity || 0) + (formData.totalProjectDebt || 0);
+          if (!projectDenom) {
+            throw new Error('Total Project Equity + Debt must be greater than 0.');
+          }
+        }
+        if (opt === '2b' && (!formData.production || !formData.emission_factor)) {
+          throw new Error('Production volume and emission factor must be greater than 0 for Option 2b.');
+        }
+        if (opt === '3a' && (!formData.companyRevenue || !formData.sectorEmissions || !formData.sectorRevenue)) {
+          throw new Error(
+            loanType === 'project-finance'
+              ? 'Project revenue, sector GHG, and sector revenue are required for Option 3a.'
+              : 'Company revenue, sector GHG, and sector revenue are required for Option 3a.'
+          );
+        }
+        if (opt === '3b' && (!formData.sectorEmissions || !formData.sectorAssets)) {
+          throw new Error('Sector GHG and sector assets are required for Option 3b.');
+        }
+        if (opt === '3c' && (!formData.assetTurnoverRatio || !formData.sectorEmissions || !formData.sectorRevenue)) {
+          throw new Error('ATR, sector GHG, and sector revenue are required for Option 3c.');
         }
       }
 
@@ -1401,38 +1583,56 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         totalProjectDebt: formData.totalProjectDebt || 0,
         // Add Sovereign Debt specific fields
         pp_adjusted_gdp: formData.pp_adjusted_gdp || 0,
-        verified_country_emissions: formData.verified_country_emissions || 0, // Always tCO2e (auto-filled from questionnaire)
-        unverified_country_emissions: formData.unverified_country_emissions || 0, // Always tCO2e (auto-filled from questionnaire)
+        sovereign_country_name: formData.sovereign_country_name || '',
+        ppp_gdp_year: formData.ppp_gdp_year || 0,
+        ppp_gdp_used_fallback: formData.ppp_gdp_used_fallback || false,
+        verified_country_emissions: formData.verified_country_emissions || 0,
+        verified_emissions_country_name: formData.verified_emissions_country_name || '',
+        unverified_country_emissions: formData.unverified_country_emissions || 0,
+        proxy_country_emissions: formData.proxy_country_emissions || 0,
+        proxy_sovereign_country_name: formData.proxy_sovereign_country_name || '',
+        proxy_pp_adjusted_gdp: formData.proxy_pp_adjusted_gdp || 0,
+        proxy_ppp_gdp_year: formData.proxy_ppp_gdp_year || 0,
+        proxy_ppp_gdp_used_fallback: formData.proxy_ppp_gdp_used_fallback || false,
+        sector_key: formData.sector_key || '',
+        sector_code: formData.sector_code || '',
+        sector_name: formData.sector_name || '',
+        sector_intensity: formData.sector_intensity || 0,
+        sector_intensity_unit: formData.sector_intensity_unit || '',
         // Add Motor Vehicle Loan specific fields
         total_value_at_origination: formData.total_value_at_origination || 0,
-        total_vehicle_emissions: formData.total_vehicle_emissions ? formData.total_vehicle_emissions / 1000 : 0, // Convert from kg CO2e to tCO2e
+        total_vehicle_emissions: formData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
         fuel_consumption: smartConvertUnit(formData.fuel_consumption || 0, formData.fuel_consumption_unit),
         distance_traveled: formData.distance_traveled || 0,
         efficiency: formData.efficiency || 0,
         vehicle_emission_factor: smartConvertUnit(formData.vehicle_emission_factor || 0, formData.vehicle_emission_factor_unit),
         verified_emissions: smartConvertUnit(formData.verified_emissions || 0, formData.verified_emissionsUnit),
         unverified_emissions: smartConvertUnit(formData.unverified_emissions || 0, formData.unverified_emissionsUnit),
-        energy_consumption: formData.emissions || 0, // Use combined emissions field
-        emission_factor: 1, // Always 1 since emissions already includes the multiplication
+        ...buildEnergyPcafFields(formData, loanType, selectedFormula),
         production: formData.production || 0,
+        process_emissions: formData.process_emissions || 0,
+        company_revenue: formData.companyRevenue || 0,
         sector_emissions: formData.sectorEmissions || 0,
         sector_revenue: formData.sectorRevenue || 0,
         sector_assets: formData.sectorAssets || 0,
         asset_turnover_ratio: formData.assetTurnoverRatio || 0,
+        calculation_method: propCalculationMethod || '',
         property_value: formData.property_value || 0,
         // Mortgage-specific inputs (aggregated from multiple properties)
         property_value_at_origination: loanType === 'mortgage' ? totalPropertyValueAtOrigination : 
           loanType === 'commercial-real-estate' ? totalPropertyValueAtOrigination : 
           (formData.property_value_at_origination || 0),
-        total_emission: loanType === 'commercial-real-estate' ? (formData.total_emission || 0) : 
-          loanType === 'sovereign-debt' ? (formData.total_emission || 0) : 
-          loanType === 'mortgage' && (selectedFormula === '1a-mortgage' || selectedFormula === '1b-mortgage' || selectedFormula === '2a-mortgage') ? (properties.reduce((sum, p) => sum + (p.totalEmission || 0), 0)) : 0, // For commercial real estate, sovereign debt Option 2a, and mortgage Options 1a, 1b, 2a, use total_emission
-        actual_energy_consumption: loanType === 'mortgage' ? totalActualEnergyConsumption : 0, // Only for mortgage
-        supplier_specific_emission_factor: loanType === 'mortgage' ? weightedAverageSupplierEmissionFactor : 0, // Only for mortgage
-        average_emission_factor: loanType === 'mortgage' ? weightedAverageEmissionFactor : smartConvertUnit(formData.average_emission_factor || 0, formData.average_emission_factor_unit),
-        estimated_energy_consumption_from_labels: loanType === 'mortgage' ? totalEstimatedEnergyFromLabels : smartConvertUnit(formData.estimated_energy_consumption_from_labels || 0, formData.estimated_energy_consumption_from_labels_unit),
-        estimated_energy_consumption_from_statistics: loanType === 'mortgage' ? totalEstimatedEnergyFromStatistics : smartConvertUnit(formData.estimated_energy_consumption_from_statistics || 0, formData.estimated_energy_consumption_from_statistics_unit),
-        floor_area: loanType === 'mortgage' ? totalFloorArea : (formData.floor_area || 0)
+        total_emission: formData.total_emission || 0,
+        actual_energy_consumption: loanType === 'mortgage' ? totalActualEnergyConsumption : 0,
+        supplier_specific_emission_factor: loanType === 'mortgage' ? weightedAverageSupplierEmissionFactor : 0,
+        average_emission_factor: smartConvertUnit(formData.average_emission_factor || 0, formData.average_emission_factor_unit) || formData.average_emission_factor || 0,
+        estimated_energy_consumption_from_labels: formData.estimated_energy_consumption_from_labels || 0,
+        estimated_energy_consumption_from_statistics: formData.estimated_energy_consumption_from_statistics || 0,
+        floor_area: formData.floor_area || 0,
+        number_of_buildings: formData.number_of_buildings || 0,
+        factor_library: formData.factor_library || 'EPA',
+        factor_grid_country: formData.factor_grid_country || '',
+        factor_dataset: formData.factor_dataset || '',
       };
 
 
@@ -1443,44 +1643,33 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       console.log('🔍 PCAF CALCULATION DEBUG - Loan Type:', loanType);
       console.log('🔍 PCAF CALCULATION DEBUG - Total Emission (for Options 1a, 1b, 2a):', (loanType === 'sovereign-debt' || (loanType === 'mortgage' && (selectedFormula === '1a-mortgage' || selectedFormula === '1b-mortgage' || selectedFormula === '2a-mortgage'))) ? pcafInputs.total_emission : 'N/A');
       
-      const pcafResultLocal = calculationEngine.calculate(selectedFormula, pcafInputs, companyType);
-      console.log('🔍 PCAF CALCULATION DEBUG - Calculation Result:', pcafResultLocal);
-
-      // Instant local preview
-      const localPreview: CalculationResult = {
-        attributionFactor: pcafResultLocal.attributionFactor,
-        financeEmission: pcafResultLocal.financedEmissions,
-        totalProductOutput: 0,
-        evic: 0,
-        dataQualityScore: pcafResultLocal.dataQualityScore,
-        methodology: pcafResultLocal.methodology,
-        calculationSteps: pcafResultLocal.calculationSteps,
-      };
-      setResult(localPreview);
-
-      const pcafConfirmed = await resolveFinancedCalculation({
-        calc_kind: "finance",
-        formula_id: selectedFormula,
-        company_type: companyType,
-        inputs: pcafInputs as Record<string, unknown>,
+      const pcafConfirmed = await executePcafCalculation({
+        loanTypeKey: loanType,
+        formulaId: selectedFormula,
+        pcafInputs: pcafInputs as Record<string, unknown>,
+        companyType,
         counterparty_id: propCounterpartyId ?? null,
         persist: false,
-        local: {
-          attributionFactor: pcafResultLocal.attributionFactor,
-          financedEmissions: pcafResultLocal.financedEmissions,
-          dataQualityScore: pcafResultLocal.dataQualityScore,
-          methodology: pcafResultLocal.methodology,
-          calculationSteps: pcafResultLocal.calculationSteps,
-        },
       });
+      console.log('🔍 PCAF CALCULATION DEBUG - Calculation Result:', pcafConfirmed);
+
+      const localPreview: CalculationResult = {
+        attributionFactor: pcafConfirmed.attributionFactor,
+        financeEmission: pcafConfirmed.financedEmissions,
+        totalProductOutput: 0,
+        evic: 0,
+        dataQualityScore: pcafConfirmed.dataQualityScore,
+        methodology: pcafConfirmed.methodology,
+        calculationSteps: pcafConfirmed.calculationSteps,
+      };
+      setResult(localPreview);
 
       const pcafResult = {
         attributionFactor: pcafConfirmed.attributionFactor,
         financedEmissions: pcafConfirmed.financedEmissions,
         dataQualityScore: pcafConfirmed.dataQualityScore,
-        methodology: pcafConfirmed.methodology ?? pcafResultLocal.methodology,
-        calculationSteps:
-          pcafConfirmed.calculationSteps ?? pcafResultLocal.calculationSteps,
+        methodology: pcafConfirmed.methodology,
+        calculationSteps: pcafConfirmed.calculationSteps,
       };
       
       // Calculate the appropriate denominator based on company type
@@ -1575,30 +1764,15 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           const ltKey = inst.type;
           const saved = perLoanFormData[inst.key] || formData; // fall back to current formData
           try {
-            const r = calculateSingleLoan(ltKey, saved);
-            const confirmed = await resolveFinancedCalculation({
-              calc_kind: "finance",
-              formula_id: r.pcafFormulaId,
-              company_type: r.companyType,
-              inputs: r.pcafInputs as Record<string, unknown>,
-              counterparty_id: propCounterpartyId ?? null,
-              persist: false,
-              local: {
-                attributionFactor: r.attributionFactor,
-                financedEmissions: r.financeEmission,
-                dataQualityScore: r.dataQualityScore,
-                methodology: r.methodology,
-                calculationSteps: r.calculationSteps,
-              },
-            });
+            const r = await calculateSingleLoan(ltKey, saved);
             results.push({
               type: ltKey,
               label: `${typeLabels[ltKey] || ltKey} #${inst.instance}`,
-              attributionFactor: confirmed.attributionFactor,
-              financeEmission: confirmed.financedEmissions,
+              attributionFactor: r.attributionFactor,
+              financeEmission: r.financeEmission,
               denominatorLabel: r.denominatorLabel,
               denominatorValue: r.denominatorValue,
-              dataQualityScore: confirmed.dataQualityScore,
+              dataQualityScore: r.dataQualityScore,
               pcafFormulaId: r.pcafFormulaId,
               pcafInputs: r.pcafInputs as Record<string, unknown>,
               companyType: r.companyType,
@@ -1719,6 +1893,56 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     return availableFormulas.find(f => f.id === selectedFormula);
   };
 
+  const ENERGY_EF_LOAN_TYPES = ['project-finance', 'corporate-bond', 'business-loan', 'sovereign-debt'] as const;
+
+  const formulaForLoan = (loanTypeKey: string, formulaId?: string | null) => {
+    const formulas = getAvailableFormulasForLoan(loanTypeKey);
+    const id = formulaId || selectedFormula;
+    return formulas.find((f) => f.id === id) || (loanTypeKey === loanType ? getCurrentFormula() : undefined);
+  };
+
+  const isEnergyEfOption2a = (loanTypeKey: string, formulaId?: string | null) => {
+    if (!ENERGY_EF_LOAN_TYPES.includes(loanTypeKey as (typeof ENERGY_EF_LOAN_TYPES)[number])) {
+      return false;
+    }
+    return formulaForLoan(loanTypeKey, formulaId)?.optionCode === '2a';
+  };
+
+  const isCreActualEnergyOption = (loanTypeKey: string, formulaId?: string | null) => {
+    if (loanTypeKey !== 'commercial-real-estate' && loanTypeKey !== 'mortgage') return false;
+    const opt = formulaForLoan(loanTypeKey, formulaId)?.optionCode;
+    return opt === '1a' || opt === '1b';
+  };
+
+  const buildEnergyPcafFields = (data: typeof formData, loanTypeKey: string, formulaId?: string | null) => {
+    if (isEnergyEfOption2a(loanTypeKey, formulaId) || isCreActualEnergyOption(loanTypeKey, formulaId)) {
+      return {
+        energy_consumption: data.energy_consumption || 0,
+        emission_factor: data.emission_factor || 0,
+        energy_type: data.energy_type || 'electricity',
+        factor_library: data.factor_library || 'EPA',
+        electricity_mode: data.electricity_mode || 'grid',
+        factor_activity: data.factor_activity || '',
+        factor_fuel: data.factor_fuel || '',
+        factor_unit: data.factor_unit || '',
+        factor_grid_country: data.factor_grid_country || '',
+        factor_dataset: data.factor_dataset || '',
+        energy_consumption_unit: data.energy_consumption_unit || '',
+        electricity_total_kwh: data.electricity_total_kwh || 0,
+        electricity_grid_pct: data.electricity_grid_pct || 0,
+        electricity_renewable_pct: data.electricity_renewable_pct || 0,
+        electricity_other_pct: data.electricity_other_pct || 0,
+        electricity_grid_factor: data.electricity_grid_factor || 0,
+        electricity_other_sources: data.electricity_other_sources || [],
+      };
+    }
+    // Legacy collapse: combined emissions treated as already-multiplied tCO2e
+    return {
+      energy_consumption: data.emissions || data.energy_consumption || 0,
+      emission_factor: data.emissions ? 1 : (data.emission_factor || 1),
+    };
+  };
+
   // Unit conversion using centralized utility
 
   const renderDynamicInputs = () => {
@@ -1735,11 +1959,33 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       'totalProjectEquity',
       'totalProjectDebt',
       // Sovereign debt fields (handled by SovereignDebtForm)
+      'sovereign_country_name',
       'pp_adjusted_gdp',
+      'ppp_gdp_year',
+      'ppp_gdp_used_fallback',
       'verified_country_emissions',
       'unverified_country_emissions',
+      'proxy_country_emissions',
+      'proxy_sovereign_country_name',
+      'proxy_pp_adjusted_gdp',
+      'proxy_ppp_gdp_year',
+      'proxy_ppp_gdp_used_fallback',
+      'sector_key',
+      'sector_code',
+      'sector_name',
+      'sector_intensity',
+      'sector_intensity_unit',
       'energy_consumption',
-      'emission_factor',
+      // 2a uses EnergyEmissionInputs; 2b still needs the production EF field
+      ...(formula.optionCode === '2b' ? [] : ['emission_factor']),
+      'verified_emissions',
+      'unverified_emissions',
+      'company_revenue',
+      'sector_emissions',
+      'sector_revenue',
+      'sector_assets',
+      'asset_turnover_ratio',
+      'process_emissions',
       // Motor vehicle loan fields (handled by MotorVehicleLoanForm)
       'total_value_at_origination',
       'total_vehicle_emissions', // Auto-calculated from vehicle details
@@ -1755,7 +2001,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       'average_emission_factor',
       'estimated_energy_consumption_from_labels',
       'estimated_energy_consumption_from_statistics',
-      'floor_area'
+      'floor_area',
+      'number_of_buildings',
     ];
 
     console.log('🔍 Rendering formula inputs:', {
@@ -1858,50 +2105,50 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6">
       {/* Show content based on active tab */}
       {activeTab === 'finance' && (
         <>
           {/* Loan Type Navigation - Clean Header */}
           {expandedLoanTypes.length > 1 && (
-            <div className="space-y-4 pb-6 border-b border-gray-200">
-              <div className="space-y-1">
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {(typeLabels[expandedLoanTypes[currentLoanIndex]?.type] || expandedLoanTypes[currentLoanIndex]?.type)}
-                </h3>
-                <p className="text-base text-gray-600">
-                  Loan {currentLoanIndex + 1} of {expandedLoanTypes.length}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentLoanIndex === 0}
-                  onClick={() => setCurrentLoanIndex(i => Math.max(0, i - 1))}
-                  className="h-10 px-6"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  disabled={currentLoanIndex >= expandedLoanTypes.length - 1}
-                  onClick={() => setCurrentLoanIndex(i => Math.min(expandedLoanTypes.length - 1, i + 1))}
-                  className="h-10 px-6"
-                >
-                  Next
-                </Button>
+            <div className="space-y-2 pb-1">
+              <p className="text-xs font-medium text-[#64748B]">
+                Filling {currentLoanIndex + 1} of {expandedLoanTypes.length}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {expandedLoanTypes.map((loan, i) => {
+                  const active = i === currentLoanIndex;
+                  const method = propCalculationMethods?.[loan.type] || propCalculationMethod;
+                  return (
+                    <button
+                      key={loan.key}
+                      type="button"
+                      onClick={() => setCurrentLoanIndex(i)}
+                      className={`rounded-lg border px-3 py-1.5 text-left text-sm transition ${
+                        active
+                          ? 'border-[#0F6E56] bg-[#0F6E56] text-white'
+                          : 'border-[#E8EEF0] bg-white text-[#334155] hover:border-[#BFE3D3]'
+                      }`}
+                    >
+                      <span className="font-medium">{typeLabels[loan.type] || loan.type}</span>
+                      {method && (
+                        <span className={active ? 'ml-1.5 opacity-80' : 'ml-1.5 text-[#64748B]'}>
+                          {method.toUpperCase()}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
           
           {/* Single Loan Type Header */}
           {expandedLoanTypes.length === 1 && loanType && (
-            <div className="space-y-2 pb-6">
-              <h3 className="text-2xl font-bold text-gray-900">
-                {(typeLabels[loanType] || loanType)}
-              </h3>
+            <div className="pb-2">
+              <p className="text-sm font-medium text-[#0F6E56]">
+                {typeLabels[loanType] || loanType}
+              </p>
             </div>
           )}
 
@@ -1909,49 +2156,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       )}
 
       {activeTab === 'finance' && (
-        <>
-          {/* Properties Section - Only for Mortgages */}
-          {loanType === 'mortgage' && (
-        <MortgageForm
-          properties={properties}
-          selectedFormula={getCurrentFormula()}
-          onAddProperty={addProperty}
-          onRemoveProperty={removeProperty}
-          onUpdateProperty={updateProperty}
-        />
-      )}
-
-      {/* Country Data Section - Only for Sovereign Debt */}
-      {loanType === 'sovereign-debt' && (
-        <SovereignDebtForm
-          selectedFormula={getCurrentFormula()}
-          formData={formData}
-          onUpdateFormData={updateFormData}
-          totalEmission={(propScope1 || 0) + (propScope2 || 0) + (propScope3 || 0)}
-        />
-      )}
-
-      {/* Vehicle Data Section - Only for Motor Vehicle Loans */}
-      {loanType === 'motor-vehicle-loan' && (
-        <MotorVehicleLoanForm
-          selectedFormula={getCurrentFormula()}
-          formData={formData}
-          onUpdateFormData={updateFormData}
-        />
-      )}
-
-      {/* Property Data Section - Only for Commercial Real Estate */}
-      {loanType === 'commercial-real-estate' && (
-        <CommercialRealEstatePropertiesForm
-          properties={commercialProperties}
-          totalEmission={formData.total_emission || 0}
-          onAddProperty={addCommercialProperty}
-          onRemoveProperty={removeCommercialProperty}
-          onUpdateProperty={updateCommercialProperty}
-        />
-      )}
-
-      {/* Financial Information - Different for Each Loan Type */}
+        <div className="space-y-4">
+      {/* 1. Loan / attribution first */}
       {loanType === 'mortgage' ? (
         <MortgageFinancialForm
           outstandingLoan={formData.outstandingLoan}
@@ -1973,270 +2179,143 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           onUpdateOutstandingLoan={(value) => updateFormData('outstandingLoan', value)}
         />
       ) : (
-        <div className="space-y-8">
-          {/* Financial Information Header */}
-          <div className="space-y-1">
-            <h3 className="text-xl font-semibold text-gray-900">
-              Financial Information
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {corporateStructure === 'listed' ? 'Provide the inputs for EVIC' : 'Provide the debt and equity values'}
-            </p>
-          </div>
-
-          {/* Outstanding Loan */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="outstanding-loan" className="text-sm font-medium text-gray-900">
-                  Outstanding Loan Amount
-                </Label>
-                <span className="text-xs text-muted-foreground">(PKR)</span>
-                <FieldTooltip content="How much money is currently owed on the loan or investment" />
-              </div>
+        <InputSection
+          title="Loan & value"
+          description={
+            loanType === 'project-finance'
+              ? 'Outstanding amount and project equity + debt'
+              : corporateStructure === 'listed'
+                ? 'Outstanding amount and EVIC'
+                : 'Outstanding amount and total equity + debt'
+          }
+        >
+          <FieldGrid>
+            <FormField
+              label="Outstanding amount"
+              unit="PKR"
+              tooltip="How much is currently owed on the loan or investment"
+            >
               <FormattedNumberInput
                 id="outstanding-loan"
-                placeholder="Enter amount"
+                placeholder="0"
                 value={formData.outstandingLoan || 0}
                 onChange={(value) => updateFormData('outstandingLoan', value)}
-                className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
+                className={FIELD_INPUT}
               />
-              {loanType !== 'project-finance' &&
-                corporateStructure === 'unlisted' && (
-                  <p className="text-xs text-muted-foreground">
-                    Calculated as Total Debt + Total Equity
-                  </p>
-                )}
-            </div>
-          </div>
+            </FormField>
+          </FieldGrid>
 
-          {/* EVIC Calculation Section - Only show for Corporate Bonds and Business Loans */}
-          {loanType === 'corporate-bond' || loanType === 'business-loan' ? (
-            <div className="space-y-6 pt-2 border-t border-gray-200">
-              <div className="space-y-1">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {corporateStructure === 'listed' ? 'EVIC inputs' : 'Total Equity + Debt inputs'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {corporateStructure === 'listed' ? 'Enterprise Value Including Cash' : 'Sum of company equity and debt'}
-                </p>
-              </div>
-            {corporateStructure === 'listed' ? (
-              // Show full EVIC form only for first loan or single loan
-              propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="share-price" className="text-sm font-medium text-gray-900">
-                          Share Price
-                        </Label>
-                        <span className="text-xs text-muted-foreground">(PKR)</span>
-                        <FieldTooltip content="Current price of one company share" />
-                      </div>
-                      <FormattedNumberInput
-                        id="share-price"
-                        placeholder="Enter value"
-                        value={formData.sharePrice || 0}
-                        onChange={(value) => updateFormData('sharePrice', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="outstanding-shares" className="text-sm font-medium text-gray-900">
-                          Outstanding Shares
-                        </Label>
-                        <FieldTooltip content="Total number of company shares available" />
-                      </div>
-                      <FormattedNumberInput
-                        id="outstanding-shares"
-                        placeholder="Enter value"
-                        value={formData.outstandingShares || 0}
-                        onChange={(value) => updateFormData('outstandingShares', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="total-debt" className="text-sm font-medium text-gray-900">
-                          Total Debt
-                        </Label>
-                        <span className="text-xs text-muted-foreground">(PKR)</span>
-                        <FieldTooltip content="Total amount of money the company owes" />
-                      </div>
-                      <FormattedNumberInput
-                        id="total-debt"
-                        placeholder="Enter value"
-                        value={formData.totalDebt || 0}
-                        onChange={(value) => updateFormData('totalDebt', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="minority-interest" className="text-sm font-medium text-gray-900">
-                          Minority Interest
-                        </Label>
-                        <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                      </div>
-                      <FormattedNumberInput
-                        id="minority-interest"
-                        placeholder="Enter value"
-                        value={formData.minorityInterest || 0}
-                        onChange={(value) => updateFormData('minorityInterest', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="preferred-stock" className="text-sm font-medium text-gray-900">
-                          Preferred Stock
-                        </Label>
-                        <FieldTooltip content="The share of a subsidiary's ownership that belongs to outside (non-parent) investors." />
-                      </div>
-                      <FormattedNumberInput
-                        id="preferred-stock"
-                        placeholder="Enter value"
-                        value={formData.preferredStock || 0}
-                        onChange={(value) => updateFormData('preferredStock', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-lg border border-gray-200 bg-white p-4">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculated EVIC</div>
-                      <div className="text-2xl font-semibold text-gray-900 mt-1">
-                        {((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // Show read-only EVIC display for subsequent loans
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Shared EVIC (from first loan)</div>
-                  <div className="text-xl font-semibold text-blue-900 mt-1">
-                    {((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
-                  </div>
-                  <p className="text-xs text-blue-700 mt-1">
-                    (Share Price × Shares) + Total Debt + Minority Interest + Preferred Stock
-                  </p>
-                  <p className="text-xs text-amber-700 mt-2">
-                    EVIC values are shared across all loans and can only be edited in the first loan form.
-                  </p>
-                </div>
-              )
-            ) : (
-              // Show full form only for first loan or single loan
-              propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="total-equity" className="text-sm font-medium text-gray-900">
-                          Total Equity
-                        </Label>
-                        <span className="text-xs text-muted-foreground">(PKR)</span>
-                        <FieldTooltip content="Total value of company ownership (shares, retained earnings, etc.)" />
-                      </div>
-                      <FormattedNumberInput
-                        id="total-equity"
-                        placeholder="Enter value"
-                        value={formData.totalEquity || 0}
-                        onChange={(value) => updateFormData('totalEquity', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="total-debt-unlisted" className="text-sm font-medium text-gray-900">
-                          Total Debt
-                        </Label>
-                        <span className="text-xs text-muted-foreground">(PKR)</span>
-                        <FieldTooltip content="Total amount of money the company owes" />
-                      </div>
-                      <FormattedNumberInput
-                        id="total-debt-unlisted"
-                        placeholder="Enter value"
-                        value={formData.totalDebt || 0}
-                        onChange={(value) => updateFormData('totalDebt', value)}
-                        className="h-11 text-base border border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-200 rounded-lg px-3 text-left"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-lg border border-gray-200 bg-white p-4">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Equity + Debt</div>
-                      <div className="text-2xl font-semibold text-gray-900 mt-1">
-                        {((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Total Equity + Total Debt</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // Show read-only display for subsequent loans
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Shared Total Equity + Debt (from first loan)</div>
-                  <div className="text-xl font-semibold text-blue-900 mt-1">
-                    {((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
-                  </div>
-                  <p className="text-xs text-blue-700 mt-1">Total Equity + Total Debt</p>
-                  <p className="text-xs text-amber-700 mt-2">
-                    Equity and Debt values are shared across all loans and can only be edited in the first loan form.
-                  </p>
-                </div>
-              )
-            )}
-            </div>
-          ) : loanType === 'project-finance' ? (
-            /* Project Finance Section - Total Project Equity + Debt */
-            <div>
-              <h3 className="text-lg font-semibold mb-4">
-                Total Project Equity + Debt Calculation
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="total-project-equity">Total Project Equity (PKR)</Label>
-                    <FieldTooltip content="Total equity value invested in the project" />
-                  </div>
-                  <FormattedNumberInput
-                    id="total-project-equity"
-                    placeholder="0"
-                    value={formData.totalProjectEquity || 0}
-                    onChange={(value) => updateFormData('totalProjectEquity', value)}
-                    className="mt-1"
+          {(loanType === 'corporate-bond' || loanType === 'business-loan') && (
+            <div className="mt-4 space-y-4">
+              {corporateStructure === 'listed' ? (
+                propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
+                  <>
+                    <FieldGrid>
+                      <FormField label="Share price" unit="PKR" tooltip="Current price of one company share">
+                        <FormattedNumberInput id="share-price" placeholder="0" value={formData.sharePrice || 0} onChange={(value) => updateFormData('sharePrice', value)} className={FIELD_INPUT} />
+                      </FormField>
+                      <FormField label="Outstanding shares" tooltip="Total number of company shares">
+                        <FormattedNumberInput id="outstanding-shares" placeholder="0" value={formData.outstandingShares || 0} onChange={(value) => updateFormData('outstandingShares', value)} className={FIELD_INPUT} />
+                      </FormField>
+                      <FormField label="Total debt" unit="PKR" tooltip="Total amount the company owes">
+                        <FormattedNumberInput id="total-debt" placeholder="0" value={formData.totalDebt || 0} onChange={(value) => updateFormData('totalDebt', value)} className={FIELD_INPUT} />
+                      </FormField>
+                      <FormField label="Minority interest" tooltip="Ownership in subsidiaries held by outside investors">
+                        <FormattedNumberInput id="minority-interest" placeholder="0" value={formData.minorityInterest || 0} onChange={(value) => updateFormData('minorityInterest', value)} className={FIELD_INPUT} />
+                      </FormField>
+                      <FormField label="Preferred stock" tooltip="Preferred equity included in EVIC">
+                        <FormattedNumberInput id="preferred-stock" placeholder="0" value={formData.preferredStock || 0} onChange={(value) => updateFormData('preferredStock', value)} className={FIELD_INPUT} />
+                      </FormField>
+                    </FieldGrid>
+                    <ComputedBox
+                      label="Calculated EVIC"
+                      value={((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
+                      hint="(Share price × shares) + debt + minority interest + preferred stock"
+                    />
+                  </>
+                ) : (
+                  <ComputedBox
+                    label="Shared EVIC (from first loan)"
+                    value={((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
+                    hint="EVIC is edited on the first loan only"
                   />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="total-project-debt">Total Project Debt (PKR)</Label>
-                    <FieldTooltip content="Total debt amount for the project" />
-                  </div>
-                  <FormattedNumberInput
-                    id="total-project-debt"
-                    placeholder="0"
-                    value={formData.totalProjectDebt || 0}
-                    onChange={(value) => updateFormData('totalProjectDebt', value)}
-                    className="mt-1"
+                )
+              ) : propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
+                <>
+                  <FieldGrid>
+                    <FormField label="Total equity" unit="PKR" tooltip="Total value of company ownership">
+                      <FormattedNumberInput id="total-equity" placeholder="0" value={formData.totalEquity || 0} onChange={(value) => updateFormData('totalEquity', value)} className={FIELD_INPUT} />
+                    </FormField>
+                    <FormField label="Total debt" unit="PKR" tooltip="Total amount the company owes">
+                      <FormattedNumberInput id="total-debt-unlisted" placeholder="0" value={formData.totalDebt || 0} onChange={(value) => updateFormData('totalDebt', value)} className={FIELD_INPUT} />
+                    </FormField>
+                  </FieldGrid>
+                  <ComputedBox
+                    label="Total equity + debt"
+                    value={((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
                   />
-                </div>
-                <div className="p-4 bg-primary/5 rounded-lg">
-                  <div className="text-sm font-medium text-muted-foreground">Total Project Equity + Debt</div>
-                  <div className="text-xl font-bold text-primary">
-                    {((formData.totalProjectEquity || 0) + (formData.totalProjectDebt || 0)).toLocaleString()} PKR
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Total Project Equity + Total Project Debt
-                  </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <ComputedBox
+                  label="Shared equity + debt (from first loan)"
+                  value={((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
+                  hint="Edited on the first loan only"
+                />
+              )}
             </div>
-          ) : null}
-        </div>
+          )}
+
+          {loanType === 'project-finance' && (
+            <div className="mt-4 space-y-4">
+              <FieldGrid>
+                <FormField label="Project equity" unit="PKR" tooltip="Total equity invested in the project">
+                  <FormattedNumberInput id="total-project-equity" placeholder="0" value={formData.totalProjectEquity || 0} onChange={(value) => updateFormData('totalProjectEquity', value)} className={FIELD_INPUT} />
+                </FormField>
+                <FormField label="Project debt" unit="PKR" tooltip="Total debt for the project">
+                  <FormattedNumberInput id="total-project-debt" placeholder="0" value={formData.totalProjectDebt || 0} onChange={(value) => updateFormData('totalProjectDebt', value)} className={FIELD_INPUT} />
+                </FormField>
+              </FieldGrid>
+              <ComputedBox
+                label="Project equity + debt"
+                value={`${((formData.totalProjectEquity || 0) + (formData.totalProjectDebt || 0)).toLocaleString()} PKR`}
+              />
+            </div>
+          )}
+        </InputSection>
+      )}
+
+      {loanType === 'mortgage' && (
+        <MortgageForm
+          properties={properties}
+          selectedFormula={getCurrentFormula()}
+          onAddProperty={addProperty}
+          onRemoveProperty={removeProperty}
+          onUpdateProperty={updateProperty}
+        />
+      )}
+      {loanType === 'commercial-real-estate' && (
+        <CommercialRealEstatePropertiesForm
+          properties={commercialProperties}
+          totalEmission={formData.total_emission || 0}
+          showTotalEmission={false}
+          onAddProperty={addCommercialProperty}
+          onRemoveProperty={removeCommercialProperty}
+          onUpdateProperty={updateCommercialProperty}
+        />
+      )}
+      {loanType === 'sovereign-debt' && (
+        <SovereignDebtForm
+          selectedFormula={getCurrentFormula()}
+          formData={formData}
+          onUpdateFormData={updateFormData}
+        />
+      )}
+      {loanType === 'motor-vehicle-loan' && (
+        <MotorVehicleLoanForm
+          selectedFormula={getCurrentFormula()}
+          formData={formData}
+          onUpdateFormData={updateFormData}
+        />
       )}
 
       {/* Auto-Selected Formula Display - Hidden from UI, logged to console */}
@@ -2258,29 +2337,40 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         return null;
       })()}
 
-      {/* Dynamic Form Fields */}
+      {selectedFormula && (isEnergyEfOption2a(loanType, selectedFormula) || isCreActualEnergyOption(loanType, selectedFormula)) && (
+        <EnergyEmissionInputs
+          formData={formData as Record<string, unknown>}
+          onUpdateFormData={(field, value) => updateFormData(field, value as FinanceFormValue)}
+        />
+      )}
+
+      {selectedFormula && (loanType === 'commercial-real-estate' || loanType === 'mortgage') && ['2a', '2b', '3'].includes(getCurrentFormula()?.optionCode || '') && (
+        <CommercialRealEstateForm
+          selectedFormula={getCurrentFormula() || null}
+          formData={formData}
+          onUpdateFormData={updateFormData}
+        />
+      )}
+
+      {selectedFormula && (loanType === 'corporate-bond' || loanType === 'business-loan' || loanType === 'project-finance') && ['3a', '3b', '3c'].includes(getCurrentFormula()?.optionCode || '') && (
+        <SectorProxyInputs
+          optionCode={getCurrentFormula()?.optionCode || '3a'}
+          revenueLabel={loanType === 'project-finance' ? 'Project revenue' : 'Company revenue'}
+          formData={formData as Record<string, unknown>}
+          onUpdateFormData={(field, value) => updateFormData(field, value as FinanceFormValue)}
+        />
+      )}
+
       {(() => {
         const dynamicInputs = renderDynamicInputs();
-        return selectedFormula && dynamicInputs && dynamicInputs.length > 0 && (
-          <div className="space-y-6 pt-8 border-t border-gray-200">
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-gray-900">Additional Required Data</h3>
-              <p className="text-sm text-muted-foreground">
-                Enter the additional data required for the calculation
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {dynamicInputs}
-            </div>
-          </div>
-        );
+        return selectedFormula && dynamicInputs && dynamicInputs.length > 0 ? (
+          <InputSection title="Additional data" description="Any remaining fields required by this option">
+            <FieldGrid>{dynamicInputs}</FieldGrid>
+          </InputSection>
+        ) : null;
       })()}
 
-
-
-
-      {/* Calculate Button */}
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center pt-2">
         {(() => {
           const validation = expandedLoanTypes.length > 1 ? validateAllLoanForms() : { isValid: true };
           const isDisabled = !selectedFormula || (expandedLoanTypes.length > 1 && !validation.isValid);
@@ -2289,7 +2379,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               <Button
                 onClick={calculateFinanceEmission}
                 disabled={isDisabled || isCalculating}
-                className="px-8 py-3 h-12 text-base font-semibold bg-gradient-to-r from-[#1C7A53] to-[#1D9E75] hover:from-[#0F6E56] hover:to-[#1C7A53] text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto min-w-[220px] h-11 bg-[#0F6E56] hover:bg-[#0C5A47] text-white disabled:opacity-50"
               >
                 {isCalculating ? (
                   <>
@@ -2423,7 +2513,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         </Card>
         </motion.div>
       )}
-        </>
+        </div>
       )}
 
       {activeTab === 'facilitated' && (

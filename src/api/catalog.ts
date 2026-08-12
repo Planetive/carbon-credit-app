@@ -94,3 +94,30 @@ export function listSuppliers(params?: {
     method: "GET",
   });
 }
+
+/** ref.ppp_adjusted_gdp — sovereign PPP-adjusted GDP by country/year column. */
+export function listPppAdjustedGdp(params?: { limit?: number; offset?: number }) {
+  return apiFetch<Record<string, unknown>[]>(
+    withPaging("/api/v1/catalog/ppp-adjusted-gdp", params),
+    { method: "GET" }
+  );
+}
+
+/** ref.country_sector_intensity — kgCO2e per PKR by country and sector. */
+export function listCountrySectorIntensity(params?: {
+  country_name?: string;
+  country_code?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.country_name) search.set("country_name", params.country_name);
+  if (params?.country_code) search.set("country_code", params.country_code);
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  if (params?.offset != null) search.set("offset", String(params.offset));
+  const q = search.toString() ? `?${search}` : "";
+  return apiFetch<Record<string, unknown>[]>(
+    `/api/v1/catalog/country-sector-intensity${q}`,
+    { method: "GET" }
+  );
+}

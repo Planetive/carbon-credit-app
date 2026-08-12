@@ -72,7 +72,8 @@ export function useProcessingSoldProducts({
     };
 
     loadProcessing();
-  }, [user, enabled, companyContext, counterpartyId, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [user, enabled, companyContext, counterpartyId]);
 
   const save = async () => {
     if (!user) {

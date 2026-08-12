@@ -1,97 +1,219 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { FormulaConfig } from '../types/formula';
-import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import type { FinanceFormData, FinanceFormValue } from "../types/contracts";
+import { useSovereignPppGdp } from '../hooks/useSovereignPppGdp';
+import { useCountrySectorIntensity } from '../hooks/useCountrySectorIntensity';
+import { SovereignCountrySelect } from './SovereignCountrySelect';
+import { SovereignSectorSelect } from './SovereignSectorSelect';
+import { SovereignVerifiedEmissionSelect } from './SovereignVerifiedEmissionSelect';
+import { findWorldometerEmissions } from '../data/worldometerVerifiedEmissions';
+import type { SectorOption } from '../types/countrySectorIntensity';
+import { FIELD_INPUT, FieldGrid, FormField, InputSection } from "./InputLayout";
 
 interface SovereignDebtFormProps {
   selectedFormula: FormulaConfig | null;
   formData: FinanceFormData;
   onUpdateFormData: (field: string, value: FinanceFormValue) => void;
-  totalEmission?: number; // Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)
 }
 
 export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
   selectedFormula,
   formData,
   onUpdateFormData,
-  totalEmission = 0
 }) => {
-  // Fields that are already captured in the Financial Information section
-  const duplicateFields = ['outstanding_amount'];
+  const option = selectedFormula?.optionCode || '';
+  const num = (key: string) => Number(formData[key]) || 0;
+  const { countries, loading, error, reload, applyCountrySelection } = useSovereignPppGdp();
+  const countryName = String(formData.sovereign_country_name || '');
+  const {
+    sectors,
+    loading: sectorsLoading,
+    error: sectorsError,
+    reload: reloadSectors,
+  } = useCountrySectorIntensity(countryName, option === '3a');
 
-  const filteredInputs = selectedFormula?.inputs.filter(input => !duplicateFields.includes(input.name)) || [];
+  const pickersDisabled = loading || !!error;
 
-  if (filteredInputs.length === 0) return null;
+  const clearSector = () => {
+    onUpdateFormData('sector_code', '');
+    onUpdateFormData('sector_name', '');
+    onUpdateFormData('sector_key', '');
+    onUpdateFormData('sector_intensity', 0);
+    onUpdateFormData('sector_intensity_unit', '');
+  };
+
+  const handleCountrySelect = async (selectedName: string, prefix: 'sovereign' | 'proxy_sovereign') => {
+    const resolved = await applyCountrySelection(selectedName);
+    if (!resolved) return;
+
+    if (prefix === 'sovereign') {
+      onUpdateFormData('sovereign_country_name', resolved.sovereign_country_name);
+      onUpdateFormData('pp_adjusted_gdp', resolved.pp_adjusted_gdp);
+      onUpdateFormData('ppp_gdp_year', resolved.ppp_gdp_year);
+      onUpdateFormData('ppp_gdp_used_fallback', resolved.ppp_gdp_used_fallback);
+      clearSector();
+
+      if (option === '1a') {
+        const worldometer = findWorldometerEmissions(resolved.sovereign_country_name);
+        if (worldometer) {
+          onUpdateFormData('verified_emissions_country_name', worldometer.countryName);
+          onUpdateFormData('verified_country_emissions', worldometer.emissionsTons);
+        }
+      }
+      return;
+    }
+
+    onUpdateFormData('proxy_sovereign_country_name', resolved.sovereign_country_name);
+    onUpdateFormData('proxy_pp_adjusted_gdp', resolved.pp_adjusted_gdp);
+    onUpdateFormData('proxy_ppp_gdp_year', resolved.ppp_gdp_year);
+    onUpdateFormData('proxy_ppp_gdp_used_fallback', resolved.ppp_gdp_used_fallback);
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Country Data & Emissions Information</CardTitle>
-        <CardDescription>
-          Enter the country-specific data required for {selectedFormula?.name}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-
-        {/* Dynamic Fields Based on Selected Formula */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Required Data</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredInputs.map((input) => {
-              const fieldName = input.name;
-              // For verified/unverified country emissions, use totalEmission (auto-filled from questionnaire)
-              const isEmissionField = fieldName === 'verified_country_emissions' || fieldName === 'unverified_country_emissions';
-              // For total_emission in Option 2a, show tooltip explaining it's Energy Consumption × Emission Factor
-              const isTotalEmissionField = fieldName === 'total_emission';
-              const fieldValue = isEmissionField ? totalEmission : (formData[fieldName] || '');
-
-              // Determine tooltip content
-              let tooltipContent = input.description;
-              if (isEmissionField) {
-                tooltipContent = "Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3) • Unit: tCO₂e";
-              } else if (isTotalEmissionField) {
-                tooltipContent = "Total emission = Energy Consumption × Emission Factor • Unit: tCO₂e";
-              }
-
-              return (
-                <div key={input.name} className="space-y-2">
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Label htmlFor={input.name}>
-                          {input.label} {input.required && <span className="text-red-500">*</span>}
-                        </Label>
-                        {tooltipContent && (
-                          <FieldTooltip content={tooltipContent} />
-                        )}
-                      </div>
-                      <Input
-                        id={input.name}
-                        type="number"
-                        placeholder="0"
-                        value={fieldValue}
-                        onChange={(e) => onUpdateFormData(fieldName, parseFloat(e.target.value) || 0)}
-                        required={input.required}
-                        disabled={isEmissionField}
-                        title={isEmissionField ? "Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3) • Unit: tCO₂e" : isTotalEmissionField ? "Total emission = Energy Consumption × Emission Factor • Unit: tCO₂e" : undefined}
-                      />
-                      {!isEmissionField && input.unit && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Unit: {input.unit}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+    <InputSection
+      title="Country data"
+      description={selectedFormula?.optionCode ? `PCAF option ${selectedFormula.optionCode}` : undefined}
+    >
+      {error && (
+        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-red-800">{error}</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void reload()}>
+            Retry
+          </Button>
         </div>
+      )}
 
-      </CardContent>
-    </Card>
+      <FieldGrid>
+        <FormField
+          label="Country"
+          required
+          tooltip="Sovereign country for PPP-adjusted GDP (2025 preferred, 2024 if missing)"
+        >
+          <SovereignCountrySelect
+            value={String(formData.sovereign_country_name || '')}
+            gdpValue={num('pp_adjusted_gdp')}
+            gdpYear={num('ppp_gdp_year')}
+            usedFallback={Boolean(formData.ppp_gdp_used_fallback)}
+            countries={countries}
+            loading={loading}
+            disabled={pickersDisabled}
+            onSelect={(name) => void handleCountrySelect(name, 'sovereign')}
+          />
+        </FormField>
+
+        {option === '1a' && (
+          <FormField
+            label="Verified country emissions"
+            unit="tCO₂e"
+            required
+            tooltip="Country CO₂ emissions from Worldometer (2024)"
+          >
+            <SovereignVerifiedEmissionSelect
+              value={String(formData.verified_emissions_country_name || '')}
+              emissionsTons={num('verified_country_emissions')}
+              onSelect={(row) => {
+                onUpdateFormData('verified_emissions_country_name', row.countryName);
+                onUpdateFormData('verified_country_emissions', row.emissionsTons);
+              }}
+            />
+          </FormField>
+        )}
+
+        {option === '1b' && (
+          <FormField
+            label="Unverified country emissions"
+            unit="tCO₂e"
+            required
+            tooltip="Unverified country GHG emissions"
+          >
+            <Input
+              id="unverified_country_emissions"
+              type="number"
+              min={0}
+              step="any"
+              placeholder="0"
+              value={num('unverified_country_emissions') || ''}
+              onChange={(e) => onUpdateFormData('unverified_country_emissions', parseFloat(e.target.value) || 0)}
+              className={FIELD_INPUT}
+            />
+          </FormField>
+        )}
+
+        {option === '3a' && (
+          <FormField
+            label="Sector"
+            required
+            tooltip="Sector intensity replaces GHG ÷ revenue. Empty intensities are not listed."
+          >
+            <div className="space-y-2">
+              {sectorsError && (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-red-700">{sectorsError}</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void reloadSectors()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+              <SovereignSectorSelect
+                value={String(formData.sector_key || '')}
+                intensity={num('sector_intensity')}
+                unit={String(formData.sector_intensity_unit || 'kgCO2e/PKR')}
+                sectors={sectors}
+                loading={sectorsLoading}
+                disabled={!countryName || !!sectorsError}
+                onSelect={(sector: SectorOption) => {
+                  onUpdateFormData('sector_key', sector.sectorKey);
+                  onUpdateFormData('sector_code', sector.sectorCode);
+                  onUpdateFormData('sector_name', sector.sectorName);
+                  onUpdateFormData('sector_intensity', sector.intensity);
+                  onUpdateFormData('sector_intensity_unit', sector.unit);
+                }}
+              />
+            </div>
+          </FormField>
+        )}
+
+        {option === '3b' && (
+          <>
+            <FormField
+              label="Proxy country GHG"
+              unit="tCO₂e"
+              required
+              tooltip="GHG emissions of the proxy country"
+            >
+              <Input
+                id="proxy_country_emissions"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="0"
+                value={num('proxy_country_emissions') || ''}
+                onChange={(e) => onUpdateFormData('proxy_country_emissions', parseFloat(e.target.value) || 0)}
+                className={FIELD_INPUT}
+              />
+            </FormField>
+            <FormField
+              label="Proxy country"
+              required
+              tooltip="Proxy country for PPP-adjusted GDP"
+            >
+              <SovereignCountrySelect
+                value={String(formData.proxy_sovereign_country_name || '')}
+                gdpValue={num('proxy_pp_adjusted_gdp')}
+                gdpYear={num('proxy_ppp_gdp_year')}
+                usedFallback={Boolean(formData.proxy_ppp_gdp_used_fallback)}
+                countries={countries}
+                loading={loading}
+                disabled={pickersDisabled}
+                placeholder="Choose proxy country"
+                onSelect={(name) => void handleCountrySelect(name, 'proxy_sovereign')}
+              />
+            </FormField>
+          </>
+        )}
+      </FieldGrid>
+    </InputSection>
   );
 };

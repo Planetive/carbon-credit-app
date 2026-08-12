@@ -9,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  assignCreatedIdsToNewRows,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
+  shouldKeepLocalRowsAfterReload,
   updateLegacyTableEntry,
 } from "@/integrations/supabase/ghgEntryClient";
 import { USE_JWT_AUTH } from "@/api/config";
@@ -139,8 +141,8 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
       }
     };
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onDataChange is stable from parent
-  }, [user?.id, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [user?.id]);
 
   const updateRow = (id: string, patch: Partial<EpaRefrigerantRow>) => {
     let snapshot: EpaRefrigerantRow | null = null;
@@ -248,7 +250,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
         equipment_type: r.equipmentType ?? null,
       }));
 
-      await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
+      const created = await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
 
       const reloaded = await listLegacyTableEntries("scope1_refrigerant_entries", {
         user_id: user.id,
@@ -256,9 +258,15 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
         order: { column: "created_at", ascending: false },
       });
 
-      const mapped = (reloaded || []).map(mapDbRow);
-      setRows(mapped);
-      onDataChange(mapped.map((r) => ({ emissions: r.emissionsKg })));
+      if (shouldKeepLocalRowsAfterReload((reloaded || []).length, created.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(rows, created, toSave);
+        setRows(kept);
+        onDataChange(kept.map((r) => ({ emissions: r.emissionsKg })));
+      } else {
+        const mapped = (reloaded || []).map(mapDbRow);
+        setRows(mapped);
+        onDataChange(mapped.map((r) => ({ emissions: r.emissionsKg })));
+      }
       toast({ title: "Saved", description: `Saved ${toSave.length} refrigerant entr${toSave.length === 1 ? "y" : "ies"}.` });
     } catch (e: any) {
       toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });

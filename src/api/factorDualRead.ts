@@ -1,13 +1,50 @@
 import { USE_JWT_AUTH } from "./config";
 import { getFactorSheet, listFactorDatasets, type FactorDataset } from "./factors";
 
+let datasetsCache: FactorDataset[] | null = null;
+let datasetsInflight: Promise<FactorDataset[]> | null = null;
+const sheetCache = new Map<string, Record<string, unknown>[]>();
+const sheetInflight = new Map<string, Promise<Record<string, unknown>[]>>();
+
+async function getDatasetsCached(): Promise<FactorDataset[]> {
+  if (datasetsCache) return datasetsCache;
+  if (!datasetsInflight) {
+    datasetsInflight = listFactorDatasets({ active_only: true, limit: 500 })
+      .then((datasets) => {
+        datasetsCache = datasets;
+        return datasets;
+      })
+      .finally(() => {
+        datasetsInflight = null;
+      });
+  }
+  return datasetsInflight;
+}
+
+async function getFactorSheetCached(code: string): Promise<Record<string, unknown>[]> {
+  const hit = sheetCache.get(code);
+  if (hit) return hit;
+  const existing = sheetInflight.get(code);
+  if (existing) return existing;
+  const promise = getFactorSheet(code)
+    .then((rows) => {
+      sheetCache.set(code, rows);
+      return rows;
+    })
+    .finally(() => {
+      sheetInflight.delete(code);
+    });
+  sheetInflight.set(code, promise);
+  return promise;
+}
+
 async function resolveDatasetCode(
   codes: string[],
   nameHints: string[] = []
 ): Promise<string | null> {
   let datasets: FactorDataset[] = [];
   try {
-    datasets = await listFactorDatasets({ active_only: true, limit: 500 });
+    datasets = await getDatasetsCached();
   } catch {
     return null;
   }
@@ -47,7 +84,7 @@ export async function tryLoadFactorSheetViaApi(opts: {
   try {
     const code = await resolveDatasetCode(opts.datasetCodes, opts.nameHints ?? []);
     if (!code) return null;
-    const rows = await getFactorSheet(code);
+    const rows = await getFactorSheetCached(code);
     return rows.length > 0 ? rows : null;
   } catch (err) {
     console.warn("[factorDualRead] API factor load failed; falling back to Supabase", err);
@@ -58,6 +95,7 @@ export async function tryLoadFactorSheetViaApi(opts: {
 /**
  * Load and concatenate several datasets (e.g. Fuel EPA 1/2/3).
  * Returns null when JWT is off or no sheet returned rows.
+ * Sheets resolve in parallel and reuse dataset/sheet caches.
  */
 export async function tryLoadFactorSheetsViaApi(
   sheets: { datasetCodes: string[]; nameHints?: string[] }[]
@@ -65,13 +103,16 @@ export async function tryLoadFactorSheetsViaApi(
   if (!USE_JWT_AUTH) return null;
 
   try {
-    const all: Record<string, unknown>[] = [];
-    for (const sheet of sheets) {
-      const code = await resolveDatasetCode(sheet.datasetCodes, sheet.nameHints ?? []);
-      if (!code) continue;
-      const rows = await getFactorSheet(code);
-      if (rows.length > 0) all.push(...rows);
-    }
+    // Warm dataset list once, then fetch all sheets concurrently.
+    await getDatasetsCached();
+    const parts = await Promise.all(
+      sheets.map(async (sheet) => {
+        const code = await resolveDatasetCode(sheet.datasetCodes, sheet.nameHints ?? []);
+        if (!code) return [] as Record<string, unknown>[];
+        return getFactorSheetCached(code);
+      })
+    );
+    const all = parts.flat().filter((row) => row && Object.keys(row).length > 0);
     return all.length > 0 ? all : null;
   } catch (err) {
     console.warn("[factorDualRead] API multi-sheet load failed; falling back to Supabase", err);

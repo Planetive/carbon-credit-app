@@ -11,9 +11,7 @@
     "test": "vitest run",
     "parity": "vitest run parity/parity.test.ts",
     "parity:api": "npx --yes tsx parity/compareApi.ts",
-    "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "backend": "python -m uvicorn backend.fastapi_app.main:app --reload --host 127.0.0.1 --port 8000",
-    "backend:dev": "cd backend && python -m uvicorn fastapi_app.main:app --reload --host 127.0.0.1 --port 8000"
+    "preview": "node ./node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

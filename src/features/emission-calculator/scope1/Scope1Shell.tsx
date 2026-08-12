@@ -9,9 +9,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  assignCreatedIdsToNewRows,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
+  shouldKeepLocalRowsAfterReload,
   updateLegacyTableEntry,
 } from "@/integrations/supabase/ghgEntryClient";
 import { 
@@ -135,7 +137,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
     return () => {
       cancelled = true;
     };
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, []);
 
   const [ukDeliveryMap, setUkDeliveryMap] = useState<UkDeliveryFactorsMap>({});
   const [ukDeliveryReady, setUkDeliveryReady] = useState(false);
@@ -159,7 +162,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
     return () => {
       cancelled = true;
     };
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, []);
 
   const vehicleActivities = Object.keys(ukPassengerMap).sort((a, b) => a.localeCompare(b));
   const vehicleTypesFor = (activity?: string) =>
@@ -301,7 +305,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
     };
 
     loadExistingEntries();
-  }, [user, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [user]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -587,8 +592,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         emissions: v.emissions!,
       }));
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_fuel_entries", payload);
+        created = await insertLegacyTableEntries("scope1_fuel_entries", payload);
       }
 
       if (changedExisting.length > 0) {
@@ -606,17 +612,16 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         );
       }
 
-      toast({ 
-        title: "Saved", 
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
-      });
-
       const newData = await listLegacyTableEntries("scope1_fuel_entries", {
         user_id: user.id,
         order: { column: "created_at", ascending: false },
       });
 
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(rows, created, newEntries);
+        setExistingEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
@@ -631,6 +636,11 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         setExistingEntries(updatedExistingRows);
         setRows(updatedExistingRows);
       }
+
+      toast({ 
+        title: "Saved", 
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -668,8 +678,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         emissions: v.emissions!,
       }));
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
+        created = await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
       }
 
       if (changedExisting.length > 0) {
@@ -685,17 +696,16 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         );
       }
 
-      toast({ 
-        title: "Saved", 
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
-      });
-
       const newData = await listLegacyTableEntries("scope1_refrigerant_entries", {
         user_id: user.id,
         order: { column: "created_at", ascending: false },
       });
 
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(refrigerantRows, created, newEntries);
+        setExistingRefrigerantEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setRefrigerantRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
@@ -708,6 +718,11 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         setExistingRefrigerantEntries(updatedExistingRows);
         setRefrigerantRows(updatedExistingRows);
       }
+
+      toast({ 
+        title: "Saved", 
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -757,8 +772,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         emissions: v.emissions!,
       }));
 
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_passenger_vehicle_entries", payload);
+        created = await insertLegacyTableEntries("scope1_passenger_vehicle_entries", payload);
       }
 
       if (changedExisting.length > 0) {
@@ -778,17 +794,16 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         );
       }
 
-      toast({ 
-        title: "Saved", 
-        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
-      });
-
       const newData = await listLegacyTableEntries("scope1_passenger_vehicle_entries", {
         user_id: user.id,
         order: { column: "created_at", ascending: false },
       });
 
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(vehicleRows, created, newEntries);
+        setExistingVehicleEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setVehicleRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
@@ -807,6 +822,11 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         setExistingVehicleEntries(updatedExistingRows);
         setVehicleRows(updatedExistingRows);
       }
+
+      toast({ 
+        title: "Saved", 
+        description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` 
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {
@@ -849,8 +869,9 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         emissions: v.emissions!,
       }));
       
+      let created: { id: string }[] = [];
       if (payload.length > 0) {
-        await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
+        created = await insertLegacyTableEntries("scope1_delivery_vehicle_entries", payload);
       }
       
       if (changedExisting.length > 0) {
@@ -871,14 +892,16 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         );
       }
       
-      toast({ title: "Saved", description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` });
-      
       const newData = await listLegacyTableEntries("scope1_delivery_vehicle_entries", {
         user_id: user.id,
         order: { column: "created_at", ascending: false },
       });
         
-      if (newData) {
+      if (shouldKeepLocalRowsAfterReload(newData.length, created.length > 0 || changedExisting.length > 0)) {
+        const kept = assignCreatedIdsToNewRows(deliveryVehicleRows, created, newEntries);
+        setExistingDeliveryVehicleEntries(kept.filter((r) => r.isExisting && r.dbId));
+        setDeliveryVehicleRows(kept);
+      } else if (newData.length > 0) {
         const updatedExistingRows = newData.map((entry) => ({
           id: crypto.randomUUID(),
           dbId: String(entry.id),
@@ -902,6 +925,8 @@ const Scope1Shell: React.FC<Scope1ShellProps> = ({ onDataChange }) => {
         setExistingDeliveryVehicleEntries(updatedExistingRows);
         setDeliveryVehicleRows(updatedExistingRows);
       }
+
+      toast({ title: "Saved", description: `Saved ${newEntries.length} new and updated ${changedExisting.length} entries.` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to save", variant: "destructive" });
     } finally {

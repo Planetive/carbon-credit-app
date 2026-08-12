@@ -1,11 +1,12 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormulaConfig } from '../types/formula';
-import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
+import React, { useEffect, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SCOPE2_FACTORS } from "@/components/emissions/shared/EmissionFactors";
+import type { FormulaConfig } from "../types/formula";
 import type { FinanceFormData, FinanceFormValue } from "../types/contracts";
+import { FIELD_INPUT, FieldGrid, FormField, InputSection } from "./InputLayout";
+
+type FactorLibrary = "EPA" | "DEFRA";
 
 interface CommercialRealEstateFormProps {
   selectedFormula: FormulaConfig | null;
@@ -16,87 +17,113 @@ interface CommercialRealEstateFormProps {
 export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> = ({
   selectedFormula,
   formData,
-  onUpdateFormData
+  onUpdateFormData,
 }) => {
-  // Fields that are already captured in the Financial Information section
-  const duplicateFields = ['outstanding_amount'];
-  
-  // Filter out actual_energy_consumption and supplier_specific_emission_factor (replaced by total_emission)
-  const fieldsToExclude = ['actual_energy_consumption', 'supplier_specific_emission_factor'];
+  const onUpdateRef = useRef(onUpdateFormData);
+  onUpdateRef.current = onUpdateFormData;
 
-  const filteredInputs = selectedFormula?.inputs.filter(input => 
-    !duplicateFields.includes(input.name) && !fieldsToExclude.includes(input.name)
-  ) || [];
+  const option = selectedFormula?.optionCode || "";
+  const factorLibrary = (formData.factor_library as FactorLibrary) || "EPA";
+  const gridCountry = String(formData.factor_grid_country || "");
+  const gridKg = gridCountry ? SCOPE2_FACTORS.GridCountries?.[gridCountry] : undefined;
+  const factorTco2ePerKwh =
+    typeof gridKg === "number" && Number.isFinite(gridKg) ? gridKg / 1000 : 0;
 
-  if (filteredInputs.length === 0) return null;
+  useEffect(() => {
+    if (option !== "2a" && option !== "2b" && option !== "3") return;
+    if (factorTco2ePerKwh <= 0) return;
+    if (Number(formData.average_emission_factor) === factorTco2ePerKwh) return;
+    onUpdateRef.current("average_emission_factor", factorTco2ePerKwh);
+    onUpdateRef.current("average_emission_factor_unit", "tCO2e/kWh");
+    onUpdateRef.current("factor_dataset", "scope2_electricity");
+  }, [option, factorTco2ePerKwh, formData.average_emission_factor]);
+
+  if (option !== "2a" && option !== "2b" && option !== "3") return null;
+
+  const setLibrary = (lib: FactorLibrary) => {
+    onUpdateRef.current("factor_library", lib);
+    onUpdateRef.current("factor_dataset", "scope2_electricity");
+  };
+
+  const num = (key: string) => Number(formData[key]) || 0;
+  const setNum = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    onUpdateFormData(field, parseFloat(e.target.value) || 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Property Information & Emissions Data</CardTitle>
-        <CardDescription>
-          Enter the property-specific data required for {selectedFormula?.name}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Dynamic Fields Based on Selected Formula - Only Required Fields */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Required Data for {selectedFormula?.name}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredInputs.map((input) => {
-              const fieldName = input.name;
-              const fieldValue = formData[fieldName] || '';
-              const unitFieldName = `${fieldName}Unit`;
-              const unitValue = formData[unitFieldName] || input.unit || '';
-
-              return (
-                <div key={input.name} className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={input.name}>
-                          {input.label} {input.required && <span className="text-red-500">*</span>}
-                        </Label>
-                        {input.description && (
-                          <FieldTooltip content={input.description} />
-                        )}
-                      </div>
-                      <Input
-                        id={input.name}
-                        type="number"
-                        placeholder="0"
-                        value={fieldValue}
-                        onChange={(e) => onUpdateFormData(fieldName, parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                        required={input.required}
-                        disabled={input.name === 'total_emission' && formData[fieldName] > 0} // Disable if auto-filled from questionnaire
-                        title={input.name === 'total_emission' && formData[fieldName] > 0 ? 'Auto-filled from questionnaire (Scope 1 + Scope 2 + Scope 3)' : ''}
-                      />
-                    </div>
-                    {input.unitOptions && (
-                      <div className="w-48">
-                        <Label htmlFor={unitFieldName}>Unit</Label>
-                        <Select value={String(unitValue)} onValueChange={(value) => onUpdateFormData(unitFieldName, value)}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {input.unitOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+    <InputSection
+      title="Building energy"
+      description="Activity data for this PCAF option. Factor comes from the selected grid country."
+      action={
+        <div className="inline-flex rounded-lg border border-[#E2E8F0] bg-white p-0.5">
+          {(["EPA", "DEFRA"] as const).map((lib) => (
+            <button
+              key={lib}
+              type="button"
+              className={`px-2.5 py-1 text-xs rounded-md ${factorLibrary === lib ? "bg-[#0F6E56] text-white" : "text-[#64748B]"}`}
+              onClick={() => setLibrary(lib)}
+            >
+              {lib}
+            </button>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+      }
+    >
+      <FieldGrid>
+        <FormField
+          label="Electricity provider country"
+          required
+          tooltip="Uses the same SCOPE2 grid factors as the emission calculator."
+        >
+          <Select
+            value={gridCountry || undefined}
+            onValueChange={(v) => onUpdateFormData("factor_grid_country", v)}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UAE">UAE</SelectItem>
+              <SelectItem value="Pakistan">Pakistan</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
+        <FormField label="Average emission factor" unit="tCO₂e/kWh">
+          <Input value={factorTco2ePerKwh || ""} readOnly placeholder="Select country" className={FIELD_INPUT} />
+        </FormField>
+
+        {option === "2a" && (
+          <>
+            <FormField label="Energy from labels" unit="kWh/m²" required>
+              <Input type="number" min={0} step="any" value={num("estimated_energy_consumption_from_labels") || ""} onChange={setNum("estimated_energy_consumption_from_labels")} className={FIELD_INPUT} />
+            </FormField>
+            <FormField label="Floor area" unit="m²" required>
+              <Input type="number" min={0} step="any" value={num("floor_area") || ""} onChange={setNum("floor_area")} className={FIELD_INPUT} />
+            </FormField>
+          </>
+        )}
+
+        {option === "2b" && (
+          <>
+            <FormField label="Energy from statistics" unit="kWh/m²" required>
+              <Input type="number" min={0} step="any" value={num("estimated_energy_consumption_from_statistics") || ""} onChange={setNum("estimated_energy_consumption_from_statistics")} className={FIELD_INPUT} />
+            </FormField>
+            <FormField label="Floor area" unit="m²" required>
+              <Input type="number" min={0} step="any" value={num("floor_area") || ""} onChange={setNum("floor_area")} className={FIELD_INPUT} />
+            </FormField>
+          </>
+        )}
+
+        {option === "3" && (
+          <>
+            <FormField label="Energy from statistics" unit="kWh/building" required>
+              <Input type="number" min={0} step="any" value={num("estimated_energy_consumption_from_statistics") || ""} onChange={setNum("estimated_energy_consumption_from_statistics")} className={FIELD_INPUT} />
+            </FormField>
+            <FormField label="Number of buildings" required>
+              <Input type="number" min={0} step="any" value={num("number_of_buildings") || ""} onChange={setNum("number_of_buildings")} className={FIELD_INPUT} />
+            </FormField>
+          </>
+        )}
+      </FieldGrid>
+    </InputSection>
   );
 };

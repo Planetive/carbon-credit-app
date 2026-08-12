@@ -7,6 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  companyScopedListFilters,
   deleteLegacyTableEntry,
   insertLegacyTableEntries,
   listLegacyTableEntries,
@@ -15,16 +16,25 @@ import {
 import { USE_JWT_AUTH } from "@/api/config";
 import {
   localElectricityEmissionsKg,
+  localEpaFuelEmissionsKg,
+  localUkFuelEmissionsKg,
   resolveElectricityEmissionsKg,
 } from "@/api/calcConnection";
 import { FACTORS, SCOPE2_FACTORS } from "@/components/emissions/shared/EmissionFactors";
 import { formatDynamicEmission } from "@/features/emission-calculator/scope1/components/emissionFormatting";
+import {
+  loadEpaFuelFactors,
+  loadUkFuelFactors,
+  ukFactorsToNumericMap,
+  type NestedFactorMap,
+} from "@/features/finance-emissions/utils/pcafFactorLoaders";
 
 type FuelType = "Gaseous fuels" | "Liquid fuels" | "Solid fuels";
+type FactorLibrary = "EPA" | "DEFRA";
 
 interface OtherSourceRow {
   id: string;
-  type?: FuelType;
+  type?: string;
   fuel?: string;
   unit?: string;
   quantity?: number;
@@ -42,6 +52,26 @@ interface ElectricityEmissionsProps {
   onSaveAndNext?: () => void;
   companyContext?: boolean;
   counterpartyId?: string;
+  /** Finance embed: same UI, no GHG inventory load/save. */
+  embedded?: boolean;
+  /** EPA uses Fuel EPA 1/2/3; DEFRA uses UK_Fuel_Factors (same tables as the emission calculators). */
+  factorLibrary?: FactorLibrary;
+  onDetailChange?: (detail: {
+    totalKwh?: number;
+    gridPct?: number;
+    renewablePct?: number;
+    otherPct?: number;
+    gridCountry?: string;
+    gridFactor?: number;
+    otherRows: Array<{
+      type?: string;
+      fuel?: string;
+      unit?: string;
+      quantity?: number;
+      factor?: number;
+      emissions?: number;
+    }>;
+  }) => void;
 }
 
 const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
@@ -49,6 +79,9 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
   onSaveAndNext,
   companyContext = false,
   counterpartyId,
+  embedded = false,
+  factorLibrary,
+  onDetailChange,
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -69,6 +102,8 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const hasRestoredDraftRef = useRef(false);
+  const [libraryMap, setLibraryMap] = useState<NestedFactorMap | null>(null);
+  const [libraryReady, setLibraryReady] = useState(!factorLibrary);
 
   const getDraftKey = () => {
     if (companyContext && counterpartyId && userId) return `electricityDraft:company:${counterpartyId}:${userId}`;
@@ -77,7 +112,10 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
     return "electricityDraft:anon";
   };
 
-  const factorsSafe = FACTORS || {};
+  const factorsSafe: NestedFactorMap = libraryMap || (FACTORS as NestedFactorMap) || {};
+  const factorsSafeRef = useRef(factorsSafe);
+  factorsSafeRef.current = factorsSafe;
+
   const formatEmission = (raw: number): string => {
     if (!isFinite(raw)) return "";
     return formatDynamicEmission(raw);
@@ -89,14 +127,77 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       maximumFractionDigits: 6,
     });
   };
-  const fuelTypes = Object.keys(factorsSafe) as FuelType[];
-  const fuelsFor = (type?: FuelType) => (type ? Object.keys(factorsSafe[type] || {}) : []);
-  const unitsFor = (type?: FuelType, fuel?: string) => (type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : []);
+  const fuelTypes = Object.keys(factorsSafe);
+  const fuelsFor = (type?: string) => (type ? Object.keys(factorsSafe[type] || {}) : []);
+  const unitsFor = (type?: string, fuel?: string) =>
+    type && fuel ? Object.keys((factorsSafe[type] || {})[fuel] || {}) : [];
+
+  const rowEmissionsKg = (quantity: number, factor: number, unit?: string) => {
+    if (factorLibrary === "DEFRA") return localUkFuelEmissionsKg(quantity, factor);
+    if (factorLibrary === "EPA") return localEpaFuelEmissionsKg(quantity, factor, String(unit || ""));
+    return Number((quantity * factor).toFixed(6));
+  };
+
+  useEffect(() => {
+    if (!factorLibrary) {
+      setLibraryMap(null);
+      setLibraryReady(true);
+      return;
+    }
+    let cancelled = false;
+    setLibraryReady(false);
+    void (async () => {
+      try {
+        if (factorLibrary === "DEFRA") {
+          const uk = await loadUkFuelFactors();
+          const numeric = ukFactorsToNumericMap(uk);
+          if (!cancelled) {
+            setLibraryMap(Object.keys(numeric).length > 0 ? numeric : (FACTORS as NestedFactorMap));
+          }
+        } else {
+          const epa = await loadEpaFuelFactors();
+          if (!cancelled) {
+            setLibraryMap(epa && Object.keys(epa).length > 0 ? epa : (FACTORS as NestedFactorMap));
+          }
+        }
+      } catch (e) {
+        console.warn("Electricity other-source factor tables failed to load; using built-in FACTORS.", e);
+        if (!cancelled) setLibraryMap(FACTORS as NestedFactorMap);
+      } finally {
+        if (!cancelled) setLibraryReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [factorLibrary]);
+
+  useEffect(() => {
+    if (!factorLibrary || !libraryReady) return;
+    setOtherRows((prev) =>
+      prev.map((r) => {
+        if (!r.type || !r.fuel || !r.unit) return r;
+        const factor = factorsSafe[r.type]?.[r.fuel]?.[r.unit];
+        const nextFactor = typeof factor === "number" ? factor : undefined;
+        const nextEmissions =
+          typeof r.quantity === "number" && typeof nextFactor === "number"
+            ? rowEmissionsKg(r.quantity, nextFactor, r.unit)
+            : undefined;
+        if (nextFactor === r.factor && nextEmissions === r.emissions) return r;
+        return { ...r, factor: nextFactor, emissions: nextEmissions };
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh rows when the loaded table changes
+  }, [factorLibrary, libraryReady, libraryMap]);
 
   useEffect(() => {
     const load = async () => {
+      if (embedded) {
+        setIsInitialLoad(false);
+        return;
+      }
       if (!userId) return;
-      if (companyContext) {
+      if (companyContext && !counterpartyId) {
         setMainId(null);
         setTotalKwh(undefined);
         setGridPct(undefined);
@@ -110,10 +211,16 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       }
       try {
         // Load latest main row
-        const mains = await listLegacyTableEntries("scope2_electricity_main", {
-          user_id: userId,
-          order: { column: "created_at", ascending: false },
-        });
+        const mains = await listLegacyTableEntries(
+          "scope2_electricity_main",
+          companyContext
+            ? companyScopedListFilters(userId, true, counterpartyId)
+            : {
+                user_id: userId,
+                counterparty_id: null,
+                order: { column: "created_at", ascending: false },
+              }
+        );
         const mainData = mains[0];
 
         if (mainData) {
@@ -127,10 +234,16 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
         }
 
         if (mainData?.id) {
-          const allSubs = await listLegacyTableEntries("scope2_electricity_subanswers", {
-            user_id: userId,
-            order: { column: "created_at", ascending: true },
-          });
+          const allSubs = await listLegacyTableEntries(
+            "scope2_electricity_subanswers",
+            companyContext
+              ? companyScopedListFilters(userId, true, counterpartyId)
+              : {
+                  user_id: userId,
+                  counterparty_id: null,
+                  order: { column: "created_at", ascending: true },
+                }
+          );
           const mainLegacyId = String(mainData.legacy_id || mainData.id);
           const subData = allSubs.filter((r) => {
             const mid = String(r.main_id ?? "");
@@ -170,10 +283,15 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       }
     };
     load();
-  }, [userId, toast, companyContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
+  }, [userId, companyContext, counterpartyId, embedded]);
 
   // Restore draft after initial load when there is no saved DB data yet
   useEffect(() => {
+    if (embedded) {
+      hasRestoredDraftRef.current = true;
+      return;
+    }
     if (isInitialLoad || hasRestoredDraftRef.current || !userId) return;
 
     try {
@@ -224,11 +342,11 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
     } finally {
       hasRestoredDraftRef.current = true;
     }
-  }, [isInitialLoad, userId, mainId]);
+  }, [isInitialLoad, userId, mainId, embedded]);
 
   // Persist draft form + unsaved other rows
   useEffect(() => {
-    if (!hasRestoredDraftRef.current || !userId) return;
+    if (embedded || !hasRestoredDraftRef.current || !userId) return;
 
     try {
       const key = getDraftKey();
@@ -265,11 +383,11 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       if (r.id !== id) return r;
       const next: OtherSourceRow = { ...r, ...patch };
       if (next.type && next.fuel && next.unit) {
-        const factor = FACTORS[next.type]?.[next.fuel]?.[next.unit];
+        const factor = factorsSafeRef.current[next.type]?.[next.fuel]?.[next.unit];
         next.factor = typeof factor === 'number' ? factor : undefined;
       }
       if (typeof next.quantity === 'number' && typeof next.factor === 'number') {
-        next.emissions = Number((next.quantity * next.factor).toFixed(6));
+        next.emissions = rowEmissionsKg(next.quantity, next.factor, next.unit);
       } else {
         next.emissions = undefined;
       }
@@ -355,31 +473,22 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       toast({ title: "Missing total", description: "Enter total electricity consumption (kWh).", variant: "destructive" });
       return;
     }
-    if (companyContext) {
-      try {
-        const key = getDraftKey();
-        const payload = {
-          totalKwh,
-          gridPct,
-          renewablePct,
-          otherPct,
-          gridCountry,
-          otherRows,
-          ts: Date.now(),
-        };
-        sessionStorage.setItem(key, JSON.stringify(payload));
-        toast({ title: "Saved", description: "Saved for this company context." });
-      } catch (e: any) {
-        toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
-      }
+    if (companyContext && !counterpartyId) {
+      toast({
+        title: "Missing company",
+        description: "Select a company before saving electricity data.",
+        variant: "destructive",
+      });
       return;
     }
     setSaving(true);
     try {
+      const counterpartyPayload = companyContext ? counterpartyId ?? null : null;
       let currentMainId = mainId;
       if (!currentMainId) {
         const created = await insertLegacyTableEntries("scope2_electricity_main", [{
           user_id: user.id,
+          counterparty_id: counterpartyPayload,
           total_kwh: totalKwh,
           grid_pct: gridPct ?? null,
           renewable_pct: renewablePct ?? null,
@@ -389,6 +498,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
         setMainId(currentMainId);
       } else {
         await updateLegacyTableEntry("scope2_electricity_main", currentMainId, {
+          counterparty_id: counterpartyPayload,
           total_kwh: totalKwh,
           grid_pct: gridPct ?? null,
           renewable_pct: renewablePct ?? null,
@@ -402,10 +512,12 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
             type: "grid",
             provider_country: gridCountry,
             grid_emission_factor: gridFactor,
+            counterparty_id: counterpartyPayload,
           });
         } else {
           const created = await insertLegacyTableEntries("scope2_electricity_subanswers", [{
             user_id: user.id,
+            counterparty_id: counterpartyPayload,
             main_id: currentMainId,
             type: "grid",
             provider_country: gridCountry,
@@ -421,6 +533,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       if (newOthers.length > 0) {
         const payload = newOthers.map(r => ({
           user_id: user.id,
+          counterparty_id: counterpartyPayload,
           main_id: currentMainId,
           type: 'other',
           other_sources_type: r.type!,
@@ -430,13 +543,25 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
           other_sources_factor: r.factor!,
           other_sources_emissions: r.emissions!,
         }));
-        await insertLegacyTableEntries("scope2_electricity_subanswers", payload);
+        const createdSubs = await insertLegacyTableEntries("scope2_electricity_subanswers", payload);
+        let i = 0;
+        setOtherRows((prev) =>
+          prev.map((r) => {
+            if (r.dbId) return r;
+            if (!r.type || !r.fuel || !r.unit || typeof r.quantity !== "number") return r;
+            if (i < createdSubs.length) {
+              return { ...r, dbId: createdSubs[i++].id };
+            }
+            return r;
+          })
+        );
       }
 
       if (updateOthers.length > 0) {
         await Promise.all(
           updateOthers.map((r) =>
             updateLegacyTableEntry("scope2_electricity_subanswers", r.dbId!, {
+              counterparty_id: counterpartyPayload,
               other_sources_type: r.type ?? null,
               other_sources_fuel: r.fuel ?? null,
               other_sources_unit: r.unit ?? null,
@@ -463,9 +588,33 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
 
   const totalOtherEmissions = otherRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
 
+  const onTotalChangeRef = useRef(onTotalChange);
+  onTotalChangeRef.current = onTotalChange;
   useEffect(() => {
-    if (onTotalChange) onTotalChange(displayElectricityEmissions);
-  }, [onTotalChange, displayElectricityEmissions]);
+    onTotalChangeRef.current?.(displayElectricityEmissions);
+  }, [displayElectricityEmissions]);
+
+  const onDetailChangeRef = useRef(onDetailChange);
+  onDetailChangeRef.current = onDetailChange;
+  useEffect(() => {
+    if (!onDetailChangeRef.current) return;
+    onDetailChangeRef.current({
+      totalKwh,
+      gridPct,
+      renewablePct,
+      otherPct,
+      gridCountry,
+      gridFactor,
+      otherRows: otherRows.map(({ type, fuel, unit, quantity, factor, emissions }) => ({
+        type,
+        fuel,
+        unit,
+        quantity,
+        factor,
+        emissions,
+      })),
+    });
+  }, [totalKwh, gridPct, renewablePct, otherPct, gridCountry, gridFactor, otherRows]);
 
   return (
     <div className="space-y-6">
@@ -567,7 +716,7 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
         </div>
       </div>
 
-      {gridPct && gridPct > 0 && (
+      {(embedded || (gridPct && gridPct > 0)) && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
             <h3 className="text-lg font-medium mb-4">Grid sources</h3>
@@ -599,14 +748,19 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
         </div>
       )}
 
-      {(otherPct && otherPct > 0 || otherRows.length > 0) && (
+      {(embedded || (otherPct && otherPct > 0) || otherRows.length > 0) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium">Other sources</h3>
-            <Button onClick={addOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
+            <Button onClick={addOtherRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white" disabled={!!factorLibrary && !libraryReady}>
               <Plus className="h-4 w-4 mr-2" /> Add Row
             </Button>
           </div>
+          {factorLibrary && !libraryReady && (
+            <p className="text-sm text-muted-foreground">
+              Loading {factorLibrary === "DEFRA" ? "UK_Fuel_Factors" : "Fuel EPA 1/2/3"}…
+            </p>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Label className="text-gray-500">Type</Label>
@@ -623,7 +777,8 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
                 <div key={r.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-3 rounded-lg bg-gray-50">
                   <Select
                     value={r.type}
-                    onValueChange={v => updateOtherRow(r.id, { type: v as FuelType, fuel: undefined, unit: undefined })}
+                    onValueChange={v => updateOtherRow(r.id, { type: v, fuel: undefined, unit: undefined })}
+                    disabled={!!factorLibrary && !libraryReady}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -706,9 +861,11 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
           Total electricity emissions: <span className="font-semibold">{formatEmission(displayElectricityEmissions)} kg CO2e</span>
         </div>
         <div className="flex items-center gap-2">
+          {!embedded && (
           <Button onClick={saveAll} disabled={saving} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
             <Save className="h-4 w-4 mr-2" /> {saving ? "Saving..." : "Save"}
           </Button>
+          )}
           {onSaveAndNext && (
             <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
               Next <ChevronRight className="h-4 w-4 ml-1" />
