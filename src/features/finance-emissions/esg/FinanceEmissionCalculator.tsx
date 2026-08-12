@@ -578,7 +578,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           return PROJECT_FINANCE_FORMULAS.filter(f => f.id === '1b-project-finance');
         }
       } else if (hasEmissions === 'no') {
-        const allowed = ['2a', '2b', '3a', '3b', '3c'];
+        const allowed = ['2a', '2b', '3a', '3c'];
         const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
         return PROJECT_FINANCE_FORMULAS.filter(
           (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
@@ -608,7 +608,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           return ALL_FORMULAS.filter((f) => f.id === (isListed ? '1b-listed-equity' : '1b-unlisted-equity'));
         }
       } else if (hasEmissions === 'no') {
-        const allowed = ['2a', '2b', '3a', '3b', '3c'];
+        const allowed = ['2a', '2b', '3a', '3c'];
         const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
         return ALL_FORMULAS.filter(
           (f) => matchListing(f.id) && (method ? f.optionCode === method : allowed.includes(f.optionCode))
@@ -1022,7 +1022,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         const pfFormula = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId);
         const pfOpt = pfFormula?.optionCode;
         const totalProjectEquityPlusDebt = (loanData.totalProjectEquity || 0) + (loanData.totalProjectDebt || 0);
-        if (pfOpt !== '3b' && pfOpt !== '3c' && totalProjectEquityPlusDebt === 0) {
+        if (pfOpt !== '3c' && totalProjectEquityPlusDebt === 0) {
           errors.push({
             loanKey: inst.key,
             loanLabel,
@@ -1050,9 +1050,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         }
         if (pfOpt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
           errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
-        }
-        if (pfOpt === '3b' && (!loanData.sectorEmissions || !loanData.sectorAssets)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Sector GHG and sector assets are required for ${loanLabel} (Option 3b)` });
         }
         if (pfOpt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
           errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
@@ -1126,9 +1123,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           }
           if (opt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
             errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
-          }
-          if (opt === '3b' && (!loanData.sectorEmissions || !loanData.sectorAssets)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `Sector GHG and sector assets are required for ${loanLabel} (Option 3b)` });
           }
           if (opt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
             errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
@@ -1532,7 +1526,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
       if (loanType === 'corporate-bond' || loanType === 'business-loan' || loanType === 'project-finance') {
         const opt = getCurrentFormula()?.optionCode;
-        if (loanType === 'project-finance' && opt !== '3b' && opt !== '3c') {
+        if (loanType === 'project-finance' && opt !== '3c') {
           const projectDenom = (formData.totalProjectEquity || 0) + (formData.totalProjectDebt || 0);
           if (!projectDenom) {
             throw new Error('Total Project Equity + Debt must be greater than 0.');
@@ -1547,9 +1541,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               ? 'Project revenue, sector GHG, and sector revenue are required for Option 3a.'
               : 'Company revenue, sector GHG, and sector revenue are required for Option 3a.'
           );
-        }
-        if (opt === '3b' && (!formData.sectorEmissions || !formData.sectorAssets)) {
-          throw new Error('Sector GHG and sector assets are required for Option 3b.');
         }
         if (opt === '3c' && (!formData.assetTurnoverRatio || !formData.sectorEmissions || !formData.sectorRevenue)) {
           throw new Error('ATR, sector GHG, and sector revenue are required for Option 3c.');
@@ -2352,7 +2343,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         />
       )}
 
-      {selectedFormula && (loanType === 'corporate-bond' || loanType === 'business-loan' || loanType === 'project-finance') && ['3a', '3b', '3c'].includes(getCurrentFormula()?.optionCode || '') && (
+      {selectedFormula && (loanType === 'corporate-bond' || loanType === 'business-loan' || loanType === 'project-finance') && ['3a', '3c'].includes(getCurrentFormula()?.optionCode || '') && (
         <SectorProxyInputs
           optionCode={getCurrentFormula()?.optionCode || '3a'}
           revenueLabel={loanType === 'project-finance' ? 'Project revenue' : 'Company revenue'}

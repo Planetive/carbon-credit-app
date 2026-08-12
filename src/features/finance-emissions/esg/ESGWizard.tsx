@@ -74,7 +74,6 @@ const BOND_NO_GHG_METHODS = [
   { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
   { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
-  { id: '3b', title: 'Asset-based', score: 'Score 5', description: 'Outstanding amount × sector GHG / sector assets' },
   { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
 ];
 
@@ -1784,7 +1783,6 @@ export const ESGWizard: React.FC = () => {
             { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
             { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
             { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
-            { id: '3b', title: 'Asset-based', score: 'Score 5', description: 'Outstanding amount × sector GHG / sector assets' },
             { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
           ];
           if (usesBondLoanMethods) {

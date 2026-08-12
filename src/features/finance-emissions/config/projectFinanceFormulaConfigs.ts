@@ -502,48 +502,6 @@ export const OPTION_3A_PROJECT_FINANCE: FormulaConfig = {
   notes: ['Data quality score: 4', 'Uses project revenue and sector intensity'],
 };
 
-export const OPTION_3B_PROJECT_FINANCE: FormulaConfig = {
-  id: '3b-project-finance',
-  name: 'Option 3b - Asset-based (Project Finance)',
-  description: 'Outstanding amount × sector GHG / sector assets (no attribution factor)',
-  dataQualityScore: 5,
-  category: 'project_finance',
-  optionCode: '3b',
-  inputs: [
-    COMMON_INPUTS.outstanding_amount,
-    { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e' },
-    { name: 'sector_assets', label: 'Sector Assets', type: 'number', required: true, unit: 'PKR' },
-  ],
-  calculate: (inputs, companyType) => {
-    const outstandingAmount = inputs.outstanding_amount;
-    const sectorEmissions = Number(inputs.sector_emissions || 0);
-    const sectorAssets = Number(inputs.sector_assets || 0);
-    if (!outstandingAmount || !sectorEmissions || !sectorAssets) {
-      throw new Error('Outstanding amount, sector emissions, and sector assets must be greater than 0');
-    }
-    const intensity = sectorEmissions / sectorAssets;
-    const financedEmissions = outstandingAmount * intensity;
-    return {
-      attributionFactor: 1,
-      emissionFactor: intensity,
-      financedEmissions,
-      dataQualityScore: 5,
-      methodology: 'PCAF Option 3b - Asset-based (Project Finance)',
-      calculationSteps: [
-        { step: 'Sector asset intensity', value: intensity, formula: `${sectorEmissions} / ${sectorAssets} = ${intensity.toFixed(8)}` },
-        { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
-      ],
-      metadata: {
-        companyType,
-        optionCode: '3b',
-        category: 'project_finance',
-        formula: 'Σ Outstanding_p × (GHG_s / Assets_s)',
-      },
-    };
-  },
-  notes: ['Data quality score: 5', 'No project equity+debt attribution — outstanding is applied directly'],
-};
-
 export const OPTION_3C_PROJECT_FINANCE: FormulaConfig = {
   id: '3c-project-finance',
   name: 'Option 3c - Asset Turnover Ratio (Project Finance)',
@@ -594,7 +552,6 @@ export const PROJECT_FINANCE_FORMULAS = [
   OPTION_2A_PROJECT_FINANCE,
   OPTION_2B_PROJECT_FINANCE,
   OPTION_3A_PROJECT_FINANCE,
-  OPTION_3B_PROJECT_FINANCE,
   OPTION_3C_PROJECT_FINANCE,
 ];
 

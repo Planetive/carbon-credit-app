@@ -36,17 +36,6 @@ const SectorProxyInputs: React.FC<Props> = ({
           </>
         )}
 
-        {optionCode === "3b" && (
-          <>
-            <FormField label="Sector GHG" unit="tCO₂e" required>
-              <Input type="number" min={0} step="any" value={num("sectorEmissions") || ""} onChange={setNum("sectorEmissions")} className={FIELD_INPUT} />
-            </FormField>
-            <FormField label="Sector assets" required>
-              <Input type="number" min={0} step="any" value={num("sectorAssets") || ""} onChange={setNum("sectorAssets")} className={FIELD_INPUT} />
-            </FormField>
-          </>
-        )}
-
         {optionCode === "3c" && (
           <>
             <FormField label="Asset turnover ratio" required>
