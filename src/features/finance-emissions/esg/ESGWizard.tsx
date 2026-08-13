@@ -63,7 +63,7 @@ const PROPERTY_METHODS = [
 ];
 
 const SOVEREIGN_METHODS = [
-  { id: '1a', title: 'Verified country GHG', score: 'Score 1', description: 'UNFCCC-reported verified country emissions' },
+  { id: '1a', title: 'Verified country GHG', score: 'Score 1', description: 'Climate TRACE country emissions (Pakistan & UAE)' },
   { id: '1b', title: 'Unverified country GHG', score: 'Score 2', description: 'Unverified country GHG emissions' },
   { id: '2a', title: 'Country energy consumption', score: 'Score 3', description: 'Country energy × EPA/DEFRA factor (+ process emissions)' },
   { id: '3a', title: 'Country sector intensity', score: 'Score 4', description: 'PPP-GDP × sector intensity from the reference table' },
@@ -73,8 +73,15 @@ const SOVEREIGN_METHODS = [
 const BOND_NO_GHG_METHODS = [
   { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
-  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
-  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
+  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
+  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
+];
+
+const FACILITATED_NO_GHG_METHODS = [
+  { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor × weight factor' },
+  { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × emission factor × weight factor' },
+  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table) × weight factor' },
+  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Facilitated amount × ATR × sector intensity (GHG / revenue from table) × weight factor' },
 ];
 
 const TILE =
@@ -646,15 +653,16 @@ export const ESGWizard: React.FC = () => {
   
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [results, setResults] = useState<EmissionResultRow[]>([]);
 
   // Helper function to sanitize numeric values for database storage
-  const sanitizeNumericValue = (value: number | null): number | null => {
-    if (value === null || value === undefined) return null;
-    if (!isFinite(value)) return null; // Convert Infinity/NaN to null
-    return value;
+  const sanitizeNumericValue = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n)) return null;
+    return n;
   };
 
   // Save questionnaire data to database
@@ -942,7 +950,10 @@ export const ESGWizard: React.FC = () => {
         exposure_id: null,
         questionnaire_id: questionnaire?.id || null,
         calculation_type: mode, // 'finance' or 'facilitated'
-        company_type: formData?.corporateStructure || 'unlisted',
+        company_type: (() => {
+          const structure = formData?.corporateStructure;
+          return typeof structure === "string" && structure ? structure : "unlisted";
+        })(),
         formula_id: 'aggregate', // Always use 'aggregate' for the main record shown in Company Detail
         inputs: {
           corporateStructure: formData?.corporateStructure,
@@ -1055,11 +1066,12 @@ export const ESGWizard: React.FC = () => {
       }
 
       // Update exposure amount in exposures table
-      if (formData?.outstandingLoan && formData.outstandingLoan > 0) {
+      const outstandingLoan = sanitizeNumericValue(formData?.outstandingLoan);
+      if (outstandingLoan != null && outstandingLoan > 0) {
         try {
           await PortfolioClient.updateExposureAmountForCounterparty(
-            counterpartyId, 
-            sanitizeNumericValue(formData.outstandingLoan)
+            counterpartyId,
+            outstandingLoan
           );
           console.log('Successfully updated exposure amount');
         } catch (error) {
@@ -1755,6 +1767,16 @@ export const ESGWizard: React.FC = () => {
             </div>
           );
         } else if (formData.hasEmissions === 'no') {
+          if (mode === 'facilitated') {
+            return (
+              <MethodOptionGrid
+                methods={FACILITATED_NO_GHG_METHODS}
+                selectedId={formData.calculationMethod}
+                onSelect={(id) => updateFormData('calculationMethod', id)}
+                error={validationErrors.calculationMethod}
+              />
+            );
+          }
           const hasCommercialRealEstate = formData.loanTypes.some(
             (item) => item.type === 'commercial-real-estate'
           );
@@ -1782,8 +1804,8 @@ export const ESGWizard: React.FC = () => {
           const corporateBondMethods: Array<{ id: string; title: string; score: string; description: string }> = [
             { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
             { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
-            { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector GHG / sector revenue' },
-            { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector GHG / sector revenue' },
+            { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
+            { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
           ];
           if (usesBondLoanMethods) {
             return (

@@ -5,7 +5,7 @@
  * Table 10.1-7: Data quality score table for sovereign debt
  *
  * Attribution (all options): Outstanding amount / PPP-adjusted GDP
- * - 1a (score 1): verified country GHG (UNFCCC)
+ * - 1a (score 1): verified country GHG (Climate TRACE — Pakistan & UAE)
  * - 1b (score 2): unverified country GHG
  * - 2a (score 3): energy consumption × emission factor (+ process emissions)
  * - 3a (score 4): PPP-GDP × sector intensity (from country_sector_intensity table)

@@ -12,21 +12,15 @@
  * - Weighting Factor: Factor to account for the proportion of services provided
  * - Facilitated Emissions: The final calculated emissions attributed to the financial services
  * 
- * Available Formula Options (8 total - 4 options × 2 company types):
+ * Available Formula Options (12 total - 6 options × 2 company types):
  * 
- * LISTED COMPANIES (Uses EVIC as denominator):
- * - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
- * - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality
- * - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
- * - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
- * 
- * UNLISTED COMPANIES (Uses Total Equity + Debt as denominator):
- * - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
- * - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality
- * - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
- * - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
- * 
- * Note: Options 1a and 1b use direct emissions data, while Options 2a and 2b use activity data.
+ * LISTED / UNLISTED COMPANIES:
+ * - Option 1a: Verified GHG Emissions (Score 1)
+ * - Option 1b: Unverified GHG Emissions (Score 2)
+ * - Option 2a: Energy Consumption Data (Score 3)
+ * - Option 2b: Production Data (Score 3)
+ * - Option 3a: Revenue-based sector intensity (Score 4)
+ * - Option 3c: Asset turnover ratio (Score 5)
  */
 
 import { FormulaConfig } from '../types/formula';
@@ -451,27 +445,16 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Energy Consumption',
         type: 'number',
         required: true,
-        unit: 'MWh',
-        description: 'How much energy the client company used (from utility bills)',
-        unitOptions: [
-          { value: 'MWh', label: 'MWh (Megawatt-hours)' },
-          { value: 'GWh', label: 'GWh (Gigawatt-hours)' },
-          { value: 'TWh', label: 'TWh (Terawatt-hours)' },
-          { value: 'kWh', label: 'kWh (Kilowatt-hours)' }
-        ]
+        unit: 'tCO2e',
+        description: 'Electricity emissions from EPA/DEFRA Scope 2 form (tCO2e)'
       },
       {
         name: 'emission_factor',
         label: 'Emission Factor',
         type: 'number',
         required: true,
-        unit: 'tCO2e/MWh',
-        description: 'How much carbon is released per unit of energy used',
-        unitOptions: [
-          { value: 'tCO2e/MWh', label: 'tCO2e/MWh' },
-          { value: 'kgCO2e/MWh', label: 'kgCO2e/MWh' },
-          { value: 'tCO2e/GWh', label: 'tCO2e/GWh' }
-        ]
+        unit: 'ratio',
+        description: 'Set to 1 when electricity is already converted via EPA/DEFRA'
       },
       {
         name: 'process_emissions',
@@ -479,7 +462,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         type: 'number',
         required: false,
         unit: 'tCO2e',
-        description: 'Extra carbon emissions from manufacturing processes (not from energy use)',
+        description: 'Optional process emissions added to electricity (tCO2e)',
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
@@ -531,8 +514,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
       };
     },
     notes: [
-      'Use energy consumption data from the listed client company',
-      'Apply energy source-specific emission factors',
+      'Use EPA/DEFRA Scope 2 electricity form (same as finance emissions Option 2a)',
       'Include process emissions if available',
       'Weighting factor should reflect the proportion of services provided'
     ]
@@ -577,27 +559,16 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         label: 'Energy Consumption',
         type: 'number',
         required: true,
-        unit: 'MWh',
-        description: 'How much energy the client company used (from utility bills)',
-        unitOptions: [
-          { value: 'MWh', label: 'MWh (Megawatt-hours)' },
-          { value: 'GWh', label: 'GWh (Gigawatt-hours)' },
-          { value: 'TWh', label: 'TWh (Terawatt-hours)' },
-          { value: 'kWh', label: 'kWh (Kilowatt-hours)' }
-        ]
+        unit: 'tCO2e',
+        description: 'Electricity emissions from EPA/DEFRA Scope 2 form (tCO2e)'
       },
       {
         name: 'emission_factor',
         label: 'Emission Factor',
         type: 'number',
         required: true,
-        unit: 'tCO2e/MWh',
-        description: 'How much carbon is released per unit of energy used',
-        unitOptions: [
-          { value: 'tCO2e/MWh', label: 'tCO2e/MWh' },
-          { value: 'kgCO2e/MWh', label: 'kgCO2e/MWh' },
-          { value: 'tCO2e/GWh', label: 'tCO2e/GWh' }
-        ]
+        unit: 'ratio',
+        description: 'Set to 1 when electricity is already converted via EPA/DEFRA'
       },
       {
         name: 'process_emissions',
@@ -605,7 +576,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         type: 'number',
         required: false,
         unit: 'tCO2e',
-        description: 'Extra carbon emissions from manufacturing processes (not from energy use)',
+        description: 'Optional process emissions added to electricity (tCO2e)',
         unitOptions: EMISSION_UNIT_OPTIONS
       }
     ],
@@ -657,8 +628,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
       };
     },
     notes: [
-      'Use energy consumption data from the unlisted client company',
-      'Apply energy source-specific emission factors',
+      'Use EPA/DEFRA Scope 2 electricity form (same as finance emissions Option 2a)',
       'Include process emissions if available',
       'Weighting factor should reflect the proportion of services provided'
     ]
@@ -900,21 +870,238 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
       'Weighting factor should reflect the proportion of services provided',
       'Include all relevant production outputs'
     ]
-  }
+  },
+
+  /**
+   * OPTION 3A - REVENUE-BASED (FACILITATED - LISTED)
+   * Formula: Σ (Facilitated amount_c / EVIC_c) × Weighting factor × Revenue_c × sector intensity
+   */
+  {
+    id: '3a-facilitated-revenue-listed',
+    name: 'Option 3a - Revenue-based (Facilitated - Listed)',
+    description: 'Company revenue × sector intensity (GHG / revenue from reference table) with EVIC attribution and weighting factor',
+    category: 'facilitated_emission',
+    optionCode: '3a',
+    dataQualityScore: 4,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      { name: 'facilitated_amount', label: 'Facilitated Amount', type: 'number', required: true, unit: 'PKR' },
+      COMMON_INPUTS.evic,
+      { name: 'weighting_factor', label: 'Weighting Factor', type: 'number', required: true, unit: 'ratio', validation: { min: 0, max: 1 } },
+      { name: 'company_revenue', label: 'Company Revenue', type: 'number', required: true, unit: 'PKR' },
+      { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
+    ],
+    calculate: (inputs) => {
+      const facilitatedAmount = Number(inputs.facilitated_amount || 0);
+      const weightingFactor = Number(inputs.weighting_factor || 0);
+      const companyRevenue = Number(inputs.company_revenue || 0);
+      const rawIntensity = Number(inputs.sector_intensity || 0);
+      if (!facilitatedAmount || !weightingFactor || !companyRevenue || !rawIntensity) {
+        throw new Error('Facilitated amount, weighting factor, company revenue, and sector intensity must be greater than 0');
+      }
+      const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+      const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
+      const evic = calculateEVIC(inputs);
+      if (!evic) throw new Error('EVIC must be greater than 0');
+      const attributionFactor = calculateAttributionFactorListed(facilitatedAmount, evic);
+      const estimatedEmissions = companyRevenue * intensity;
+      const facilitatedEmissions = attributionFactor * weightingFactor * estimatedEmissions;
+      return {
+        attributionFactor,
+        emissionFactor: intensity,
+        financedEmissions: facilitatedEmissions,
+        dataQualityScore: 4,
+        methodology: 'Option 3a - Revenue-based (Facilitated - Listed)',
+        calculationSteps: [
+          { step: 'EVIC', value: evic, formula: `EVIC = ${evic.toFixed(2)}` },
+          { step: 'Attribution Factor', value: attributionFactor, formula: `${facilitatedAmount} / ${evic.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
+          { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+          { step: 'Estimated company emissions', value: estimatedEmissions, formula: `${companyRevenue} × ${intensity.toExponential(6)} = ${estimatedEmissions.toFixed(4)}` },
+          { step: 'Facilitated Emissions', value: facilitatedEmissions, formula: `${attributionFactor.toFixed(6)} × ${weightingFactor} × ${estimatedEmissions.toFixed(4)} = ${facilitatedEmissions.toFixed(4)}` },
+        ],
+        metadata: {
+          companyType: 'listed',
+          optionCode: '3a',
+          category: 'facilitated_emission',
+          formula: 'Σ (Facilitated amount_c / EVIC_c) × Weighting factor × Revenue_c × sector intensity',
+        },
+      };
+    },
+    notes: ['Data quality score: 4', 'Weighting factor fixed at 33% in the UI', 'Uses reference table intensity (GHG / revenue)'],
+  },
+
+  /**
+   * OPTION 3A - REVENUE-BASED (FACILITATED - UNLISTED)
+   * Formula: Σ (Facilitated amount_c / (Total equity + debt)_c) × Weighting factor × Revenue_c × sector intensity
+   */
+  {
+    id: '3a-facilitated-revenue-unlisted',
+    name: 'Option 3a - Revenue-based (Facilitated - Unlisted)',
+    description: 'Company revenue × sector intensity (GHG / revenue from reference table) with equity+debt attribution and weighting factor',
+    category: 'facilitated_emission',
+    optionCode: '3a',
+    dataQualityScore: 4,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      { name: 'facilitated_amount', label: 'Facilitated Amount', type: 'number', required: true, unit: 'PKR' },
+      COMMON_INPUTS.total_equity_plus_debt,
+      { name: 'weighting_factor', label: 'Weighting Factor', type: 'number', required: true, unit: 'ratio', validation: { min: 0, max: 1 } },
+      { name: 'company_revenue', label: 'Company Revenue', type: 'number', required: true, unit: 'PKR' },
+      { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
+    ],
+    calculate: (inputs) => {
+      const facilitatedAmount = Number(inputs.facilitated_amount || 0);
+      const weightingFactor = Number(inputs.weighting_factor || 0);
+      const companyRevenue = Number(inputs.company_revenue || 0);
+      const rawIntensity = Number(inputs.sector_intensity || 0);
+      if (!facilitatedAmount || !weightingFactor || !companyRevenue || !rawIntensity) {
+        throw new Error('Facilitated amount, weighting factor, company revenue, and sector intensity must be greater than 0');
+      }
+      const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+      const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
+      const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
+      if (!totalEquityPlusDebt) throw new Error('Total equity + debt must be greater than 0');
+      const attributionFactor = calculateAttributionFactorUnlisted(facilitatedAmount, totalEquityPlusDebt);
+      const estimatedEmissions = companyRevenue * intensity;
+      const facilitatedEmissions = attributionFactor * weightingFactor * estimatedEmissions;
+      return {
+        attributionFactor,
+        emissionFactor: intensity,
+        financedEmissions: facilitatedEmissions,
+        dataQualityScore: 4,
+        methodology: 'Option 3a - Revenue-based (Facilitated - Unlisted)',
+        calculationSteps: [
+          { step: 'Total Equity + Debt', value: totalEquityPlusDebt, formula: `Equity + Debt = ${totalEquityPlusDebt.toFixed(2)}` },
+          { step: 'Attribution Factor', value: attributionFactor, formula: `${facilitatedAmount} / ${totalEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
+          { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+          { step: 'Estimated company emissions', value: estimatedEmissions, formula: `${companyRevenue} × ${intensity.toExponential(6)} = ${estimatedEmissions.toFixed(4)}` },
+          { step: 'Facilitated Emissions', value: facilitatedEmissions, formula: `${attributionFactor.toFixed(6)} × ${weightingFactor} × ${estimatedEmissions.toFixed(4)} = ${facilitatedEmissions.toFixed(4)}` },
+        ],
+        metadata: {
+          companyType: 'unlisted',
+          optionCode: '3a',
+          category: 'facilitated_emission',
+          formula: 'Σ (Facilitated amount_c / (Total equity + debt)_c) × Weighting factor × Revenue_c × sector intensity',
+        },
+      };
+    },
+    notes: ['Data quality score: 4', 'Weighting factor fixed at 33% in the UI', 'Uses reference table intensity (GHG / revenue)'],
+  },
+
+  /**
+   * OPTION 3C - ASSET TURNOVER RATIO (FACILITATED - LISTED)
+   * Formula: Σ Facilitated amount_c × Weighting factor × ATR_s × sector intensity
+   */
+  {
+    id: '3c-facilitated-atr-listed',
+    name: 'Option 3c - Asset Turnover Ratio (Facilitated - Listed)',
+    description: 'Facilitated amount × weighting factor × ATR × sector intensity (GHG / revenue from reference table)',
+    category: 'facilitated_emission',
+    optionCode: '3c',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      { name: 'facilitated_amount', label: 'Facilitated Amount', type: 'number', required: true, unit: 'PKR' },
+      { name: 'weighting_factor', label: 'Weighting Factor', type: 'number', required: true, unit: 'ratio', validation: { min: 0, max: 1 } },
+      { name: 'asset_turnover_ratio', label: 'Asset Turnover Ratio', type: 'number', required: true, unit: 'ratio' },
+      { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
+    ],
+    calculate: (inputs) => {
+      const facilitatedAmount = Number(inputs.facilitated_amount || 0);
+      const weightingFactor = Number(inputs.weighting_factor || 0);
+      const atr = Number(inputs.asset_turnover_ratio || 0);
+      const rawIntensity = Number(inputs.sector_intensity || 0);
+      if (!facilitatedAmount || !weightingFactor || !atr || !rawIntensity) {
+        throw new Error('Facilitated amount, weighting factor, ATR, and sector intensity must be greater than 0');
+      }
+      const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+      const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
+      const facilitatedEmissions = facilitatedAmount * weightingFactor * atr * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions: facilitatedEmissions,
+        dataQualityScore: 5,
+        methodology: 'Option 3c - Asset Turnover Ratio (Facilitated - Listed)',
+        calculationSteps: [
+          { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+          { step: 'Facilitated Emissions', value: facilitatedEmissions, formula: `${facilitatedAmount} × ${weightingFactor} × ${atr} × ${intensity.toExponential(6)} = ${facilitatedEmissions.toFixed(4)}` },
+        ],
+        metadata: {
+          companyType: 'listed',
+          optionCode: '3c',
+          category: 'facilitated_emission',
+          formula: 'Σ Facilitated amount_c × Weighting factor × ATR_s × sector intensity',
+        },
+      };
+    },
+    notes: ['Data quality score: 5', 'No EVIC attribution — facilitated amount is applied directly'],
+  },
+
+  /**
+   * OPTION 3C - ASSET TURNOVER RATIO (FACILITATED - UNLISTED)
+   */
+  {
+    id: '3c-facilitated-atr-unlisted',
+    name: 'Option 3c - Asset Turnover Ratio (Facilitated - Unlisted)',
+    description: 'Facilitated amount × weighting factor × ATR × sector intensity (GHG / revenue from reference table)',
+    category: 'facilitated_emission',
+    optionCode: '3c',
+    dataQualityScore: 5,
+    applicableScopes: ['scope1', 'scope2', 'scope3'],
+    inputs: [
+      { name: 'facilitated_amount', label: 'Facilitated Amount', type: 'number', required: true, unit: 'PKR' },
+      { name: 'weighting_factor', label: 'Weighting Factor', type: 'number', required: true, unit: 'ratio', validation: { min: 0, max: 1 } },
+      { name: 'asset_turnover_ratio', label: 'Asset Turnover Ratio', type: 'number', required: true, unit: 'ratio' },
+      { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
+    ],
+    calculate: (inputs) => {
+      const facilitatedAmount = Number(inputs.facilitated_amount || 0);
+      const weightingFactor = Number(inputs.weighting_factor || 0);
+      const atr = Number(inputs.asset_turnover_ratio || 0);
+      const rawIntensity = Number(inputs.sector_intensity || 0);
+      if (!facilitatedAmount || !weightingFactor || !atr || !rawIntensity) {
+        throw new Error('Facilitated amount, weighting factor, ATR, and sector intensity must be greater than 0');
+      }
+      const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+      const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
+      const facilitatedEmissions = facilitatedAmount * weightingFactor * atr * intensity;
+      return {
+        attributionFactor: 1,
+        emissionFactor: intensity,
+        financedEmissions: facilitatedEmissions,
+        dataQualityScore: 5,
+        methodology: 'Option 3c - Asset Turnover Ratio (Facilitated - Unlisted)',
+        calculationSteps: [
+          { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+          { step: 'Facilitated Emissions', value: facilitatedEmissions, formula: `${facilitatedAmount} × ${weightingFactor} × ${atr} × ${intensity.toExponential(6)} = ${facilitatedEmissions.toFixed(4)}` },
+        ],
+        metadata: {
+          companyType: 'unlisted',
+          optionCode: '3c',
+          category: 'facilitated_emission',
+          formula: 'Σ Facilitated amount_c × Weighting factor × ATR_s × sector intensity',
+        },
+      };
+    },
+    notes: ['Data quality score: 5', 'No equity+debt attribution — facilitated amount is applied directly'],
+  },
 ];
 
 // Export all facilitated emission formulas
 export const ALL_FACILITATED_FORMULAS = FACILITATED_EMISSION_FORMULAS;
 
 // Helper function to get formulas by option code
-export const getFacilitatedFormulasByOption = (optionCode: '1a' | '1b' | '2a' | '2b'): FormulaConfig[] => {
+export const getFacilitatedFormulasByOption = (
+  optionCode: '1a' | '1b' | '2a' | '2b' | '3a' | '3c'
+): FormulaConfig[] => {
   return FACILITATED_EMISSION_FORMULAS.filter(formula => formula.optionCode === optionCode);
 };
 
 // Helper function to get formulas by company type
 export const getFacilitatedFormulasByCompanyType = (companyType: 'listed' | 'unlisted'): FormulaConfig[] => {
-  return FACILITATED_EMISSION_FORMULAS.filter(formula => 
-    formula.metadata?.companyType === companyType
+  return FACILITATED_EMISSION_FORMULAS.filter((formula) =>
+    companyType === 'listed' ? formula.id.includes('-listed') : formula.id.includes('-unlisted')
   );
 };
 

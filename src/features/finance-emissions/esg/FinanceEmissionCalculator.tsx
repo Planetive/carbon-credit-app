@@ -207,6 +207,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     sector_name: '',
     sector_intensity: 0,
     sector_intensity_unit: '',
+    intensity_country_name: '',
     energy_consumption: 0,
     energy_consumption_unit: 'kWh',
     emission_factor: 0,
@@ -1048,11 +1049,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         if (pfOpt === '2b' && (!loanData.production || !loanData.emission_factor)) {
           errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
         }
-        if (pfOpt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
+        if (pfOpt === '3a' && (!loanData.companyRevenue || !loanData.sector_intensity || !loanData.sector_key)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue and a sector with intensity are required for ${loanLabel} (Option 3a)` });
         }
-        if (pfOpt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
+        if (pfOpt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sector_intensity || !loanData.sector_key)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Option 3c)` });
         }
       } else {
         // For corporate-bond, business-loan, etc.
@@ -1121,11 +1122,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           if (opt === '2b' && (!loanData.production || !loanData.emission_factor)) {
             errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
           }
-          if (opt === '3a' && (!loanData.companyRevenue || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue, sector GHG, and sector revenue are required for ${loanLabel} (Option 3a)` });
+          if (opt === '3a' && (!loanData.companyRevenue || !loanData.sector_intensity || !loanData.sector_key)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue and a sector with intensity are required for ${loanLabel} (Option 3a)` });
           }
-          if (opt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sectorEmissions || !loanData.sectorRevenue)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `ATR, sector GHG, and sector revenue are required for ${loanLabel} (Option 3c)` });
+          if (opt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sector_intensity || !loanData.sector_key)) {
+            errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Option 3c)` });
           }
         }
       }
@@ -1231,6 +1232,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       sector_name: loanFormData.sector_name || '',
       sector_intensity: loanFormData.sector_intensity || 0,
       sector_intensity_unit: loanFormData.sector_intensity_unit || '',
+      intensity_country_name: loanFormData.intensity_country_name || '',
       total_value_at_origination: loanFormData.total_value_at_origination || 0,
       total_vehicle_emissions: loanFormData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
       fuel_consumption: smartConvertUnit(loanFormData.fuel_consumption || 0, loanFormData.fuel_consumption_unit),
@@ -1535,15 +1537,15 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         if (opt === '2b' && (!formData.production || !formData.emission_factor)) {
           throw new Error('Production volume and emission factor must be greater than 0 for Option 2b.');
         }
-        if (opt === '3a' && (!formData.companyRevenue || !formData.sectorEmissions || !formData.sectorRevenue)) {
+        if (opt === '3a' && (!formData.companyRevenue || !formData.sector_intensity || !formData.sector_key)) {
           throw new Error(
             loanType === 'project-finance'
-              ? 'Project revenue, sector GHG, and sector revenue are required for Option 3a.'
-              : 'Company revenue, sector GHG, and sector revenue are required for Option 3a.'
+              ? 'Project revenue and a sector with intensity are required for Option 3a.'
+              : 'Company revenue and a sector with intensity are required for Option 3a.'
           );
         }
-        if (opt === '3c' && (!formData.assetTurnoverRatio || !formData.sectorEmissions || !formData.sectorRevenue)) {
-          throw new Error('ATR, sector GHG, and sector revenue are required for Option 3c.');
+        if (opt === '3c' && (!formData.assetTurnoverRatio || !formData.sector_intensity || !formData.sector_key)) {
+          throw new Error('ATR and a sector with intensity are required for Option 3c.');
         }
       }
 
@@ -1590,6 +1592,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         sector_name: formData.sector_name || '',
         sector_intensity: formData.sector_intensity || 0,
         sector_intensity_unit: formData.sector_intensity_unit || '',
+        intensity_country_name: formData.intensity_country_name || '',
         // Add Motor Vehicle Loan specific fields
         total_value_at_origination: formData.total_value_at_origination || 0,
         total_vehicle_emissions: formData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
@@ -1966,6 +1969,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       'sector_name',
       'sector_intensity',
       'sector_intensity_unit',
+      'intensity_country_name',
       'energy_consumption',
       // 2a uses EnergyEmissionInputs; 2b still needs the production EF field
       ...(formula.optionCode === '2b' ? [] : ['emission_factor']),
@@ -2514,6 +2518,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             corporateStructure={corporateStructure}
             hasEmissions={propHasEmissions}
             verificationStatus={propVerificationStatus}
+            calculationMethod={propCalculationMethod}
             verifiedEmissions={propVerifiedEmissions}
             unverifiedEmissions={propUnverifiedEmissions}
           onCalculationComplete={(result) => {

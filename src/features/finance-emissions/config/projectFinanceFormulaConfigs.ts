@@ -439,7 +439,7 @@ export const OPTION_2B_PROJECT_FINANCE: FormulaConfig = {
 export const OPTION_3A_PROJECT_FINANCE: FormulaConfig = {
   id: '3a-project-finance',
   name: 'Option 3a - Revenue-based (Project Finance)',
-  description: 'Project revenue × sector GHG intensity (emissions / revenue)',
+  description: 'Project revenue × sector intensity (GHG / revenue from reference table)',
   dataQualityScore: 4,
   category: 'project_finance',
   optionCode: '3a',
@@ -460,20 +460,19 @@ export const OPTION_3A_PROJECT_FINANCE: FormulaConfig = {
       unit: 'PKR',
     },
     { name: 'company_revenue', label: 'Project Revenue', type: 'number', required: true, unit: 'PKR' },
-    { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e' },
-    { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR' },
+    { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
   ],
   calculate: (inputs, companyType) => {
-    const outstandingAmount = inputs.outstanding_amount;
+    const outstandingAmount = Number(inputs.outstanding_amount || 0);
     const projectRevenue = Number(inputs.company_revenue || 0);
-    const sectorEmissions = Number(inputs.sector_emissions || 0);
-    const sectorRevenue = Number(inputs.sector_revenue || 0);
-    if (!projectRevenue || !sectorRevenue || !sectorEmissions) {
-      throw new Error('Project revenue, sector emissions, and sector revenue must be greater than 0');
+    const rawIntensity = Number(inputs.sector_intensity || 0);
+    if (!projectRevenue || !rawIntensity) {
+      throw new Error('Project revenue and sector intensity must be greater than 0');
     }
-    const totalProjectEquityPlusDebt = inputs.totalProjectEquity + inputs.totalProjectDebt;
+    const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+    const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
+    const totalProjectEquityPlusDebt = Number(inputs.totalProjectEquity || 0) + Number(inputs.totalProjectDebt || 0);
     const attributionFactor = calculateAttributionFactorProject(outstandingAmount, totalProjectEquityPlusDebt);
-    const intensity = sectorEmissions / sectorRevenue;
     const estimatedEmissions = projectRevenue * intensity;
     const financedEmissions = calculateFinancedEmissions(outstandingAmount, totalProjectEquityPlusDebt, estimatedEmissions);
     return {
@@ -485,8 +484,8 @@ export const OPTION_3A_PROJECT_FINANCE: FormulaConfig = {
       calculationSteps: [
         { step: 'Total Project Equity + Debt', value: totalProjectEquityPlusDebt, formula: `${inputs.totalProjectEquity} + ${inputs.totalProjectDebt} = ${totalProjectEquityPlusDebt.toFixed(2)}` },
         { step: 'Attribution Factor', value: attributionFactor, formula: `${outstandingAmount} / ${totalProjectEquityPlusDebt.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
-        { step: 'Sector intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
-        { step: 'Estimated project emissions', value: estimatedEmissions, formula: `${projectRevenue} × ${intensity.toFixed(8)} = ${estimatedEmissions.toFixed(4)}` },
+        { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+        { step: 'Estimated project emissions', value: estimatedEmissions, formula: `${projectRevenue} × ${intensity.toExponential(6)} = ${estimatedEmissions.toFixed(4)}` },
         { step: 'Financed Emissions', value: financedEmissions, formula: `(${outstandingAmount} / ${totalProjectEquityPlusDebt.toFixed(2)}) × ${estimatedEmissions.toFixed(4)} = ${financedEmissions.toFixed(4)}` },
       ],
       metadata: {
@@ -495,35 +494,34 @@ export const OPTION_3A_PROJECT_FINANCE: FormulaConfig = {
         category: 'project_finance',
         totalProjectEquityPlusDebt,
         estimatedEmissions,
-        formula: 'Σ (Outstanding_p / (Total equity + debt)_p) × Revenue_p × (GHG_s / Revenue_s)',
+        formula: 'Σ (Outstanding_p / (Total equity + debt)_p) × Revenue_p × sector intensity',
       },
     };
   },
-  notes: ['Data quality score: 4', 'Uses project revenue and sector intensity'],
+  notes: ['Data quality score: 4', 'Uses project revenue and reference-table sector intensity'],
 };
 
 export const OPTION_3C_PROJECT_FINANCE: FormulaConfig = {
   id: '3c-project-finance',
   name: 'Option 3c - Asset Turnover Ratio (Project Finance)',
-  description: 'Outstanding × sector ATR × sector GHG / sector revenue',
+  description: 'Outstanding × sector ATR × sector intensity (GHG / revenue from reference table)',
   dataQualityScore: 5,
   category: 'project_finance',
   optionCode: '3c',
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     { name: 'asset_turnover_ratio', label: 'Asset Turnover Ratio', type: 'number', required: true, unit: 'ratio' },
-    { name: 'sector_emissions', label: 'Sector GHG Emissions', type: 'number', required: true, unit: 'tCO2e' },
-    { name: 'sector_revenue', label: 'Sector Revenue', type: 'number', required: true, unit: 'PKR' },
+    { name: 'sector_intensity', label: 'Sector intensity', type: 'number', required: true, unit: 'kgCO2e/PKR' },
   ],
   calculate: (inputs, companyType) => {
-    const outstandingAmount = inputs.outstanding_amount;
+    const outstandingAmount = Number(inputs.outstanding_amount || 0);
     const atr = Number(inputs.asset_turnover_ratio || 0);
-    const sectorEmissions = Number(inputs.sector_emissions || 0);
-    const sectorRevenue = Number(inputs.sector_revenue || 0);
-    if (!outstandingAmount || !atr || !sectorEmissions || !sectorRevenue) {
-      throw new Error('Outstanding amount, ATR, sector emissions, and sector revenue must be greater than 0');
+    const rawIntensity = Number(inputs.sector_intensity || 0);
+    if (!outstandingAmount || !atr || !rawIntensity) {
+      throw new Error('Outstanding amount, ATR, and sector intensity must be greater than 0');
     }
-    const intensity = sectorEmissions / sectorRevenue;
+    const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
+    const intensity = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
     const financedEmissions = outstandingAmount * atr * intensity;
     return {
       attributionFactor: 1,
@@ -532,14 +530,14 @@ export const OPTION_3C_PROJECT_FINANCE: FormulaConfig = {
       dataQualityScore: 5,
       methodology: 'PCAF Option 3c - Asset Turnover Ratio (Project Finance)',
       calculationSteps: [
-        { step: 'Sector revenue intensity', value: intensity, formula: `${sectorEmissions} / ${sectorRevenue} = ${intensity.toFixed(8)}` },
-        { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${atr} × ${intensity.toFixed(8)} = ${financedEmissions.toFixed(4)}` },
+        { step: 'Sector intensity', value: intensity, formula: `${rawIntensity} ${unit} → ${intensity.toExponential(6)} tCO2e/PKR` },
+        { step: 'Financed Emissions', value: financedEmissions, formula: `${outstandingAmount} × ${atr} × ${intensity.toExponential(6)} = ${financedEmissions.toFixed(4)}` },
       ],
       metadata: {
         companyType,
         optionCode: '3c',
         category: 'project_finance',
-        formula: 'Σ Outstanding_p × ATR_s × (GHG_s / Revenue_s)',
+        formula: 'Σ Outstanding_p × ATR_s × sector intensity',
       },
     };
   },

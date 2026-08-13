@@ -11,6 +11,7 @@ interface FormattedNumberInputProps {
   min?: number;
   max?: number;
   step?: number;
+  disabled?: boolean;
 }
 
 export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
@@ -22,6 +23,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   min,
   max,
   step,
+  disabled,
 }) => {
   const [displayValue, setDisplayValue] = React.useState(value ? formatNumberWithCommas(value) : "");
 
@@ -46,6 +48,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
       min={min}
       max={max}
       step={step}
+      disabled={disabled}
     />
   );
 };

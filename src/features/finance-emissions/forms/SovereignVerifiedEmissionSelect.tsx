@@ -16,25 +16,32 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  CLIMATE_TRACE_EMISSIONS_YEAR,
+  CLIMATE_TRACE_SOURCE_URL,
   formatEmissionsMillions,
-  WORLDOMETER_EMISSIONS_SOURCE_URL,
-  WORLDOMETER_EMISSIONS_YEAR,
-  WORLDOMETER_VERIFIED_EMISSIONS,
-  type WorldometerVerifiedEmission,
-} from "../data/worldometerVerifiedEmissions";
+  type ClimateTraceVerifiedEmission,
+} from "../api/climateTraceCountryEmissions";
 import { FIELD_INPUT } from "./InputLayout";
 
 type SovereignVerifiedEmissionSelectProps = {
   value: string;
   emissionsTons?: number;
+  rows: ClimateTraceVerifiedEmission[];
+  loading?: boolean;
   disabled?: boolean;
-  onSelect: (row: WorldometerVerifiedEmission) => void;
+  error?: string | null;
+  onRetry?: () => void;
+  onSelect: (row: ClimateTraceVerifiedEmission) => void;
 };
 
 export function SovereignVerifiedEmissionSelect({
   value,
   emissionsTons = 0,
+  rows,
+  loading = false,
   disabled = false,
+  error = null,
+  onRetry,
   onSelect,
 }: SovereignVerifiedEmissionSelectProps) {
   const [open, setOpen] = useState(false);
@@ -42,18 +49,25 @@ export function SovereignVerifiedEmissionSelect({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return WORLDOMETER_VERIFIED_EMISSIONS;
-    return WORLDOMETER_VERIFIED_EMISSIONS.filter((row) =>
-      row.countryName.toLowerCase().includes(q)
-    );
-  }, [search]);
+    if (!q) return rows;
+    return rows.filter((row) => row.countryName.toLowerCase().includes(q));
+  }, [rows, search]);
 
-  const selected = WORLDOMETER_VERIFIED_EMISSIONS.find(
-    (row) => row.countryName === value
-  );
+  const selected = rows.find((row) => row.countryName === value);
 
   return (
     <div className="space-y-1.5">
+      {error && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-red-700">{error}</p>
+          {onRetry && (
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          )}
+        </div>
+      )}
+
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -61,7 +75,7 @@ export function SovereignVerifiedEmissionSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            disabled={disabled}
+            disabled={disabled || loading || !!error || rows.length === 0}
             className={cn(
               FIELD_INPUT,
               "w-full justify-between font-normal",
@@ -69,9 +83,11 @@ export function SovereignVerifiedEmissionSelect({
             )}
           >
             <span className="truncate">
-              {selected
-                ? `${selected.countryName} · ${formatEmissionsMillions(selected.emissionsTons)}`
-                : "Choose country emissions"}
+              {loading
+                ? "Loading Climate TRACE…"
+                : selected
+                  ? `${selected.countryName} · ${formatEmissionsMillions(selected.emissionsTons)}`
+                  : "Choose country emissions"}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
           </Button>
@@ -79,7 +95,7 @@ export function SovereignVerifiedEmissionSelect({
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder="Type to filter…"
+              placeholder="Pakistan or UAE…"
               value={search}
               onValueChange={setSearch}
             />
@@ -88,7 +104,7 @@ export function SovereignVerifiedEmissionSelect({
               <CommandGroup>
                 {filtered.map((row) => (
                   <CommandItem
-                    key={row.countryName}
+                    key={row.countryCode}
                     value={row.countryName}
                     onSelect={() => {
                       onSelect(row);
@@ -115,20 +131,23 @@ export function SovereignVerifiedEmissionSelect({
 
       {value && emissionsTons > 0 && (
         <p className="text-xs text-[#64748B]">
-          {formatEmissionsMillions(emissionsTons)} ({emissionsTons.toLocaleString()} tCO₂e, {WORLDOMETER_EMISSIONS_YEAR})
+          {formatEmissionsMillions(emissionsTons)} (
+          {Math.round(emissionsTons).toLocaleString()} tCO₂e, {CLIMATE_TRACE_EMISSIONS_YEAR})
         </p>
       )}
 
       <p className="text-[11px] leading-snug text-[#94A3B8]">
         Source:{" "}
         <a
-          href={WORLDOMETER_EMISSIONS_SOURCE_URL}
+          href={CLIMATE_TRACE_SOURCE_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="underline decoration-[#CBD5E1] underline-offset-2 hover:text-[#64748B]"
         >
-          Worldometer
+          Climate TRACE
         </a>
+        {" · "}
+        Pakistan &amp; UAE only
       </p>
     </div>
   );

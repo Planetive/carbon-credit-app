@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FormulaConfig } from '../types/formula';
@@ -8,7 +8,8 @@ import { useCountrySectorIntensity } from '../hooks/useCountrySectorIntensity';
 import { SovereignCountrySelect } from './SovereignCountrySelect';
 import { SovereignSectorSelect } from './SovereignSectorSelect';
 import { SovereignVerifiedEmissionSelect } from './SovereignVerifiedEmissionSelect';
-import { findWorldometerEmissions } from '../data/worldometerVerifiedEmissions';
+import { useClimateTraceVerifiedEmissions } from '../hooks/useClimateTraceVerifiedEmissions';
+import { findClimateTraceEmissions } from '../api/climateTraceCountryEmissions';
 import type { SectorOption } from '../types/countrySectorIntensity';
 import { FIELD_INPUT, FieldGrid, FormField, InputSection } from "./InputLayout";
 
@@ -33,8 +34,30 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
     error: sectorsError,
     reload: reloadSectors,
   } = useCountrySectorIntensity(countryName, option === '3a');
+  const {
+    rows: climateTraceRows,
+    loading: climateTraceLoading,
+    error: climateTraceError,
+    reload: reloadClimateTrace,
+  } = useClimateTraceVerifiedEmissions(option === '1a');
 
   const pickersDisabled = loading || !!error;
+
+  useEffect(() => {
+    if (option !== '1a' || climateTraceRows.length === 0) return;
+    const current = String(formData.sovereign_country_name || '');
+    if (!current) return;
+    const climate = findClimateTraceEmissions(current, climateTraceRows);
+    if (!climate) return;
+    if (
+      formData.verified_emissions_country_name === climate.countryName &&
+      Number(formData.verified_country_emissions) === climate.emissionsTons
+    ) {
+      return;
+    }
+    onUpdateFormData('verified_emissions_country_name', climate.countryName);
+    onUpdateFormData('verified_country_emissions', climate.emissionsTons);
+  }, [option, climateTraceRows, formData.sovereign_country_name]);
 
   const clearSector = () => {
     onUpdateFormData('sector_code', '');
@@ -56,10 +79,13 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
       clearSector();
 
       if (option === '1a') {
-        const worldometer = findWorldometerEmissions(resolved.sovereign_country_name);
-        if (worldometer) {
-          onUpdateFormData('verified_emissions_country_name', worldometer.countryName);
-          onUpdateFormData('verified_country_emissions', worldometer.emissionsTons);
+        const climate = findClimateTraceEmissions(
+          resolved.sovereign_country_name,
+          climateTraceRows
+        );
+        if (climate) {
+          onUpdateFormData('verified_emissions_country_name', climate.countryName);
+          onUpdateFormData('verified_country_emissions', climate.emissionsTons);
         }
       }
       return;
@@ -108,11 +134,15 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
             label="Verified country emissions"
             unit="tCO₂e"
             required
-            tooltip="Country CO₂ emissions from Worldometer (2024)"
+            tooltip="Country GHG (CO₂e 100-yr) from Climate TRACE — Pakistan and UAE only"
           >
             <SovereignVerifiedEmissionSelect
               value={String(formData.verified_emissions_country_name || '')}
               emissionsTons={num('verified_country_emissions')}
+              rows={climateTraceRows}
+              loading={climateTraceLoading}
+              error={climateTraceError}
+              onRetry={() => void reloadClimateTrace()}
               onSelect={(row) => {
                 onUpdateFormData('verified_emissions_country_name', row.countryName);
                 onUpdateFormData('verified_country_emissions', row.emissionsTons);
