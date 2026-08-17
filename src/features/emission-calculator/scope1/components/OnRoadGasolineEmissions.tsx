@@ -17,6 +17,7 @@ import {
 import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
 import { USE_JWT_AUTH } from "@/api/config";
 import { resolveEpaOnRoadGasolineEmissionsKg } from "@/api/calcConnection";
+import { normalizeEpaModelYear, sortEpaModelYears } from "@/components/emissions/shared/epaModelYear";
 import { formatDynamicEmission } from "./emissionFormatting";
 
 const TABLE_NAME = "scope1_epa_on_road_gasoline_entries";
@@ -217,7 +218,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
           dbId: String(entry.id),
           isExisting: true,
           vehicleType: entry.vehicle_type as string | undefined,
-          modelYear: entry.model_year as string | undefined,
+          modelYear: normalizeEpaModelYear(entry.model_year),
           emissionSelection: toEmissionSelection(entry.emission_selection),
           distanceUnit: "mile",
           miles: entry.miles as number | undefined,
@@ -258,11 +259,12 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
               r["VehicleType"] ??
               r.vehicle_type ??
               r.vehicleType;
-            const modelYear =
-              pickFirstKey(r, [/^Model\s*Year$/i, /model[_\s]*year/i, /year/i]) ??
-              r["ModelYear"] ??
-              r.model_year ??
-              r.modelYear;
+            const modelYear = normalizeEpaModelYear(
+              pickFirstKey(r, [/^Model\s*Year$/i, /model[_\s]*year/i, /^year$/i]) ??
+                r["ModelYear"] ??
+                r.model_year ??
+                r.modelYear
+            );
 
             // Prefer a direct CO2e factor if the table has one
             const co2e = pickNumber(r, [/co2e\s*factor/i, /co2[_\s]*equivalent/i, /ghg\s*factor/i]);
@@ -275,7 +277,7 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
             return {
               id: r.id || r.ID || r.Id,
               vehicleType: String(vehicleType),
-              modelYear: String(modelYear),
+              modelYear,
               co2e_g_per_mile: co2e,
               co2_g_per_mile: co2,
               ch4_g_per_mile: ch4,
@@ -387,9 +389,11 @@ const OnRoadGasolineEmissions: React.FC<Props> = ({ onDataChange, onSaveAndNext,
   );
 
   const modelYearsFor = (vehicleType?: string) =>
-    Array.from(
-      new Set(factors.filter((f) => f.vehicleType === vehicleType).map((f) => f.modelYear)),
-    ).sort((a, b) => a.localeCompare(b));
+    sortEpaModelYears(
+      Array.from(
+        new Set(factors.filter((f) => f.vehicleType === vehicleType).map((f) => f.modelYear))
+      )
+    );
 
   const addRow = () => setRows((prev) => [...prev, newRow()]);
   const removeRow = async (id: string) => {

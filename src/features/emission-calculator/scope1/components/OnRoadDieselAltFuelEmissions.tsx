@@ -17,6 +17,7 @@ import {
 import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
 import { USE_JWT_AUTH } from "@/api/config";
 import { resolveEpaOnRoadDieselEmissionsKg } from "@/api/calcConnection";
+import { normalizeEpaModelYear, sortEpaModelYears } from "@/components/emissions/shared/epaModelYear";
 import { formatDynamicEmission } from "./emissionFormatting";
 
 const TABLE_NAME = "scope1_epa_on_road_diesel_alt_fuel_entries";
@@ -97,8 +98,8 @@ const pickNumber = (row: any, patterns: RegExp[]): number | undefined => {
   return parseNum(v);
 };
 
-const normalizeYear = (v: any): string | undefined => {
-  const s = v == null ? "" : String(v).trim();
+const normalizeYear = (v: unknown): string | undefined => {
+  const s = normalizeEpaModelYear(v);
   return s.length > 0 ? s : undefined;
 };
 
@@ -147,7 +148,7 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
           isExisting: true,
           vehicleType: entry.vehicle_type as string | undefined,
           fuelType: entry.fuel_type as string | undefined,
-          modelYear: (entry.model_year as string | undefined) ?? undefined,
+          modelYear: normalizeEpaModelYear(entry.model_year) || undefined,
           emissionSelection: (entry.emission_selection as EmissionSelection) ?? "ch4",
           distanceUnit: "mile",
           miles: entry.miles as number | undefined,
@@ -325,14 +326,16 @@ const OnRoadDieselAltFuelEmissions: React.FC<Props> = ({ onDataChange, onSaveAnd
     );
 
   const modelYearsFor = (vehicleType?: string, fuelType?: string) =>
-    Array.from(
-      new Set(
-        factors
-          .filter((f) => f.vehicleType === vehicleType && f.fuelType === fuelType)
-          .map((f) => f.modelYear)
-          .filter((v): v is string => !!v),
-      ),
-    ).sort((a, b) => a.localeCompare(b));
+    sortEpaModelYears(
+      Array.from(
+        new Set(
+          factors
+            .filter((f) => f.vehicleType === vehicleType && f.fuelType === fuelType)
+            .map((f) => f.modelYear)
+            .filter((v): v is string => !!v)
+        )
+      )
+    );
 
   const needsModelYear = (vehicleType?: string, fuelType?: string) => {
     if (!vehicleType || !fuelType) return false;

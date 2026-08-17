@@ -229,6 +229,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     // Motor vehicle loan specific fields
     total_value_at_origination: 0,
     total_vehicle_emissions: 0, // Auto-calculated from vehicle details (tCO2e)
+    vehicle_entries: [] as Array<Record<string, unknown>>,
     fuel_consumption: 0,
     fuel_consumption_unit: 'L',
     distance_traveled: 0,
@@ -1235,9 +1236,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       intensity_country_name: loanFormData.intensity_country_name || '',
       total_value_at_origination: loanFormData.total_value_at_origination || 0,
       total_vehicle_emissions: loanFormData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
+      vehicle_entries: (loanFormData.vehicle_entries as Array<Record<string, unknown>>) || [],
       fuel_consumption: smartConvertUnit(loanFormData.fuel_consumption || 0, loanFormData.fuel_consumption_unit),
       distance_traveled: loanFormData.distance_traveled || 0,
       efficiency: loanFormData.efficiency || 0,
+      emission_factor: loanFormData.emission_factor || 0,
       vehicle_emission_factor: smartConvertUnit(loanFormData.vehicle_emission_factor || 0, loanFormData.vehicle_emission_factor_unit),
       verified_emissions: smartConvertUnit(loanFormData.verified_emissions || 0, loanFormData.verified_emissionsUnit),
       unverified_emissions: smartConvertUnit(loanFormData.unverified_emissions || 0, loanFormData.unverified_emissionsUnit),
@@ -1596,9 +1599,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         // Add Motor Vehicle Loan specific fields
         total_value_at_origination: formData.total_value_at_origination || 0,
         total_vehicle_emissions: formData.total_vehicle_emissions || 0, // Already tCO2e from MotorVehicleLoanForm
+        vehicle_entries: (formData.vehicle_entries as Array<Record<string, unknown>>) || [],
         fuel_consumption: smartConvertUnit(formData.fuel_consumption || 0, formData.fuel_consumption_unit),
         distance_traveled: formData.distance_traveled || 0,
         efficiency: formData.efficiency || 0,
+        emission_factor: formData.emission_factor || 0,
         vehicle_emission_factor: smartConvertUnit(formData.vehicle_emission_factor || 0, formData.vehicle_emission_factor_unit),
         verified_emissions: smartConvertUnit(formData.verified_emissions || 0, formData.verified_emissionsUnit),
         unverified_emissions: smartConvertUnit(formData.unverified_emissions || 0, formData.unverified_emissionsUnit),
@@ -1984,6 +1989,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       // Motor vehicle loan fields (handled by MotorVehicleLoanForm)
       'total_value_at_origination',
       'total_vehicle_emissions', // Auto-calculated from vehicle details
+      'vehicle_entries',
       'fuel_consumption',
       'distance_traveled',
       'efficiency',

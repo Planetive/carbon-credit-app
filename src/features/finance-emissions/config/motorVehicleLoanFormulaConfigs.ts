@@ -4,18 +4,17 @@
  * PCAF Global GHG Accounting and Reporting Standard
  * Table 10.1-6: Motor vehicle loans — data needs and equations
  *
- * Attribution (all options): Outstanding amount / Total value at origination
- * Emission factor (all options): fuel-specific EF
- * - 1a (score 1): actual fuel consumption × EF
- * - 1b (score 1): actual distance × make/model efficiency × EF
- * - 2a (score 2): local statistical distance × make/model efficiency × EF
- * - 2b (score 3): regional statistical distance × make/model efficiency × EF
- * - 3a (score 4): statistical distance × vehicle-type efficiency × EF
- * - 3b (score 5): statistical distance × average-vehicle efficiency × EF
+ * Multi-vehicle: Σ_v (Outstanding_v / Value_v) × Emissions_v
+ * Single vehicle: same with one row.
  */
 
 import { FormulaConfig } from '../types/formula';
 import { COMMON_INPUTS } from './sharedFormulaUtils';
+import {
+  computeMotorVehiclePcafFinanced,
+  parseMotorVehicleEntries,
+  type MotorVehiclePcafEntry,
+} from '../utils/motorVehiclePcaf';
 
 const valueAtOriginationInput = {
   name: 'total_value_at_origination',
@@ -23,7 +22,15 @@ const valueAtOriginationInput = {
   type: 'number' as const,
   required: true,
   unit: 'PKR',
-  description: 'Vehicle value at the time the loan was originated',
+  description: 'Sum of vehicle values at origination (auto-calculated from vehicle rows)',
+};
+
+const vehicleEntriesInput = {
+  name: 'vehicle_entries',
+  label: 'Vehicle entries',
+  type: 'text' as const,
+  required: false,
+  description: 'Per-vehicle value, emissions, and optional outstanding (JSON)',
 };
 
 const fuelConsumptionInput = {
@@ -32,7 +39,7 @@ const fuelConsumptionInput = {
   type: 'number' as const,
   required: true,
   unit: 'L',
-  description: 'Primary data on actual vehicle fuel consumption',
+  description: 'Primary data on actual vehicle fuel consumption (aggregate fallback)',
 };
 
 const distanceInput = (label: string, description: string) => ({
@@ -59,7 +66,7 @@ const emissionFactorInput = {
   type: 'number' as const,
   required: true,
   unit: 'tCO2e/L',
-  description: 'Emission factor specific to the fuel type',
+  description: 'Emission factor specific to the fuel type (aggregate fallback)',
 };
 
 const totalVehicleEmissionsInput = {
@@ -71,24 +78,130 @@ const totalVehicleEmissionsInput = {
   description: 'Aggregated vehicle emissions from the vehicle form',
 };
 
-const attribution = (outstanding: number, value: number) => {
-  if (!value) throw new Error('Total value at origination must be greater than 0');
-  return outstanding / value;
-};
-
 const num = (v: unknown) => Number(v || 0);
 
-const resolveFuelEmissions = (inputs: Record<string, unknown>) => {
-  const aggregated = num(inputs.total_vehicle_emissions);
-  if (aggregated > 0) return aggregated;
-  return num(inputs.fuel_consumption) * num(inputs.emission_factor);
-};
+function resolveVehicleRows(inputs: Record<string, unknown>): MotorVehiclePcafEntry[] {
+  const parsed = parseMotorVehicleEntries(inputs.vehicle_entries);
+  if (parsed.length > 0) return parsed;
+  const emissions = num(inputs.total_vehicle_emissions);
+  const value = num(inputs.total_value_at_origination);
+  if (emissions > 0 && value > 0) {
+    return [
+      {
+        id: 'single',
+        name: 'Vehicle 1',
+        value_at_origination: value,
+        emissions_tco2e: emissions,
+        fuel_consumption: num(inputs.fuel_consumption) || undefined,
+        distance_traveled: num(inputs.distance_traveled) || undefined,
+        efficiency: num(inputs.efficiency) || undefined,
+        emission_factor: num(inputs.emission_factor) || undefined,
+      },
+    ];
+  }
+  return [];
+}
 
-const resolveDistanceEmissions = (inputs: Record<string, unknown>) => {
+function resolveLegacyVehicleEmissions(inputs: Record<string, unknown>, fuelPath: boolean): number {
   const aggregated = num(inputs.total_vehicle_emissions);
   if (aggregated > 0) return aggregated;
+  if (fuelPath) {
+    return num(inputs.fuel_consumption) * num(inputs.emission_factor);
+  }
   return num(inputs.distance_traveled) * num(inputs.efficiency) * num(inputs.emission_factor);
-};
+}
+
+function runMotorVehicleCalculation(
+  inputs: Record<string, unknown>,
+  companyType: string,
+  optionCode: string,
+  dataQualityScore: number,
+  methodology: string,
+  formulaNote: string,
+  fuelPath: boolean
+) {
+  const outstandingAmount = num(inputs.outstanding_amount);
+  let vehicles = resolveVehicleRows(inputs);
+
+  if (vehicles.length === 0) {
+    const legacyEmissions = resolveLegacyVehicleEmissions(inputs, fuelPath);
+    const value = num(inputs.total_value_at_origination);
+    if (legacyEmissions > 0 && value > 0) {
+      vehicles = [
+        {
+          id: 'legacy',
+          name: 'Vehicle 1',
+          value_at_origination: value,
+          emissions_tco2e: legacyEmissions,
+        },
+      ];
+    }
+  }
+
+  if (vehicles.length === 0) {
+    throw new Error(
+      fuelPath
+        ? 'Add at least one vehicle with fuel data and value at origination.'
+        : 'Add at least one vehicle with distance, efficiency, and value at origination.'
+    );
+  }
+
+  if (vehicles.some((v) => v.value_at_origination <= 0)) {
+    throw new Error('Each vehicle must have a value at origination greater than 0.');
+  }
+
+  if (vehicles.some((v) => v.emissions_tco2e <= 0)) {
+    throw new Error('Each vehicle must have emissions greater than 0.');
+  }
+
+  if (outstandingAmount <= 0) {
+    throw new Error('Outstanding loan amount must be greater than 0.');
+  }
+
+  const pcaf = computeMotorVehiclePcafFinanced(outstandingAmount, vehicles);
+
+  const calculationSteps = [
+    {
+      step: 'Total value at origination',
+      value: pcaf.totalValueAtOrigination,
+      formula: `Σ Value_v = ${pcaf.totalValueAtOrigination.toFixed(2)} PKR`,
+    },
+    ...pcaf.vehicleResults.map((vr) => ({
+      step: `${vr.name} — attribution`,
+      value: vr.attributionFactor,
+      formula: `${vr.outstandingAllocated.toFixed(2)} / ${vr.valueAtOrigination.toFixed(2)} = ${vr.attributionFactor.toFixed(6)}`,
+    })),
+    ...pcaf.vehicleResults.map((vr) => ({
+      step: `${vr.name} — financed`,
+      value: vr.financedEmissions,
+      formula: vr.formula,
+    })),
+    {
+      step: 'Total financed emissions',
+      value: pcaf.totalFinancedEmissions,
+      formula: `Σ_v (Outstanding_v / Value_v) × Emissions_v = ${pcaf.totalFinancedEmissions.toFixed(6)} tCO2e`,
+    },
+  ];
+
+  return {
+    attributionFactor: pcaf.displayAttributionFactor,
+    emissionFactor: pcaf.totalVehicleEmissions,
+    financedEmissions: pcaf.totalFinancedEmissions,
+    dataQualityScore,
+    methodology,
+    calculationSteps,
+    metadata: {
+      companyType,
+      optionCode,
+      category: 'motor_vehicle_loan',
+      totalValueAtOrigination: pcaf.totalValueAtOrigination,
+      totalVehicleEmissions: pcaf.totalVehicleEmissions,
+      vehicleCount: vehicles.length,
+      vehicleResults: pcaf.vehicleResults,
+      formula: formulaNote,
+    },
+  };
+}
 
 const buildFuelOption = (
   id: string,
@@ -108,62 +221,14 @@ const buildFuelOption = (
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     valueAtOriginationInput,
+    vehicleEntriesInput,
     fuelConsumptionInput,
     emissionFactorInput,
     totalVehicleEmissionsInput,
   ],
-  calculate: (inputs, companyType) => {
-    const outstandingAmount = num(inputs.outstanding_amount);
-    const totalValueAtOrigination = num(inputs.total_value_at_origination);
-    const fuelConsumption = num(inputs.fuel_consumption);
-    const emissionFactor = num(inputs.emission_factor);
-    const attributionFactor = attribution(outstandingAmount, totalValueAtOrigination);
-    const vehicleEmissions = resolveFuelEmissions(inputs);
-    if (!vehicleEmissions) {
-      throw new Error('Enter actual fuel consumption and a fuel emission factor.');
-    }
-    const financedEmissions = attributionFactor * vehicleEmissions;
-    return {
-      attributionFactor,
-      emissionFactor: vehicleEmissions,
-      financedEmissions,
-      dataQualityScore,
-      methodology,
-      calculationSteps: [
-        {
-          step: 'Total Value at Origination',
-          value: totalValueAtOrigination,
-          formula: `Total Value at Origination = ${totalValueAtOrigination.toFixed(2)} PKR`,
-        },
-        {
-          step: 'Attribution Factor',
-          value: attributionFactor,
-          formula: `${outstandingAmount} / ${totalValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`,
-        },
-        {
-          step: 'Vehicle Emissions',
-          value: vehicleEmissions,
-          formula: `${fuelConsumption || vehicleEmissions} × ${emissionFactor || 1} = ${vehicleEmissions.toFixed(6)} tCO2e`,
-        },
-        {
-          step: 'Financed Emissions',
-          value: financedEmissions,
-          formula: `${attributionFactor.toFixed(6)} × ${vehicleEmissions.toFixed(6)} = ${financedEmissions.toFixed(6)} tCO2e`,
-        },
-      ],
-      metadata: {
-        companyType,
-        optionCode,
-        category: 'motor_vehicle_loan',
-        totalValueAtOrigination,
-        fuelConsumption,
-        emissionFactor,
-        vehicleEmissions,
-        formula: formulaNote,
-      },
-    };
-  },
-  notes: [formulaNote],
+  calculate: (inputs, companyType) =>
+    runMotorVehicleCalculation(inputs, companyType, optionCode, dataQualityScore, methodology, formulaNote, true),
+  notes: [formulaNote, 'Multi-vehicle: Σ (Outstanding_v / Value_v) × Fuel_v × EF_f'],
 });
 
 const buildDistanceOption = (
@@ -187,65 +252,15 @@ const buildDistanceOption = (
   inputs: [
     COMMON_INPUTS.outstanding_amount,
     valueAtOriginationInput,
+    vehicleEntriesInput,
     distanceInput(distanceLabel, distanceDescription),
     efficiencyInput(efficiencyDescription),
     emissionFactorInput,
     totalVehicleEmissionsInput,
   ],
-  calculate: (inputs, companyType) => {
-    const outstandingAmount = num(inputs.outstanding_amount);
-    const totalValueAtOrigination = num(inputs.total_value_at_origination);
-    const distanceTraveled = num(inputs.distance_traveled);
-    const efficiency = num(inputs.efficiency);
-    const emissionFactor = num(inputs.emission_factor);
-    const attributionFactor = attribution(outstandingAmount, totalValueAtOrigination);
-    const vehicleEmissions = resolveDistanceEmissions(inputs);
-    if (!vehicleEmissions) {
-      throw new Error('Enter distance, fuel efficiency, and a fuel emission factor.');
-    }
-    const financedEmissions = attributionFactor * vehicleEmissions;
-    return {
-      attributionFactor,
-      emissionFactor: vehicleEmissions,
-      financedEmissions,
-      dataQualityScore,
-      methodology,
-      calculationSteps: [
-        {
-          step: 'Total Value at Origination',
-          value: totalValueAtOrigination,
-          formula: `Total Value at Origination = ${totalValueAtOrigination.toFixed(2)} PKR`,
-        },
-        {
-          step: 'Attribution Factor',
-          value: attributionFactor,
-          formula: `${outstandingAmount} / ${totalValueAtOrigination.toFixed(2)} = ${attributionFactor.toFixed(6)}`,
-        },
-        {
-          step: 'Vehicle Emissions',
-          value: vehicleEmissions,
-          formula: `${distanceTraveled} × ${efficiency} × ${emissionFactor} = ${vehicleEmissions.toFixed(6)} tCO2e`,
-        },
-        {
-          step: 'Financed Emissions',
-          value: financedEmissions,
-          formula: `${attributionFactor.toFixed(6)} × ${vehicleEmissions.toFixed(6)} = ${financedEmissions.toFixed(6)} tCO2e`,
-        },
-      ],
-      metadata: {
-        companyType,
-        optionCode,
-        category: 'motor_vehicle_loan',
-        totalValueAtOrigination,
-        distanceTraveled,
-        efficiency,
-        emissionFactor,
-        vehicleEmissions,
-        formula: formulaNote,
-      },
-    };
-  },
-  notes: [formulaNote],
+  calculate: (inputs, companyType) =>
+    runMotorVehicleCalculation(inputs, companyType, optionCode, dataQualityScore, methodology, formulaNote, false),
+  notes: [formulaNote, 'Multi-vehicle: Σ (Outstanding_v / Value_v) × Distance_v × Efficiency_v × EF_f'],
 });
 
 export const OPTION_1A_MOTOR_VEHICLE = buildFuelOption(
@@ -255,7 +270,7 @@ export const OPTION_1A_MOTOR_VEHICLE = buildFuelOption(
   '1a',
   1,
   'PCAF Option 1a - Actual Vehicle Fuel Consumption (Motor Vehicle Loan)',
-  'Σ (Outstanding / Value at origination) × Fuel consumption × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Fuel_v × EF_f'
 );
 
 export const OPTION_1B_MOTOR_VEHICLE = buildDistanceOption(
@@ -268,7 +283,7 @@ export const OPTION_1B_MOTOR_VEHICLE = buildDistanceOption(
   'Actual Distance Traveled',
   'Primary data on actual vehicle distance traveled',
   'Fuel efficiency from known vehicle make and model',
-  'Σ (Outstanding / Value at origination) × Distance × Efficiency × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_v,f × EF_f'
 );
 
 export const OPTION_2A_MOTOR_VEHICLE = buildDistanceOption(
@@ -281,7 +296,7 @@ export const OPTION_2A_MOTOR_VEHICLE = buildDistanceOption(
   'Local Statistical Distance',
   'Local statistical data for distance traveled',
   'Fuel efficiency from known vehicle make and model',
-  'Σ (Outstanding / Value at origination) × Local distance × Efficiency × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Distance_l,v × Efficiency_v,f × EF_f'
 );
 
 export const OPTION_2B_MOTOR_VEHICLE = buildDistanceOption(
@@ -294,7 +309,7 @@ export const OPTION_2B_MOTOR_VEHICLE = buildDistanceOption(
   'Regional Statistical Distance',
   'Regional statistical data for distance traveled',
   'Fuel efficiency from known vehicle make and model',
-  'Σ (Outstanding / Value at origination) × Regional distance × Efficiency × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Distance_r,v × Efficiency_v,f × EF_f'
 );
 
 export const OPTION_3A_MOTOR_VEHICLE = buildDistanceOption(
@@ -307,7 +322,7 @@ export const OPTION_3A_MOTOR_VEHICLE = buildDistanceOption(
   'Statistical Distance',
   'Local or regional statistical data for distance traveled',
   'Fuel efficiency from known vehicle type',
-  'Σ (Outstanding / Value at origination) × Statistical distance × Type efficiency × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Distance_s,v × Efficiency_t,f × EF_f'
 );
 
 export const OPTION_3B_MOTOR_VEHICLE = buildDistanceOption(
@@ -320,7 +335,7 @@ export const OPTION_3B_MOTOR_VEHICLE = buildDistanceOption(
   'Statistical Distance',
   'Local or regional statistical data for distance traveled',
   'Fuel efficiency from an average vehicle',
-  'Σ (Outstanding / Value at origination) × Statistical distance × Average efficiency × Fuel EF'
+  'Σ_v (Outstanding_v / Value_v) × Distance_s,v × Efficiency_a,f × EF_f'
 );
 
 export const MOTOR_VEHICLE_LOAN_FORMULAS = [

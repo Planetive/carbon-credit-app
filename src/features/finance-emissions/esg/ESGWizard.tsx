@@ -46,12 +46,12 @@ const BOND_FAMILY = ['corporate-bond', 'business-loan', 'project-finance'];
 const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
 
 const VEHICLE_METHODS = [
-  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'Primary fuel use × EPA Mobile Combustion or DEFRA UK fuel factor' },
-  { id: '1b', title: 'Actual distance + make/model efficiency', score: 'Score 1', description: 'Actual distance × EPA fuel factor (or DEFRA passenger vehicle factor)' },
-  { id: '2a', title: 'Local distance statistics', score: 'Score 2', description: 'Local statistical distance × EPA/DEFRA vehicle factor' },
-  { id: '2b', title: 'Regional distance statistics', score: 'Score 3', description: 'Regional statistical distance × EPA/DEFRA vehicle factor' },
-  { id: '3a', title: 'Vehicle-type efficiency', score: 'Score 4', description: 'Statistical distance × vehicle-type EPA/DEFRA factor' },
-  { id: '3b', title: 'Average vehicle efficiency', score: 'Score 5', description: 'Statistical distance × average-vehicle EPA/DEFRA factor' },
+  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'EPA Mobile Fuel, Non-Road, or Vehicular Footprints — DEFRA passenger/delivery distance factors' },
+  { id: '1b', title: 'Actual distance + make/model efficiency', score: 'Score 1', description: 'EPA On-Road Gasoline/Diesel make & model — DEFRA passenger/delivery' },
+  { id: '2a', title: 'Local distance statistics', score: 'Score 2', description: 'Local statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
+  { id: '2b', title: 'Regional distance statistics', score: 'Score 3', description: 'Regional statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
+  { id: '3a', title: 'Vehicle-type efficiency', score: 'Score 4', description: 'Statistical distance × EPA mobile fuel or DEFRA vehicle-type factor' },
+  { id: '3b', title: 'Average vehicle efficiency', score: 'Score 5', description: 'Statistical distance × EPA average or DEFRA passenger/delivery factor' },
 ];
 
 const PROPERTY_METHODS = [
