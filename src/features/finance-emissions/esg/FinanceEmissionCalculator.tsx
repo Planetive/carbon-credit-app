@@ -555,8 +555,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     
     // Handle Motor Vehicle Loan formulas — always by method card (Table 10.1-6)
     if (isMotorVehicleLoan) {
-      const allowed = ['1a', '1b', '2a', '2b', '3a', '3b'];
-      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
+      const allowed = ['1a', '2a', '2b', '3a', '3b'];
+      const requested = propCalculationMethod === '1b' ? '1a' : propCalculationMethod;
+      const method = allowed.includes(requested) ? requested : null;
       return MOTOR_VEHICLE_LOAN_FORMULAS.filter(
         (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
       );

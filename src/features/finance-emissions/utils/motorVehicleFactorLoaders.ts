@@ -1,6 +1,7 @@
 /**
- * EPA (5 mobile/vehicle tables) + DEFRA (passenger & delivery only) factor loaders
- * for motor vehicle loan finance emissions.
+ * EPA + DEFRA factor loaders for motor vehicle loan finance emissions.
+ * Score 1 (1a): EPA Mobile Fuel / DEFRA Scope 1 Fuel.
+ * Options 2a–3b: EPA on-road/mobile/non-road; DEFRA passenger + delivery.
  */
 
 import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
@@ -11,6 +12,11 @@ import {
 } from "@/components/emissions/shared/ukPassengerFactors";
 import { fetchUkDeliveryFactorsMap, type UkDeliveryFactorsMap } from "@/components/emissions/shared/ukDeliveryFactors";
 import { normalizeEpaModelYear } from "@/components/emissions/shared/epaModelYear";
+import {
+  loadUkFuelFactors,
+  ukFactorsToNumericMap,
+  type NestedFactorMap,
+} from "./pcafFactorLoaders";
 
 export type EpaVehicleSource =
   | "mobile_combustion"
@@ -19,7 +25,7 @@ export type EpaVehicleSource =
   | "non_road"
   | "vehicular_footprint";
 
-export type DefraVehicleSource = "passenger" | "delivery";
+export type DefraVehicleSource = "passenger" | "delivery" | "fuel";
 
 export type VehicleSource = EpaVehicleSource | DefraVehicleSource;
 
@@ -34,6 +40,7 @@ export const EPA_SOURCE_LABELS: Record<EpaVehicleSource, string> = {
 export const DEFRA_SOURCE_LABELS: Record<DefraVehicleSource, string> = {
   passenger: "Passenger Vehicle",
   delivery: "Delivery Vehicle",
+  fuel: "Scope 1 Fuel",
 };
 
 export type EpaMobileFuelOption = { fuelType: string; unit: string; factorKg: number };
@@ -83,6 +90,7 @@ export type MotorVehicleFactorLibraries = {
   passengerMap: UkPassengerFactorsMap;
   passengerTypeDescriptions: UkPassengerTypeDescriptions;
   deliveryMap: UkDeliveryFactorsMap;
+  ukFuelMap: NestedFactorMap;
 };
 
 const DEFAULT_VEHICULAR: VehicularFootprintFactors = { dieselKgPerL: 2.7, petrolKgPerL: 2.32 };
@@ -126,13 +134,47 @@ const toFactorPerLiter = (row: Record<string, unknown>): number | null => {
 
 export function epaSourcesForPcafOption(optionCode: string | undefined, fuelPath: boolean): EpaVehicleSource[] {
   if (fuelPath || optionCode === "1a") {
-    return ["mobile_combustion", "non_road", "vehicular_footprint"];
+    return ["mobile_combustion"];
   }
   return ["on_road_gasoline", "on_road_diesel", "mobile_combustion", "non_road"];
 }
 
+export function defraSourcesForPcafOption(optionCode: string | undefined, fuelPath: boolean): DefraVehicleSource[] {
+  if (fuelPath || optionCode === "1a") {
+    return ["fuel"];
+  }
+  return ["passenger", "delivery"];
+}
+
 export function defraSources(): DefraVehicleSource[] {
   return ["passenger", "delivery"];
+}
+
+/** Score 1 (Option 1a) Mobile Fuel — CNG, LPG, LNG, and diesel only. */
+export function isScore1aMobileFuel(fuelType: string): boolean {
+  const t = fuelType.toLowerCase();
+  if (t.includes("biodiesel")) return false;
+  return (
+    /\bcng\b/.test(t) ||
+    t.includes("compressed natural") ||
+    /\blpg\b/.test(t) ||
+    t.includes("liquefied petroleum") ||
+    /\blng\b/.test(t) ||
+    t.includes("liquefied natural") ||
+    /\bdiesel\b/.test(t)
+  );
+}
+
+/** Score 1 DEFRA Scope 1 Fuel — mineral petrol, mineral diesel, CNG, LPG only. */
+export function isScore1aDefraFuel(fuel: string): boolean {
+  const t = fuel.trim().toLowerCase().replace(/\s+/g, " ");
+  if (t === "petrol (100% mineral petrol)" || (t.includes("100%") && t.includes("mineral petrol"))) {
+    return true;
+  }
+  if (t === "diesel (100% mineral diesel)" || (t.includes("100%") && t.includes("mineral diesel"))) {
+    return true;
+  }
+  return t === "cng" || t === "lpg";
 }
 
 export async function loadMotorVehicleFactorLibraries(
@@ -147,18 +189,23 @@ export async function loadMotorVehicleFactorLibraries(
     passengerMap: {},
     passengerTypeDescriptions: {},
     deliveryMap: {},
+    ukFuelMap: {},
   };
 
   if (factorLibrary === "DEFRA") {
-    const [passenger, delivery] = await Promise.all([
+    const [passenger, delivery, ukFuel] = await Promise.all([
       fetchUkPassengerFactorsMap(),
       fetchUkDeliveryFactorsMap(),
+      loadUkFuelFactors(),
     ]);
+    const ukFuelMap = ukFactorsToNumericMap(ukFuel);
     const error =
       passenger.error ||
       delivery.error ||
-      (Object.keys(passenger.map).length === 0 && Object.keys(delivery.map).length === 0
-        ? "Could not load DEFRA passenger or delivery vehicle factors."
+      (Object.keys(passenger.map).length === 0 &&
+      Object.keys(delivery.map).length === 0 &&
+      Object.keys(ukFuelMap).length === 0
+        ? "Could not load DEFRA passenger, delivery, or Scope 1 Fuel factors."
         : null);
     return {
       libs: {
@@ -166,6 +213,7 @@ export async function loadMotorVehicleFactorLibraries(
         passengerMap: passenger.map,
         passengerTypeDescriptions: passenger.typeDescriptions,
         deliveryMap: delivery.map,
+        ukFuelMap,
       },
       error,
     };
@@ -304,6 +352,7 @@ export async function loadMotorVehicleFactorLibraries(
       passengerMap: {},
       passengerTypeDescriptions: {},
       deliveryMap: {},
+      ukFuelMap: {},
     },
     error,
   };

@@ -26,8 +26,10 @@ import { normalizeEpaModelYear, sortEpaModelYears } from "@/components/emissions
 import {
   DEFRA_SOURCE_LABELS,
   EPA_SOURCE_LABELS,
-  defraSources,
+  defraSourcesForPcafOption,
   epaSourcesForPcafOption,
+  isScore1aDefraFuel,
+  isScore1aMobileFuel,
   loadMotorVehicleFactorLibraries,
   type DefraVehicleSource,
   type EpaVehicleSource,
@@ -63,6 +65,7 @@ interface VehicleEntry {
   emissionSelection: OnRoadEmissionSelection;
   distanceUnit: DistanceUnit;
   nonRoadUnit: NonRoadUnit;
+  inputUnit: "gallon" | "liter";
   distance: number;
   fuelConsumption: number;
   dieselLitres: number;
@@ -103,13 +106,15 @@ const distanceLabelFor = (formula: FormulaConfig | null) => {
 };
 
 const defaultSource = (lib: FactorLibrary, fuelPath: boolean, optionCode?: string): VehicleSource => {
-  if (lib === "DEFRA") return "passenger";
+  if (lib === "DEFRA") return defraSourcesForPcafOption(optionCode, fuelPath)[0] ?? "passenger";
   return epaSourcesForPcafOption(optionCode, fuelPath)[0] ?? "mobile_combustion";
 };
 
 const factorDatasetFor = (lib: FactorLibrary, source: VehicleSource) => {
   if (lib === "DEFRA") {
-    return source === "delivery" ? "uk_delivery_factors" : "uk_passenger_factors";
+    if (source === "delivery") return "uk_delivery_factors";
+    if (source === "fuel") return "uk_fuel_factors";
+    return "uk_passenger_factors";
   }
   switch (source) {
     case "on_road_gasoline":
@@ -125,7 +130,8 @@ const factorDatasetFor = (lib: FactorLibrary, source: VehicleSource) => {
   }
 };
 
-const isDefraSource = (source: VehicleSource) => source === "passenger" || source === "delivery";
+const isDefraSource = (source: VehicleSource) =>
+  source === "passenger" || source === "delivery" || source === "fuel";
 
 const entryMatchesLibrary = (entry: VehicleEntry, lib: FactorLibrary) =>
   lib === "DEFRA" ? isDefraSource(entry.vehicleSource) : !isDefraSource(entry.vehicleSource);
@@ -156,7 +162,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   } | null>(null);
 
   const availableSources = useMemo((): VehicleSource[] => {
-    if (activeLibrary === "DEFRA") return defraSources();
+    if (activeLibrary === "DEFRA") return defraSourcesForPcafOption(selectedFormula?.optionCode, fuelPath);
     return epaSourcesForPcafOption(selectedFormula?.optionCode, fuelPath);
   }, [activeLibrary, selectedFormula?.optionCode, fuelPath]);
 
@@ -205,10 +211,23 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     () => Object.keys(libs?.deliveryMap ?? {}).sort((a, b) => a.localeCompare(b)),
     [libs]
   );
-  const epaFuelTypes = useMemo(
-    () => Array.from(new Set((libs?.mobileFuels ?? []).map((f) => f.fuelType))).sort((a, b) => a.localeCompare(b)),
-    [libs]
-  );
+  const ukFuelActivities = useMemo(() => {
+    const map = libs?.ukFuelMap ?? {};
+    return Object.keys(map)
+      .filter((activity) => Object.keys(map[activity] || {}).some(isScore1aDefraFuel))
+      .sort((a, b) => a.localeCompare(b));
+  }, [libs]);
+  const ukFuelFuelsFor = (activity: string) =>
+    Object.keys(libs?.ukFuelMap[activity] ?? {})
+      .filter(isScore1aDefraFuel)
+      .sort((a, b) => a.localeCompare(b));
+  const ukFuelUnitsFor = (activity: string, fuel: string) =>
+    Object.keys(libs?.ukFuelMap[activity]?.[fuel] ?? {}).sort((a, b) => a.localeCompare(b));
+  const epaFuelTypes = useMemo(() => {
+    const all = Array.from(new Set((libs?.mobileFuels ?? []).map((f) => f.fuelType)));
+    const filtered = fuelPath ? all.filter(isScore1aMobileFuel) : all;
+    return filtered.sort((a, b) => a.localeCompare(b));
+  }, [libs, fuelPath]);
   const gasolineTypes = useMemo(
     () => Array.from(new Set((libs?.onRoadGasoline ?? []).map((f) => f.vehicleType))).sort((a, b) => a.localeCompare(b)),
     [libs]
@@ -270,23 +289,54 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   const applyDerived = useCallback(
     (entry: VehicleEntry): VehicleEntry => {
       if (!libs) return entry;
-      const derived = computeMotorVehicleEntryEmissions(entry, libs, {
+      let next = entry;
+      if (fuelPath && activeLibrary === "EPA" && next.vehicleSource !== "mobile_combustion") {
+        next = { ...next, vehicleSource: "mobile_combustion", inputUnit: next.inputUnit || "gallon" };
+      }
+      if (fuelPath && activeLibrary === "DEFRA" && next.vehicleSource !== "fuel") {
+        next = { ...next, vehicleSource: "fuel" };
+      }
+      if (fuelPath && next.vehicleSource === "mobile_combustion") {
+        const allowed = (libs.mobileFuels ?? []).map((f) => f.fuelType).filter(isScore1aMobileFuel);
+        if (allowed.length > 0 && !allowed.includes(next.fuelType)) {
+          const fuelType = allowed[0];
+          const opt = libs.mobileFuels.find((f) => f.fuelType === fuelType);
+          next = {
+            ...next,
+            fuelType,
+            unit: opt?.unit || next.unit,
+            inputUnit: (opt?.unit || "").toLowerCase().includes("gallon") ? next.inputUnit || "gallon" : next.inputUnit,
+          };
+        }
+      }
+      if (fuelPath && next.vehicleSource === "fuel") {
+        const activity =
+          next.activity && ukFuelActivities.includes(next.activity) ? next.activity : ukFuelActivities[0] || "";
+        const fuels = ukFuelFuelsFor(activity);
+        const fuelType = fuels.includes(next.fuelType) ? next.fuelType : fuels[0] || "";
+        const units = ukFuelUnitsFor(activity, fuelType);
+        const unit = units.includes(next.unit) ? next.unit : units[0] || "";
+        if (activity !== next.activity || fuelType !== next.fuelType || unit !== next.unit) {
+          next = { ...next, activity, fuelType, unit };
+        }
+      }
+      const derived = computeMotorVehicleEntryEmissions(next, libs, {
         fuelPath,
         typeEfficiencyPath,
         averageEfficiencyPath,
       });
       return {
-        ...entry,
-        modelYear: normalizeEpaModelYear(entry.modelYear),
+        ...next,
+        modelYear: normalizeEpaModelYear(next.modelYear),
         efficiency: derived.efficiency,
         factorKg: derived.factorKg,
         factor: derived.factor,
         emissions: derived.emissions,
         formulaHint: derived.formulaHint,
-        unit: derived.unit || entry.unit,
+        unit: derived.unit || next.unit,
       };
     },
-    [libs, fuelPath, typeEfficiencyPath, averageEfficiencyPath]
+    [libs, fuelPath, typeEfficiencyPath, averageEfficiencyPath, activeLibrary, ukFuelActivities]
   );
 
   const pushTotals = (entries: VehicleEntry[]) => {
@@ -368,6 +418,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       emissionSelection: "co2e",
       distanceUnit: "mile",
       nonRoadUnit: "gallon",
+      inputUnit: "gallon",
       distance: 0,
       fuelConsumption: 0,
       dieselLitres: 0,
@@ -382,23 +433,30 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     };
 
     if (lib === "DEFRA") {
-      const activities = source === "delivery" ? deliveryActivities : passengerActivities;
-      draft.activity = activities[0] || "";
-      if (source === "passenger" && draft.activity) {
-        draft.vehicleType = passengerTypesFor(draft.activity)[0] || "";
-        draft.unit = passengerUnitsFor(draft.activity, draft.vehicleType)[0] || "km";
-        draft.fuelType = passengerFuelsFor(draft.activity, draft.vehicleType, draft.unit)[0] || "";
-      }
-      if (source === "delivery" && draft.activity) {
-        draft.vehicleType = deliveryTypesFor(draft.activity)[0] || "";
-        draft.unit = deliveryUnitsFor(draft.activity, draft.vehicleType)[0] || "km";
-        draft.fuelType = deliveryFuelsFor(draft.activity, draft.vehicleType, draft.unit)[0] || "";
-        draft.ladenLevel =
-          deliveryLadenFor(draft.activity, draft.vehicleType, draft.unit, draft.fuelType)[0] || "";
+      if (source === "fuel") {
+        draft.activity = ukFuelActivities[0] || "";
+        draft.fuelType = ukFuelFuelsFor(draft.activity)[0] || "";
+        draft.unit = ukFuelUnitsFor(draft.activity, draft.fuelType)[0] || "";
+      } else {
+        const activities = source === "delivery" ? deliveryActivities : passengerActivities;
+        draft.activity = activities[0] || "";
+        if (source === "passenger" && draft.activity) {
+          draft.vehicleType = passengerTypesFor(draft.activity)[0] || "";
+          draft.unit = passengerUnitsFor(draft.activity, draft.vehicleType)[0] || "km";
+          draft.fuelType = passengerFuelsFor(draft.activity, draft.vehicleType, draft.unit)[0] || "";
+        }
+        if (source === "delivery" && draft.activity) {
+          draft.vehicleType = deliveryTypesFor(draft.activity)[0] || "";
+          draft.unit = deliveryUnitsFor(draft.activity, draft.vehicleType)[0] || "km";
+          draft.fuelType = deliveryFuelsFor(draft.activity, draft.vehicleType, draft.unit)[0] || "";
+          draft.ladenLevel =
+            deliveryLadenFor(draft.activity, draft.vehicleType, draft.unit, draft.fuelType)[0] || "";
+        }
       }
     } else if (source === "mobile_combustion" && epaFuelTypes[0]) {
       draft.fuelType = epaFuelTypes[0];
       draft.unit = libs?.mobileFuels.find((f) => f.fuelType === epaFuelTypes[0])?.unit || "gallon";
+      draft.inputUnit = (draft.unit || "").toLowerCase().includes("gallon") ? "gallon" : "gallon";
     } else if (source === "on_road_gasoline" && gasolineTypes[0]) {
       draft.vehicleType = gasolineTypes[0];
       draft.modelYear = gasolineYearsFor(gasolineTypes[0])[0] || "";
@@ -428,6 +486,14 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
 
   const cascadeDefra = (entry: VehicleEntry, field: keyof VehicleEntry, value: unknown): VehicleEntry => {
     const next = { ...entry, [field]: value } as VehicleEntry;
+    if (entry.vehicleSource === "fuel") {
+      if (field === "activity") {
+        next.fuelType = ukFuelFuelsFor(String(value))[0] || "";
+        next.unit = ukFuelUnitsFor(String(value), next.fuelType)[0] || "";
+      } else if (field === "fuelType") {
+        next.unit = ukFuelUnitsFor(next.activity, String(value))[0] || "";
+      }
+    }
     if (entry.vehicleSource === "passenger") {
       if (field === "activity") {
         next.vehicleType = passengerTypesFor(String(value))[0] || "";
@@ -466,7 +532,11 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   const cascadeEpa = (entry: VehicleEntry, field: keyof VehicleEntry, value: unknown): VehicleEntry => {
     const next = { ...entry, [field]: value } as VehicleEntry;
     if (entry.vehicleSource === "mobile_combustion" && field === "fuelType") {
-      next.unit = libs?.mobileFuels.find((f) => f.fuelType === String(value))?.unit || next.unit;
+      const opt = libs?.mobileFuels.find((f) => f.fuelType === String(value));
+      next.unit = opt?.unit || next.unit;
+      if ((next.unit || "").toLowerCase().includes("gallon")) {
+        next.inputUnit = next.inputUnit || "gallon";
+      }
     }
     if (entry.vehicleSource === "on_road_gasoline" && field === "vehicleType") {
       next.modelYear = gasolineYearsFor(String(value))[0] || "";
@@ -517,7 +587,10 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
 
   useEffect(() => {
     if (!libraryReady || !libs || vehicleEntries.length === 0) return;
-    if (vehicleEntries.every((e) => entryMatchesLibrary(e, activeLibrary))) return;
+    const sourcesOk = vehicleEntries.every(
+      (e) => entryMatchesLibrary(e, activeLibrary) && availableSources.includes(e.vehicleSource)
+    );
+    if (sourcesOk) return;
 
     const reset = vehicleEntries.map((e, i) => {
       const fresh = blankEntry(i + 1, undefined, activeLibrary);
@@ -532,7 +605,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     setVehicleEntries(reset);
     pushTotals(reset);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild rows after EPA/DEFRA datasets load
-  }, [libraryReady, libs, activeLibrary]);
+  }, [libraryReady, libs, activeLibrary, fuelPath, availableSources]);
 
   const efficiencyLocked =
     typeEfficiencyPath || averageEfficiencyPath;
@@ -557,16 +630,122 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
 
   const sectionDescription =
     activeLibrary === "DEFRA"
-      ? "DEFRA passenger or delivery vehicles — distance × UK factor"
+      ? fuelPath
+        ? "DEFRA Scope 1 Fuel — mineral petrol, mineral diesel, CNG, or LPG"
+        : "DEFRA passenger or delivery vehicles — distance × UK factor"
       : fuelPath
-        ? "EPA Mobile Fuel, Non-Road, or Vehicular Carbon Footprints"
+        ? "EPA Mobile Fuel — actual consumption in gallons or liters"
         : "EPA On-Road Gasoline/Diesel, Mobile Fuel, or Non-Road";
 
   const renderDefraFields = (entry: VehicleEntry) => {
+    const showSourcePicker = availableSources.length > 1;
+    if (entry.vehicleSource === "fuel") {
+      return (
+        <>
+          {showSourcePicker && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Data source</Label>
+              <Select
+                value={entry.vehicleSource}
+                onValueChange={(v) => updateVehicleEntry(entry.id, "vehicleSource", v as VehicleSource)}
+                disabled={libraryLocked}
+              >
+                <SelectTrigger className={FIELD_INPUT}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSources.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {DEFRA_SOURCE_LABELS[s as DefraVehicleSource]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Activity</Label>
+            <Select
+              value={entry.activity || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "activity", v)}
+              disabled={libraryLocked}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Select activity" />
+              </SelectTrigger>
+              <SelectContent>
+                {ukFuelActivities.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Fuel</Label>
+            <Select
+              value={entry.fuelType || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
+              disabled={libraryLocked || !entry.activity}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Select fuel" />
+              </SelectTrigger>
+              <SelectContent>
+                {ukFuelFuelsFor(entry.activity).map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Unit</Label>
+            <Select
+              value={entry.unit || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "unit", v)}
+              disabled={libraryLocked || !entry.fuelType}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {ukFuelUnitsFor(entry.activity, entry.fuelType).map((u) => (
+                  <SelectItem key={u} value={u}>
+                    {u}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Actual fuel consumption ({entry.unit || "unit"})</Label>
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={entry.fuelConsumption || ""}
+              onChange={(e) =>
+                updateVehicleEntry(entry.id, "fuelConsumption", parseFloat(e.target.value) || 0)
+              }
+              className={FIELD_INPUT}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Emission factor</Label>
+            <Input type="number" value={entry.factor || ""} disabled className={`${FIELD_INPUT} bg-muted`} />
+          </div>
+        </>
+      );
+    }
+
     const isDelivery = entry.vehicleSource === "delivery";
     const activities = isDelivery ? deliveryActivities : passengerActivities;
     return (
       <>
+        {showSourcePicker && (
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Data source</Label>
           <Select
@@ -578,14 +757,15 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {defraSources().map((s) => (
+              {availableSources.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {DEFRA_SOURCE_LABELS[s]}
+                  {DEFRA_SOURCE_LABELS[s as DefraVehicleSource]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+        )}
         <div className="space-y-1.5">
           <Label>Activity</Label>
           <Select
@@ -760,8 +940,11 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
 
   const renderEpaFields = (entry: VehicleEntry) => {
     const src = entry.vehicleSource as EpaVehicleSource;
+    const showSourcePicker = availableSources.length > 1;
+    const gallonBase = (entry.unit || "").toLowerCase().includes("gallon");
     return (
       <>
+        {showSourcePicker && (
         <div className="space-y-1.5 sm:col-span-2">
           <Label>EPA data source</Label>
           <Select
@@ -781,6 +964,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             </SelectContent>
           </Select>
         </div>
+        )}
 
         {src === "mobile_combustion" && (
           <>
@@ -804,8 +988,23 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Unit</Label>
-              <Input value={entry.unit || ""} readOnly className={`${FIELD_INPUT} bg-[#F8FAFC]`} />
+              <Label>{gallonBase ? "Input unit" : "Unit"}</Label>
+              {gallonBase ? (
+                <Select
+                  value={entry.inputUnit || "gallon"}
+                  onValueChange={(v) => updateVehicleEntry(entry.id, "inputUnit", v as "gallon" | "liter")}
+                >
+                  <SelectTrigger className={FIELD_INPUT}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gallon">gallon</SelectItem>
+                    <SelectItem value="liter">liter</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={entry.unit || ""} readOnly className={`${FIELD_INPUT} bg-[#F8FAFC]`} />
+              )}
             </div>
           </>
         )}
@@ -1033,8 +1232,9 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         {(src === "mobile_combustion" && fuelPath) || src === "non_road" ? (
           <div className="space-y-1.5">
             <Label>
-              {src === "non_road" ? "Fuel quantity" : "Actual fuel consumption"} (
-              {src === "non_road" ? entry.nonRoadUnit : entry.unit || "unit"})
+              {src === "non_road"
+                ? `Fuel quantity (${entry.nonRoadUnit})`
+                : `Actual fuel consumption (${gallonBase ? entry.inputUnit || "gallon" : entry.unit || "unit"})`}
             </Label>
             <Input
               type="number"

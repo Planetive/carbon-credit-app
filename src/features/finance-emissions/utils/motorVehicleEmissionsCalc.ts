@@ -1,4 +1,4 @@
-import { localOnRoadEmissionsKg } from "@/api/calcConnection";
+import { localMobileFuelEmissionsKg, localOnRoadEmissionsKg, localUkFuelEmissionsKg } from "@/api/calcConnection";
 import {
   getUkDeliveryFactorCell,
   ukDeliveryBasisValue,
@@ -58,6 +58,8 @@ export type MotorVehicleEntryInput = {
   emissionSelection?: OnRoadEmissionSelection;
   distanceUnit?: DistanceUnit;
   nonRoadUnit?: NonRoadUnit;
+  /** User-entered unit when the EPA table factor is per gallon. */
+  inputUnit?: "gallon" | "liter";
   distance: number;
   fuelConsumption: number;
   dieselLitres: number;
@@ -110,6 +112,19 @@ export function computeMotorVehicleEntryEmissions(
   }
 ): MotorVehicleEntryDerived {
   const source = entry.vehicleSource;
+
+  if (source === "fuel") {
+    const factorKg = libs.ukFuelMap[entry.activity]?.[entry.fuelType]?.[entry.unit] ?? 0;
+    const kg = localUkFuelEmissionsKg(entry.fuelConsumption, factorKg);
+    return {
+      emissions: kg / 1000,
+      factorKg,
+      factor: factorKg / 1000,
+      efficiency: entry.efficiency,
+      unit: entry.unit,
+      formulaHint: `${entry.fuelConsumption} ${entry.unit || "unit"} × ${factorKg.toFixed(6)} kg/${entry.unit || "unit"} ÷ 1000`,
+    };
+  }
 
   if (source === "passenger" || source === "delivery") {
     const basis = entry.ukFactorBasis ?? "total";
@@ -231,17 +246,22 @@ export function computeMotorVehicleEntryEmissions(
   const unit = mobile?.unit || entry.unit || "gallon";
 
   if (ctx.fuelPath) {
-    let qty = entry.fuelConsumption;
-    if (isGallonUnit(unit) && entry.unit === "liter") qty = qty / LITERS_PER_GALLON;
-    if (!isGallonUnit(unit) && entry.unit === "gallon") qty = qty * LITERS_PER_GALLON;
-    const emissions = (qty * factorKg) / 1000;
+    const inputUnit = isGallonUnit(unit) ? entry.inputUnit || "gallon" : unit;
+    const kg = isGallonUnit(unit)
+      ? localMobileFuelEmissionsKg(entry.fuelConsumption, factorKg, inputUnit)
+      : entry.fuelConsumption * factorKg;
+    const emissions = kg / 1000;
+    const qtyHint =
+      isGallonUnit(unit) && inputUnit === "liter"
+        ? `${entry.fuelConsumption} L ÷ 3.78541 gal`
+        : `${entry.fuelConsumption} ${inputUnit || unit}`;
     return {
       emissions,
       factorKg,
       factor: factorKg / 1000,
       efficiency: entry.efficiency,
       unit,
-      formulaHint: `${entry.fuelConsumption} × ${factorKg.toFixed(6)} kg/${unit} ÷ 1000`,
+      formulaHint: `${qtyHint} × ${factorKg.toFixed(6)} kg/${unit} ÷ 1000`,
     };
   }
 

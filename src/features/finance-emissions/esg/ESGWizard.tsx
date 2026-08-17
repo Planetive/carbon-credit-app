@@ -46,8 +46,7 @@ const BOND_FAMILY = ['corporate-bond', 'business-loan', 'project-finance'];
 const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
 
 const VEHICLE_METHODS = [
-  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'EPA Mobile Fuel, Non-Road, or Vehicular Footprints — DEFRA passenger/delivery distance factors' },
-  { id: '1b', title: 'Actual distance + make/model efficiency', score: 'Score 1', description: 'EPA On-Road Gasoline/Diesel make & model — DEFRA passenger/delivery' },
+  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'EPA Mobile Fuel (CNG/LPG/LNG/diesel) or DEFRA Scope 1 Fuel (mineral petrol/diesel, CNG, LPG)' },
   { id: '2a', title: 'Local distance statistics', score: 'Score 2', description: 'Local statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
   { id: '2b', title: 'Regional distance statistics', score: 'Score 3', description: 'Regional statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
   { id: '3a', title: 'Vehicle-type efficiency', score: 'Score 4', description: 'Statistical distance × EPA mobile fuel or DEFRA vehicle-type factor' },
