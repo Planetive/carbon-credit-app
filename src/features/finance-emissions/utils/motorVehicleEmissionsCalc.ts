@@ -1,4 +1,12 @@
-import { localMobileFuelEmissionsKg, localOnRoadEmissionsKg, localUkFuelEmissionsKg } from "@/api/calcConnection";
+import { localOnRoadEmissionsKg, localUkFuelEmissionsKg } from "@/api/calcConnection";
+import {
+  allowedInputUnits,
+  convertQuantityToBase,
+  defaultInputUnit,
+  factorBaseKind,
+  LITERS_PER_GALLON,
+  type FuelQuantityUnit,
+} from "./fuelQuantityConversions";
 import {
   getUkDeliveryFactorCell,
   ukDeliveryBasisValue,
@@ -17,7 +25,6 @@ import type {
   NonRoadFactor,
 } from "./motorVehicleFactorLoaders";
 
-const LITERS_PER_GALLON = 3.785411784;
 const AVERAGE_VEHICLE_EFFICIENCY = 0.08;
 const ELECTRIC_KWH_PER_KM = 0.16;
 
@@ -58,8 +65,8 @@ export type MotorVehicleEntryInput = {
   emissionSelection?: OnRoadEmissionSelection;
   distanceUnit?: DistanceUnit;
   nonRoadUnit?: NonRoadUnit;
-  /** User-entered unit when the EPA table factor is per gallon. */
-  inputUnit?: "gallon" | "liter";
+  /** User-entered unit; converted to the factor table base unit before calculation. */
+  inputUnit?: FuelQuantityUnit;
   distance: number;
   fuelConsumption: number;
   dieselLitres: number;
@@ -115,14 +122,24 @@ export function computeMotorVehicleEntryEmissions(
 
   if (source === "fuel") {
     const factorKg = libs.ukFuelMap[entry.activity]?.[entry.fuelType]?.[entry.unit] ?? 0;
-    const kg = localUkFuelEmissionsKg(entry.fuelConsumption, factorKg);
+    const baseKind = factorBaseKind(entry.unit);
+    const allowed = allowedInputUnits(entry.unit, entry.fuelType);
+    const inputUnit: FuelQuantityUnit =
+      entry.inputUnit && allowed.includes(entry.inputUnit) ? entry.inputUnit : defaultInputUnit(baseKind);
+    const { baseQuantity, hint } = convertQuantityToBase(
+      entry.fuelConsumption,
+      inputUnit,
+      entry.unit,
+      entry.fuelType
+    );
+    const kg = localUkFuelEmissionsKg(baseQuantity, factorKg);
     return {
       emissions: kg / 1000,
       factorKg,
       factor: factorKg / 1000,
       efficiency: entry.efficiency,
       unit: entry.unit,
-      formulaHint: `${entry.fuelConsumption} ${entry.unit || "unit"} × ${factorKg.toFixed(6)} kg/${entry.unit || "unit"} ÷ 1000`,
+      formulaHint: `${hint} × ${factorKg.toFixed(6)} kg/${entry.unit || "unit"} ÷ 1000`,
     };
   }
 
@@ -227,8 +244,13 @@ export function computeMotorVehicleEntryEmissions(
       (f) => f.vehicleType === entry.vehicleType && f.fuelType === entry.fuelType
     );
     const gPerGallon = row ? nonRoadGPerGallon(row, entry.emissionSelection) : 0;
-    let qty = entry.fuelConsumption;
-    if (entry.nonRoadUnit === "liter") qty = qty / LITERS_PER_GALLON;
+    const { baseQuantity } = convertQuantityToBase(
+      entry.fuelConsumption,
+      entry.nonRoadUnit === "liter" ? "liter" : "gallon",
+      "gallon",
+      entry.fuelType
+    );
+    const qty = baseQuantity;
     const kg = (qty * gPerGallon) / 1000;
     return {
       emissions: kg / 1000,
@@ -246,22 +268,23 @@ export function computeMotorVehicleEntryEmissions(
   const unit = mobile?.unit || entry.unit || "gallon";
 
   if (ctx.fuelPath) {
-    const inputUnit = isGallonUnit(unit) ? entry.inputUnit || "gallon" : unit;
-    const kg = isGallonUnit(unit)
-      ? localMobileFuelEmissionsKg(entry.fuelConsumption, factorKg, inputUnit)
-      : entry.fuelConsumption * factorKg;
+    const baseKind = factorBaseKind(unit);
+    const allowed = allowedInputUnits(unit, entry.fuelType);
+    const inputUnit: FuelQuantityUnit =
+      entry.inputUnit && allowed.includes(entry.inputUnit) ? entry.inputUnit : defaultInputUnit(baseKind);
+    const { baseQuantity, hint } =
+      baseKind === "other"
+        ? { baseQuantity: entry.fuelConsumption, hint: `${entry.fuelConsumption} ${unit}` }
+        : convertQuantityToBase(entry.fuelConsumption, inputUnit, unit, entry.fuelType);
+    const kg = baseQuantity * factorKg;
     const emissions = kg / 1000;
-    const qtyHint =
-      isGallonUnit(unit) && inputUnit === "liter"
-        ? `${entry.fuelConsumption} L ÷ 3.78541 gal`
-        : `${entry.fuelConsumption} ${inputUnit || unit}`;
     return {
       emissions,
       factorKg,
       factor: factorKg / 1000,
       efficiency: entry.efficiency,
       unit,
-      formulaHint: `${qtyHint} × ${factorKg.toFixed(6)} kg/${unit} ÷ 1000`,
+      formulaHint: `${hint} × ${factorKg.toFixed(6)} kg/${unit} ÷ 1000`,
     };
   }
 

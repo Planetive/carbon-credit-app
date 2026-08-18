@@ -42,6 +42,14 @@ import {
   type NonRoadUnit,
   type OnRoadEmissionSelection,
 } from "../utils/motorVehicleEmissionsCalc";
+import {
+  allowedInputUnits,
+  defaultInputUnit,
+  factorBaseKind,
+  FUEL_INPUT_UNIT_LABELS,
+  supportsInputUnitConversion,
+  type FuelQuantityUnit,
+} from "../utils/fuelQuantityConversions";
 
 type FactorLibrary = "EPA" | "DEFRA";
 
@@ -65,7 +73,7 @@ interface VehicleEntry {
   emissionSelection: OnRoadEmissionSelection;
   distanceUnit: DistanceUnit;
   nonRoadUnit: NonRoadUnit;
-  inputUnit: "gallon" | "liter";
+  inputUnit: FuelQuantityUnit;
   distance: number;
   fuelConsumption: number;
   dieselLitres: number;
@@ -305,7 +313,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             ...next,
             fuelType,
             unit: opt?.unit || next.unit,
-            inputUnit: (opt?.unit || "").toLowerCase().includes("gallon") ? next.inputUnit || "gallon" : next.inputUnit,
+            inputUnit: defaultInputUnit(factorBaseKind(opt?.unit || next.unit)),
           };
         }
       }
@@ -316,8 +324,26 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         const fuelType = fuels.includes(next.fuelType) ? next.fuelType : fuels[0] || "";
         const units = ukFuelUnitsFor(activity, fuelType);
         const unit = units.includes(next.unit) ? next.unit : units[0] || "";
-        if (activity !== next.activity || fuelType !== next.fuelType || unit !== next.unit) {
-          next = { ...next, activity, fuelType, unit };
+        const allowed = allowedInputUnits(unit, fuelType);
+        const inputUnit =
+          next.inputUnit && allowed.includes(next.inputUnit)
+            ? next.inputUnit
+            : defaultInputUnit(factorBaseKind(unit));
+        if (activity !== next.activity || fuelType !== next.fuelType || unit !== next.unit || inputUnit !== next.inputUnit) {
+          next = { ...next, activity, fuelType, unit, inputUnit };
+        }
+      }
+      if (fuelPath && next.vehicleSource === "mobile_combustion") {
+        const mobileUnit = libs.mobileFuels.find((f) => f.fuelType === next.fuelType)?.unit || next.unit;
+        const allowed = allowedInputUnits(mobileUnit, next.fuelType);
+        if (allowed.length > 0) {
+          const inputUnit =
+            next.inputUnit && allowed.includes(next.inputUnit)
+              ? next.inputUnit
+              : defaultInputUnit(factorBaseKind(mobileUnit));
+          if (inputUnit !== next.inputUnit) {
+            next = { ...next, inputUnit };
+          }
         }
       }
       const derived = computeMotorVehicleEntryEmissions(next, libs, {
@@ -437,6 +463,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         draft.activity = ukFuelActivities[0] || "";
         draft.fuelType = ukFuelFuelsFor(draft.activity)[0] || "";
         draft.unit = ukFuelUnitsFor(draft.activity, draft.fuelType)[0] || "";
+        draft.inputUnit = defaultInputUnit(factorBaseKind(draft.unit));
       } else {
         const activities = source === "delivery" ? deliveryActivities : passengerActivities;
         draft.activity = activities[0] || "";
@@ -456,7 +483,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     } else if (source === "mobile_combustion" && epaFuelTypes[0]) {
       draft.fuelType = epaFuelTypes[0];
       draft.unit = libs?.mobileFuels.find((f) => f.fuelType === epaFuelTypes[0])?.unit || "gallon";
-      draft.inputUnit = (draft.unit || "").toLowerCase().includes("gallon") ? "gallon" : "gallon";
+      draft.inputUnit = defaultInputUnit(factorBaseKind(draft.unit));
     } else if (source === "on_road_gasoline" && gasolineTypes[0]) {
       draft.vehicleType = gasolineTypes[0];
       draft.modelYear = gasolineYearsFor(gasolineTypes[0])[0] || "";
@@ -490,8 +517,12 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       if (field === "activity") {
         next.fuelType = ukFuelFuelsFor(String(value))[0] || "";
         next.unit = ukFuelUnitsFor(String(value), next.fuelType)[0] || "";
+        next.inputUnit = defaultInputUnit(factorBaseKind(next.unit));
       } else if (field === "fuelType") {
         next.unit = ukFuelUnitsFor(next.activity, String(value))[0] || "";
+        next.inputUnit = defaultInputUnit(factorBaseKind(next.unit));
+      } else if (field === "unit") {
+        next.inputUnit = defaultInputUnit(factorBaseKind(String(value)));
       }
     }
     if (entry.vehicleSource === "passenger") {
@@ -534,9 +565,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     if (entry.vehicleSource === "mobile_combustion" && field === "fuelType") {
       const opt = libs?.mobileFuels.find((f) => f.fuelType === String(value));
       next.unit = opt?.unit || next.unit;
-      if ((next.unit || "").toLowerCase().includes("gallon")) {
-        next.inputUnit = next.inputUnit || "gallon";
-      }
+      next.inputUnit = defaultInputUnit(factorBaseKind(next.unit));
     }
     if (entry.vehicleSource === "on_road_gasoline" && field === "vehicleType") {
       next.modelYear = gasolineYearsFor(String(value))[0] || "";
@@ -631,11 +660,43 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   const sectionDescription =
     activeLibrary === "DEFRA"
       ? fuelPath
-        ? "DEFRA Scope 1 Fuel — mineral petrol, mineral diesel, CNG, or LPG"
+        ? "DEFRA Scope 1 Fuel — mineral petrol, mineral diesel, CNG, or LPG (litre/gallon or m³/scf conversions)"
         : "DEFRA passenger or delivery vehicles — distance × UK factor"
       : fuelPath
-        ? "EPA Mobile Fuel — actual consumption in gallons or liters"
+        ? "EPA Mobile Fuel — enter gallon, liter, or scf (converted to the factor unit)"
         : "EPA On-Road Gasoline/Diesel, Mobile Fuel, or Non-Road";
+
+  const fuelConsumptionLabel = (entry: VehicleEntry, baseUnit: string) => {
+    if (supportsInputUnitConversion(baseUnit, entry.fuelType)) {
+      return FUEL_INPUT_UNIT_LABELS[entry.inputUnit] || entry.inputUnit || baseUnit;
+    }
+    return baseUnit || "unit";
+  };
+
+  const renderFuelInputUnitSelect = (entry: VehicleEntry, baseUnit: string) => {
+    const options = allowedInputUnits(baseUnit, entry.fuelType);
+    if (options.length <= 1 || !baseUnit) return null;
+    return (
+      <div className="space-y-1.5">
+        <Label>Input unit</Label>
+        <Select
+          value={entry.inputUnit || defaultInputUnit(factorBaseKind(baseUnit))}
+          onValueChange={(v) => updateVehicleEntry(entry.id, "inputUnit", v as FuelQuantityUnit)}
+        >
+          <SelectTrigger className={FIELD_INPUT}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((u) => (
+              <SelectItem key={u} value={u}>
+                {FUEL_INPUT_UNIT_LABELS[u]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  };
 
   const renderDefraFields = (entry: VehicleEntry) => {
     const showSourcePicker = availableSources.length > 1;
@@ -702,14 +763,14 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Unit</Label>
+            <Label>Factor unit</Label>
             <Select
               value={entry.unit || undefined}
               onValueChange={(v) => updateVehicleEntry(entry.id, "unit", v)}
               disabled={libraryLocked || !entry.fuelType}
             >
               <SelectTrigger className={FIELD_INPUT}>
-                <SelectValue placeholder="Select unit" />
+                <SelectValue placeholder="Select factor unit" />
               </SelectTrigger>
               <SelectContent>
                 {ukFuelUnitsFor(entry.activity, entry.fuelType).map((u) => (
@@ -720,8 +781,9 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
               </SelectContent>
             </Select>
           </div>
+          {entry.unit ? renderFuelInputUnitSelect(entry, entry.unit) : null}
           <div className="space-y-1.5">
-            <Label>Actual fuel consumption ({entry.unit || "unit"})</Label>
+            <Label>Actual fuel consumption ({fuelConsumptionLabel(entry, entry.unit)})</Label>
             <Input
               type="number"
               min={0}
@@ -941,7 +1003,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   const renderEpaFields = (entry: VehicleEntry) => {
     const src = entry.vehicleSource as EpaVehicleSource;
     const showSourcePicker = availableSources.length > 1;
-    const gallonBase = (entry.unit || "").toLowerCase().includes("gallon");
+    const mobileBaseUnit =
+      libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType)?.unit || entry.unit || "";
     return (
       <>
         {showSourcePicker && (
@@ -988,24 +1051,10 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{gallonBase ? "Input unit" : "Unit"}</Label>
-              {gallonBase ? (
-                <Select
-                  value={entry.inputUnit || "gallon"}
-                  onValueChange={(v) => updateVehicleEntry(entry.id, "inputUnit", v as "gallon" | "liter")}
-                >
-                  <SelectTrigger className={FIELD_INPUT}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gallon">gallon</SelectItem>
-                    <SelectItem value="liter">liter</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input value={entry.unit || ""} readOnly className={`${FIELD_INPUT} bg-[#F8FAFC]`} />
-              )}
+              <Label>Factor unit</Label>
+              <Input value={mobileBaseUnit || ""} readOnly className={`${FIELD_INPUT} bg-[#F8FAFC]`} />
             </div>
+            {fuelPath ? renderFuelInputUnitSelect(entry, mobileBaseUnit) : null}
           </>
         )}
 
@@ -1234,7 +1283,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             <Label>
               {src === "non_road"
                 ? `Fuel quantity (${entry.nonRoadUnit})`
-                : `Actual fuel consumption (${gallonBase ? entry.inputUnit || "gallon" : entry.unit || "unit"})`}
+                : `Actual fuel consumption (${fuelConsumptionLabel(entry, mobileBaseUnit)})`}
             </Label>
             <Input
               type="number"

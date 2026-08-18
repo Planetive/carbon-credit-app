@@ -56,8 +56,11 @@ export const convertToTonnes = (value: number, unit: string): number => {
     case 'mt': return value * 1000000; // million tonnes to tonnes
     case 'kg': return value / 1000; // kilograms to tonnes
     case 'units': return value; // units remain as-is (no conversion)
+    case 'each': return value; // each remains as-is
     case 'barrels': return value; // barrels remain as-is (no conversion)
     case 'cubic-meters': return value; // cubic meters remain as-is (no conversion)
+    case 'm': return value; // linear meters remain as-is
+    case 'm2': return value; // square meters remain as-is
     default: return value;
   }
 };
@@ -71,7 +74,21 @@ export const convertToTonnesCO2ePerTonne = (value: number, unit: string): number
     case 'tCO2e/tonne': return value;
     case 'kgCO2e/tonne': return value / 1000; // kg to tonnes
     case 'tCO2e/unit': return value; // per unit remains as-is
+    case 'kgCO2e/unit': return value / 1000;
+    case 'tCO2e/each': return value;
+    case 'kgCO2e/each': return value / 1000;
     case 'tCO2e/barrel': return value; // per barrel remains as-is
+    case 'kgCO2e/barrel': return value / 1000;
+    case 'tCO2e/m': return value;
+    case 'kgCO2e/m': return value / 1000;
+    case 'tCO2e/m2': return value;
+    case 'kgCO2e/m2': return value / 1000;
+    case 'tCO2e/kg': return value;
+    case 'kgCO2e/kg': return value / 1000;
+    case 'tCO2e/cubic-meter': return value;
+    case 'kgCO2e/cubic-meter': return value / 1000;
+    case 'tCO2e/cubic-meters': return value;
+    case 'kgCO2e/cubic-meters': return value / 1000;
     default: return value;
   }
 };
@@ -165,12 +182,22 @@ export const detectUnitType = (unit: string): 'emissions' | 'energy' | 'emission
   }
   
   // Production units
-  if (['tonnes', 'mt', 'kg', 'units', 'barrels', 'cubic-meters'].includes(unit)) {
+  if (['tonnes', 'mt', 'kg', 'units', 'each', 'barrels', 'cubic-meters', 'm', 'm2'].includes(unit)) {
     return 'production';
   }
   
   // Production emission factor units
-  if (['tCO2e/tonne', 'kgCO2e/tonne', 'tCO2e/unit', 'tCO2e/barrel'].includes(unit)) {
+  if ([
+    'tCO2e/tonne', 'kgCO2e/tonne',
+    'tCO2e/unit', 'kgCO2e/unit',
+    'tCO2e/each', 'kgCO2e/each',
+    'tCO2e/barrel', 'kgCO2e/barrel',
+    'tCO2e/m', 'kgCO2e/m',
+    'tCO2e/m2', 'kgCO2e/m2',
+    'tCO2e/kg', 'kgCO2e/kg',
+    'tCO2e/cubic-meter', 'kgCO2e/cubic-meter',
+    'tCO2e/cubic-meters', 'kgCO2e/cubic-meters',
+  ].includes(unit)) {
     return 'productionEmissionFactor';
   }
   

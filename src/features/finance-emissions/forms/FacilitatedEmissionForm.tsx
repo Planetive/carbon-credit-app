@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Calculator } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Calculator, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CalculationEngine } from '../engines/CalculationEngine';
 import { ALL_FACILITATED_FORMULAS, getFacilitatedFormulaById } from '../config/facilitatedEmissionFormulaConfigs';
@@ -10,10 +11,14 @@ import { smartConvertUnit } from '../utils/unitConversions';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import type { FacilitatedCalculationResult } from "../types/contracts";
 import { resolveFinancedCalculation } from "@/api/financedConnection";
+import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 import SectorProxyInputs from "./SectorProxyInputs";
 import EnergyEmissionInputs from "./EnergyEmissionInputs";
 import { FIELD_INPUT, FieldGrid, FormField, InputSection, ComputedBox } from "./InputLayout";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; 
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 interface FacilitatedEmissionFormProps {
   corporateStructure?: string; // 'listed' or 'unlisted'
@@ -24,6 +29,87 @@ interface FacilitatedEmissionFormProps {
   unverifiedEmissions?: number; // Auto-calculated unverified emissions from parent
   onCalculationComplete?: (result: FacilitatedCalculationResult) => void;
 }
+
+type ProductionFactorRow = {
+  category: string;
+  subCategory: string;
+  materialName: string;
+  declaredUnit: string;
+  factorKg: number;
+};
+
+const MATERIAL_FACTOR_DATASET = "ice_embodied_carbon_v5";
+
+const normalizeDeclaredUnit = (value: unknown): string => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "kg";
+  if (raw === "each" || raw === "unit" || raw === "units") return "units";
+  if (raw === "m²" || raw === "square meter" || raw === "square meters") return "m2";
+  if (raw === "m3" || raw === "m³" || raw === "cubic meter" || raw === "cubic meters") return "cubic-meters";
+  return raw;
+};
+
+const productionFactorUnitFor = (declaredUnit: string) => {
+  switch (normalizeDeclaredUnit(declaredUnit)) {
+    case "kg":
+      return "kgCO2e/kg";
+    case "m":
+      return "kgCO2e/m";
+    case "m2":
+      return "kgCO2e/m2";
+    case "units":
+      return "kgCO2e/unit";
+    case "barrels":
+      return "kgCO2e/barrel";
+    case "cubic-meters":
+      return "kgCO2e/cubic-meters";
+    default:
+      return `kgCO2e/${normalizeDeclaredUnit(declaredUnit)}`;
+  }
+};
+
+const productionUnitLabel = (unit: string) => {
+  switch (unit) {
+    case "kg": return "kg";
+    case "m": return "m";
+    case "m2": return "m²";
+    case "units": return "units";
+    case "barrels": return "barrels";
+    case "cubic-meters": return "m³";
+    case "tonnes": return "Tonnes";
+    case "mt": return "Mt";
+    default: return unit;
+  }
+};
+
+const formatFactorText = (value: string) => {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  return cleaned
+    .replace(/\bMotar\b/gi, "Mortar")
+    .replace(/\bM2\b/g, "m2");
+};
+
+const normalizeFactorDenominator = (unit: string): string => {
+  const raw = unit.split("/")[1] ?? "";
+  return normalizeDeclaredUnit(raw);
+};
+
+const convertProductionFactorValue = (
+  value: number,
+  fromUnit: string,
+  toUnit: string
+): number => {
+  if (!Number.isFinite(value) || fromUnit === toUnit) return value;
+  const fromDen = normalizeFactorDenominator(fromUnit);
+  const toDen = normalizeFactorDenominator(toUnit);
+  if (fromDen !== toDen) return value;
+
+  const fromIsKg = fromUnit.toLowerCase().startsWith("kgco2e/");
+  const toIsKg = toUnit.toLowerCase().startsWith("kgco2e/");
+  if (fromIsKg === toIsKg) return value;
+  return fromIsKg ? value / 1000 : value * 1000;
+};
 
 export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = ({
   corporateStructure = 'listed',
@@ -66,6 +152,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
     productionUnit: 'tonnes',
     productionEmissionFactor: 0,
     productionEmissionFactorUnit: 'tCO2e/tonne',
+    productionCategory: '',
+    productionSubCategory: '',
+    productionMaterial: '',
+    factor_dataset: MATERIAL_FACTOR_DATASET,
     // Options 3a / 3c - sector proxies
     companyRevenue: 0,
     assetTurnoverRatio: 0,
@@ -79,6 +169,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   
   const [result, setResult] = useState<FacilitatedCalculationResult | null>(null);
   const [companyType, setCompanyType] = useState<'listed' | 'unlisted'>(corporateStructure === 'listed' ? 'listed' : 'unlisted');
+  const [productionFactorRows, setProductionFactorRows] = useState<ProductionFactorRow[]>([]);
+  const [loadingProductionFactors, setLoadingProductionFactors] = useState(false);
+  const [materialOpen, setMaterialOpen] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
 
   // Load questionnaire data from database and restore saved form state
   useEffect(() => {
@@ -184,6 +278,77 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
     }
   }, [hasEmissions, verificationStatus, verifiedEmissions, unverifiedEmissions]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadProductionFactors = async () => {
+      setLoadingProductionFactors(true);
+      try {
+        let rows = await tryLoadFactorSheetViaApi({
+          datasetCodes: [MATERIAL_FACTOR_DATASET],
+          nameHints: ["ICE embodied carbon", "Finance_production_Unit"],
+        });
+
+        if (!rows || rows.length === 0) {
+          const refClient = (supabase as any).schema ? (supabase as any).schema("ref") : supabase;
+          const { data: dataset, error: datasetError } = await refClient
+            .from("factor_datasets")
+            .select("id, code")
+            .eq("code", MATERIAL_FACTOR_DATASET)
+            .maybeSingle();
+          if (datasetError) throw datasetError;
+
+          if (dataset?.id) {
+            const { data: fallbackRows, error: rowsError } = await refClient
+              .from("factor_rows")
+              .select("category, label, unit, kg_co2e, attributes")
+              .eq("dataset_id", dataset.id)
+              .order("category", { ascending: true })
+              .order("label", { ascending: true });
+            if (rowsError) throw rowsError;
+            rows = fallbackRows ?? [];
+          }
+        }
+
+        const parsed = (rows ?? [])
+          .map((row) => {
+            const record = row as Record<string, unknown>;
+            const attrs = (record.attributes ?? {}) as Record<string, unknown>;
+            const category = String(record.category ?? record.Category ?? "").trim();
+            const materialName = String(record.label ?? record.material_name ?? record.Materials ?? "").trim();
+            const declaredUnit = normalizeDeclaredUnit(
+              record.unit ?? record.declared_unit ?? record["Declared Units"] ?? "kg"
+            );
+            const subCategory = String(
+              attrs.sub_category ?? record.sub_category ?? record["Sub Category"] ?? ""
+            ).trim();
+            const factorRaw = record.kg_co2e ?? record.ec_value ?? record["Embodied Carbon - kgCO2e/kg"];
+            const factorKg = typeof factorRaw === "number" ? factorRaw : Number(factorRaw);
+            if (!category || !materialName || !Number.isFinite(factorKg)) return null;
+            return { category, subCategory, materialName, declaredUnit, factorKg };
+          })
+          .filter((row): row is ProductionFactorRow => !!row);
+
+        if (!cancelled) setProductionFactorRows(parsed);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error loading production factor rows:", error);
+          toast({
+            title: "Factor load error",
+            description: "Could not load the ICE production factor dataset.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (!cancelled) setLoadingProductionFactors(false);
+      }
+    };
+
+    void loadProductionFactors();
+    return () => {
+      cancelled = true;
+    };
+  }, [toast]);
+
   // Get available formulas based on selections (same logic as Finance Emission)
   const getAvailableFormulas = () => {
     let formulas = ALL_FACILITATED_FORMULAS.filter(formula => {
@@ -225,6 +390,64 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   // Calculate facilitated amount from underwriting amount and share percentage
   const facilitatedAmount = formData.underwritingAmount * (formData.underwritingShare / 100);
 
+  const productionCategories = useMemo(
+    () => Array.from(new Set(productionFactorRows.map((row) => row.category))).sort((a, b) => a.localeCompare(b)),
+    [productionFactorRows]
+  );
+  const productionSubCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          productionFactorRows
+            .filter((row) => !formData.productionCategory || row.category === formData.productionCategory)
+            .map((row) => row.subCategory)
+            .filter((sub) => sub.trim().length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [productionFactorRows, formData.productionCategory]
+  );
+  const productionMaterials = useMemo(
+    () =>
+      productionFactorRows
+        .filter((row) => !formData.productionCategory || row.category === formData.productionCategory)
+        .filter((row) => !formData.productionSubCategory || row.subCategory === formData.productionSubCategory)
+        .filter((row) => {
+          const q = materialSearch.trim().toLowerCase();
+          if (!q) return true;
+          return (
+            row.materialName.toLowerCase().includes(q) ||
+            row.subCategory.toLowerCase().includes(q) ||
+            row.category.toLowerCase().includes(q)
+          );
+        })
+        .sort((a, b) => a.materialName.localeCompare(b.materialName)),
+    [productionFactorRows, formData.productionCategory, formData.productionSubCategory, materialSearch]
+  );
+  const materialUnitOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          productionFactorRows
+            .filter((row) => row.materialName === formData.productionMaterial)
+            .filter((row) => !formData.productionCategory || row.category === formData.productionCategory)
+            .filter((row) => !formData.productionSubCategory || row.subCategory === formData.productionSubCategory)
+            .map((row) => row.declaredUnit)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [productionFactorRows, formData.productionMaterial, formData.productionCategory, formData.productionSubCategory]
+  );
+  const selectedProductionMaterial = useMemo(
+    () =>
+      productionFactorRows.find(
+        (row) =>
+          row.materialName === formData.productionMaterial &&
+          (!formData.productionCategory || row.category === formData.productionCategory) &&
+          (!formData.productionSubCategory || row.subCategory === formData.productionSubCategory) &&
+          (!formData.productionUnit || row.declaredUnit === formData.productionUnit)
+      ) ?? null,
+    [productionFactorRows, formData.productionCategory, formData.productionSubCategory, formData.productionMaterial, formData.productionUnit]
+  );
+
   // Unit conversion using centralized utility
 
   const updateFormData = (field: string, value: unknown) => {
@@ -234,6 +457,47 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       return;
     }
     setFormData(prev => ({ ...prev, [field]: value } as typeof prev));
+  };
+
+  const applyProductionMaterial = (row: ProductionFactorRow) => {
+    setFormData((prev) => ({
+      ...prev,
+      productionCategory: row.category,
+      productionSubCategory: row.subCategory,
+      productionMaterial: row.materialName,
+      productionUnit: row.declaredUnit,
+      productionEmissionFactor: row.factorKg,
+      productionEmissionFactorUnit: productionFactorUnitFor(row.declaredUnit),
+      factor_dataset: MATERIAL_FACTOR_DATASET,
+    }));
+  };
+
+  const applyMaterialDeclaredUnit = (declaredUnit: string) => {
+    const match = productionFactorRows.find(
+      (row) =>
+        row.materialName === formData.productionMaterial &&
+        (!formData.productionCategory || row.category === formData.productionCategory) &&
+        (!formData.productionSubCategory || row.subCategory === formData.productionSubCategory) &&
+        row.declaredUnit === declaredUnit
+    );
+    if (match) {
+      applyProductionMaterial(match);
+      return;
+    }
+    updateFormData("productionUnit", declaredUnit);
+    updateFormData("productionEmissionFactorUnit", productionFactorUnitFor(declaredUnit));
+  };
+
+  const handleProductionEmissionFactorUnitChange = (nextUnit: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      productionEmissionFactor: convertProductionFactorValue(
+        prev.productionEmissionFactor,
+        prev.productionEmissionFactorUnit,
+        nextUnit
+      ),
+      productionEmissionFactorUnit: nextUnit,
+    }));
   };
 
   const getDataQualityColor = (score: number) => {
@@ -299,8 +563,20 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
           throw new Error('Emission factor must be greater than 0. Select an EPA or DEFRA factor.');
         }
       }
+      if (selectedOptionCode === '2b') {
+        if (!formData.production || formData.production <= 0) {
+          throw new Error('Production must be greater than 0 for Option 2b.');
+        }
+        if (!formData.productionEmissionFactor || formData.productionEmissionFactor <= 0) {
+          throw new Error('Select a production material or enter a valid production emission factor.');
+        }
+      }
 
        // Prepare inputs for calculation
+       const productionEmissionFactor = smartConvertUnit(
+         formData.productionEmissionFactor,
+         formData.productionEmissionFactorUnit
+       );
        const calculationInputs = {
          facilitated_amount: facilitatedAmount,
          total_assets: totalAssetsValue,
@@ -322,12 +598,16 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
          unverified_emissions: smartConvertUnit(formData.unverifiedEmissions, formData.unverifiedEmissionsUnit),
          // Option 2a - EPA/DEFRA electricity (energy_consumption already in tCO2e, EF = 1)
          energy_consumption: formData.energy_consumption || 0,
-         emission_factor: formData.emission_factor || 0,
+         emission_factor: selectedOptionCode === '2b' ? productionEmissionFactor : (formData.emission_factor || 0),
          process_emissions: formData.process_emissions || 0,
          factor_library: formData.factor_library || 'EPA',
          // Option 2b - Production Data
          production: smartConvertUnit(formData.production, formData.productionUnit),
-         production_emission_factor: smartConvertUnit(formData.productionEmissionFactor, formData.productionEmissionFactorUnit),
+         production_emission_factor: productionEmissionFactor,
+         production_category: formData.productionCategory,
+         production_material: formData.productionMaterial,
+         production_declared_unit: formData.productionUnit,
+         factor_dataset: formData.factor_dataset || MATERIAL_FACTOR_DATASET,
          // Options 3a / 3c
          company_revenue: formData.companyRevenue,
          asset_turnover_ratio: formData.assetTurnoverRatio,
@@ -732,6 +1012,154 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
 
                 {selectedOptionCode === "2b" && (
                   <>
+                    <FormField
+                      label="Production category"
+                      required
+                      tooltip="Material family from the ICE embodied-carbon dataset"
+                    >
+                      <Select
+                        value={formData.productionCategory}
+                        onValueChange={(value) => {
+                          const first = productionFactorRows.find((row) => row.category === value);
+                          if (first) applyProductionMaterial(first);
+                          else updateFormData("productionCategory", value);
+                          setMaterialSearch("");
+                        }}
+                      >
+                        <SelectTrigger className={FIELD_INPUT}>
+                          <SelectValue placeholder={loadingProductionFactors ? "Loading categories..." : "Select category"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productionCategories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {formatFactorText(category)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Sub category"
+                      tooltip="Narrow down category rows before material selection"
+                    >
+                      <Select
+                        value={formData.productionSubCategory}
+                        onValueChange={(value) => {
+                          updateFormData("productionSubCategory", value);
+                          const first = productionFactorRows.find(
+                            (row) =>
+                              (!formData.productionCategory || row.category === formData.productionCategory) &&
+                              row.subCategory === value
+                          );
+                          if (first) applyProductionMaterial(first);
+                          setMaterialSearch("");
+                        }}
+                        disabled={!formData.productionCategory}
+                      >
+                        <SelectTrigger className={FIELD_INPUT}>
+                          <SelectValue placeholder="All sub categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productionSubCategories.map((sub) => (
+                            <SelectItem key={sub} value={sub}>
+                              {formatFactorText(sub)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField
+                      label="Production material"
+                      required
+                      tooltip="Specific ICE material/product row used as the production emission factor"
+                      span
+                    >
+                      <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={materialOpen}
+                            className={cn(
+                              FIELD_INPUT,
+                              "w-full justify-between font-normal",
+                              !formData.productionMaterial && "text-[#94A3B8]"
+                            )}
+                            disabled={loadingProductionFactors}
+                          >
+                            <span className="truncate">
+                              {loadingProductionFactors
+                                ? "Loading materials..."
+                                : formatFactorText(formData.productionMaterial) || "Select material"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Search material or keyword..."
+                              value={materialSearch}
+                              onValueChange={setMaterialSearch}
+                            />
+                            <CommandList className="max-h-64">
+                              <CommandEmpty>No matching materials.</CommandEmpty>
+                              <CommandGroup>
+                                {productionMaterials.map((row) => (
+                                  <CommandItem
+                                    key={`${row.category}-${row.subCategory}-${row.materialName}-${row.declaredUnit}`}
+                                    value={`${row.materialName} ${row.subCategory}`}
+                                    onSelect={() => {
+                                      applyProductionMaterial(row);
+                                      setMaterialOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.productionMaterial === row.materialName ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <span className="truncate">
+                                      {formatFactorText(row.materialName)}
+                                      {row.subCategory ? ` · ${formatFactorText(row.subCategory)}` : ""}
+                                    </span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {selectedProductionMaterial && (
+                        <p className="mt-1.5 text-xs text-[#64748B]">
+                          Dataset: ICE Educational V5.0 · Declared unit: {productionUnitLabel(selectedProductionMaterial.declaredUnit)}
+                        </p>
+                      )}
+                    </FormField>
+                    {materialUnitOptions.length > 1 && (
+                      <FormField
+                        label="Declared unit"
+                        tooltip="Some materials have multiple declared units. Choose the matching basis."
+                      >
+                        <Select
+                          value={formData.productionUnit}
+                          onValueChange={(value) => applyMaterialDeclaredUnit(value)}
+                        >
+                          <SelectTrigger className={FIELD_INPUT}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {materialUnitOptions.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {productionUnitLabel(unit)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+                    )}
                     <FormField label="Production" required tooltip="Client production volume">
                       <div className="flex gap-2">
                         <FormattedNumberInput
@@ -752,6 +1180,8 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                             <SelectItem value="tonnes">Tonnes</SelectItem>
                             <SelectItem value="mt">Mt</SelectItem>
                             <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="m">m</SelectItem>
+                            <SelectItem value="m2">m²</SelectItem>
                             <SelectItem value="units">Units</SelectItem>
                             <SelectItem value="barrels">Barrels</SelectItem>
                             <SelectItem value="cubic-meters">m³</SelectItem>
@@ -762,7 +1192,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                     <FormField
                       label="Emission factor"
                       required
-                      tooltip="Emissions per unit of production"
+                      tooltip="Embodied carbon factor from the selected production material"
                     >
                       <div className="flex gap-2">
                         <FormattedNumberInput
@@ -775,17 +1205,27 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                         <Select
                           value={formData.productionEmissionFactorUnit}
                           onValueChange={(value) =>
-                            updateFormData("productionEmissionFactorUnit", value)
+                            handleProductionEmissionFactorUnitChange(value)
                           }
                         >
-                          <SelectTrigger className={cn(FIELD_INPUT, "w-[9.5rem] shrink-0")}>
+                          <SelectTrigger className={cn(FIELD_INPUT, "w-[10.5rem] shrink-0")}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="tCO2e/tonne">tCO₂e/tonne</SelectItem>
                             <SelectItem value="kgCO2e/tonne">kgCO₂e/tonne</SelectItem>
+                            <SelectItem value="tCO2e/kg">tCO₂e/kg</SelectItem>
+                            <SelectItem value="kgCO2e/kg">kgCO₂e/kg</SelectItem>
+                            <SelectItem value="tCO2e/m">tCO₂e/m</SelectItem>
+                            <SelectItem value="kgCO2e/m">kgCO₂e/m</SelectItem>
+                            <SelectItem value="tCO2e/m2">tCO₂e/m²</SelectItem>
+                            <SelectItem value="kgCO2e/m2">kgCO₂e/m²</SelectItem>
                             <SelectItem value="tCO2e/unit">tCO₂e/unit</SelectItem>
+                            <SelectItem value="kgCO2e/unit">kgCO₂e/unit</SelectItem>
                             <SelectItem value="tCO2e/barrel">tCO₂e/barrel</SelectItem>
+                            <SelectItem value="kgCO2e/barrel">kgCO₂e/barrel</SelectItem>
+                            <SelectItem value="tCO2e/cubic-meters">tCO₂e/m³</SelectItem>
+                            <SelectItem value="kgCO2e/cubic-meters">kgCO₂e/m³</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
