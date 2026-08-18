@@ -2199,31 +2199,45 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           </FormField>
 
           <FormField label="Sub category" tooltip="Narrow down rows before material selection">
-            <Select
-              value={String(formData.productionSubCategory || "")}
-              onValueChange={(value) => {
-                updateFormData("productionSubCategory", value);
-                const first = productionFactorRows.find(
-                  (row) =>
-                    (!formData.productionCategory || row.category === formData.productionCategory) &&
-                    row.subCategory === value
-                );
-                if (first) applyProductionMaterial(first);
-                setMaterialSearch("");
-              }}
-              disabled={!formData.productionCategory}
-            >
-              <SelectTrigger className={FIELD_INPUT}>
-                <SelectValue placeholder="All sub categories" />
-              </SelectTrigger>
-              <SelectContent>
-                {productionSubCategories.map((sub) => (
-                  <SelectItem key={sub} value={sub}>
-                    {formatFactorText(sub)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!formData.productionCategory ? (
+              <Input
+                value=""
+                readOnly
+                placeholder="Select a category first"
+                className={`${FIELD_INPUT} bg-[#F8FAFC]`}
+              />
+            ) : productionSubCategories.length === 0 ? (
+              <Input
+                value="No sub categories for this category"
+                readOnly
+                className={`${FIELD_INPUT} bg-[#F8FAFC] text-[#64748B]`}
+              />
+            ) : (
+              <Select
+                value={String(formData.productionSubCategory || "")}
+                onValueChange={(value) => {
+                  updateFormData("productionSubCategory", value);
+                  const first = productionFactorRows.find(
+                    (row) =>
+                      (!formData.productionCategory || row.category === formData.productionCategory) &&
+                      row.subCategory === value
+                  );
+                  if (first) applyProductionMaterial(first);
+                  setMaterialSearch("");
+                }}
+              >
+                <SelectTrigger className={FIELD_INPUT}>
+                  <SelectValue placeholder="Select sub category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {productionSubCategories.map((sub) => (
+                    <SelectItem key={sub} value={sub}>
+                      {formatFactorText(sub)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </FormField>
 
           <FormField label="Production material" required tooltip="Search and select the exact material row" span>
