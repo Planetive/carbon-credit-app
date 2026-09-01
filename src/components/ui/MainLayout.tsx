@@ -112,7 +112,7 @@ const MainLayout = () => {
         <AppHeader />
       </div>
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="hidden lg:flex flex-shrink-0 sticky top-0 self-start h-full lg:h-screen lg:max-h-screen">
+        <div className="hidden lg:flex flex-shrink-0 sticky top-0 self-start h-full lg:h-screen lg:max-h-screen z-30">
           <DashboardSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
         </div>
         <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">

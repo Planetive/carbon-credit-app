@@ -287,7 +287,7 @@ const DashboardSidebar = ({ activeSection, onSectionChange }: DashboardSidebarPr
                               <TooltipContent
                                 side="right"
                                 sideOffset={10}
-                                className="max-w-[220px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12px] leading-relaxed text-gray-600 shadow-lg"
+                                className="z-[100] max-w-[220px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-[12px] leading-relaxed text-gray-600 shadow-lg"
                               >
                                 <p className="font-semibold text-gray-900 mb-0.5">{child.title}</p>
                                 {child.description}
