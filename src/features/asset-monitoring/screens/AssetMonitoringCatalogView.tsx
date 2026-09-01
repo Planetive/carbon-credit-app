@@ -29,7 +29,7 @@ const moduleIcons: Record<string, typeof Sprout> = {
   "vert-os": Sprout,
   "helios-solar": Sun,
   "helios-terra": Sun,
-  helios: Flame,
+  terra: Flame,
   sequest: Factory,
 };
 
@@ -187,7 +187,7 @@ function SectionBlock({ section }: { section: MrvCatalogSection }) {
     // Paste real module URLs here when ready
     const MODULE_URLS: Record<string, string> = {
       "vert-os": "https://hydroponics-planetive.vercel.app",
-      helios: "https://bio-char-mrv-api-server.vercel.app",
+      terra: "https://bio-char-mrv-api-server.vercel.app",
       "helios-solar": "https://bess-beacon-core.vercel.app/login",
       "helios-terra": "https://bess-beacon-core.vercel.app/login",
     };

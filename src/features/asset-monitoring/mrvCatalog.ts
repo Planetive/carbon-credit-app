@@ -82,8 +82,8 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "biochar",
     modules: [
       {
-        id: "helios",
-        name: "Helios",
+        id: "terra",
+        name: "Terra",
         subtitle: "Feedstock & Production",
         cardDescription:
           "Manage feedstock tracking, sustainability data, and production monitoring for biochar operations.",
