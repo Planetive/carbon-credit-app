@@ -188,6 +188,7 @@ function SectionBlock({ section }: { section: MrvCatalogSection }) {
     const MODULE_URLS: Record<string, string> = {
       "vert-os": "https://hydroponics-planetive.vercel.app",
       helios: "https://bio-char-mrv-api-server.vercel.app",
+      "helios-solar": "https://bess-beacon-core.vercel.app/login",
       "helios-terra": "https://bess-beacon-core.vercel.app/login",
     };
 
