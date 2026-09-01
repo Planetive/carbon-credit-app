@@ -27,7 +27,8 @@ const sectionIcons = {
 
 const moduleIcons: Record<string, typeof Sprout> = {
   "vert-os": Sprout,
-  terra: Sun,
+  "helios-solar": Sun,
+  "helios-terra": Sun,
   helios: Flame,
   sequest: Factory,
 };
@@ -187,7 +188,7 @@ function SectionBlock({ section }: { section: MrvCatalogSection }) {
     const MODULE_URLS: Record<string, string> = {
       "vert-os": "https://hydroponics-planetive.vercel.app",
       helios: "https://bio-char-mrv-api-server.vercel.app",
-      terra: "https://bess-beacon-core.vercel.app/login",
+      "helios-terra": "https://bess-beacon-core.vercel.app/login",
     };
 
     const url = MODULE_URLS[mod.id];

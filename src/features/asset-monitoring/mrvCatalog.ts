@@ -50,17 +50,28 @@ export const MRV_CATALOG_SECTIONS: MrvCatalogSection[] = [
     iconKey: "renewable",
     modules: [
       {
-        id: "terra",
-        name: "Terra",
-        subtitle: "Solar PV & Battery Storage",
+        id: "helios-solar",
+        name: "Helios",
+        subtitle: "Solar PV",
         cardDescription:
-          "Track solar generation, inverter performance, and battery storage—charge cycles, efficiency, and grid services—in one hybrid renewable workspace.",
+          "Track solar generation, inverter performance, irradiance-adjusted output, and export or self-consumption across your PV portfolio.",
         capabilities: "Track • Measure • Report",
         status: "preview",
         description:
-          "Combined solar and BESS MRV for installed PV capacity, irradiance-adjusted generation, performance ratio, and export or self-consumption, " +
-          "alongside battery state of charge, round-trip efficiency, cycling, and grid or behind-the-meter services. " +
-          "Align meter reads, inverter telemetry, and storage degradation with registry and disclosure workflows for hybrid renewable portfolios.",
+          "Solar MRV for installed PV capacity, irradiance-adjusted generation, performance ratio, and export or self-consumption. " +
+          "Align meter reads and inverter telemetry with registry and disclosure workflows for renewable portfolios.",
+      },
+      {
+        id: "helios-terra",
+        name: "Helios Terra",
+        subtitle: "Battery Storage (BESS)",
+        cardDescription:
+          "Monitor battery state of charge, charge cycles, round-trip efficiency, degradation, and grid or behind-the-meter services.",
+        capabilities: "Track • Measure • Report",
+        status: "preview",
+        description:
+          "BESS MRV for battery state of charge, round-trip efficiency, cycling, and grid or behind-the-meter services. " +
+          "Align storage telemetry and degradation with registry and disclosure workflows for hybrid renewable portfolios.",
       },
     ],
   },
