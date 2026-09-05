@@ -46,19 +46,339 @@ const BOND_FAMILY = ['corporate-bond', 'business-loan', 'project-finance'];
 const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
 
 const VEHICLE_METHODS = [
-  { id: '1a', title: 'Actual fuel consumption', score: 'Score 1', description: 'EPA Mobile Fuel (CNG/LPG/LNG/diesel) or DEFRA Scope 1 Fuel (mineral petrol/diesel, CNG, LPG)' },
-  { id: '2a', title: 'Local distance statistics', score: 'Score 2', description: 'Local statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
-  { id: '2b', title: 'Regional distance statistics', score: 'Score 3', description: 'Regional statistical distance × EPA on-road or DEFRA passenger/delivery factor' },
-  { id: '3a', title: 'Vehicle-type efficiency', score: 'Score 4', description: 'Statistical distance × EPA mobile fuel or DEFRA vehicle-type factor' },
-  { id: '3b', title: 'Average vehicle efficiency', score: 'Score 5', description: 'Statistical distance × EPA average or DEFRA passenger/delivery factor' },
+  {
+    id: '1a',
+    title: 'Actual fuel consumption',
+    score: 'Score 1a',
+    description:
+      'User enters actual fuel consumed; Brand / Model / Year from sheet; EPA Mobile Fuel supplies the emission factor',
+  },
+  {
+    id: '1b',
+    title: 'Actual distance + make/model',
+    score: 'Score 1b',
+    description:
+      'Actual km + Brand / Model / Year from sheet (efficiency from Efficiency Average); EPA supplies the emission factor',
+  },
+  {
+    id: '2a',
+    title: 'Local distance statistics',
+    score: 'Score 2',
+    description:
+      'Private/public (+ intercity/outercity), Brand / Model / Year for efficiency; distance from stats; EF from EPA fuel type',
+  },
+  {
+    id: '2b',
+    title: 'Regional distance statistics',
+    score: 'Score 3',
+    description:
+      'Same as Score 2 with regional distance; Brand / Model / Year efficiency from sheet; EF from EPA fuel type',
+  },
+  {
+    id: '3a',
+    title: 'Vehicle-type efficiency',
+    score: 'Score 4',
+    description:
+      'Private/public + local/regional distance; pick one vehicle or fuel from a combined list for the emission factor',
+  },
+  {
+    id: '3b',
+    title: 'Efficiency by engine CC',
+    score: 'Score 5',
+    description:
+      'Private/public, local or regional; fuel type from EPA Mobile Fuel; efficiency from CC-band sheet (Pakistan local / regional)',
+  },
 ];
 
+const vehicleMethodLabel = (id: string) => {
+  const m = VEHICLE_METHODS.find((x) => x.id === id);
+  return m ? `${m.score} — ${m.title}` : id.toUpperCase();
+};
+
+type YesNo = 'yes' | 'no' | '';
+type DistanceScope = 'local' | 'regional' | '';
+
+function resolveVehicleOptionFromAnswers(answers: {
+  hasFuel: YesNo;
+  hasKmAndModel: YesNo;
+  hasModelOnly: YesNo;
+  distanceScope: DistanceScope;
+  hasVehicleType: YesNo;
+}): string {
+  if (answers.hasFuel === 'yes') return '1a';
+  if (answers.hasFuel !== 'no') return '';
+  if (answers.hasKmAndModel === 'yes') return '1b';
+  if (answers.hasKmAndModel !== 'no') return '';
+  if (answers.hasModelOnly === 'yes') {
+    if (answers.distanceScope === 'local') return '2a';
+    if (answers.distanceScope === 'regional') return '2b';
+    return '';
+  }
+  if (answers.hasModelOnly !== 'no') return '';
+  if (answers.hasVehicleType === 'yes') return '3a';
+  if (answers.hasVehicleType === 'no') return '3b';
+  return '';
+}
+
+function answersFromVehicleOption(optionId: string): {
+  hasFuel: YesNo;
+  hasKmAndModel: YesNo;
+  hasModelOnly: YesNo;
+  distanceScope: DistanceScope;
+  hasVehicleType: YesNo;
+} {
+  switch (optionId) {
+    case '1a':
+      return { hasFuel: 'yes', hasKmAndModel: '', hasModelOnly: '', distanceScope: '', hasVehicleType: '' };
+    case '1b':
+      return { hasFuel: 'no', hasKmAndModel: 'yes', hasModelOnly: '', distanceScope: '', hasVehicleType: '' };
+    case '2a':
+      return {
+        hasFuel: 'no',
+        hasKmAndModel: 'no',
+        hasModelOnly: 'yes',
+        distanceScope: 'local',
+        hasVehicleType: '',
+      };
+    case '2b':
+      return {
+        hasFuel: 'no',
+        hasKmAndModel: 'no',
+        hasModelOnly: 'yes',
+        distanceScope: 'regional',
+        hasVehicleType: '',
+      };
+    case '3a':
+      return {
+        hasFuel: 'no',
+        hasKmAndModel: 'no',
+        hasModelOnly: 'no',
+        distanceScope: '',
+        hasVehicleType: 'yes',
+      };
+    case '3b':
+      return {
+        hasFuel: 'no',
+        hasKmAndModel: 'no',
+        hasModelOnly: 'no',
+        distanceScope: '',
+        hasVehicleType: 'no',
+      };
+    default:
+      return { hasFuel: '', hasKmAndModel: '', hasModelOnly: '', distanceScope: '', hasVehicleType: '' };
+  }
+}
+
+function VehicleProgressiveCapabilityPicker({
+  selectedId,
+  onSelect,
+  error,
+}: {
+  selectedId: string;
+  onSelect: (id: string) => void;
+  error?: string;
+}) {
+  const [answers, setAnswers] = useState(() => answersFromVehicleOption(selectedId));
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const resolved = resolveVehicleOptionFromAnswers(answers);
+    if (resolved !== selectedId) {
+      setAnswers(answersFromVehicleOption(selectedId));
+    }
+    // Only re-sync when the wizard restores a different method id
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const applyAnswers = (next: typeof answers) => {
+    setAnswers(next);
+    const resolved = resolveVehicleOptionFromAnswers(next);
+    onSelect(resolved);
+  };
+
+  const resolved = resolveVehicleOptionFromAnswers(answers);
+  const resolvedMeta = VEHICLE_METHODS.find((m) => m.id === resolved);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-[#64748B] leading-relaxed">
+        Answer in order. The platform picks the highest PCAF score your data supports. Emission factors are
+        EPA by fuel type (DEFRA available later in the form).
+      </p>
+
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-[#0F172A]">Can you provide actual fuel consumption?</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <ChoiceTile
+            selected={answers.hasFuel === 'yes'}
+            title="Yes — Score 1a"
+            description="Actual fuel consumed for the year"
+            onClick={() =>
+              applyAnswers({
+                hasFuel: 'yes',
+                hasKmAndModel: '',
+                hasModelOnly: '',
+                distanceScope: '',
+                hasVehicleType: '',
+              })
+            }
+          />
+          <ChoiceTile
+            selected={answers.hasFuel === 'no'}
+            title="No"
+            description="Continue with distance or vehicle details"
+            onClick={() =>
+              applyAnswers({
+                hasFuel: 'no',
+                hasKmAndModel: '',
+                hasModelOnly: '',
+                distanceScope: '',
+                hasVehicleType: '',
+              })
+            }
+          />
+        </div>
+      </div>
+
+      {answers.hasFuel === 'no' && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-[#0F172A]">
+            Can you provide actual km driven and make/model?
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <ChoiceTile
+              selected={answers.hasKmAndModel === 'yes'}
+              title="Yes — Score 1b"
+              description="Odometer km, make/model, and fuel efficiency — EPA supplies the emission factor"
+              onClick={() =>
+                applyAnswers({
+                  ...answers,
+                  hasKmAndModel: 'yes',
+                  hasModelOnly: '',
+                  distanceScope: '',
+                  hasVehicleType: '',
+                })
+              }
+            />
+            <ChoiceTile
+              selected={answers.hasKmAndModel === 'no'}
+              title="No"
+              onClick={() =>
+                applyAnswers({
+                  ...answers,
+                  hasKmAndModel: 'no',
+                  hasModelOnly: '',
+                  distanceScope: '',
+                  hasVehicleType: '',
+                })
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {answers.hasFuel === 'no' && answers.hasKmAndModel === 'no' && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-[#0F172A]">Can you provide make/model only?</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <ChoiceTile
+              selected={answers.hasModelOnly === 'yes'}
+              title="Yes — Score 2 or 3"
+              description="Efficiency from make/model; distance from statistics"
+              onClick={() =>
+                applyAnswers({
+                  ...answers,
+                  hasModelOnly: 'yes',
+                  distanceScope: '',
+                  hasVehicleType: '',
+                })
+              }
+            />
+            <ChoiceTile
+              selected={answers.hasModelOnly === 'no'}
+              title="No"
+              onClick={() =>
+                applyAnswers({
+                  ...answers,
+                  hasModelOnly: 'no',
+                  distanceScope: '',
+                  hasVehicleType: '',
+                })
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {answers.hasFuel === 'no' && answers.hasKmAndModel === 'no' && answers.hasModelOnly === 'yes' && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-[#0F172A]">Which distance statistics will you use?</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <ChoiceTile
+              selected={answers.distanceScope === 'local'}
+              title="Local — Score 2"
+              description="Local statistical distance (e.g. NTRC local)"
+              onClick={() => applyAnswers({ ...answers, distanceScope: 'local', hasVehicleType: '' })}
+            />
+            <ChoiceTile
+              selected={answers.distanceScope === 'regional'}
+              title="Regional — Score 3"
+              description="Regional / national average distance"
+              onClick={() => applyAnswers({ ...answers, distanceScope: 'regional', hasVehicleType: '' })}
+            />
+          </div>
+        </div>
+      )}
+
+      {answers.hasFuel === 'no' &&
+        answers.hasKmAndModel === 'no' &&
+        answers.hasModelOnly === 'no' && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#0F172A]">
+              Can you provide a broad vehicle type?
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <ChoiceTile
+                selected={answers.hasVehicleType === 'yes'}
+                title="Yes — Score 4"
+                description="Motorcycle / small car / large car / LCV / truck / bus"
+                onClick={() => applyAnswers({ ...answers, hasVehicleType: 'yes' })}
+              />
+              <ChoiceTile
+                selected={answers.hasVehicleType === 'no'}
+                title="No — Score 5"
+                description="Use average vehicle distance and efficiency"
+                onClick={() => applyAnswers({ ...answers, hasVehicleType: 'no' })}
+              />
+            </div>
+          </div>
+        )}
+
+      {resolvedMeta && (
+        <div className="rounded-[14px] border border-[#BFE3D3] bg-[#EAF7F1]/70 px-4 py-3">
+          <p className="text-sm font-semibold text-[#0F6E56]">
+            Using {resolvedMeta.score} — {resolvedMeta.title}
+          </p>
+          <p className="text-xs text-[#64748B] mt-1 leading-relaxed">{resolvedMeta.description}</p>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-600 flex items-center gap-1.5">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const PROPERTY_METHODS = [
-  { id: '1a', title: 'Actual energy + supplier factor', score: 'Score 1', description: 'Actual building electricity × EPA/DEFRA supplier-specific factor' },
-  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building electricity × EPA/DEFRA average factor' },
-  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy from labels × floor area × EPA/DEFRA average factor' },
-  { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'Energy from statistics × floor area × EPA/DEFRA average factor' },
-  { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'Energy from statistics × number of buildings × EPA/DEFRA average factor' },
+  { id: '1a', title: 'Actual energy + supplier factor', score: 'Score 1', description: 'Actual building energy (kWh) × user-supplied supplier-specific emission factor' },
+  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building energy (kWh) × user-supplied average emission factor' },
+  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy per floor area × floor area × grid emission factor' },
+  { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
+  { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
 ];
 
 const SOVEREIGN_METHODS = [
@@ -1265,7 +1585,7 @@ export const ESGWizard: React.FC = () => {
             errors.calculationMethod = 'Select a PCAF option for the corporate bond / business loan';
           }
           if (hasVehicleFamily && !dataToValidate.calculationMethods?.['motor-vehicle-loan']) {
-            errors.vehicleMethod = 'Select a PCAF option for the motor vehicle loan';
+            errors.vehicleMethod = 'Answer the motor vehicle data questions to determine the PCAF score';
           }
           if (hasPropertyFamily && !PROPERTY_FAMILY.some((t) => dataToValidate.calculationMethods?.[t])) {
             errors.propertyMethod = 'Select a PCAF option for the property loan';
@@ -1277,7 +1597,9 @@ export const ESGWizard: React.FC = () => {
         }
         if (isDirectMethod) {
           if (!dataToValidate.calculationMethod) {
-            errors.calculationMethod = 'Please select a calculation method';
+            errors.calculationMethod = isVehicleDirect
+              ? 'Answer the motor vehicle data questions to determine the PCAF score'
+              : 'Please select a calculation method';
           }
           break;
         }
@@ -1653,9 +1975,7 @@ export const ESGWizard: React.FC = () => {
               {hasVehicleFamily && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-[#0F172A]">Motor vehicle loan — activity data</h3>
-                  <p className="text-xs text-[#64748B]">Not company GHG. Choose how you know fuel or distance.</p>
-                  <MethodOptionGrid
-                    methods={VEHICLE_METHODS}
+                  <VehicleProgressiveCapabilityPicker
                     selectedId={methodFor('motor-vehicle-loan')}
                     onSelect={(id) => applyMethods(['motor-vehicle-loan'], id)}
                     error={validationErrors.vehicleMethod}
@@ -1701,8 +2021,7 @@ export const ESGWizard: React.FC = () => {
         }
         if (isVehicleDirect) {
           return (
-            <MethodOptionGrid
-              methods={VEHICLE_METHODS}
+            <VehicleProgressiveCapabilityPicker
               selectedId={formData.calculationMethod}
               onSelect={(id) => applyMethods(['motor-vehicle-loan'], id)}
               error={validationErrors.calculationMethod}
@@ -1786,9 +2105,9 @@ export const ESGWizard: React.FC = () => {
               item.type === 'project-finance'
           );
           const creMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy from labels × floor area × EPA/DEFRA average factor' },
-            { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'Energy from statistics × floor area × EPA/DEFRA average factor' },
-            { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'Energy from statistics × number of buildings × EPA/DEFRA average factor' },
+            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy per floor area × floor area × grid emission factor' },
+            { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
+            { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
           ];
           if (hasCommercialRealEstate) {
             return (
@@ -2330,9 +2649,13 @@ export const ESGWizard: React.FC = () => {
                     {formData.loanTypes.map((lt) => {
                       const method = formData.calculationMethods?.[lt.type] || formData.calculationMethod;
                       if (!method) return null;
+                      const label =
+                        lt.type === 'motor-vehicle-loan'
+                          ? vehicleMethodLabel(method)
+                          : method.toUpperCase();
                       return (
                         <div key={lt.type}>
-                          {loanTypeLabel(lt.type)} · {method.toUpperCase()}
+                          {loanTypeLabel(lt.type)} · {label}
                         </div>
                       );
                     })}
@@ -2341,7 +2664,11 @@ export const ESGWizard: React.FC = () => {
               ) : formData.calculationMethod ? (
                 <div>
                   <dt className="text-xs text-[#64748B]">Method</dt>
-                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">{formData.calculationMethod.toUpperCase()}</dd>
+                  <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">
+                    {hasVehicleFamily || isVehicleDirect
+                      ? vehicleMethodLabel(formData.calculationMethod)
+                      : formData.calculationMethod.toUpperCase()}
+                  </dd>
                 </div>
               ) : null}
               {formData.verificationStatus && (

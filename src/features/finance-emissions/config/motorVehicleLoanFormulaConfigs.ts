@@ -66,7 +66,7 @@ const emissionFactorInput = {
   type: 'number' as const,
   required: true,
   unit: 'tCO2e/L',
-  description: 'Emission factor specific to the fuel type (aggregate fallback)',
+  description: 'EPA emission factor by fuel type (aggregate fallback; DEFRA optional)',
 };
 
 const totalVehicleEmissionsInput = {
@@ -266,80 +266,81 @@ const buildDistanceOption = (
 export const OPTION_1A_MOTOR_VEHICLE = buildFuelOption(
   '1a-motor-vehicle',
   'Option 1a - Actual Fuel Consumption (Motor Vehicle Loan)',
-  'Primary data on actual vehicle fuel consumption × fuel-specific emission factor',
+  'Primary data on actual vehicle fuel consumption × EPA Mobile Fuel emission factor by fuel type',
   '1a',
   1,
   'PCAF Option 1a - Actual Vehicle Fuel Consumption (Motor Vehicle Loan)',
-  'Σ_v (Outstanding_v / Value_v) × Fuel_v × EF_f'
+  'Σ_v (Outstanding_v / Value_v) × Fuel_v × EF_f (EPA by fuel type)'
 );
 
 export const OPTION_1B_MOTOR_VEHICLE = buildDistanceOption(
   '1b-motor-vehicle',
   'Option 1b - Actual Distance + Make/Model Efficiency (Motor Vehicle Loan)',
-  'Primary distance traveled × make/model fuel efficiency × fuel-specific emission factor',
+  'User-entered distance × make/model efficiency (Efficiency Average) × EPA Mobile Fuel emission factor',
   '1b',
   1,
   'PCAF Option 1b - Actual Distance Traveled (Motor Vehicle Loan)',
   'Actual Distance Traveled',
   'Primary data on actual vehicle distance traveled',
-  'Fuel efficiency from known vehicle make and model',
-  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_v,f × EF_f'
+  'Fuel efficiency from make/model sheet (Efficiency Average → L/km)',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_make/model × EF_f (EPA by fuel type)'
 );
 
 export const OPTION_2A_MOTOR_VEHICLE = buildDistanceOption(
   '2a-motor-vehicle',
   'Option 2a - Local Distance Statistics (Motor Vehicle Loan)',
-  'Local statistical distance × make/model fuel efficiency × fuel-specific emission factor',
+  'Distance traveled × make/model efficiency × EPA Mobile Fuel emission factor. Distance from local stats; efficiency from make/model sheet.',
   '2a',
   2,
   'PCAF Option 2a - Local Statistical Distance (Motor Vehicle Loan)',
-  'Local Statistical Distance',
-  'Local statistical data for distance traveled',
-  'Fuel efficiency from known vehicle make and model',
-  'Σ_v (Outstanding_v / Value_v) × Distance_l,v × Efficiency_v,f × EF_f'
+  'Distance Traveled',
+  'Local statistical km from the distance stats sheet by vehicle use and class',
+  'Fuel efficiency from make/model sheet (Efficiency Average → L/km)',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_make/model × EF_f (EPA by fuel type)'
 );
 
 export const OPTION_2B_MOTOR_VEHICLE = buildDistanceOption(
   '2b-motor-vehicle',
   'Option 2b - Regional Distance Statistics (Motor Vehicle Loan)',
-  'Regional statistical distance × make/model fuel efficiency × fuel-specific emission factor',
+  'Regional distance stats by vehicle use/class × make/model efficiency × EPA Mobile Fuel EF',
   '2b',
   3,
   'PCAF Option 2b - Regional Statistical Distance (Motor Vehicle Loan)',
-  'Regional Statistical Distance',
-  'Regional statistical data for distance traveled',
-  'Fuel efficiency from known vehicle make and model',
-  'Σ_v (Outstanding_v / Value_v) × Distance_r,v × Efficiency_v,f × EF_f'
+  'Distance Traveled',
+  'Regional statistical km from the distance stats sheet by vehicle use and class',
+  'Fuel efficiency from make/model sheet (Efficiency Average → L/km)',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_make/model × EF_f (EPA by fuel type)'
 );
 
 export const OPTION_3A_MOTOR_VEHICLE = buildDistanceOption(
   '3a-motor-vehicle',
-  'Option 3a - Vehicle-Type Efficiency (Motor Vehicle Loan)',
-  'Statistical distance × vehicle-type fuel efficiency × fuel-specific emission factor',
+  'Option 3a - Combined EPA Vehicle Factors (Motor Vehicle Loan)',
+  'Statistical distance × emission factor from a single vehicle/fuel list (EPA gasoline, diesel, fuel-type, and equipment factors)',
   '3a',
   4,
-  'PCAF Option 3a - Vehicle-Type Efficiency (Motor Vehicle Loan)',
-  'Statistical Distance',
-  'Local or regional statistical data for distance traveled',
-  'Fuel efficiency from known vehicle type',
-  'Σ_v (Outstanding_v / Value_v) × Distance_s,v × Efficiency_t,f × EF_f'
+  'PCAF Option 3a - Combined EPA Emission Factors (Motor Vehicle Loan)',
+  'Distance Traveled',
+  'Local or regional statistical km from the distance stats sheet by vehicle use and class',
+  'Emission factor from the combined vehicle/fuel list',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × EF (g/mile or fuel-based, depending on selection)'
 );
 
 export const OPTION_3B_MOTOR_VEHICLE = buildDistanceOption(
   '3b-motor-vehicle',
   'Option 3b - Average Vehicle Efficiency (Motor Vehicle Loan)',
-  'Statistical distance × average-vehicle fuel efficiency × fuel-specific emission factor',
+  'Distance from vehicle-use stats × efficiency by engine CC band (local/regional sheet) × EPA Mobile Fuel emission factor',
   '3b',
   5,
   'PCAF Option 3b - Average Vehicle Efficiency (Motor Vehicle Loan)',
-  'Statistical Distance',
-  'Local or regional statistical data for distance traveled',
-  'Fuel efficiency from an average vehicle',
-  'Σ_v (Outstanding_v / Value_v) × Distance_s,v × Efficiency_a,f × EF_f'
+  'Distance Traveled',
+  'Local or regional statistical km from the distance stats sheet by vehicle use and class',
+  'Fuel efficiency from CC-band sheet (local Pakistan / regional) by engine cc + fuel type',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_cc × EF_f (EPA by fuel type)'
 );
 
 export const MOTOR_VEHICLE_LOAN_FORMULAS = [
   OPTION_1A_MOTOR_VEHICLE,
+  OPTION_1B_MOTOR_VEHICLE,
   OPTION_2A_MOTOR_VEHICLE,
   OPTION_2B_MOTOR_VEHICLE,
   OPTION_3A_MOTOR_VEHICLE,

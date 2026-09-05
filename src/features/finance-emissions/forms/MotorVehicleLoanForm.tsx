@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Info } from "lucide-react";
 import { FormulaConfig } from "../types/formula";
@@ -30,12 +30,43 @@ import {
   epaSourcesForPcafOption,
   isScore1aDefraFuel,
   isScore1aMobileFuel,
+  efficiencyForEpaFuelType,
+  efficiencyForEpaVehicleType,
   loadMotorVehicleFactorLibraries,
   type DefraVehicleSource,
   type EpaVehicleSource,
   type MotorVehicleFactorLibraries,
   type VehicleSource,
 } from "../utils/motorVehicleFactorLoaders";
+import {
+  classesForDistance,
+  findDistanceStat,
+  formatDistanceStatHint,
+  loadVehicleDistanceStats,
+  preferredDistanceClass,
+  usesForStats,
+  type DistanceScope,
+  type DistanceUseClass,
+  type PublicRoute,
+  type VehicleDistanceStat,
+} from "../utils/motorVehicleDistanceLoaders";
+import {
+  brandsFromMakeModel,
+  findMakeModelRow,
+  formatMakeModelHint,
+  loadVehicleMakeModelRows,
+  matchEpaFuelFromSheet,
+  modelNamesForBrand,
+  yearsForBrandModel,
+  type VehicleMakeModelRow,
+} from "../utils/motorVehicleMakeModelLoaders";
+import {
+  efficiencyForScore5Cc,
+  findCcEfficiency,
+  formatCcEfficiencyHint,
+  loadVehicleCcEfficiencyRows,
+  type VehicleCcEfficiencyRow,
+} from "../utils/motorVehicleCcEfficiencyLoaders";
 import {
   computeMotorVehicleEntryEmissions,
   type DistanceUnit,
@@ -67,6 +98,20 @@ interface VehicleEntry {
   vehicleType: string;
   unit: string;
   fuelType: string;
+  /** Make / brand — from make/model sheet on Scores 1a / 1b / 2 / 3 */
+  make: string;
+  /** Model name — from make/model sheet on Scores 1a / 1b / 2 / 3 */
+  model: string;
+  /** Score 2–5: private / public / commercial (matches distance stats sheet) */
+  vehicleUseClass: DistanceUseClass | "";
+  /** Score 2–5 public only: intercity vs outercity (intracity) */
+  publicRoute: PublicRoute | "";
+  /** Score 4–5: local vs regional statistical distance */
+  distanceScope: DistanceScope | "";
+  /** Vehicle class from distance stats sheet */
+  distanceClass: string;
+  /** Score 5: engine cubic capacity (cc) */
+  engineCc: number;
   modelYear: string;
   ladenLevel: string;
   ukFactorBasis: UkFactorBasis;
@@ -89,9 +134,158 @@ interface VehicleEntry {
 
 const AVERAGE_VEHICLE_EFFICIENCY = 0.08;
 
+/** One row in Score 4’s combined vehicle/fuel picker (Tables 3+4 + Mobile + Non-Road). */
+type Score4CombinedOption = {
+  key: string;
+  label: string;
+  group: string;
+  source: EpaVehicleSource;
+  vehicleType: string;
+  fuelType: string;
+  needsModelYear: boolean;
+  needsFuelQuantity: boolean;
+  needsDistanceUnit: boolean;
+};
+
+function buildScore4CombinedOptions(libs: MotorVehicleFactorLibraries | null): Score4CombinedOption[] {
+  if (!libs) return [];
+  const out: Score4CombinedOption[] = [];
+
+  const gasTypes = Array.from(new Set(libs.onRoadGasoline.map((f) => f.vehicleType))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  for (const vehicleType of gasTypes) {
+    out.push({
+      key: `gas::${vehicleType}`,
+      label: vehicleType,
+      group: "Gasoline vehicles",
+      source: "on_road_gasoline",
+      vehicleType,
+      fuelType: "",
+      needsModelYear: true,
+      needsFuelQuantity: false,
+      needsDistanceUnit: true,
+    });
+  }
+
+  const dieselPairs = new Map<string, { vehicleType: string; fuelType: string }>();
+  for (const f of libs.onRoadDiesel) {
+    const k = `${f.vehicleType}::${f.fuelType}`;
+    if (!dieselPairs.has(k)) dieselPairs.set(k, { vehicleType: f.vehicleType, fuelType: f.fuelType });
+  }
+  Array.from(dieselPairs.values())
+    .sort((a, b) => a.vehicleType.localeCompare(b.vehicleType) || a.fuelType.localeCompare(b.fuelType))
+    .forEach(({ vehicleType, fuelType }) => {
+      out.push({
+        key: `diesel::${vehicleType}::${fuelType}`,
+        label: `${vehicleType} — ${fuelType}`,
+        group: "Diesel & alternative-fuel vehicles",
+        source: "on_road_diesel",
+        vehicleType,
+        fuelType,
+        needsModelYear: true,
+        needsFuelQuantity: false,
+        needsDistanceUnit: true,
+      });
+    });
+
+  const fuels = Array.from(new Set(libs.mobileFuels.map((f) => f.fuelType))).sort((a, b) => a.localeCompare(b));
+  for (const fuelType of fuels) {
+    let label = fuelType;
+    const t = fuelType.toLowerCase();
+    if (t.includes("motor gasoline") || (t.includes("gasoline") && !t.includes("aviation"))) {
+      label = `${fuelType} (Petrol)`;
+    } else if (/\bcng\b/.test(t) || t.includes("compressed natural")) {
+      label = fuelType.includes("(") ? fuelType : `${fuelType} (CNG)`;
+    } else if (/\blpg\b/.test(t) || t.includes("liquefied petroleum")) {
+      label = fuelType.includes("(") ? fuelType : `${fuelType} (LPG)`;
+    }
+    out.push({
+      key: `mobile::${fuelType}`,
+      label,
+      group: "By fuel type",
+      source: "mobile_combustion",
+      vehicleType: "",
+      fuelType,
+      needsModelYear: false,
+      needsFuelQuantity: false,
+      needsDistanceUnit: false,
+    });
+  }
+
+  const nonRoadPairs = new Map<string, { vehicleType: string; fuelType: string }>();
+  for (const f of libs.nonRoad) {
+    const k = `${f.vehicleType}::${f.fuelType}`;
+    if (!nonRoadPairs.has(k)) nonRoadPairs.set(k, { vehicleType: f.vehicleType, fuelType: f.fuelType });
+  }
+  Array.from(nonRoadPairs.values())
+    .sort((a, b) => a.vehicleType.localeCompare(b.vehicleType) || a.fuelType.localeCompare(b.fuelType))
+    .forEach(({ vehicleType, fuelType }) => {
+      out.push({
+        key: `nonroad::${vehicleType}::${fuelType}`,
+        label: `${vehicleType} — ${fuelType}`,
+        group: "Equipment & off-road",
+        source: "non_road",
+        vehicleType,
+        fuelType,
+        needsModelYear: false,
+        needsFuelQuantity: true,
+        needsDistanceUnit: false,
+      });
+    });
+
+  return out;
+}
+
+function score4KeyFromEntry(entry: {
+  vehicleSource: string;
+  vehicleType: string;
+  fuelType: string;
+}): string | undefined {
+  switch (entry.vehicleSource) {
+    case "on_road_gasoline":
+      return entry.vehicleType ? `gas::${entry.vehicleType}` : undefined;
+    case "on_road_diesel":
+      return entry.vehicleType && entry.fuelType
+        ? `diesel::${entry.vehicleType}::${entry.fuelType}`
+        : undefined;
+    case "mobile_combustion":
+      return entry.fuelType ? `mobile::${entry.fuelType}` : undefined;
+    case "non_road":
+      return entry.vehicleType && entry.fuelType
+        ? `nonroad::${entry.vehicleType}::${entry.fuelType}`
+        : undefined;
+    default:
+      return undefined;
+  }
+}
+
 const isFuelConsumptionOption = (formula: FormulaConfig | null) => formula?.optionCode === "1a";
+const isScore1bOption = (formula: FormulaConfig | null) => formula?.optionCode === "1b";
+const isScore2Option = (formula: FormulaConfig | null) => formula?.optionCode === "2a";
+const isScore3Option = (formula: FormulaConfig | null) => formula?.optionCode === "2b";
+/** Score 2 (local) and Score 3 (regional) share the same EPA fuel-type form. */
+const isDistanceStatsScore = (formula: FormulaConfig | null) =>
+  isScore2Option(formula) || isScore3Option(formula);
 const isTypeEfficiencyOption = (formula: FormulaConfig | null) => formula?.optionCode === "3a";
 const isAverageEfficiencyOption = (formula: FormulaConfig | null) => formula?.optionCode === "3b";
+const usesEpaFuelTypeOnly = (formula: FormulaConfig | null) =>
+  isFuelConsumptionOption(formula) || isScore1bOption(formula) || isDistanceStatsScore(formula);
+
+/** Display labels for EPA fuel names (DB value stays unchanged). */
+const formatEpaFuelLabel = (fuelType: string) => {
+  const t = fuelType.toLowerCase();
+  if (t.includes("motor gasoline") || (t.includes("gasoline") && !t.includes("aviation"))) {
+    return `${fuelType} (Petrol)`;
+  }
+  if (/\bcng\b/.test(t) || t.includes("compressed natural")) {
+    return fuelType.includes("(") ? fuelType : `${fuelType} (CNG)`;
+  }
+  if (/\blpg\b/.test(t) || t.includes("liquefied petroleum")) {
+    return fuelType.includes("(") ? fuelType : `${fuelType} (LPG)`;
+  }
+  return fuelType;
+};
 const usesEfficiencyFormula = (formula: FormulaConfig | null) => {
   const code = formula?.optionCode;
   return code === "1b" || code === "2a" || code === "2b" || code === "3a" || code === "3b";
@@ -102,12 +296,13 @@ const distanceLabelFor = (formula: FormulaConfig | null) => {
     case "1b":
       return "Actual distance traveled";
     case "2a":
-      return "Local statistical distance";
+      return "Distance traveled (local)";
     case "2b":
-      return "Regional statistical distance";
+      return "Distance traveled (regional)";
     case "3a":
+      return "Distance traveled";
     case "3b":
-      return "Statistical distance";
+      return "Distance traveled";
     default:
       return "Distance traveled";
   }
@@ -153,9 +348,23 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   onUpdateRef.current = onUpdateFormData;
 
   const fuelPath = isFuelConsumptionOption(selectedFormula);
-  const efficiencyPath = usesEfficiencyFormula(selectedFormula);
+  const score1bPath = isScore1bOption(selectedFormula);
+  const score3Path = isScore3Option(selectedFormula);
+  const distanceStatsPath = isDistanceStatsScore(selectedFormula);
   const typeEfficiencyPath = isTypeEfficiencyOption(selectedFormula);
   const averageEfficiencyPath = isAverageEfficiencyOption(selectedFormula);
+  const statisticalDistancePath = distanceStatsPath || typeEfficiencyPath || averageEfficiencyPath;
+  const mobileFuelPath = fuelPath || score1bPath || distanceStatsPath || averageEfficiencyPath;
+  /** Scores that pick Brand / Model / Year from the make/model sheet */
+  const makeModelPath = fuelPath || score1bPath || distanceStatsPath;
+  /** Scores that use sheet efficiency_average (→ L/km) */
+  const makeModelEfficiencyPath = score1bPath || distanceStatsPath;
+  /** Scores 1a / 1b / 2 / 3 / 4 / 5 — EPA-only (no DEFRA toggle). */
+  const epaLockedPath =
+    usesEpaFuelTypeOnly(selectedFormula) || typeEfficiencyPath || averageEfficiencyPath;
+  /** Scores that use EPA Mobile Fuel + Score 1a fuel filter */
+  const epaFuelOnlyPath = usesEpaFuelTypeOnly(selectedFormula) || averageEfficiencyPath;
+  const efficiencyPath = usesEfficiencyFormula(selectedFormula);
 
   const factorLibrary = (formData.factor_library as FactorLibrary) || "EPA";
   const [activeLibrary, setActiveLibrary] = useState<FactorLibrary>(factorLibrary);
@@ -163,6 +372,12 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   const [libs, setLibs] = useState<MotorVehicleFactorLibraries | null>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [distanceStats, setDistanceStats] = useState<VehicleDistanceStat[]>([]);
+  const [distanceStatsError, setDistanceStatsError] = useState<string | null>(null);
+  const [makeModelRows, setMakeModelRows] = useState<VehicleMakeModelRow[]>([]);
+  const [makeModelError, setMakeModelError] = useState<string | null>(null);
+  const [ccEfficiencyRows, setCcEfficiencyRows] = useState<VehicleCcEfficiencyRow[]>([]);
+  const [ccEfficiencyError, setCcEfficiencyError] = useState<string | null>(null);
   const [hoveredInfo, setHoveredInfo] = useState<{
     value: string;
     description: string;
@@ -180,8 +395,14 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       : EPA_SOURCE_LABELS[source as EpaVehicleSource];
 
   useEffect(() => {
-    setActiveLibrary(factorLibrary);
-  }, [factorLibrary]);
+    // Score 1a / 2 / 3 / 4 / 5: EPA only
+    if (epaLockedPath && factorLibrary !== "EPA") {
+      onUpdateRef.current("factor_library", "EPA");
+      setActiveLibrary("EPA");
+      return;
+    }
+    setActiveLibrary(epaLockedPath ? "EPA" : factorLibrary);
+  }, [factorLibrary, epaLockedPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +418,75 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       cancelled = true;
     };
   }, [activeLibrary]);
+
+  useEffect(() => {
+    if (!statisticalDistancePath) return;
+    let cancelled = false;
+    void loadVehicleDistanceStats()
+      .then((rows) => {
+        if (cancelled) return;
+        setDistanceStats(rows);
+        setDistanceStatsError(
+          rows.length === 0
+            ? "No distance stats found. Import motor_vehicle_distance_stats in pgAdmin."
+            : null
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDistanceStatsError(err instanceof Error ? err.message : "Failed to load distance stats.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [statisticalDistancePath]);
+
+  useEffect(() => {
+    if (!makeModelPath) return;
+    let cancelled = false;
+    void loadVehicleMakeModelRows()
+      .then((rows) => {
+        if (cancelled) return;
+        setMakeModelRows(rows);
+        setMakeModelError(
+          rows.length === 0
+            ? "No make/model rows found. Import motor_vehicle_make_model in pgAdmin."
+            : null
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setMakeModelError(err instanceof Error ? err.message : "Failed to load make/model sheet.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [makeModelPath]);
+
+  useEffect(() => {
+    if (!averageEfficiencyPath) return;
+    let cancelled = false;
+    void loadVehicleCcEfficiencyRows()
+      .then((rows) => {
+        if (cancelled) return;
+        setCcEfficiencyRows(rows);
+        setCcEfficiencyError(
+          rows.length === 0
+            ? "No CC efficiency rows found. Import motor_vehicle_cc_efficiency in pgAdmin."
+            : null
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCcEfficiencyError(err instanceof Error ? err.message : "Failed to load CC efficiency sheet.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [averageEfficiencyPath]);
 
   useEffect(() => {
     const handleClickOutside = () => setHoveredInfo(null);
@@ -233,9 +523,9 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     Object.keys(libs?.ukFuelMap[activity]?.[fuel] ?? {}).sort((a, b) => a.localeCompare(b));
   const epaFuelTypes = useMemo(() => {
     const all = Array.from(new Set((libs?.mobileFuels ?? []).map((f) => f.fuelType)));
-    const filtered = fuelPath ? all.filter(isScore1aMobileFuel) : all;
+    const filtered = epaFuelOnlyPath ? all.filter(isScore1aMobileFuel) : all;
     return filtered.sort((a, b) => a.localeCompare(b));
-  }, [libs, fuelPath]);
+  }, [libs, epaFuelOnlyPath]);
   const gasolineTypes = useMemo(
     () => Array.from(new Set((libs?.onRoadGasoline ?? []).map((f) => f.vehicleType))).sort((a, b) => a.localeCompare(b)),
     [libs]
@@ -277,6 +567,17 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       new Set((libs?.nonRoad ?? []).filter((f) => f.vehicleType === vehicleType).map((f) => f.fuelType))
     ).sort((a, b) => a.localeCompare(b));
 
+  const score4CombinedOptions = useMemo(() => buildScore4CombinedOptions(libs), [libs]);
+  const score4OptionsByGroup = useMemo(() => {
+    const map = new Map<string, Score4CombinedOption[]>();
+    for (const opt of score4CombinedOptions) {
+      const list = map.get(opt.group) ?? [];
+      list.push(opt);
+      map.set(opt.group, list);
+    }
+    return map;
+  }, [score4CombinedOptions]);
+
   const passengerTypesFor = (activity: string) =>
     Object.keys(libs?.passengerMap[activity] ?? {}).sort((a, b) => a.localeCompare(b));
   const passengerUnitsFor = (activity: string, vehicleType: string) =>
@@ -298,13 +599,37 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     (entry: VehicleEntry): VehicleEntry => {
       if (!libs) return entry;
       let next = entry;
-      if (fuelPath && activeLibrary === "EPA" && next.vehicleSource !== "mobile_combustion") {
-        next = { ...next, vehicleSource: "mobile_combustion", inputUnit: next.inputUnit || "gallon" };
+      if (
+        mobileFuelPath &&
+        activeLibrary === "EPA" &&
+        next.vehicleSource !== "mobile_combustion"
+      ) {
+        next = {
+          ...next,
+          vehicleSource: "mobile_combustion",
+          inputUnit: next.inputUnit || "gallon",
+          unit: score1bPath || distanceStatsPath || averageEfficiencyPath ? next.unit || "km" : next.unit,
+        };
+      }
+      if (
+        typeEfficiencyPath &&
+        activeLibrary === "EPA" &&
+        next.vehicleSource !== "on_road_gasoline" &&
+        next.vehicleSource !== "on_road_diesel" &&
+        next.vehicleSource !== "mobile_combustion" &&
+        next.vehicleSource !== "non_road"
+      ) {
+        next = {
+          ...next,
+          vehicleSource: "on_road_gasoline",
+          unit: "mile",
+          distanceUnit: next.distanceUnit || "mile",
+        };
       }
       if (fuelPath && activeLibrary === "DEFRA" && next.vehicleSource !== "fuel") {
         next = { ...next, vehicleSource: "fuel" };
       }
-      if (fuelPath && next.vehicleSource === "mobile_combustion") {
+      if (mobileFuelPath && next.vehicleSource === "mobile_combustion") {
         const allowed = (libs.mobileFuels ?? []).map((f) => f.fuelType).filter(isScore1aMobileFuel);
         if (allowed.length > 0 && !allowed.includes(next.fuelType)) {
           const fuelType = allowed[0];
@@ -312,10 +637,41 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           next = {
             ...next,
             fuelType,
-            unit: opt?.unit || next.unit,
+            unit: score1bPath || distanceStatsPath || averageEfficiencyPath ? next.unit || "km" : opt?.unit || next.unit,
             inputUnit: defaultInputUnit(factorBaseKind(opt?.unit || next.unit)),
+            efficiency: next.efficiency,
           };
         }
+        if (makeModelEfficiencyPath) {
+          const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+          next = {
+            ...next,
+            efficiency:
+              mm?.efficiencyLPerKm ||
+              (distanceStatsPath && next.fuelType
+                ? efficiencyForEpaFuelType(next.fuelType)
+                : next.efficiency),
+          };
+        } else if (averageEfficiencyPath) {
+          next = {
+            ...next,
+            efficiency: efficiencyForScore5Cc(ccEfficiencyRows, {
+              geography: next.distanceScope,
+              engineCc: next.engineCc,
+              fuelType: next.fuelType,
+            }),
+          };
+        }
+      }
+      if (
+        typeEfficiencyPath &&
+        (next.vehicleSource === "on_road_gasoline" || next.vehicleSource === "on_road_diesel") &&
+        next.vehicleType
+      ) {
+        next = { ...next, efficiency: efficiencyForEpaVehicleType(next.vehicleType) };
+      }
+      if (typeEfficiencyPath && next.vehicleSource === "mobile_combustion" && next.fuelType) {
+        next = { ...next, efficiency: efficiencyForEpaFuelType(next.fuelType), unit: next.unit || "km" };
       }
       if (fuelPath && next.vehicleSource === "fuel") {
         const activity =
@@ -353,17 +709,57 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       });
       return {
         ...next,
-        modelYear: normalizeEpaModelYear(next.modelYear),
+        modelYear:
+          typeEfficiencyPath ||
+          next.vehicleSource === "on_road_gasoline" ||
+          next.vehicleSource === "on_road_diesel"
+            ? normalizeEpaModelYear(next.modelYear)
+            : next.modelYear,
         efficiency: derived.efficiency,
         factorKg: derived.factorKg,
         factor: derived.factor,
         emissions: derived.emissions,
         formulaHint: derived.formulaHint,
-        unit: derived.unit || next.unit,
+        unit: score1bPath || distanceStatsPath ? next.unit || "km" : derived.unit || next.unit,
       };
     },
-    [libs, fuelPath, typeEfficiencyPath, averageEfficiencyPath, activeLibrary, ukFuelActivities]
+    [libs, fuelPath, score1bPath, mobileFuelPath, makeModelEfficiencyPath, distanceStatsPath, typeEfficiencyPath, averageEfficiencyPath, activeLibrary, ukFuelActivities, makeModelRows, ccEfficiencyRows]
   );
+
+  const impliedDistanceScope = (entry: VehicleEntry): DistanceScope | "" => {
+    if (isScore2Option(selectedFormula)) return "local";
+    if (isScore3Option(selectedFormula)) return "regional";
+    return entry.distanceScope || "";
+  };
+
+  const applyDistanceStats = (entry: VehicleEntry): VehicleEntry => {
+    if (!statisticalDistancePath || distanceStats.length === 0) return entry;
+    const scope = impliedDistanceScope(entry);
+    const classes = classesForDistance(
+      distanceStats,
+      entry.vehicleUseClass,
+      entry.publicRoute,
+      scope
+    );
+    let distanceClass = entry.distanceClass;
+    if (distanceClass && !classes.includes(distanceClass)) distanceClass = "";
+    if (!distanceClass) distanceClass = preferredDistanceClass(entry.vehicleUseClass, classes);
+    const hit = findDistanceStat(distanceStats, {
+      use: entry.vehicleUseClass,
+      vehicleClass: distanceClass,
+      publicRoute: entry.publicRoute,
+      scope,
+    });
+    if (!hit) return { ...entry, distanceClass };
+    const statsUnit = (hit.unit || "km").toLowerCase().includes("mile") ? "mile" : "km";
+    return {
+      ...entry,
+      distanceClass: distanceClass || hit.vehicleClass,
+      distance: hit.annualKm,
+      distanceUnit: statsUnit,
+      unit: typeEfficiencyPath ? entry.unit : statsUnit,
+    };
+  };
 
   const pushTotals = (entries: VehicleEntry[]) => {
     const primarySource = entries[0]?.vehicleSource;
@@ -394,6 +790,13 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       fuel_type: entry.fuelType || undefined,
       activity: entry.activity || undefined,
       vehicle_type: entry.vehicleType || undefined,
+      make: entry.make || undefined,
+      model: entry.model || undefined,
+      vehicle_use_class: entry.vehicleUseClass || undefined,
+      public_route: entry.publicRoute || undefined,
+      distance_scope: entry.distanceScope || undefined,
+      distance_class: entry.distanceClass || undefined,
+      engine_cc: entry.engineCc > 0 ? entry.engineCc : undefined,
       model_year: entry.modelYear || undefined,
       laden_level: entry.ladenLevel || undefined,
     }));
@@ -438,6 +841,13 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       vehicleType: "",
       unit: source === "on_road_gasoline" || source === "on_road_diesel" ? "mile" : "km",
       fuelType: "",
+      make: "",
+      model: "",
+      vehicleUseClass: statisticalDistancePath ? "private" : "",
+      publicRoute: "",
+      distanceScope: typeEfficiencyPath || averageEfficiencyPath ? "regional" : "",
+      distanceClass: "",
+      engineCc: 0,
       modelYear: "",
       ladenLevel: "",
       ukFactorBasis: "total",
@@ -482,21 +892,38 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       }
     } else if (source === "mobile_combustion" && epaFuelTypes[0]) {
       draft.fuelType = epaFuelTypes[0];
-      draft.unit = libs?.mobileFuels.find((f) => f.fuelType === epaFuelTypes[0])?.unit || "gallon";
+      draft.unit =
+        score1bPath ||
+        distanceStatsPath ||
+        averageEfficiencyPath ||
+        typeEfficiencyPath
+          ? "km"
+          : libs?.mobileFuels.find((f) => f.fuelType === epaFuelTypes[0])?.unit || "gallon";
       draft.inputUnit = defaultInputUnit(factorBaseKind(draft.unit));
+      if (score1bPath) draft.efficiency = 0;
+      if (distanceStatsPath) draft.efficiency = efficiencyForEpaFuelType(draft.fuelType);
+      if (typeEfficiencyPath) draft.efficiency = efficiencyForEpaFuelType(draft.fuelType);
+      if (averageEfficiencyPath)
+        draft.efficiency = efficiencyForScore5Cc(ccEfficiencyRows, {
+          geography: draft.distanceScope,
+          engineCc: draft.engineCc,
+          fuelType: draft.fuelType,
+        });
     } else if (source === "on_road_gasoline" && gasolineTypes[0]) {
       draft.vehicleType = gasolineTypes[0];
       draft.modelYear = gasolineYearsFor(gasolineTypes[0])[0] || "";
+      if (typeEfficiencyPath) draft.efficiency = efficiencyForEpaVehicleType(draft.vehicleType);
     } else if (source === "on_road_diesel" && dieselTypes[0]) {
       draft.vehicleType = dieselTypes[0];
       draft.fuelType = dieselFuelsFor(dieselTypes[0])[0] || "";
       draft.modelYear = dieselYearsFor(draft.vehicleType, draft.fuelType)[0] || "";
+      if (typeEfficiencyPath) draft.efficiency = efficiencyForEpaVehicleType(draft.vehicleType);
     } else if (source === "non_road" && nonRoadTypes[0]) {
       draft.vehicleType = nonRoadTypes[0];
       draft.fuelType = nonRoadFuelsFor(nonRoadTypes[0])[0] || "";
     }
 
-    return applyDerived(draft);
+    return applyDerived(applyDistanceStats(draft));
   };
 
   const addVehicleEntry = () => {
@@ -564,16 +991,45 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     const next = { ...entry, [field]: value } as VehicleEntry;
     if (entry.vehicleSource === "mobile_combustion" && field === "fuelType") {
       const opt = libs?.mobileFuels.find((f) => f.fuelType === String(value));
-      next.unit = opt?.unit || next.unit;
-      next.inputUnit = defaultInputUnit(factorBaseKind(next.unit));
+      if (distanceStatsPath) {
+        next.unit = next.unit || "km";
+        const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+        next.efficiency = mm?.efficiencyLPerKm || efficiencyForEpaFuelType(String(value));
+      } else if (score1bPath) {
+        next.unit = next.unit || "km";
+        const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+        if (mm) next.efficiency = mm.efficiencyLPerKm;
+      } else if (typeEfficiencyPath && entry.vehicleSource === "mobile_combustion") {
+        next.unit = next.unit || "km";
+        next.efficiency = efficiencyForEpaFuelType(String(value));
+      } else if (averageEfficiencyPath) {
+        next.unit = next.unit || "km";
+        next.efficiency = efficiencyForScore5Cc(ccEfficiencyRows, {
+          geography: next.distanceScope,
+          engineCc: next.engineCc,
+          fuelType: String(value),
+        });
+      } else {
+        next.unit = opt?.unit || next.unit;
+        next.inputUnit = defaultInputUnit(factorBaseKind(next.unit));
+      }
+    }
+    if (field === "engineCc" && averageEfficiencyPath) {
+      next.efficiency = efficiencyForScore5Cc(ccEfficiencyRows, {
+        geography: next.distanceScope,
+        engineCc: Number(value) || 0,
+        fuelType: next.fuelType,
+      });
     }
     if (entry.vehicleSource === "on_road_gasoline" && field === "vehicleType") {
       next.modelYear = gasolineYearsFor(String(value))[0] || "";
+      if (typeEfficiencyPath) next.efficiency = efficiencyForEpaVehicleType(String(value));
     }
     if (entry.vehicleSource === "on_road_diesel") {
       if (field === "vehicleType") {
         next.fuelType = dieselFuelsFor(String(value))[0] || "";
         next.modelYear = dieselYearsFor(String(value), next.fuelType)[0] || "";
+        if (typeEfficiencyPath) next.efficiency = efficiencyForEpaVehicleType(String(value));
       } else if (field === "fuelType") {
         next.modelYear = dieselYearsFor(next.vehicleType, String(value))[0] || "";
       }
@@ -584,16 +1040,107 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     return next;
   };
 
+  const applyScore4CombinedOption = (id: string, optionKey: string) => {
+    const opt = score4CombinedOptions.find((o) => o.key === optionKey);
+    if (!opt) return;
+    const updated = vehicleEntries.map((entry) => {
+      if (entry.id !== id) return entry;
+      let modelYear = "";
+      if (opt.source === "on_road_gasoline") {
+        modelYear = gasolineYearsFor(opt.vehicleType)[0] || "";
+      } else if (opt.source === "on_road_diesel") {
+        modelYear = dieselYearsFor(opt.vehicleType, opt.fuelType)[0] || "";
+      }
+      const efficiency =
+        opt.source === "on_road_gasoline" || opt.source === "on_road_diesel"
+          ? efficiencyForEpaVehicleType(opt.vehicleType)
+          : opt.source === "mobile_combustion"
+            ? efficiencyForEpaFuelType(opt.fuelType)
+            : entry.efficiency;
+      const next: VehicleEntry = {
+        ...entry,
+        vehicleSource: opt.source,
+        vehicleType: opt.vehicleType,
+        fuelType: opt.fuelType,
+        modelYear,
+        efficiency,
+        unit: opt.source === "on_road_gasoline" || opt.source === "on_road_diesel" ? "mile" : "km",
+        distanceUnit: opt.needsDistanceUnit ? entry.distanceUnit || "km" : entry.distanceUnit,
+        fuelConsumption: opt.needsFuelQuantity ? entry.fuelConsumption : entry.fuelConsumption,
+      };
+      return applyDerived(next);
+    });
+    setVehicleEntries(updated);
+    pushTotals(updated);
+  };
+
   const updateVehicleEntry = (id: string, field: keyof VehicleEntry, value: VehicleEntry[keyof VehicleEntry]) => {
     const updated = vehicleEntries.map((entry) => {
       if (entry.id !== id) return entry;
       let next: VehicleEntry = { ...entry, [field]: value };
-      if (field === "vehicleSource") {
+      if (field === "vehicleUseClass") {
+        const useClass = value as DistanceUseClass | "";
+        next.vehicleUseClass = useClass;
+        next.publicRoute = useClass === "public" ? entry.publicRoute || "intercity" : "";
+        next.distanceClass = "";
+        next = applyDistanceStats(next);
+      } else if (field === "publicRoute" || field === "distanceScope" || field === "distanceClass") {
+        next = applyDistanceStats(next);
+      } else if (field === "make" && makeModelPath) {
+        next.make = String(value);
+        next.model = "";
+        next.modelYear = "";
+        if (makeModelEfficiencyPath) {
+          next.efficiency = next.fuelType ? efficiencyForEpaFuelType(next.fuelType) : 0;
+        }
+      } else if (field === "model" && makeModelPath) {
+        next.model = String(value);
+        next.modelYear = "";
+        const years = yearsForBrandModel(makeModelRows, next.make, next.model);
+        if (years.length === 1) {
+          next.modelYear = years[0] === "Unknown" ? "" : years[0];
+        }
+        const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+        if (mm && makeModelEfficiencyPath) {
+          next.efficiency = mm.efficiencyLPerKm;
+          const matchedFuel = matchEpaFuelFromSheet(mm.fuelType, epaFuelTypes);
+          if (matchedFuel) next.fuelType = matchedFuel;
+        }
+      } else if (field === "modelYear" && makeModelPath) {
+        next.modelYear = String(value) === "Unknown" ? "" : String(value);
+        const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+        if (mm && makeModelEfficiencyPath) {
+          next.efficiency = mm.efficiencyLPerKm;
+          const matchedFuel = matchEpaFuelFromSheet(mm.fuelType, epaFuelTypes);
+          if (matchedFuel) next.fuelType = matchedFuel;
+        }
+      } else if (field === "vehicleSource") {
         next = blankEntry(1, value as VehicleSource, activeLibrary);
         next.id = entry.id;
         next.name = entry.name;
         next.totalValueAtOrigination = entry.totalValueAtOrigination;
         next.outstandingAmount = entry.outstandingAmount;
+        if (distanceStatsPath || typeEfficiencyPath || averageEfficiencyPath) {
+          next.vehicleUseClass = entry.vehicleUseClass;
+          next.publicRoute = entry.publicRoute;
+          next.distanceClass = entry.distanceClass;
+          if (typeEfficiencyPath || averageEfficiencyPath) {
+            next.distanceScope = entry.distanceScope;
+          }
+          next = applyDistanceStats(next);
+        }
+        if (makeModelPath) {
+          next.make = entry.make;
+          next.model = entry.model;
+          next.modelYear = entry.modelYear;
+          if (makeModelEfficiencyPath) {
+            const mm = findMakeModelRow(makeModelRows, next.make, next.model, next.modelYear);
+            if (mm) next.efficiency = mm.efficiencyLPerKm;
+          }
+        }
+        if (averageEfficiencyPath) {
+          next.engineCc = entry.engineCc;
+        }
       } else if (activeLibrary === "DEFRA") {
         next = cascadeDefra(next, field, value);
       } else {
@@ -612,7 +1159,44 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     setVehicleEntries(recalculated);
     pushTotals(recalculated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [libraryReady, libs, activeLibrary, fuelPath, typeEfficiencyPath, averageEfficiencyPath]);
+  }, [libraryReady, libs, activeLibrary, fuelPath, score1bPath, distanceStatsPath, typeEfficiencyPath, averageEfficiencyPath]);
+
+  useEffect(() => {
+    if (!statisticalDistancePath || distanceStats.length === 0 || vehicleEntries.length === 0) return;
+    const updated = vehicleEntries.map((entry) => applyDerived(applyDistanceStats(entry)));
+    setVehicleEntries(updated);
+    pushTotals(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distanceStats, statisticalDistancePath]);
+
+  useEffect(() => {
+    if (!makeModelEfficiencyPath || makeModelRows.length === 0 || vehicleEntries.length === 0) return;
+    const updated = vehicleEntries.map((entry) => {
+      const mm = findMakeModelRow(makeModelRows, entry.make, entry.model, entry.modelYear);
+      if (!mm) return applyDerived(entry);
+      return applyDerived({ ...entry, efficiency: mm.efficiencyLPerKm });
+    });
+    setVehicleEntries(updated);
+    pushTotals(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [makeModelRows, makeModelEfficiencyPath]);
+
+  useEffect(() => {
+    if (!averageEfficiencyPath || vehicleEntries.length === 0) return;
+    const updated = vehicleEntries.map((entry) =>
+      applyDerived({
+        ...entry,
+        efficiency: efficiencyForScore5Cc(ccEfficiencyRows, {
+          geography: entry.distanceScope,
+          engineCc: entry.engineCc,
+          fuelType: entry.fuelType,
+        }),
+      })
+    );
+    setVehicleEntries(updated);
+    pushTotals(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ccEfficiencyRows, averageEfficiencyPath]);
 
   useEffect(() => {
     if (!libraryReady || !libs || vehicleEntries.length === 0) return;
@@ -657,14 +1241,21 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     return computeMotorVehiclePcafFinanced(outstandingLoan, rows);
   }, [vehicleEntries, outstandingLoan]);
 
-  const sectionDescription =
-    activeLibrary === "DEFRA"
-      ? fuelPath
-        ? "DEFRA Scope 1 Fuel — mineral petrol, mineral diesel, CNG, or LPG (litre/gallon or m³/scf conversions)"
-        : "DEFRA passenger or delivery vehicles — distance × UK factor"
-      : fuelPath
-        ? "EPA Mobile Fuel — enter gallon, liter, or scf (converted to the factor unit)"
-        : "EPA On-Road Gasoline/Diesel, Mobile Fuel, or Non-Road";
+  const sectionDescription = fuelPath
+    ? "Score 1a — pick Brand / Model / Year from the sheet, then enter fuel type and fuel used. Emission factor from EPA Mobile Fuel."
+    : score1bPath
+      ? "Score 1b — pick Brand / Model / Year from the sheet (efficiency from Efficiency Average). Enter actual km. EF from EPA fuel type."
+      : distanceStatsPath
+      ? score3Path
+        ? "Score 3 — vehicle use + class for regional distance; Brand / Model / Year for efficiency from the make/model sheet. EF from EPA fuel type."
+        : "Score 2 — vehicle use + class for local distance; Brand / Model / Year for efficiency from the make/model sheet. EF from EPA fuel type."
+      : typeEfficiencyPath
+        ? "Score 4 — distance from vehicle-use stats. Pick one vehicle or fuel from the combined list; emission factor loads automatically."
+        : averageEfficiencyPath
+          ? "Score 5 — same vehicle use/class stats as Score 2–3, plus local or regional scope. Efficiency from CC-band sheet (local Pakistan / regional); EF from EPA fuel type."
+          : activeLibrary === "DEFRA"
+            ? "DEFRA passenger or delivery vehicles — distance × UK factor"
+            : "EPA vehicle and fuel options";
 
   const fuelConsumptionLabel = (entry: VehicleEntry, baseUnit: string) => {
     if (supportsInputUnitConversion(baseUnit, entry.fuelType)) {
@@ -1000,7 +1591,728 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     );
   };
 
+  const distanceUseOptions = useMemo(() => {
+    const fromSheet = usesForStats(distanceStats);
+    return fromSheet.length > 0 ? fromSheet : (["private", "public"] as DistanceUseClass[]);
+  }, [distanceStats]);
+
+  const renderDistanceStatsFields = (entry: VehicleEntry, opts?: { includeScope?: boolean }) => {
+    const scope = impliedDistanceScope(entry);
+    const classes = classesForDistance(
+      distanceStats,
+      entry.vehicleUseClass,
+      entry.publicRoute,
+      scope
+    );
+    const hit = findDistanceStat(distanceStats, {
+      use: entry.vehicleUseClass,
+      vehicleClass: entry.distanceClass,
+      publicRoute: entry.publicRoute,
+      scope,
+    });
+    const distLabel = score3Path
+      ? "Distance traveled (regional, km)"
+      : opts?.includeScope
+        ? entry.distanceScope === "regional"
+          ? "Distance traveled (regional, km)"
+          : entry.distanceScope === "local"
+            ? "Distance traveled (local, km)"
+            : "Distance traveled (km)"
+        : "Distance traveled (local, km)";
+
+    return (
+      <>
+        <div className="space-y-1.5">
+          <Label>Vehicle use</Label>
+          <Select
+            value={entry.vehicleUseClass || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "vehicleUseClass", v as DistanceUseClass)}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Private, public, or commercial" />
+            </SelectTrigger>
+            <SelectContent>
+              {distanceUseOptions.map((use) => (
+                <SelectItem key={use} value={use}>
+                  {use.charAt(0).toUpperCase() + use.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {entry.vehicleUseClass === "public" && (
+          <div className="space-y-1.5">
+            <Label>Public route</Label>
+            <Select
+              value={entry.publicRoute || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "publicRoute", v as PublicRoute)}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Intercity or outercity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="intercity">Intercity</SelectItem>
+                <SelectItem value="outercity">Outercity (intracity)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {opts?.includeScope && (
+          <div className="space-y-1.5">
+            <Label>Distance scope</Label>
+            <Select
+              value={entry.distanceScope || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "distanceScope", v as DistanceScope)}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Local or regional" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">Local</SelectItem>
+                <SelectItem value="regional">Regional</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label>Vehicle class</Label>
+          <Select
+            value={entry.distanceClass || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "distanceClass", v)}
+            disabled={!entry.vehicleUseClass || classes.length === 0}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue
+                placeholder={
+                  !entry.vehicleUseClass
+                    ? "Select vehicle use first"
+                    : classes.length === 0
+                      ? "No classes for this use"
+                      : "Select class"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map((cls) => (
+                <SelectItem key={cls} value={cls}>
+                  {cls}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>{distLabel}</Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            value={entry.distance || ""}
+            onChange={(e) => updateVehicleEntry(entry.id, "distance", parseFloat(e.target.value) || 0)}
+            className={FIELD_INPUT}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {hit
+              ? `${formatDistanceStatHint(hit)}${
+                  scope === "local" && hit.geographyKind !== "local"
+                    ? " (regional fallback — no local row)"
+                    : ""
+                }`
+              : distanceStatsError || "Distance auto-fills from the stats sheet for this use / class"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
+  const renderMakeModelSheetFields = (entry: VehicleEntry) => {
+    const brandOptions = brandsFromMakeModel(makeModelRows);
+    const modelOptions = modelNamesForBrand(makeModelRows, entry.make);
+    const yearOptions = yearsForBrandModel(makeModelRows, entry.make, entry.model);
+    const yearSelectValue =
+      entry.modelYear ||
+      (entry.model && yearOptions.length === 1 && yearOptions[0] === "Unknown" ? "Unknown" : undefined);
+    const mmHit = findMakeModelRow(makeModelRows, entry.make, entry.model, entry.modelYear);
+
+    return (
+      <>
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Make (Brand)
+            <FieldTooltip content="From the make/model sheet. Efficiency uses Efficiency (Average) + unit." />
+          </Label>
+          <Select
+            value={entry.make || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "make", v)}
+            disabled={brandOptions.length === 0}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue
+                placeholder={brandOptions.length === 0 ? "Import make/model sheet first" : "Select brand"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {brandOptions.map((brand) => (
+                <SelectItem key={brand} value={brand}>
+                  {brand}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Model
+            <FieldTooltip content="Model name from the make/model sheet." />
+          </Label>
+          <Select
+            value={entry.model || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "model", v)}
+            disabled={!entry.make || modelOptions.length === 0}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue
+                placeholder={
+                  !entry.make
+                    ? "Select brand first"
+                    : modelOptions.length === 0
+                      ? "No models for this brand"
+                      : "Select model"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {modelOptions.map((model) => (
+                <SelectItem key={model} value={model}>
+                  {model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Year
+            <FieldTooltip content="Model year from the make/model sheet." />
+          </Label>
+          <Select
+            value={yearSelectValue}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "modelYear", v)}
+            disabled={!entry.model || yearOptions.length === 0}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue
+                placeholder={
+                  !entry.model
+                    ? "Select model first"
+                    : yearOptions.length === 0
+                      ? "No year for this model"
+                      : "Select year"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {makeModelError && !mmHit && (
+            <p className="text-xs text-[#94A3B8]">{makeModelError}</p>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  const renderMakeModelEfficiencyField = (entry: VehicleEntry) => {
+    const mmHit = findMakeModelRow(makeModelRows, entry.make, entry.model, entry.modelYear);
+    return (
+      <div className="space-y-1.5">
+        <Label>Fuel efficiency (make/model)</Label>
+        <Input
+          type="number"
+          value={entry.efficiency > 0 ? entry.efficiency : ""}
+          disabled
+          className={`${FIELD_INPUT} bg-muted`}
+        />
+        <p className="text-xs text-[#94A3B8]">
+          {mmHit
+            ? formatMakeModelHint(mmHit)
+            : makeModelError ||
+              "Pick Brand / Model / Year — uses Efficiency (Average) converted to L/km"}
+        </p>
+      </div>
+    );
+  };
+
+  const renderScore1bEpaFields = (entry: VehicleEntry) => {
+    const mobile = libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType);
+    const factorUnit = mobile?.unit || "gallon";
+    const factorKg = mobile?.factorKg ?? entry.factorKg ?? 0;
+    return (
+      <>
+        {renderMakeModelSheetFields(entry)}
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Fuel type
+            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline). May auto-match from the make/model sheet." />
+          </Label>
+          <Select
+            value={entry.fuelType || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
+            disabled={libraryLocked}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select fuel (EPA)" />
+            </SelectTrigger>
+            <SelectContent>
+              {epaFuelTypes.map((f) => (
+                <SelectItem key={f} value={f} title={formatEpaFuelLabel(f)}>
+                  {formatEpaFuelLabel(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Actual distance traveled (km)</Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            value={entry.distance || ""}
+            onChange={(e) => updateVehicleEntry(entry.id, "distance", parseFloat(e.target.value) || 0)}
+            className={FIELD_INPUT}
+          />
+          <p className="text-xs text-[#94A3B8]">Odometer kilometres for the year</p>
+        </div>
+
+        {renderMakeModelEfficiencyField(entry)}
+
+        <div className="space-y-1.5">
+          <Label>Emission factor (EPA)</Label>
+          <Input
+            type="number"
+            value={factorKg > 0 ? factorKg : ""}
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {factorKg > 0
+              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
+              : "Select a fuel type to load the EPA factor"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
+  const renderScore2EpaFields = (entry: VehicleEntry) => {
+    const mobile = libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType);
+    const factorUnit = mobile?.unit || "gallon";
+    const factorKg = mobile?.factorKg ?? entry.factorKg ?? 0;
+    return (
+      <>
+        {renderDistanceStatsFields(entry)}
+        {renderMakeModelSheetFields(entry)}
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Fuel type
+            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline). May auto-match from the make/model sheet." />
+          </Label>
+          <Select
+            value={entry.fuelType || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
+            disabled={libraryLocked}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select fuel (EPA)" />
+            </SelectTrigger>
+            <SelectContent>
+              {epaFuelTypes.map((f) => (
+                <SelectItem key={f} value={f} title={formatEpaFuelLabel(f)}>
+                  {formatEpaFuelLabel(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {renderMakeModelEfficiencyField(entry)}
+
+        <div className="space-y-1.5">
+          <Label>Emission factor (EPA)</Label>
+          <Input
+            type="number"
+            value={factorKg > 0 ? factorKg : ""}
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {factorKg > 0
+              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
+              : "Select a fuel type to load the EPA factor"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
+  const renderScore4EpaFields = (entry: VehicleEntry) => {
+    const src = entry.vehicleSource as EpaVehicleSource;
+    const selectedKey = score4KeyFromEntry(entry);
+    const selectedOpt = score4CombinedOptions.find((o) => o.key === selectedKey);
+    const isOnRoad = src === "on_road_gasoline" || src === "on_road_diesel";
+    const isMobile = src === "mobile_combustion";
+    const isNonRoad = src === "non_road";
+    const mobile = libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType);
+    const mobileFactorKg = mobile?.factorKg ?? entry.factorKg ?? 0;
+    const mobileFactorUnit = mobile?.unit || "gallon";
+    const yearOptions =
+      src === "on_road_gasoline"
+        ? gasolineYearsFor(entry.vehicleType)
+        : src === "on_road_diesel"
+          ? dieselYearsFor(entry.vehicleType, entry.fuelType)
+          : [];
+
+    return (
+      <>
+        {renderDistanceStatsFields(entry, { includeScope: true })}
+
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="flex items-center gap-2">
+            Vehicle / fuel
+            <FieldTooltip content="All EPA vehicle and fuel options in one list (gasoline vehicles, diesel and alt-fuel, by fuel type, and equipment)." />
+          </Label>
+          <Select
+            value={selectedKey || undefined}
+            onValueChange={(v) => applyScore4CombinedOption(entry.id, v)}
+            disabled={libraryLocked || score4CombinedOptions.length === 0}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select vehicle or fuel" />
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+              {Array.from(score4OptionsByGroup.entries()).map(([group, opts]) => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {opts.map((opt) => (
+                    <SelectItem key={opt.key} value={opt.key} title={opt.label}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedOpt?.needsDistanceUnit && (
+          <div className="space-y-1.5">
+            <Label>Distance unit</Label>
+            <Select
+              value={entry.distanceUnit}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "distanceUnit", v as DistanceUnit)}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="km">km</SelectItem>
+                <SelectItem value="mile">mile</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {selectedOpt?.needsModelYear && yearOptions.length > 0 && (
+          <div className="space-y-1.5">
+            <Label>Model year</Label>
+            <Select
+              value={entry.modelYear || undefined}
+              onValueChange={(v) => updateVehicleEntry(entry.id, "modelYear", v)}
+              disabled={libraryLocked}
+            >
+              <SelectTrigger className={FIELD_INPUT}>
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {isMobile && (
+          <div className="space-y-1.5">
+            <Label>Fuel efficiency</Label>
+            <Input
+              type="number"
+              value={entry.efficiency > 0 ? entry.efficiency : ""}
+              disabled
+              className={`${FIELD_INPUT} bg-muted`}
+            />
+            <p className="text-xs text-[#94A3B8]">L/km from fuel type — used with distance from stats</p>
+          </div>
+        )}
+
+        {isOnRoad && (
+          <div className="space-y-1.5">
+            <Label>Fuel efficiency</Label>
+            <Input
+              type="number"
+              value={entry.efficiency > 0 ? entry.efficiency : ""}
+              disabled
+              className={`${FIELD_INPUT} bg-muted`}
+            />
+            <p className="text-xs text-[#94A3B8]">L/km provisional from vehicle type</p>
+          </div>
+        )}
+
+        {isNonRoad && (
+          <>
+            <div className="space-y-1.5">
+              <Label>Fuel unit</Label>
+              <Select
+                value={entry.nonRoadUnit}
+                onValueChange={(v) => updateVehicleEntry(entry.id, "nonRoadUnit", v as NonRoadUnit)}
+              >
+                <SelectTrigger className={FIELD_INPUT}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gallon">gallon</SelectItem>
+                  <SelectItem value="liter">liter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fuel quantity ({entry.nonRoadUnit})</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={entry.fuelConsumption || ""}
+                onChange={(e) =>
+                  updateVehicleEntry(entry.id, "fuelConsumption", parseFloat(e.target.value) || 0)
+                }
+                className={FIELD_INPUT}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-1.5">
+          <Label>Emission factor</Label>
+          <Input
+            type="number"
+            value={
+              isMobile
+                ? mobileFactorKg > 0
+                  ? mobileFactorKg
+                  : ""
+                : entry.factorKg > 0
+                  ? entry.factorKg
+                  : ""
+            }
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {!selectedOpt
+              ? "Select a vehicle or fuel to load the emission factor"
+              : isMobile
+                ? mobileFactorKg > 0
+                  ? `kg CO₂e / ${mobileFactorUnit}`
+                  : "Select a vehicle or fuel to load the emission factor"
+                : isNonRoad
+                  ? entry.factorKg > 0
+                    ? "g CO₂e / gallon"
+                    : "Select a vehicle or fuel to load the emission factor"
+                  : entry.factorKg > 0
+                    ? "g CO₂e / mile"
+                    : "Select model year if required to load the emission factor"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
+  const renderScore5EpaFields = (entry: VehicleEntry) => {
+    const mobile = libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType);
+    const factorUnit = mobile?.unit || "gallon";
+    const factorKg = mobile?.factorKg ?? entry.factorKg ?? 0;
+    return (
+      <>
+        {renderDistanceStatsFields(entry, { includeScope: true })}
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Fuel type
+            <FieldTooltip content="Emission factor is loaded from the EPA Mobile Fuel table for this fuel type." />
+          </Label>
+          <Select
+            value={entry.fuelType || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
+            disabled={libraryLocked}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select fuel (EPA)" />
+            </SelectTrigger>
+            <SelectContent>
+              {epaFuelTypes.map((f) => (
+                <SelectItem key={f} value={f} title={formatEpaFuelLabel(f)}>
+                  {formatEpaFuelLabel(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Engine CC
+            <FieldTooltip content="Engine cubic capacity in cc. Efficiency is looked up from the CC-band sheet for local (Pakistan) or regional, matched to fuel type." />
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            step="1"
+            value={entry.engineCc || ""}
+            onChange={(e) =>
+              updateVehicleEntry(entry.id, "engineCc", parseFloat(e.target.value) || 0)
+            }
+            placeholder="e.g. 1300"
+            className={FIELD_INPUT}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Fuel efficiency (by engine CC)</Label>
+          <Input
+            type="number"
+            value={entry.efficiency > 0 ? entry.efficiency : ""}
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {(() => {
+              const hit = findCcEfficiency(ccEfficiencyRows, {
+                geography: entry.distanceScope,
+                engineCc: entry.engineCc,
+                fuelType: entry.fuelType,
+              });
+              if (hit) return formatCcEfficiencyHint(hit);
+              if (ccEfficiencyError) return ccEfficiencyError;
+              if (entry.engineCc > 0 && entry.fuelType)
+                return "No CC-band match — using provisional fallback L/km";
+              return "Enter engine CC and fuel type to load efficiency from the sheet";
+            })()}
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Emission factor (EPA Mobile Fuel)</Label>
+          <Input
+            type="number"
+            value={factorKg > 0 ? factorKg : ""}
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {factorKg > 0
+              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
+              : "Select a fuel type to load the EPA factor"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
+  const renderScore1aEpaFields = (entry: VehicleEntry) => {
+    const mobile = libs?.mobileFuels.find((f) => f.fuelType === entry.fuelType);
+    const mobileBaseUnit = mobile?.unit || entry.unit || "";
+    const factorKg = mobile?.factorKg ?? entry.factorKg ?? 0;
+    return (
+      <>
+        {renderMakeModelSheetFields(entry)}
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-2">
+            Fuel type
+            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline)." />
+          </Label>
+          <Select
+            value={entry.fuelType || undefined}
+            onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
+            disabled={libraryLocked}
+          >
+            <SelectTrigger className={FIELD_INPUT}>
+              <SelectValue placeholder="Select fuel (EPA)" />
+            </SelectTrigger>
+            <SelectContent>
+              {epaFuelTypes.map((f) => (
+                <SelectItem key={f} value={f} title={formatEpaFuelLabel(f)}>
+                  {formatEpaFuelLabel(f)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {renderFuelInputUnitSelect(entry, mobileBaseUnit)}
+        <div className="space-y-1.5">
+          <Label>Actual fuel consumed ({fuelConsumptionLabel(entry, mobileBaseUnit)})</Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            value={entry.fuelConsumption || ""}
+            onChange={(e) =>
+              updateVehicleEntry(entry.id, "fuelConsumption", parseFloat(e.target.value) || 0)
+            }
+            className={FIELD_INPUT}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Emission factor (EPA)</Label>
+          <Input
+            type="number"
+            value={factorKg > 0 ? factorKg : ""}
+            disabled
+            className={`${FIELD_INPUT} bg-muted`}
+          />
+          <p className="text-xs text-[#94A3B8]">
+            {factorKg > 0
+              ? `kg CO₂e / ${mobileBaseUnit || "unit"} — from EPA Mobile Fuel for this fuel type`
+              : "Select a fuel type to load the EPA factor"}
+          </p>
+        </div>
+      </>
+    );
+  };
+
   const renderEpaFields = (entry: VehicleEntry) => {
+    if (fuelPath) return renderScore1aEpaFields(entry);
+    if (score1bPath) return renderScore1bEpaFields(entry);
+    if (distanceStatsPath) return renderScore2EpaFields(entry);
+    if (typeEfficiencyPath) return renderScore4EpaFields(entry);
+    if (averageEfficiencyPath) return renderScore5EpaFields(entry);
+
     const src = entry.vehicleSource as EpaVehicleSource;
     const showSourcePicker = availableSources.length > 1;
     const mobileBaseUnit =
@@ -1032,7 +2344,10 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         {src === "mobile_combustion" && (
           <>
             <div className="space-y-1.5">
-              <Label>Fuel type</Label>
+              <Label className="flex items-center gap-2">
+                Fuel type
+                <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline)." />
+              </Label>
               <Select
                 value={entry.fuelType || undefined}
                 onValueChange={(v) => updateVehicleEntry(entry.id, "fuelType", v)}
@@ -1043,8 +2358,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   {epaFuelTypes.map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
+                    <SelectItem key={f} value={f} title={formatEpaFuelLabel(f)}>
+                      {formatEpaFuelLabel(f)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1054,7 +2369,6 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
               <Label>Factor unit</Label>
               <Input value={mobileBaseUnit || ""} readOnly className={`${FIELD_INPUT} bg-[#F8FAFC]`} />
             </div>
-            {fuelPath ? renderFuelInputUnitSelect(entry, mobileBaseUnit) : null}
           </>
         )}
 
@@ -1346,18 +2660,20 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       description={sectionDescription}
       action={
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-[#E2E8F0] bg-white p-0.5">
-            {(["EPA", "DEFRA"] as const).map((lib) => (
-              <button
-                key={lib}
-                type="button"
-                className={`px-2.5 py-1 text-xs rounded-md ${activeLibrary === lib ? "bg-[#0F6E56] text-white" : "text-[#64748B]"}`}
-                onClick={() => setLibrary(lib)}
-              >
-                {lib}
-              </button>
-            ))}
-          </div>
+          {!epaLockedPath && (
+            <div className="inline-flex rounded-lg border border-[#E2E8F0] bg-white p-0.5">
+              {(["EPA", "DEFRA"] as const).map((lib) => (
+                <button
+                  key={lib}
+                  type="button"
+                  className={`px-2.5 py-1 text-xs rounded-md ${activeLibrary === lib ? "bg-[#0F6E56] text-white" : "text-[#64748B]"}`}
+                  onClick={() => setLibrary(lib)}
+                >
+                  {lib}
+                </button>
+              ))}
+            </div>
+          )}
           <Button
             type="button"
             onClick={addVehicleEntry}
@@ -1374,7 +2690,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     >
       {!libraryReady && (
         <p className="text-sm text-[#64748B]">
-          Loading {activeLibrary === "DEFRA" ? "DEFRA passenger & delivery factors" : "EPA mobile & vehicle tables"}…
+          Loading {epaLockedPath || activeLibrary === "EPA" ? "EPA vehicle emission factors" : "DEFRA passenger & delivery factors"}…
         </p>
       )}
       {libraryError && (
@@ -1384,7 +2700,19 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       <div className="space-y-3">
         {vehicleEntries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#E2E8F0] bg-white py-8 text-center text-sm text-[#94A3B8]">
-            Add a vehicle — choose an EPA or DEFRA data source per row.
+            {fuelPath
+              ? "Add a vehicle — pick Brand / Model / Year, then fuel type and fuel consumed. EPA supplies the emission factor."
+              : score1bPath
+                ? "Add a vehicle — pick Brand / Model / Year for efficiency, then enter actual km."
+                : distanceStatsPath
+                ? score3Path
+                  ? "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
+                  : "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
+                : typeEfficiencyPath
+                  ? "Add a vehicle — pick use/class for distance, then choose a vehicle or fuel from the list."
+                  : averageEfficiencyPath
+                    ? "Add a vehicle — same use/class stats as Score 2–3, then fuel type and engine CC."
+                    : "Add a vehicle — choose an EPA or DEFRA data source per row."}
           </div>
         ) : (
           <div className="space-y-4">
@@ -1408,7 +2736,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {activeLibrary === "DEFRA" ? renderDefraFields(entry) : renderEpaFields(entry)}
+                  {epaLockedPath || activeLibrary === "EPA" ? renderEpaFields(entry) : renderDefraFields(entry)}
 
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-2">

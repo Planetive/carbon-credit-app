@@ -17,6 +17,8 @@ export type MotorVehiclePcafEntry = {
   fuel_type?: string;
   activity?: string;
   vehicle_type?: string;
+  make?: string;
+  model?: string;
 };
 
 export type MotorVehiclePcafVehicleResult = {
@@ -161,6 +163,8 @@ export function parseMotorVehicleEntries(raw: unknown): MotorVehiclePcafEntry[] 
         fuel_type: r.fuel_type ? String(r.fuel_type) : undefined,
         activity: r.activity ? String(r.activity) : undefined,
         vehicle_type: r.vehicle_type ? String(r.vehicle_type) : undefined,
+        make: r.make ? String(r.make) : undefined,
+        model: r.model ? String(r.model) : undefined,
       } satisfies MotorVehiclePcafEntry;
     })
     .filter((v): v is MotorVehiclePcafEntry => v != null);

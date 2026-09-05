@@ -57,18 +57,19 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
     },
     {
       name: 'energy_consumption',
-      label: 'Actual building energy emissions',
+      label: 'Actual building energy consumption',
       type: 'number',
       required: true,
-      unit: 'tCO2e',
-      description: 'Actual energy × EPA/DEFRA factor from the electricity form'
+      unit: 'kWh',
+      description: 'Actual building energy consumption entered by the user'
     },
     {
       name: 'emission_factor',
       label: 'Emission Factor',
       type: 'number',
       required: true,
-      unit: 'tCO2e / unit',
+      unit: 'tCO2e/kWh',
+      description: 'User-supplied supplier-specific emission factor'
     }
   ],
   calculate: (inputs, companyType) => {
@@ -123,7 +124,7 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
   },
   notes: [
     'Highest data quality score (1)',
-    'Actual building energy × EPA/DEFRA (supplier-specific) emission factor',
+    'Actual building energy (kWh) × user-supplied supplier-specific emission factor',
     'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF'
   ]
 };
@@ -153,18 +154,19 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
     },
     {
       name: 'energy_consumption',
-      label: 'Actual building energy emissions',
+      label: 'Actual building energy consumption',
       type: 'number',
       required: true,
-      unit: 'tCO2e',
-      description: 'Actual energy × EPA/DEFRA average factor from the electricity form'
+      unit: 'kWh',
+      description: 'Actual building energy consumption entered by the user'
     },
     {
       name: 'emission_factor',
       label: 'Emission Factor',
       type: 'number',
       required: true,
-      unit: 'tCO2e / unit',
+      unit: 'tCO2e/kWh',
+      description: 'User-supplied average emission factor'
     }
   ],
   calculate: (inputs, companyType) => {
@@ -219,7 +221,7 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
   },
   notes: [
     'Good data quality score (2)',
-    'Actual building energy × EPA/DEFRA average emission factor',
+    'Actual building energy (kWh) × user-supplied average emission factor',
     'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF'
   ]
 };
@@ -269,7 +271,7 @@ export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       type: 'number',
       required: true,
       unit: 'tCO2e/kWh',
-      description: 'Average emission factors for the energy source'
+      description: 'Grid electricity emission factor (from EPA eGRID country selection)'
     }
   ],
   calculate: (inputs, companyType) => {
@@ -374,16 +376,16 @@ export const OPTION_2B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
       label: 'Estimated Energy Consumption from Statistics',
       type: 'number',
       required: true,
-      unit: 'kWh/m²',
-      description: 'Estimated building energy consumption per floor area based on building type and location-specific statistical data'
+      unit: 'kWh/sqft',
+      description: 'CBECS median intensity (kBtu/sqft × 0.29307) by building type'
     },
     {
       name: 'floor_area',
       label: 'Floor Area',
       type: 'number',
       required: true,
-      unit: 'm²',
-      description: 'Floor area of the commercial property'
+      unit: 'sqft',
+      description: 'Floor area of the commercial property (square feet)'
     },
     {
       name: 'average_emission_factor',
@@ -433,7 +435,7 @@ export const OPTION_2B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         {
           step: 'Total Energy Consumption',
           value: totalEnergyConsumption,
-          formula: `${estimatedEnergyConsumptionFromStatistics.toFixed(2)} kWh/m² × ${floorArea.toFixed(2)} m² = ${totalEnergyConsumption.toFixed(2)} kWh`
+          formula: `${estimatedEnergyConsumptionFromStatistics.toFixed(2)} kWh/sqft × ${floorArea.toFixed(2)} sqft = ${totalEnergyConsumption.toFixed(2)} kWh`
         },
         {
           step: 'Total Emissions',

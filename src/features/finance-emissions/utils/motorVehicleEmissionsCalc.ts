@@ -16,13 +16,14 @@ import {
   ukPassengerBasisValue,
 } from "@/components/emissions/shared/ukPassengerFactors";
 import type { UkFactorBasis } from "@/components/emissions/shared/types";
-import type {
-  DefraVehicleSource,
-  EpaVehicleSource,
-  MotorVehicleFactorLibraries,
-  OnRoadDieselFactor,
-  OnRoadGasolineFactor,
-  NonRoadFactor,
+import {
+  efficiencyForEngineCc,
+  type DefraVehicleSource,
+  type EpaVehicleSource,
+  type MotorVehicleFactorLibraries,
+  type OnRoadDieselFactor,
+  type OnRoadGasolineFactor,
+  type NonRoadFactor,
 } from "./motorVehicleFactorLoaders";
 
 const AVERAGE_VEHICLE_EFFICIENCY = 0.08;
@@ -72,6 +73,8 @@ export type MotorVehicleEntryInput = {
   dieselLitres: number;
   petrolLitres: number;
   efficiency: number;
+  /** Score 5 — engine cubic capacity (cc) for efficiency lookup */
+  engineCc?: number;
 };
 
 export type MotorVehicleEntryDerived = {
@@ -290,9 +293,16 @@ export function computeMotorVehicleEntryEmissions(
 
   let efficiency = entry.efficiency;
   if (ctx.averageEfficiencyPath) {
-    efficiency = /electric|ev\b/i.test(entry.fuelType) ? ELECTRIC_KWH_PER_KM : AVERAGE_VEHICLE_EFFICIENCY;
+    efficiency =
+      entry.efficiency > 0
+        ? entry.efficiency
+        : efficiencyForEngineCc(entry.engineCc ?? 0, entry.fuelType);
   } else if (ctx.typeEfficiencyPath) {
-    efficiency = typeEfficiency(entry.activity, entry.vehicleType, entry.fuelType);
+    // Score 4 mobile uses form efficiency (EPA fuel-type provisional); keep if set
+    efficiency =
+      entry.efficiency > 0
+        ? entry.efficiency
+        : typeEfficiency(entry.activity, entry.vehicleType, entry.fuelType);
   }
 
   let fuelUsed = entry.distance * efficiency;

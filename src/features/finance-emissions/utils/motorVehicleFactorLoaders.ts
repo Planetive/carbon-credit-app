@@ -1,7 +1,7 @@
 /**
  * EPA + DEFRA factor loaders for motor vehicle loan finance emissions.
- * Score 1 (1a): EPA Mobile Fuel / DEFRA Scope 1 Fuel.
- * Options 2a–3b: EPA on-road/mobile/non-road; DEFRA passenger + delivery.
+ * Score 1a: EPA Mobile Fuel / DEFRA Scope 1 Fuel.
+ * Score 1b / Options 2a–3b: EPA on-road/mobile/non-road; DEFRA passenger + delivery.
  */
 
 import { loadIpccFactorTableRows } from "@/integrations/supabase/ipccFactorLoader";
@@ -31,8 +31,8 @@ export type VehicleSource = EpaVehicleSource | DefraVehicleSource;
 
 export const EPA_SOURCE_LABELS: Record<EpaVehicleSource, string> = {
   mobile_combustion: "Mobile Fuel",
-  on_road_gasoline: "On-Road Gasoline",
-  on_road_diesel: "On-Road Diesel & Alt Fuel",
+  on_road_gasoline: "On-Road Gasoline (Table 3)",
+  on_road_diesel: "On-Road Diesel & Alt Fuel (Table 4)",
   non_road: "Non-Road Vehicle",
   vehicular_footprint: "Vehicular Carbon Footprints",
 };
@@ -133,8 +133,20 @@ const toFactorPerLiter = (row: Record<string, unknown>): number | null => {
 };
 
 export function epaSourcesForPcafOption(optionCode: string | undefined, fuelPath: boolean): EpaVehicleSource[] {
-  if (fuelPath || optionCode === "1a") {
+  // Score 1a / 2 / 3 / 5 — EPA Mobile Fuel by fuel type
+  if (
+    fuelPath ||
+    optionCode === "1a" ||
+    optionCode === "1b" ||
+    optionCode === "2a" ||
+    optionCode === "2b" ||
+    optionCode === "3b"
+  ) {
     return ["mobile_combustion"];
+  }
+  // Score 4 — combined EPA: Table 3, Table 4, Mobile Fuel (on-road), Non-Road
+  if (optionCode === "3a") {
+    return ["on_road_gasoline", "on_road_diesel", "mobile_combustion", "non_road"];
   }
   return ["on_road_gasoline", "on_road_diesel", "mobile_combustion", "non_road"];
 }
@@ -150,18 +162,57 @@ export function defraSources(): DefraVehicleSource[] {
   return ["passenger", "delivery"];
 }
 
-/** Score 1 (Option 1a) Mobile Fuel — CNG, LPG, LNG, and diesel only. */
+/** Provisional L/km (or kWh/km) by EPA fuel type until make/model datasheet is wired. */
+export function efficiencyForEpaFuelType(fuelType: string): number {
+  const t = fuelType.toLowerCase();
+  if (/electric|ev\b/.test(t)) return 0.16;
+  if (/\bdiesel\b/.test(t)) return 0.07;
+  if (/\bcng\b/.test(t) || t.includes("compressed natural")) return 0.08;
+  if (/\blpg\b/.test(t) || t.includes("liquefied petroleum")) return 0.075;
+  // Motor gasoline / petrol
+  return 0.08;
+}
+
+/** Provisional L/km by EPA on-road vehicle type (Score 4) until type-efficiency datasheet is wired. */
+export function efficiencyForEpaVehicleType(vehicleType: string): number {
+  const t = vehicleType.toLowerCase();
+  if (/motorcycle|motorbike|scooter/.test(t)) return 0.04;
+  if (/bus|coach/.test(t)) return 0.28;
+  if (/heavy|truck|hdv|combination|trailer/.test(t)) return 0.32;
+  if (/light.?duty.?truck|pickup|van|suv|ldt/.test(t)) return 0.11;
+  if (/passenger.?car|automobile|ldv|car\b/.test(t)) return 0.08;
+  return 0.09;
+}
+
+/**
+ * Provisional L/km (or kWh/km) by engine cubic capacity — Score 5.
+ * Replace with datasheet bands when available.
+ */
+export function efficiencyForEngineCc(cc: number, fuelType = ""): number {
+  if (/electric|ev\b/i.test(fuelType)) return 0.16;
+  if (!(cc > 0)) return 0.08;
+  if (cc <= 800) return 0.05;
+  if (cc <= 1000) return 0.06;
+  if (cc <= 1300) return 0.07;
+  if (cc <= 1600) return 0.08;
+  if (cc <= 2000) return 0.095;
+  if (cc <= 3000) return 0.11;
+  return 0.13;
+}
+
+/** Score 1a / Score 2 EPA Mobile Fuel — Motor Gasoline, Diesel Fuel, CNG, LPG only. */
 export function isScore1aMobileFuel(fuelType: string): boolean {
   const t = fuelType.toLowerCase();
   if (t.includes("biodiesel")) return false;
+  if (/\blng\b/.test(t) || t.includes("liquefied natural")) return false;
   return (
+    t.includes("motor gasoline") ||
+    (t.includes("gasoline") && !t.includes("aviation")) ||
+    /\bdiesel\b/.test(t) ||
     /\bcng\b/.test(t) ||
     t.includes("compressed natural") ||
     /\blpg\b/.test(t) ||
-    t.includes("liquefied petroleum") ||
-    /\blng\b/.test(t) ||
-    t.includes("liquefied natural") ||
-    /\bdiesel\b/.test(t)
+    t.includes("liquefied petroleum")
   );
 }
 

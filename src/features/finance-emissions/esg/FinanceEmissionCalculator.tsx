@@ -634,11 +634,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       );
     }
     
-    // Handle Motor Vehicle Loan formulas — always by method card (Table 10.1-6)
+    // Handle Motor Vehicle Loan formulas — by progressive capability / method (Table 10.1-6)
     if (isMotorVehicleLoan) {
-      const allowed = ['1a', '2a', '2b', '3a', '3b'];
-      const requested = propCalculationMethod === '1b' ? '1a' : propCalculationMethod;
-      const method = allowed.includes(requested) ? requested : null;
+      const allowed = ['1a', '1b', '2a', '2b', '3a', '3b'];
+      const method = allowed.includes(propCalculationMethod) ? propCalculationMethod : null;
       return MOTOR_VEHICLE_LOAN_FORMULAS.filter(
         (f) => method ? f.optionCode === method : allowed.includes(f.optionCode)
       );
@@ -1027,16 +1026,16 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         }
         const mortgageOpt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
         if ((mortgageOpt === '1a' || mortgageOpt === '1b') && (!loanData.energy_consumption || !loanData.emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Building electricity (EPA/DEFRA) is required for ${loanLabel}` });
+          errors.push({ loanKey: inst.key, loanLabel, error: `Actual energy (kWh) and user emission factor are required for ${loanLabel} (Score 1/2)` });
         }
-        if (mortgageOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Energy labels, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2a)` });
+        if (mortgageOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Energy per floor area, floor area, and grid EF are required for ${loanLabel} (Score 3)` });
         }
-        if (mortgageOpt === '2b' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2b)` });
+        if (mortgageOpt === '2b' && (!loanData.cbecs_category || !loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building type, floor area (sqft), and grid EF are required for ${loanLabel} (Score 4)` });
         }
-        if (mortgageOpt === '3' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, number of buildings, and EPA/DEFRA factor are required for ${loanLabel} (Option 3)` });
+        if (mortgageOpt === '3' && (!loanData.cbecs_category || !loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building type, building count, and grid EF are required for ${loanLabel} (Score 5)` });
         }
       } else if (loanType === 'commercial-real-estate') {
         if (loanData.outstandingLoan === 0 || !loanData.outstandingLoan) {
@@ -1057,16 +1056,16 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         }
         const creOpt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
         if ((creOpt === '1a' || creOpt === '1b') && (!loanData.energy_consumption || !loanData.emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Building electricity (EPA/DEFRA) is required for ${loanLabel}` });
+          errors.push({ loanKey: inst.key, loanLabel, error: `Actual energy (kWh) and user emission factor are required for ${loanLabel} (Score 1/2)` });
         }
-        if (creOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Energy labels, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2a)` });
+        if (creOpt === '2a' && (!loanData.estimated_energy_consumption_from_labels || !loanData.floor_area || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Energy per floor area, floor area, and grid EF are required for ${loanLabel} (Score 3)` });
         }
-        if (creOpt === '2b' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, floor area, and EPA/DEFRA factor are required for ${loanLabel} (Option 2b)` });
+        if (creOpt === '2b' && (!loanData.cbecs_category || !loanData.estimated_energy_consumption_from_statistics || !loanData.floor_area || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building type, floor area (sqft), and grid EF are required for ${loanLabel} (Score 4)` });
         }
-        if (creOpt === '3' && (!loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Statistics energy, number of buildings, and EPA/DEFRA factor are required for ${loanLabel} (Option 3)` });
+        if (creOpt === '3' && (!loanData.cbecs_category || !loanData.estimated_energy_consumption_from_statistics || !loanData.number_of_buildings || !loanData.average_emission_factor || !loanData.factor_grid_country)) {
+          errors.push({ loanKey: inst.key, loanLabel, error: `Building type, building count, and grid EF are required for ${loanLabel} (Score 5)` });
         }
       } else if (loanType === 'motor-vehicle-loan') {
         if (loanData.outstandingLoan === 0 || !loanData.outstandingLoan) {
@@ -1316,19 +1315,19 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
     if (isCreActualEnergyOption(loanTypeKey, selectedId)) {
       if (!loanFormData.energy_consumption || !loanFormData.emission_factor) {
-        throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
+        throw new Error('Enter actual building energy (kWh) and the emission factor for Score 1/2.');
       }
     }
     const propertyOpt = formulas.find((f) => f.id === selectedId)?.optionCode;
     if (loanTypeKey === 'mortgage' || loanTypeKey === 'commercial-real-estate') {
-      if (propertyOpt === '2a' && (!loanFormData.estimated_energy_consumption_from_labels || !loanFormData.floor_area || !loanFormData.average_emission_factor)) {
-        throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
+      if (propertyOpt === '2a' && (!loanFormData.estimated_energy_consumption_from_labels || !loanFormData.floor_area || !loanFormData.average_emission_factor || !loanFormData.factor_grid_country)) {
+        throw new Error('Energy per floor area, floor area, and grid EF are required for Score 3.');
       }
-      if (propertyOpt === '2b' && (!loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.floor_area || !loanFormData.average_emission_factor)) {
-        throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+      if (propertyOpt === '2b' && (!loanFormData.cbecs_category || !loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.floor_area || !loanFormData.average_emission_factor || !loanFormData.factor_grid_country)) {
+        throw new Error('Building type, floor area (sqft), and grid EF are required for Score 4.');
       }
-      if (propertyOpt === '3' && (!loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.number_of_buildings || !loanFormData.average_emission_factor)) {
-        throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
+      if (propertyOpt === '3' && (!loanFormData.cbecs_category || !loanFormData.estimated_energy_consumption_from_statistics || !loanFormData.number_of_buildings || !loanFormData.average_emission_factor || !loanFormData.factor_grid_country)) {
+        throw new Error('Building type, building count, and grid EF are required for Score 5.');
       }
     }
 
@@ -1540,22 +1539,22 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         const formula = getCurrentFormula();
         if (formula?.optionCode === '1a' || formula?.optionCode === '1b') {
           if (!formData.energy_consumption || !formData.emission_factor) {
-            throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
+            throw new Error('Enter actual building energy (kWh) and the emission factor for Score 1/2.');
           }
         }
         if (formula?.optionCode === '2a') {
-          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor) {
-            throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
+          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Energy per floor area, floor area, and grid EF are required for Score 3.');
           }
         }
         if (formula?.optionCode === '2b') {
-          if (!formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor) {
-            throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+          if (!formData.cbecs_category || !formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Building type, floor area (sqft), and grid EF are required for Score 4.');
           }
         }
         if (formula?.optionCode === '3') {
-          if (!formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor) {
-            throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
+          if (!formData.cbecs_category || !formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Building type, building count, and grid EF are required for Score 5.');
           }
         }
       } else if (loanType === 'commercial-real-estate') {
@@ -1571,22 +1570,22 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         const formula = getCurrentFormula();
         if (formula?.optionCode === '1a' || formula?.optionCode === '1b') {
           if (!formData.energy_consumption || !formData.emission_factor) {
-            throw new Error('Enter building electricity using the EPA/DEFRA form for Option 1a/1b.');
+            throw new Error('Enter actual building energy (kWh) and the emission factor for Score 1/2.');
           }
         }
         if (formula?.optionCode === '2a') {
-          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor) {
-            throw new Error('Energy labels, floor area, and EPA/DEFRA factor are required for Option 2a.');
+          if (!formData.estimated_energy_consumption_from_labels || !formData.floor_area || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Energy per floor area, floor area, and grid EF are required for Score 3.');
           }
         }
         if (formula?.optionCode === '2b') {
-          if (!formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor) {
-            throw new Error('Statistics energy, floor area, and EPA/DEFRA factor are required for Option 2b.');
+          if (!formData.cbecs_category || !formData.estimated_energy_consumption_from_statistics || !formData.floor_area || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Building type, floor area (sqft), and grid EF are required for Score 4.');
           }
         }
         if (formula?.optionCode === '3') {
-          if (!formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor) {
-            throw new Error('Statistics energy, number of buildings, and EPA/DEFRA factor are required for Option 3.');
+          if (!formData.cbecs_category || !formData.estimated_energy_consumption_from_statistics || !formData.number_of_buildings || !formData.average_emission_factor || !formData.factor_grid_country) {
+            throw new Error('Building type, building count, and grid EF are required for Score 5.');
           }
         }
       } else if (loanType === 'motor-vehicle-loan') {
@@ -1666,10 +1665,18 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
       if (isEnergyEfOption2a(loanType, selectedFormula) || isCreActualEnergyOption(loanType, selectedFormula)) {
         if (!formData.energy_consumption || formData.energy_consumption === 0) {
-          throw new Error('Energy consumption must be greater than 0. Please enter energy or fuel consumption.');
+          throw new Error(
+            isCreActualEnergyOption(loanType, selectedFormula)
+              ? 'Actual building energy (kWh) must be greater than 0 for Score 1/2.'
+              : 'Energy consumption must be greater than 0. Please enter energy or fuel consumption.'
+          );
         }
         if (!formData.emission_factor || formData.emission_factor === 0) {
-          throw new Error('Emission factor must be greater than 0. Select an EPA or DEFRA factor (or enter one manually).');
+          throw new Error(
+            isCreActualEnergyOption(loanType, selectedFormula)
+              ? 'Emission factor must be greater than 0. Enter the user-supplied factor for Score 1/2.'
+              : 'Emission factor must be greater than 0. Select an EPA or DEFRA factor (or enter one manually).'
+          );
         }
       }
 
@@ -2170,6 +2177,16 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
   const renderProductionFactorInputs = () => {
     const formula = getCurrentFormula();
+    // Option 2b production factors are for bond/loan/project/facilitated only —
+    // CRE & mortgage also use optionCode "2b" for CBECS Score 4 (different UI).
+    if (
+      loanType === "commercial-real-estate" ||
+      loanType === "mortgage" ||
+      loanType === "motor-vehicle-loan" ||
+      loanType === "sovereign-debt"
+    ) {
+      return null;
+    }
     if (!formula || formula.optionCode !== "2b") return null;
     return (
       <InputSection title="Production factor" description="Category, sub-category, and material reference for Option 2b">
@@ -2783,14 +2800,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         return null;
       })()}
 
-      {selectedFormula && (isEnergyEfOption2a(loanType, selectedFormula) || isCreActualEnergyOption(loanType, selectedFormula)) && (
+      {selectedFormula && isEnergyEfOption2a(loanType, selectedFormula) && (
         <EnergyEmissionInputs
           formData={formData as Record<string, unknown>}
           onUpdateFormData={(field, value) => updateFormData(field, value as FinanceFormValue)}
         />
       )}
 
-      {selectedFormula && (loanType === 'commercial-real-estate' || loanType === 'mortgage') && ['2a', '2b', '3'].includes(getCurrentFormula()?.optionCode || '') && (
+      {selectedFormula && (loanType === 'commercial-real-estate' || loanType === 'mortgage') && ['1a', '1b', '2a', '2b', '3'].includes(getCurrentFormula()?.optionCode || '') && (
         <CommercialRealEstateForm
           selectedFormula={getCurrentFormula() || null}
           formData={formData}
