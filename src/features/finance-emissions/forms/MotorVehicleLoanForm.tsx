@@ -2906,7 +2906,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                   ? "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
                   : "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
                 : typeEfficiencyPath
-                  ? "Add a vehicle — pick use/class for distance, then choose a vehicle or fuel from the list."
+                  ? "Add a vehicle — pick use/class for distance, then vehicle type (Hatchback/Sedan/…) for efficiency, then EPA factor source."
                   : averageEfficiencyPath
                     ? "Add a vehicle — same use/class stats as Score 2–3, then fuel type and engine CC."
                     : "Add a vehicle — choose an EPA or DEFRA data source per row."}

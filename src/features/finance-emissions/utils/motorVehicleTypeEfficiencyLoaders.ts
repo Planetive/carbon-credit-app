@@ -3,7 +3,8 @@
  * Dataset: motor_vehicle_type_efficiency (ref.factor_rows).
  * Fallback: public.staging_motor_vehicle_type_efficiency
  *
- * Lookup: geography (local | regional) + vehicle_type + fuel_type → efficiency (+ unit → L/km).
+ * Lookup: vehicle_type + fuel_type → efficiency (+ unit → L/km).
+ * Geography is stored if present but local/regional use the same efficiency values.
  * Examples: Hatchback / Sedan / SUV × Petrol / CNG / Hybrid / EV.
  * Emission factor remains EPA (Table 2 / 3 / 4 / Non-Road) — not this sheet.
  */
@@ -19,7 +20,8 @@ export const TYPE_EFFICIENCY_STAGING_TABLE = "staging_motor_vehicle_type_efficie
 
 export type VehicleTypeEfficiencyRow = {
   key: string;
-  geography: DistanceScope;
+  /** Stored for reference; lookup does not require local ≠ regional. */
+  geography: DistanceScope | "";
   vehicleType: string;
   fuelType: string;
   efficiencyLPerKm: number;
@@ -75,15 +77,23 @@ function parseRow(row: Record<string, unknown>): VehicleTypeEfficiencyRow | null
   const geographyRaw = String(
     attrs.geography ?? row.geography ?? row.category ?? ""
   ).trim();
-  const geography = parseGeography(geographyRaw);
-  if (!geography) return null;
+  // Type efficiency is the same for local/regional; default missing geography to local.
+  const geo: DistanceScope | "" = parseGeography(geographyRaw) ?? "local";
 
-  const vehicleType = String(
-    attrs.vehicle_type ?? row.vehicle_type ?? row.label ?? ""
-  ).trim();
-  if (!vehicleType) return null;
+  let resolvedType = String(attrs.vehicle_type ?? row.vehicle_type ?? "").trim();
+  if (!resolvedType) {
+    const label = String(row.label ?? "").trim();
+    // Promote label may be "Hatchback — Petrol"
+    resolvedType = label.split(/\s+[—–-]\s+/)[0]?.trim() || label;
+  }
+  if (!resolvedType) return null;
 
-  const fuelType = String(attrs.fuel_type ?? row.fuel_type ?? "").trim();
+  let fuelType = String(attrs.fuel_type ?? row.fuel_type ?? "").trim();
+  if (!fuelType) {
+    const label = String(row.label ?? "").trim();
+    const parts = label.split(/\s+[—–-]\s+/);
+    if (parts.length > 1) fuelType = parts.slice(1).join(" — ").trim();
+  }
   if (!fuelType) return null;
 
   const efficiencyRaw = parseNumericLoose(attrs.efficiency ?? row.efficiency);
@@ -95,9 +105,9 @@ function parseRow(row: Record<string, unknown>): VehicleTypeEfficiencyRow | null
   if (!(efficiencyLPerKm > 0)) return null;
 
   return {
-    key: `${geography}::${vehicleType}::${fuelType}`,
-    geography,
-    vehicleType,
+    key: `${geo}::${resolvedType}::${fuelType}`,
+    geography: geo,
+    vehicleType: resolvedType,
     fuelType,
     efficiencyLPerKm,
     efficiencyRaw,
@@ -155,14 +165,10 @@ export async function loadVehicleTypeEfficiencyRows(): Promise<VehicleTypeEffici
 
 export function vehicleTypesFromSheet(
   rows: VehicleTypeEfficiencyRow[],
-  geography?: DistanceScope | ""
+  _geography?: DistanceScope | ""
 ): string[] {
-  const pool =
-    geography === "local" || geography === "regional"
-      ? rows.filter((r) => r.geography === geography)
-      : rows;
-  const preferred = pool.length > 0 ? pool : rows;
-  return Array.from(new Set(preferred.map((r) => r.vehicleType))).sort((a, b) =>
+  // Geography ignored — same efficiency for local and regional distance scope.
+  return Array.from(new Set(rows.map((r) => r.vehicleType))).sort((a, b) =>
     a.localeCompare(b)
   );
 }
@@ -170,14 +176,10 @@ export function vehicleTypesFromSheet(
 export function fuelsForVehicleType(
   rows: VehicleTypeEfficiencyRow[],
   vehicleType: string,
-  geography?: DistanceScope | ""
+  _geography?: DistanceScope | ""
 ): string[] {
   if (!vehicleType) return [];
-  let pool = rows.filter((r) => normalize(r.vehicleType) === normalize(vehicleType));
-  if (geography === "local" || geography === "regional") {
-    const scoped = pool.filter((r) => r.geography === geography);
-    if (scoped.length > 0) pool = scoped;
-  }
+  const pool = rows.filter((r) => normalize(r.vehicleType) === normalize(vehicleType));
   return Array.from(new Set(pool.map((r) => r.fuelType))).sort((a, b) => a.localeCompare(b));
 }
 
@@ -191,15 +193,15 @@ export function findTypeEfficiency(
 ): VehicleTypeEfficiencyRow | null {
   if (!opts.vehicleType || !opts.fuelType || rows.length === 0) return null;
 
-  const scope = opts.geography === "local" || opts.geography === "regional" ? opts.geography : "";
-  let pool = scope ? rows.filter((r) => r.geography === scope) : rows;
-  if (pool.length === 0) pool = rows;
-
-  const typeMatched = pool.filter((r) => normalize(r.vehicleType) === normalize(opts.vehicleType));
+  // Prefer exact geography if present, else any row for type+fuel (local ≈ regional).
+  const typeMatched = rows.filter((r) => normalize(r.vehicleType) === normalize(opts.vehicleType));
   if (typeMatched.length === 0) return null;
 
-  const fuelHit = typeMatched.find((r) => typeFuelsMatch(r.fuelType, opts.fuelType));
-  return fuelHit ?? null;
+  const scope = opts.geography === "local" || opts.geography === "regional" ? opts.geography : "";
+  const scoped = scope ? typeMatched.filter((r) => r.geography === scope) : typeMatched;
+  const pool = scoped.length > 0 ? scoped : typeMatched;
+
+  return pool.find((r) => typeFuelsMatch(r.fuelType, opts.fuelType)) ?? null;
 }
 
 /** Sheet L/km if found; else provisional EPA type/fuel maps. */
