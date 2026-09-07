@@ -122,8 +122,9 @@ function parseRow(row: Record<string, unknown>): VehicleMakeModelRow | null {
   if (!model && !modelYearLabel) return null;
 
   const { raw, unit } = pickEfficiency(attrs, row);
-  const efficiencyLPerKm = efficiencyToLPerKm(raw, unit);
-  if (!(efficiencyLPerKm > 0)) return null;
+  const efficiencyLPerKm = raw > 0 ? efficiencyToLPerKm(raw, unit) : 0;
+  // Keep rows even when Efficiency Average is blank / "Not researched"
+  // (Score 1a still needs Brand/Model/Year; Score 1b/2/3 show 0 until a value exists).
 
   const modelName = model || modelYearLabel;
   const label = modelYearLabel || [modelName, year].filter(Boolean).join(" ");
