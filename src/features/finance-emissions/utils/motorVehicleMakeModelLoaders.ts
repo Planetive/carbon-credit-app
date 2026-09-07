@@ -105,10 +105,22 @@ function pickEfficiency(attrs: Record<string, unknown>, row: Record<string, unkn
   return { raw: 0, unit: unitCol || "L/km", rawText: "" };
 }
 
+function isMetaBrandLabel(brand: string): boolean {
+  const n = normalize(brand);
+  if (!n) return true;
+  // Sheet section / status labels that are not manufacturer brands
+  return (
+    /new\s*&\s*upcoming|classic\s*\/|pre-?2001|^dated$|no dated|popular model|spotlight|identified during|efficiency research|pakistan market|not researched|^n\/a$|^unknown$|^null$/.test(
+      n
+    ) || n.includes("upcoming")
+  );
+}
+
 function parseRow(row: Record<string, unknown>): VehicleMakeModelRow | null {
   const attrs = (row.attributes ?? {}) as Record<string, unknown>;
-  const brand = String(row.category ?? attrs.brand ?? row.brand ?? "").trim();
-  if (!brand) return null;
+  // Prefer attributes.brand (from sheet Brand column); category is only a promote mirror.
+  const brand = String(attrs.brand ?? row.brand ?? row.category ?? "").trim();
+  if (!brand || isMetaBrandLabel(brand)) return null;
 
   const model = String(attrs.model ?? row.model ?? "").trim();
   const year = String(attrs.year ?? row.year ?? "").trim();
