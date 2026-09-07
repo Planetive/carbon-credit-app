@@ -79,7 +79,7 @@ const VEHICLE_METHODS = [
     title: 'Vehicle-type efficiency',
     score: 'Score 4',
     description:
-      'Private/public + local/regional distance; pick one vehicle or fuel from a combined list for the emission factor',
+      'Private/public + local/regional distance; vehicle type efficiency (Hatchback/Sedan/…); EPA Table 3/4/Mobile/Non-Road for EF',
   },
   {
     id: '3b',

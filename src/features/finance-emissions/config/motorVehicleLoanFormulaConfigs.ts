@@ -315,14 +315,14 @@ export const OPTION_2B_MOTOR_VEHICLE = buildDistanceOption(
 export const OPTION_3A_MOTOR_VEHICLE = buildDistanceOption(
   '3a-motor-vehicle',
   'Option 3a - Combined EPA Vehicle Factors (Motor Vehicle Loan)',
-  'Statistical distance × emission factor from a single vehicle/fuel list (EPA gasoline, diesel, fuel-type, and equipment factors)',
+  'Statistical distance × vehicle-type efficiency (Hatchback/Sedan/…) × EPA EF (Table 3/4/Mobile/Non-Road)',
   '3a',
   4,
   'PCAF Option 3a - Combined EPA Emission Factors (Motor Vehicle Loan)',
   'Distance Traveled',
   'Local or regional statistical km from the distance stats sheet by vehicle use and class',
-  'Emission factor from the combined vehicle/fuel list',
-  'Σ_v (Outstanding_v / Value_v) × Distance_v × EF (g/mile or fuel-based, depending on selection)'
+  'Efficiency from market vehicle-type sheet; emission factor from EPA Table 3 / 4 / Mobile / Non-Road',
+  'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_type × EF (or Table 3/4 g/mile path)'
 );
 
 export const OPTION_3B_MOTOR_VEHICLE = buildDistanceOption(
