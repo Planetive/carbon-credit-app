@@ -17,13 +17,13 @@
  * LISTED COMPANIES (Uses EVIC as denominator):
  * - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
  * - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality  
- * - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
+ * - Option 2a: Energy Consumption Data (Data Quality Score: 2) - Good quality
  * - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
  * 
  * UNLISTED/PRIVATE COMPANIES (Uses Total Equity + Debt as denominator):
  * - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
  * - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality  
- * - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
+ * - Option 2a: Energy Consumption Data (Data Quality Score: 2) - Good quality
  * - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
  */
 
@@ -56,13 +56,13 @@ import {
 // LISTED COMPANIES (Uses EVIC as denominator):
 // - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
 // - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality  
-// - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
+// - Option 2a: Energy Consumption Data (Data Quality Score: 2) - Good quality
 // - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
 //
 // UNLISTED/PRIVATE COMPANIES (Uses Total Equity + Debt as denominator):
 // - Option 1a: Verified GHG Emissions (Data Quality Score: 1) - Highest quality
 // - Option 1b: Unverified GHG Emissions (Data Quality Score: 2) - Good quality  
-// - Option 2a: Energy Consumption Data (Data Quality Score: 3) - Fair quality
+// - Option 2a: Energy Consumption Data (Data Quality Score: 2) - Good quality
 // - Option 2b: Production Data (Data Quality Score: 3) - Fair quality
 //
 // Note: Options 3a, 3b, 3c (sector-based calculations) have been removed as requested
@@ -271,7 +271,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
    * 
    * Formula: Σ (Outstanding amount_c / EVIC_c) × Energy consumption_c × Emission factor_c
    * 
-   * Data Quality Score: 3 (Fair)
+   * Data Quality Score: 2 (Good)
    * Applicable Scopes: 1, 2 (Scope 3 cannot be estimated by this option)
    * 
    * When to use: When you have energy consumption data (MWh) and corresponding emission factors
@@ -283,7 +283,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
     description: 'Primary physical activity data for energy consumption by energy source plus any process emissions',
     category: 'listed_equity',
     optionCode: '2a',
-    dataQualityScore: 3, // Fair quality score
+    dataQualityScore: 2,
     applicableScopes: ['scope1', 'scope2'], // Note: Scope 3 cannot be estimated by this option
     inputs: [
       COMMON_INPUTS.outstanding_amount,  // Outstanding amount invested/loaned
@@ -336,7 +336,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         attributionFactor,
         emissionFactor: energyEmissions,
         financedEmissions,
-        dataQualityScore: 3,
+        dataQualityScore: 2,
         methodology: 'PCAF Option 2a - Energy Consumption Data (Listed)',
         calculationSteps: [
           {
@@ -373,7 +373,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       };
     },
     notes: [
-      'Data quality score: 3',
+      'Data quality score: 2',
       'Only applicable to Scope 1 and Scope 2 emissions',
       'Process emissions must be added if applicable',
       'Supplier-specific emission factors preferred',
@@ -690,7 +690,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
    * 
    * Formula: Σ (Outstanding amount_c / (Total equity + debt)_c) × Energy consumption_c × Emission factor_c
    * 
-   * Data Quality Score: 3 (Fair)
+   * Data Quality Score: 2 (Good)
    * Applicable Scopes: 1, 2 (Scope 3 cannot be estimated by this option)
    * 
    * When to use: When you have energy consumption data (MWh) and corresponding emission factors for unlisted companies
@@ -702,7 +702,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
     description: 'Primary physical activity data for energy consumption by energy source plus any process emissions',
     category: 'listed_equity', // Using same category for consistency
     optionCode: '2a',
-    dataQualityScore: 3, // Fair quality score
+    dataQualityScore: 2,
     applicableScopes: ['scope1', 'scope2'], // Note: Scope 3 cannot be estimated by this option
     inputs: [
       COMMON_INPUTS.outstanding_amount,  // Outstanding amount invested/loaned
@@ -757,7 +757,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
         attributionFactor,
         emissionFactor: energyEmissions,
         financedEmissions,
-        dataQualityScore: 3,
+        dataQualityScore: 2,
         methodology: 'PCAF Option 2a - Energy Consumption Data (Unlisted/Private)',
         calculationSteps: [
           {
@@ -794,7 +794,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
       };
     },
     notes: [
-      'Data quality score: 3',
+      'Data quality score: 2',
       'Applicable to scopes 1 and 2 only',
       'Based on energy consumption and emission factors',
       'Formula: Σ (Outstanding amount_c / (Total equity + debt)_c) × Energy consumption_c × Emission factor'

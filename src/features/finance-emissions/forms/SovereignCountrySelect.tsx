@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { SovereignCountryOption } from "../types/pppAdjustedGdp";
+import { cleanCountryName } from "../utils/cleanCountryName";
 import { FIELD_INPUT } from "./InputLayout";
 
 function formatGdp(value: number): string {
@@ -51,7 +52,9 @@ export function SovereignCountrySelect({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return countries;
-    return countries.filter((c) => c.countryName.toLowerCase().includes(q));
+    return countries.filter((c) =>
+      cleanCountryName(c.countryName).toLowerCase().includes(q)
+    );
   }, [countries, search]);
 
   const handleSelect = (name: string) => {
@@ -77,7 +80,11 @@ export function SovereignCountrySelect({
             )}
           >
             <span className="truncate">
-              {loading ? "Loading countries…" : value || placeholder}
+              {loading
+                ? "Loading countries…"
+                : value
+                  ? cleanCountryName(value)
+                  : placeholder}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
           </Button>
@@ -92,10 +99,12 @@ export function SovereignCountrySelect({
             <CommandList className="max-h-56">
               <CommandEmpty>No matching country.</CommandEmpty>
               <CommandGroup>
-                {filtered.map((country) => (
+                {filtered.map((country) => {
+                  const label = cleanCountryName(country.countryName);
+                  return (
                   <CommandItem
                     key={country.countryName}
-                    value={country.countryName}
+                    value={label}
                     onSelect={() => handleSelect(country.countryName)}
                   >
                     <Check
@@ -104,12 +113,10 @@ export function SovereignCountrySelect({
                         value === country.countryName ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <span className="truncate">
-                      {country.countryName}
-                      {country.usedFallback ? " · 2024" : ""}
-                    </span>
+                    <span className="truncate">{label}</span>
                   </CommandItem>
-                ))}
+                  );
+                })}
               </CommandGroup>
             </CommandList>
           </Command>
@@ -119,7 +126,7 @@ export function SovereignCountrySelect({
       {value && gdpValue > 0 && (
         <p className="text-xs text-[#64748B]">
           PPP-adjusted GDP: <span className="font-medium text-[#334155]">{formatGdp(gdpValue)}</span>
-          {" · "}
+          {" · year "}
           {gdpYear}
           {usedFallback ? " (2025 unavailable)" : ""}
         </p>

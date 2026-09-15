@@ -3,7 +3,7 @@
  * Dataset: motor_vehicle_distance_stats (ref.factor_rows).
  * Fallback: public.staging_motor_vehicle_distance_stats
  *
- * Lookup: vehicle_use (private / public / commercial) + vehicle_class
+ * Lookup: vehicle_use (private / public) + vehicle_class
  *         + public operation_type (intercity / outercity≈intracity)
  *         + distance_geography (local vs regional).
  */
@@ -14,7 +14,7 @@ import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 export const DISTANCE_STATS_DATASET_CODE = "motor_vehicle_distance_stats";
 export const DISTANCE_STATS_STAGING_TABLE = "staging_motor_vehicle_distance_stats";
 
-export type DistanceUseClass = "private" | "public" | "commercial";
+export type DistanceUseClass = "private" | "public";
 export type DistanceScope = "local" | "regional";
 export type PublicRoute = "intercity" | "outercity";
 
@@ -40,7 +40,7 @@ function parseUse(raw: string): DistanceUseClass | null {
   const n = normalize(raw);
   if (n === "private") return "private";
   if (n === "public") return "public";
-  if (n === "commercial") return "commercial";
+  // Commercial rows in the sheet are intentionally ignored for motor vehicle loans.
   return null;
 }
 
@@ -141,7 +141,7 @@ export async function loadVehicleDistanceStats(): Promise<VehicleDistanceStat[]>
 
 export function usesForStats(rows: VehicleDistanceStat[]): DistanceUseClass[] {
   const set = new Set(rows.map((r) => r.vehicleUse));
-  return (["private", "public", "commercial"] as const).filter((u) => set.has(u));
+  return (["private", "public"] as const).filter((u) => set.has(u));
 }
 
 function filterByScope(rows: VehicleDistanceStat[], scope?: DistanceScope | ""): VehicleDistanceStat[] {

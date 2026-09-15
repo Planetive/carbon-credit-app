@@ -110,7 +110,7 @@ interface VehicleEntry {
   make: string;
   /** Model name — from make/model sheet on Scores 1a / 1b / 2 / 3 */
   model: string;
-  /** Score 2–5: private / public / commercial (matches distance stats sheet) */
+  /** Score 2–5: private / public (matches distance stats sheet) */
   vehicleUseClass: DistanceUseClass | "";
   /** Score 2–5 public only: intercity vs outercity (intracity) */
   publicRoute: PublicRoute | "";
@@ -1777,7 +1777,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             onValueChange={(v) => updateVehicleEntry(entry.id, "vehicleUseClass", v as DistanceUseClass)}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Private, public, or commercial" />
+              <SelectValue placeholder="Private or public" />
             </SelectTrigger>
             <SelectContent>
               {distanceUseOptions.map((use) => (

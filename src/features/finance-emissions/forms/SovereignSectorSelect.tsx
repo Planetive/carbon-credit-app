@@ -49,11 +49,7 @@ export function SovereignSectorSelect({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return sectors;
-    return sectors.filter(
-      (s) =>
-        s.sectorName.toLowerCase().includes(q) ||
-        s.sectorCode.toLowerCase().includes(q)
-    );
+    return sectors.filter((s) => s.sectorName.toLowerCase().includes(q));
   }, [sectors, search]);
 
   const selected = sectors.find((s) => s.sectorKey === value);
@@ -110,10 +106,7 @@ export function SovereignSectorSelect({
                         value === sector.sectorKey ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <span className="truncate">
-                      {sector.sectorName}
-                      {sector.sectorCode ? ` · ${sector.sectorCode}` : ""}
-                    </span>
+                    <span className="truncate">{sector.sectorName}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>

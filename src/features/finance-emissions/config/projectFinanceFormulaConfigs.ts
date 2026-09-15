@@ -15,7 +15,7 @@
  * Formula Categories:
  * - Option 1a: Verified GHG emissions data (Score 1) - Highest quality
  * - Option 1b: Unverified GHG emissions data (Score 2) - Good quality
- * - Option 2a: Energy consumption + emission factors (Score 3) - Fair quality
+ * - Option 2a: Energy consumption + emission factors (Score 2) - Good quality
  * - Option 2b: Production data + emission factors (Score 3) - Fair quality
  * 
  * Attribution Factor: Outstanding Amount / Total Assets (consistent across all formulas)
@@ -226,7 +226,7 @@ export const OPTION_1B_PROJECT_FINANCE: FormulaConfig = {
 
 /**
  * OPTION 2A - ENERGY CONSUMPTION DATA (PROJECT FINANCE)
- * Data Quality Score: 3 (Fair)
+ * Data Quality Score: 2 (Good)
  * Uses: Primary physical activity data for project's energy consumption + emission factors
  * Formula: Σ (Outstanding amount_p / (Total equity + debt)_p) × Energy consumption_p × Emission factor
  */
@@ -234,7 +234,7 @@ export const OPTION_2A_PROJECT_FINANCE: FormulaConfig = {
   id: '2a-project-finance',
   name: 'Option 2a - Energy Consumption Data (Project Finance)',
   description: 'Primary physical activity data for the project\'s energy consumption by energy source plus any process emissions',
-  dataQualityScore: 3,
+  dataQualityScore: 2,
   category: 'project_finance',
   optionCode: '2a',
   inputs: [
@@ -290,7 +290,7 @@ export const OPTION_2A_PROJECT_FINANCE: FormulaConfig = {
       attributionFactor,
       emissionFactor: energyEmissions,
       financedEmissions,
-      dataQualityScore: 3,
+      dataQualityScore: 2,
       methodology: 'PCAF Option 2a - Energy Consumption Data (Project Finance)',
       calculationSteps: [
         {
@@ -325,7 +325,7 @@ export const OPTION_2A_PROJECT_FINANCE: FormulaConfig = {
     };
   },
   notes: [
-    'Fair data quality score (3)',
+    'Good data quality score (2)',
     'Requires energy consumption data and emission factors',
     'Applicable to scope 1 and 2 emissions only',
     'Formula: Σ (Outstanding amount_p / (Total equity + debt)_p) × Energy consumption_p × Emission factor'

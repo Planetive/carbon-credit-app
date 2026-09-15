@@ -7,6 +7,7 @@ import { useCountrySectorIntensity } from "../hooks/useCountrySectorIntensity";
 import { SovereignCountrySelect } from "./SovereignCountrySelect";
 import { SovereignSectorSelect } from "./SovereignSectorSelect";
 import type { SectorOption } from "../types/countrySectorIntensity";
+import { cleanCountryName } from "../utils/cleanCountryName";
 
 type Props = {
   optionCode: string;
@@ -77,7 +78,7 @@ const SectorProxyInputs: React.FC<Props> = ({
                   disabled={!!countriesError}
                   placeholder="Choose country for sector intensity"
                   onSelect={(name) => {
-                    onUpdateFormData("intensity_country_name", name);
+                    onUpdateFormData("intensity_country_name", cleanCountryName(name));
                     clearSector();
                   }}
                 />

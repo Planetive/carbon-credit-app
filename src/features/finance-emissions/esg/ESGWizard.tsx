@@ -375,8 +375,8 @@ function VehicleProgressiveCapabilityPicker({
 
 const PROPERTY_METHODS = [
   { id: '1a', title: 'Actual energy + supplier factor', score: 'Score 1', description: 'Actual building energy (kWh) × user-supplied supplier-specific emission factor' },
-  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building energy (kWh) × user-supplied average emission factor' },
-  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy per floor area × floor area × grid emission factor' },
+  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building energy (kWh) × average grid emission factor (we provide)' },
+  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Estimated whole-building energy × floor area financed × average grid factor' },
   { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
   { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
 ];
@@ -390,14 +390,14 @@ const SOVEREIGN_METHODS = [
 ];
 
 const BOND_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
   { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
   { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
 ];
 
 const FACILITATED_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor × weight factor' },
+  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor × weight factor' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × emission factor × weight factor' },
   { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table) × weight factor' },
   { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Facilitated amount × ATR × sector intensity (GHG / revenue from table) × weight factor' },
@@ -2105,7 +2105,7 @@ export const ESGWizard: React.FC = () => {
               item.type === 'project-finance'
           );
           const creMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Energy per floor area × floor area × grid emission factor' },
+            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Estimated whole-building energy × floor area financed × average grid factor' },
             { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
             { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
           ];
@@ -2120,7 +2120,7 @@ export const ESGWizard: React.FC = () => {
             );
           }
           const corporateBondMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy consumption', score: 'Score 3', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+            { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
             { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
             { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
             { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },

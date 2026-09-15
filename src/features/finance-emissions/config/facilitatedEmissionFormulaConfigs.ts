@@ -17,7 +17,7 @@
  * LISTED / UNLISTED COMPANIES:
  * - Option 1a: Verified GHG Emissions (Score 1)
  * - Option 1b: Unverified GHG Emissions (Score 2)
- * - Option 2a: Energy Consumption Data (Score 3)
+ * - Option 2a: Energy Consumption Data (Score 2)
  * - Option 2b: Production Data (Score 3)
  * - Option 3a: Revenue-based sector intensity (Score 4)
  * - Option 3c: Asset turnover ratio (Score 5)
@@ -410,7 +410,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
    * OPTION 2A - ENERGY CONSUMPTION DATA (FACILITATED - LISTED)
    * 
    * Formula: Σ (Facilitated amount_c / EVIC_c) × Weighting factor × Energy consumption_c × Emission factor
-   * Data Quality Score: 3 (Fair)
+   * Data Quality Score: 2 (Good)
    */
   {
     id: '2a-facilitated-energy-listed',
@@ -418,7 +418,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
     description: 'Energy consumption data with energy-specific emission factors for facilitated emissions from listed companies',
     category: 'facilitated_emission',
     optionCode: '2a',
-    dataQualityScore: 3,
+    dataQualityScore: 2,
     applicableScopes: ['scope1', 'scope2'],
     inputs: [
       {
@@ -481,7 +481,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         attributionFactor,
         emissionFactor: energyEmissions,
         financedEmissions: facilitatedEmissions,
-        dataQualityScore: 3,
+        dataQualityScore: 2,
         methodology: 'Option 2a - Energy Consumption Data (Facilitated - Listed)',
         calculationSteps: [
           {
@@ -524,7 +524,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
    * OPTION 2A - ENERGY CONSUMPTION DATA (FACILITATED - UNLISTED)
    * 
    * Formula: Σ (Facilitated amount_c / (Total equity + debt)_c) × Weighting factor × Energy consumption_c × Emission factor
-   * Data Quality Score: 3 (Fair)
+   * Data Quality Score: 2 (Good)
    */
   {
     id: '2a-facilitated-energy-unlisted',
@@ -532,7 +532,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
     description: 'Energy consumption data with energy-specific emission factors for facilitated emissions from unlisted companies',
     category: 'facilitated_emission',
     optionCode: '2a',
-    dataQualityScore: 3,
+    dataQualityScore: 2,
     applicableScopes: ['scope1', 'scope2'],
     inputs: [
       {
@@ -595,7 +595,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
         attributionFactor,
         emissionFactor: energyEmissions,
         financedEmissions: facilitatedEmissions,
-        dataQualityScore: 3,
+        dataQualityScore: 2,
         methodology: 'Option 2a - Energy Consumption Data (Facilitated - Unlisted)',
         calculationSteps: [
           {

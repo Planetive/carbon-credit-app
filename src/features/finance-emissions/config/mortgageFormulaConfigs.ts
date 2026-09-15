@@ -117,7 +117,7 @@ export const OPTION_1A_MORTGAGE: FormulaConfig = {
 export const OPTION_1B_MORTGAGE: FormulaConfig = {
   id: '1b-mortgage',
   name: 'Option 1b - Average Emission Factors (Mortgage)',
-  description: 'Primary data on actual building energy consumption with average emission factors',
+  description: 'Primary data on actual building energy consumption with average grid emission factors (platform-provided)',
   dataQualityScore: 2,
   category: 'mortgage',
   optionCode: '1b',
@@ -134,11 +134,11 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
     },
     {
       name: 'emission_factor',
-      label: 'Emission Factor',
+      label: 'Average Grid Emission Factor',
       type: 'number',
       required: true,
       unit: 'tCO2e/kWh',
-      description: 'User-supplied average emission factor',
+      description: 'Average grid emission factor from EPA eGRID country selection',
     },
   ],
   calculate: (inputs, companyType) => {
@@ -190,21 +190,21 @@ export const OPTION_1B_MORTGAGE: FormulaConfig = {
         category: 'mortgage',
         propertyValueAtOrigination,
         totalEmissions,
-        formula: 'Σ (Outstanding / Property value) × Actual energy × Average EF',
+        formula: 'Σ (Outstanding / Property value) × Actual energy × Average grid EF',
       },
     };
   },
   notes: [
     'Good data quality score (2)',
-    'Actual building energy (kWh) × user-supplied average emission factor',
-    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF',
+    'Actual building energy (kWh) × average grid emission factor (platform-provided)',
+    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × Average grid EF',
   ],
 };
 
 export const OPTION_2A_MORTGAGE: FormulaConfig = {
   id: '2a-mortgage',
   name: 'Option 2a - Energy Labels Data (Mortgage)',
-  description: 'Estimated building energy consumption per floor area based on official building energy labels and floor area financed',
+  description: 'Estimated energy consumption of the whole building from energy labels × floor area financed × average grid factor',
   dataQualityScore: 3,
   category: 'mortgage',
   optionCode: '2a',
@@ -213,15 +213,15 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
     propertyValueInput,
     {
       name: 'estimated_energy_consumption_from_labels',
-      label: 'Estimated Energy Consumption from Energy Labels',
+      label: 'Estimated Energy Consumption of Whole Building',
       type: 'number',
       required: true,
       unit: 'kWh/m²',
-      description: 'Estimated building energy consumption per floor area based on official building energy labels',
+      description: 'Estimated energy consumption of the whole building from energy labels (per unit floor area)',
     },
     {
       name: 'floor_area',
-      label: 'Floor Area',
+      label: 'Floor Area Financed',
       type: 'number',
       required: true,
       unit: 'm²',
@@ -229,11 +229,11 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
     },
     {
       name: 'average_emission_factor',
-      label: 'Average Emission Factor',
+      label: 'Average Grid Emission Factor',
       type: 'number',
       required: true,
       unit: 'tCO2e/kWh',
-      description: 'Grid electricity emission factor (from EPA eGRID country selection)',
+      description: 'Average grid electricity emission factor (from EPA eGRID country selection)',
     },
   ],
   calculate: (inputs, companyType) => {
@@ -271,7 +271,7 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
         {
           step: 'Total Energy Consumption',
           value: totalEnergyConsumption,
-          formula: `${estimatedEnergyConsumptionFromLabels.toFixed(2)} kWh/m² × ${floorArea.toFixed(2)} m² = ${totalEnergyConsumption.toFixed(2)} kWh`,
+          formula: `${estimatedEnergyConsumptionFromLabels.toFixed(2)} kWh/m² × ${floorArea.toFixed(2)} m² financed = ${totalEnergyConsumption.toFixed(2)} kWh`,
         },
         {
           step: 'Total Emissions',
@@ -294,14 +294,14 @@ export const OPTION_2A_MORTGAGE: FormulaConfig = {
         averageEmissionFactor,
         totalEnergyConsumption,
         totalEmissions,
-        formula: 'Σ (Outstanding / Property value) × Energy from labels × Floor area × Average EF',
+        formula: 'Σ (Outstanding / Property value) × Whole-building energy × Floor area financed × Average grid EF',
       },
     };
   },
   notes: [
     'Fair data quality score (3)',
-    'Energy from labels × floor area × EPA/DEFRA average factor',
-    'Formula: Σ (Outstanding / Property value at origination) × Labels × Floor × EF',
+    'Whole-building energy from labels × floor area financed × average grid factor',
+    'Formula: Σ (Outstanding / Property value at origination) × Labels × Floor financed × Grid EF',
   ],
 };
 

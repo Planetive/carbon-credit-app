@@ -28,8 +28,9 @@ interface CommercialRealEstateFormProps {
 
 /**
  * CRE / mortgage PCAF options:
- * - 1a / 1b (Score 1–2): user enters energy + emission factor (no grid lookup)
- * - 2a (Score 3): floor area + energy per floor area + grid EF
+ * - 1a (Score 1): user enters energy + supplier-specific emission factor
+ * - 1b (Score 2): user enters energy; average emission factor from EPA grid country
+ * - 2a (Score 3): estimated whole-building energy (kWh/m² from labels) × floor area financed × grid EF
  * - 2b (Score 4): CBECS PBA + kWh/sqft + floor area (sqft) + grid EF
  * - 3  (Score 5): CBECS PBA + kWh/building + building count + grid EF
  */
@@ -42,7 +43,8 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
   onUpdateRef.current = onUpdateFormData;
 
   const option = selectedFormula?.optionCode || "";
-  const isUserEfPath = option === "1a" || option === "1b";
+  const isSupplierEfPath = option === "1a";
+  const isAverageEfPath = option === "1b";
   const isLabelsPath = option === "2a";
   const isStatisticsPath = option === "2b" || option === "3";
 
@@ -88,15 +90,21 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
 
   const gridCountries = useMemo(() => getElectricityGridCountries(), []);
 
-  if (!isUserEfPath && !isLabelsPath && !isStatisticsPath) return null;
+  if (!isSupplierEfPath && !isAverageEfPath && !isLabelsPath && !isStatisticsPath) return null;
 
   const applyGridFactorFromCountry = (country: string) => {
     const kg = getElectricityGridFactorKgPerKwh(country);
     if (kg && kg > 0) {
+      const tco2ePerKwh = kg / 1000;
       onUpdateRef.current("factor_grid_country", country);
       onUpdateRef.current("electricity_grid_factor", kg);
-      onUpdateRef.current("average_emission_factor", kg / 1000);
+      onUpdateRef.current("average_emission_factor", tco2ePerKwh);
       onUpdateRef.current("average_emission_factor_unit", "tCO2e/kWh");
+      // Score 2 (1b) formula reads emission_factor — keep it in sync with the grid average.
+      if (option === "1b") {
+        onUpdateRef.current("emission_factor", tco2ePerKwh);
+        onUpdateRef.current("emission_factor_unit", "tCO2e/kWh");
+      }
     }
   };
 
@@ -136,78 +144,25 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
   const estimatedEmissionsTco2e =
     totalEnergyKwh > 0 && averageFactor > 0 ? totalEnergyKwh * averageFactor : 0;
 
-  const sectionTitle = isUserEfPath
+  const sectionTitle = isSupplierEfPath
     ? "Actual building energy"
-    : isLabelsPath
-      ? "Energy labels & grid factor"
-      : option === "2b"
-        ? "Building type, floor area & grid factor"
-        : "Building type, buildings & grid factor";
+    : isAverageEfPath
+      ? "Actual building energy & average grid factor"
+      : isLabelsPath
+        ? "Whole-building energy, floor area & grid factor"
+        : option === "2b"
+          ? "Building type, floor area & grid factor"
+          : "Building type, buildings & grid factor";
 
-  const sectionDescription = isUserEfPath
-    ? "Enter actual building energy consumption and the emission factor. No grid lookup — both values come from the user."
-    : isLabelsPath
-      ? "Enter energy consumption per floor area and floor area. Grid emission factor uses the same EPA Scope 2 countries as the emission calculator."
-      : option === "2b"
-        ? "Pick a CBECS principal building activity for kWh/sqft, enter floor area (sqft), and select an EPA grid country (same list as the emission calculator)."
-        : "Pick a CBECS principal building activity for kWh/building, enter building count, and select an EPA grid country (same list as the emission calculator).";
-
-  if (isUserEfPath) {
-    const energy = num("energy_consumption");
-    const ef = num("emission_factor");
-    const product = energy > 0 && ef > 0 ? energy * ef : 0;
-
-    return (
-      <InputSection title={sectionTitle} description={sectionDescription}>
-        <FieldGrid>
-          <FormField
-            label="Actual building energy consumption"
-            unit="kWh"
-            required
-            tooltip="Primary data on actual building energy use"
-          >
-            <Input
-              type="number"
-              min={0}
-              step="any"
-              value={energy || ""}
-              onChange={setNum("energy_consumption")}
-              className={FIELD_INPUT}
-            />
-          </FormField>
-          <FormField
-            label="Emission factor"
-            unit="tCO₂e/kWh"
-            required
-            tooltip="User-supplied emission factor (supplier-specific for Score 1, average for Score 2)"
-          >
-            <Input
-              type="number"
-              min={0}
-              step="any"
-              value={ef || ""}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value) || 0;
-                onUpdateFormData("emission_factor", v);
-                onUpdateFormData("emission_factor_unit", "tCO2e/kWh");
-              }}
-              className={FIELD_INPUT}
-            />
-          </FormField>
-          <ComputedBox
-            label="Building energy emissions"
-            value={
-              product > 0
-                ? product.toLocaleString(undefined, { maximumFractionDigits: 4 })
-                : "—"
-            }
-            unit="tCO₂e"
-            hint="Energy × emission factor (before loan attribution)"
-          />
-        </FieldGrid>
-      </InputSection>
-    );
-  }
+  const sectionDescription = isSupplierEfPath
+    ? "Enter actual building energy consumption and the supplier-specific emission factor."
+    : isAverageEfPath
+      ? "Enter actual building energy consumption. We supply the average emission factor from the EPA electricity grid for the country you pick."
+      : isLabelsPath
+        ? "Enter estimated energy consumption for the whole building (from energy labels), then the floor area financed. Emissions = energy × floor area × average grid factor."
+        : option === "2b"
+          ? "Pick a CBECS principal building activity for kWh/sqft, enter floor area (sqft), and select an EPA grid country (same list as the emission calculator)."
+          : "Pick a CBECS principal building activity for kWh/building, enter building count, and select an EPA grid country (same list as the emission calculator).";
 
   const gridCountryField = (
     <FormField
@@ -237,22 +192,124 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
 
   const gridEfBox = (
     <ComputedBox
-      label="Grid emission factor"
+      label="Average grid emission factor"
       value={gridFactorKg > 0 ? gridFactorKg.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—"}
       unit="kgCO₂e/kWh"
-      hint="Same EPA Scope 2 grid factors as the emission calculator"
+      hint="Provided from EPA Scope 2 grid factors — you don’t need to enter this"
     />
   );
+
+  if (isSupplierEfPath) {
+    const energy = num("energy_consumption");
+    const ef = num("emission_factor");
+    const product = energy > 0 && ef > 0 ? energy * ef : 0;
+
+    return (
+      <InputSection title={sectionTitle} description={sectionDescription}>
+        <FieldGrid>
+          <FormField
+            label="Actual building energy consumption"
+            unit="kWh"
+            required
+            tooltip="How much energy the building actually used (for example from meter readings or utility bills)."
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={energy || ""}
+              onChange={setNum("energy_consumption")}
+              className={FIELD_INPUT}
+            />
+          </FormField>
+          <FormField
+            label="Emission factor"
+            unit="tCO₂e/kWh"
+            required
+            tooltip="The carbon intensity figure from your energy supplier for this building (for example from a utility bill or supplier statement)."
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={ef || ""}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value) || 0;
+                onUpdateFormData("emission_factor", v);
+                onUpdateFormData("emission_factor_unit", "tCO2e/kWh");
+              }}
+              className={FIELD_INPUT}
+            />
+          </FormField>
+          <ComputedBox
+            label="Building energy emissions"
+            value={
+              product > 0
+                ? product.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                : "—"
+            }
+            unit="tCO₂e"
+            hint="Energy × emission factor (before loan attribution)"
+          />
+        </FieldGrid>
+      </InputSection>
+    );
+  }
+
+  if (isAverageEfPath) {
+    const energy = num("energy_consumption");
+    const ef = num("emission_factor");
+    const product = energy > 0 && ef > 0 ? energy * ef : 0;
+
+    return (
+      <InputSection title={sectionTitle} description={sectionDescription}>
+        <FieldGrid>
+          <FormField
+            label="Actual building energy consumption"
+            unit="kWh"
+            required
+            tooltip="How much energy the building actually used (for example from meter readings or utility bills)."
+          >
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={energy || ""}
+              onChange={setNum("energy_consumption")}
+              className={FIELD_INPUT}
+            />
+          </FormField>
+          {gridCountryField}
+        </FieldGrid>
+
+        <div className="mt-4">
+          <FieldGrid>
+            {gridEfBox}
+            <ComputedBox
+              label="Building energy emissions"
+              value={
+                product > 0
+                  ? product.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                  : "—"
+              }
+              unit="tCO₂e"
+              hint="Energy × average grid factor (before loan attribution)"
+            />
+          </FieldGrid>
+        </div>
+      </InputSection>
+    );
+  }
 
   if (isLabelsPath) {
     return (
       <InputSection title={sectionTitle} description={sectionDescription}>
         <FieldGrid>
           <FormField
-            label="Energy consumption per floor area"
+            label="Estimated energy consumption of whole building"
             unit="kWh/m²"
             required
-            tooltip="Building energy intensity from energy labels"
+            tooltip="Estimated energy use for the whole building from energy labels (per unit floor area)"
           >
             <Input
               type="number"
@@ -263,7 +320,12 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
               className={FIELD_INPUT}
             />
           </FormField>
-          <FormField label="Floor area" unit="m²" required>
+          <FormField
+            label="Floor area financed"
+            unit="m²"
+            required
+            tooltip="Floor area covered by the loan / financed portion of the building"
+          >
             <Input
               type="number"
               min={0}
@@ -286,7 +348,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                   : "—"
               }
               unit="kWh"
-              hint="kWh/m² × m²"
+              hint="Whole-building energy (kWh/m²) × floor area financed"
             />
             {gridEfBox}
             <ComputedBox
@@ -297,7 +359,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                   : "—"
               }
               unit="tCO₂e"
-              hint="Total kWh × grid EF (before loan attribution)"
+              hint="Total kWh × average grid factor (before loan attribution)"
             />
           </FieldGrid>
         </div>

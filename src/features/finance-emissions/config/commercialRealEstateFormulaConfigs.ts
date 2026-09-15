@@ -138,7 +138,7 @@ export const OPTION_1A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
 export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
   id: '1b-commercial-real-estate',
   name: 'Option 1b - Average Emission Factors (Commercial Real Estate)',
-  description: 'Primary data on actual building energy consumption with average emission factors',
+  description: 'Primary data on actual building energy consumption with average grid emission factors (platform-provided)',
   dataQualityScore: 2,
   category: 'commercial_real_estate',
   optionCode: '1b',
@@ -162,11 +162,11 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
     },
     {
       name: 'emission_factor',
-      label: 'Emission Factor',
+      label: 'Average Grid Emission Factor',
       type: 'number',
       required: true,
       unit: 'tCO2e/kWh',
-      description: 'User-supplied average emission factor'
+      description: 'Average grid emission factor from EPA eGRID country selection'
     }
   ],
   calculate: (inputs, companyType) => {
@@ -215,14 +215,14 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         category: 'commercial_real_estate',
         propertyValueAtOrigination,
         totalEmissions,
-        formula: 'Σ (Outstanding / Property value) × Actual energy × Average EF'
+        formula: 'Σ (Outstanding / Property value) × Actual energy × Average grid EF'
       }
     };
   },
   notes: [
     'Good data quality score (2)',
-    'Actual building energy (kWh) × user-supplied average emission factor',
-    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × EF'
+    'Actual building energy (kWh) × average grid emission factor (platform-provided)',
+    'Formula: Σ (Outstanding / Property value at origination) × Actual energy × Average grid EF'
   ]
 };
 
@@ -235,7 +235,7 @@ export const OPTION_1B_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
 export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
   id: '2a-commercial-real-estate',
   name: 'Option 2a - Estimated Energy Consumption from Energy Labels (Commercial Real Estate)',
-  description: 'Estimated building energy consumption per floor area based on official building energy labels and floor area financed',
+  description: 'Estimated energy consumption of the whole building from energy labels × floor area financed × average grid factor',
   dataQualityScore: 3,
   category: 'commercial_real_estate',
   optionCode: '2a',
@@ -251,27 +251,27 @@ export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
     },
     {
       name: 'estimated_energy_consumption_from_labels',
-      label: 'Estimated Energy Consumption from Energy Labels',
+      label: 'Estimated Energy Consumption of Whole Building',
       type: 'number',
       required: true,
       unit: 'kWh/m²',
-      description: 'Estimated building energy consumption per floor area based on official building energy labels'
+      description: 'Estimated energy consumption of the whole building from energy labels (per unit floor area)'
     },
     {
       name: 'floor_area',
-      label: 'Floor Area',
+      label: 'Floor Area Financed',
       type: 'number',
       required: true,
       unit: 'm²',
-      description: 'Floor area of the commercial property'
+      description: 'Floor area financed'
     },
     {
       name: 'average_emission_factor',
-      label: 'Average Emission Factor',
+      label: 'Average Grid Emission Factor',
       type: 'number',
       required: true,
       unit: 'tCO2e/kWh',
-      description: 'Grid electricity emission factor (from EPA eGRID country selection)'
+      description: 'Average grid electricity emission factor (from EPA eGRID country selection)'
     }
   ],
   calculate: (inputs, companyType) => {
@@ -313,7 +313,7 @@ export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         {
           step: 'Total Energy Consumption',
           value: totalEnergyConsumption,
-          formula: `${estimatedEnergyConsumptionFromLabels.toFixed(2)} kWh/m² × ${floorArea.toFixed(2)} m² = ${totalEnergyConsumption.toFixed(2)} kWh`
+          formula: `${estimatedEnergyConsumptionFromLabels.toFixed(2)} kWh/m² × ${floorArea.toFixed(2)} m² financed = ${totalEnergyConsumption.toFixed(2)} kWh`
         },
         {
           step: 'Total Emissions',
@@ -336,15 +336,14 @@ export const OPTION_2A_COMMERCIAL_REAL_ESTATE: FormulaConfig = {
         averageEmissionFactor,
         totalEnergyConsumption,
         totalEmissions,
-        formula: 'Σ_p (Outstanding amount_p / Property value at origination_p) × Estimated energy consumption from energy labels_p,e × Floor area_p × Average emission factor_e'
+        formula: 'Σ (Outstanding / Property value) × Whole-building energy × Floor area financed × Average grid EF'
       }
     };
   },
   notes: [
     'Fair data quality score (3)',
-    'Uses estimated building energy consumption per floor area based on official building energy labels',
-    'Requires floor area financed and average emission factors',
-    'Formula: Σ_p (Outstanding amount_p / Property value at origination_p) × Estimated energy consumption from energy labels_p,e × Floor area_p × Average emission factor_e'
+    'Whole-building energy from labels × floor area financed × average grid factor',
+    'Formula: Σ (Outstanding / Property value at origination) × Labels × Floor financed × Grid EF'
   ]
 };
 

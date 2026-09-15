@@ -4,6 +4,8 @@ import type {
   CountrySectorIntensityRow,
   SectorOption,
 } from "../types/countrySectorIntensity";
+import { cleanCountryName } from "../utils/cleanCountryName";
+import { cleanSectorDisplayName } from "../utils/cleanSectorDisplayName";
 
 function num(v: unknown): number | null {
   if (v == null || v === "") return null;
@@ -12,9 +14,10 @@ function num(v: unknown): number | null {
 }
 
 function normalizeRow(raw: Record<string, unknown>): CountrySectorIntensityRow | null {
-  const countryName = String(raw.country_name ?? "").trim();
-  const sectorName = String(raw.sector_name ?? "").trim();
+  const countryName = cleanCountryName(String(raw.country_name ?? ""));
   const sectorCode = String(raw.sector_code ?? "").trim();
+  const rawSectorName = String(raw.sector_name ?? "").trim();
+  const sectorName = cleanSectorDisplayName(rawSectorName || sectorCode, sectorCode);
   const intensity = num(raw.intensity);
   if (!countryName || (!sectorName && !sectorCode) || intensity == null) return null;
   return {
@@ -32,7 +35,7 @@ export function toSectorOption(row: CountrySectorIntensityRow): SectorOption {
   return {
     sectorKey: row.sector_code || row.sector_name,
     sectorCode: row.sector_code,
-    sectorName: row.sector_name,
+    sectorName: cleanSectorDisplayName(row.sector_name, row.sector_code),
     year: row.year,
     unit: row.unit,
     intensity: row.intensity,
@@ -49,21 +52,36 @@ export function intensityToTco2ePerCurrency(intensity: number, unit: string): nu
 export async function fetchSectorsForCountry(
   countryName: string
 ): Promise<SectorOption[]> {
-  const trimmed = countryName.trim();
-  if (!trimmed) return [];
+  const cleaned = cleanCountryName(countryName);
+  if (!cleaned) return [];
 
   if (!isJwtAuthEnabled()) {
     throw new Error("Country sector intensity requires the backend API (JWT auth).");
   }
 
-  const raw = await listCountrySectorIntensity({
-    country_name: trimmed,
-    limit: 5000,
-  });
+  const toOptions = (raw: Record<string, unknown>[]) =>
+    raw
+      .map((row) => normalizeRow(row))
+      .filter((row): row is CountrySectorIntensityRow => row != null)
+      // Match cleaned names so "Pakistan 2024" in DB still maps to "Pakistan".
+      .filter((row) => row.country_name.toLowerCase() === cleaned.toLowerCase())
+      .map(toSectorOption)
+      .sort((a, b) => a.sectorName.localeCompare(b.sectorName));
 
-  return raw
-    .map((row) => normalizeRow(row))
-    .filter((row): row is CountrySectorIntensityRow => row != null)
-    .map(toSectorOption)
-    .sort((a, b) => a.sectorName.localeCompare(b.sectorName));
+  const attempts = [cleaned, countryName.trim()].filter(
+    (name, index, arr) => name && arr.indexOf(name) === index
+  );
+
+  for (const name of attempts) {
+    const options = toOptions(
+      await listCountrySectorIntensity({
+        country_name: name,
+        limit: 5000,
+      })
+    );
+    if (options.length > 0) return options;
+  }
+
+  // Last resort: backend may only match the year-suffixed DB label.
+  return toOptions(await listCountrySectorIntensity({ limit: 5000 }));
 }
