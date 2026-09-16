@@ -30,17 +30,17 @@ export type DefraVehicleSource = "passenger" | "delivery" | "fuel";
 export type VehicleSource = EpaVehicleSource | DefraVehicleSource;
 
 export const EPA_SOURCE_LABELS: Record<EpaVehicleSource, string> = {
-  mobile_combustion: "Mobile Fuel",
-  on_road_gasoline: "On-Road Gasoline (Table 3)",
-  on_road_diesel: "On-Road Diesel & Alt Fuel (Table 4)",
-  non_road: "Non-Road Vehicle",
-  vehicular_footprint: "Vehicular Carbon Footprints",
+  mobile_combustion: "By fuel type",
+  on_road_gasoline: "Petrol / gasoline vehicles",
+  on_road_diesel: "Diesel & alternative-fuel vehicles",
+  non_road: "Non-road vehicles",
+  vehicular_footprint: "Vehicle carbon footprints",
 };
 
 export const DEFRA_SOURCE_LABELS: Record<DefraVehicleSource, string> = {
-  passenger: "Passenger Vehicle",
-  delivery: "Delivery Vehicle",
-  fuel: "Scope 1 Fuel",
+  passenger: "Passenger vehicle",
+  delivery: "Delivery vehicle",
+  fuel: "Fuel consumption",
 };
 
 export type EpaMobileFuelOption = { fuelType: string; unit: string; factorKg: number };

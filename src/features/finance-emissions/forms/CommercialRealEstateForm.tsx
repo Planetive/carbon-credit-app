@@ -155,20 +155,20 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
           : "Building type, buildings & grid factor";
 
   const sectionDescription = isSupplierEfPath
-    ? "Enter actual building energy consumption and the supplier-specific emission factor."
+    ? "Enter how much energy the building used, and the emissions rate from your electricity supplier."
     : isAverageEfPath
-      ? "Enter actual building energy consumption. We supply the average emission factor from the EPA electricity grid for the country you pick."
+      ? "Enter how much energy the building used. Pick the country for electricity — we provide the average emissions rate for that grid."
       : isLabelsPath
-        ? "Enter estimated energy consumption for the whole building (from energy labels), then the floor area financed. Emissions = energy × floor area × average grid factor."
+        ? "Enter estimated energy use for the whole building (from energy labels), then the floor area financed. Emissions = energy × floor area × average grid rate."
         : option === "2b"
-          ? "Pick a CBECS principal building activity for kWh/sqft, enter floor area (sqft), and select an EPA grid country (same list as the emission calculator)."
-          : "Pick a CBECS principal building activity for kWh/building, enter building count, and select an EPA grid country (same list as the emission calculator).";
+          ? "Pick a building type for typical energy use per square foot, enter floor area, and select the electricity country. We provide the average grid emissions rate."
+          : "Pick a building type for typical energy use per building, enter building count, and select the electricity country. We provide the average grid emissions rate.";
 
   const gridCountryField = (
     <FormField
       label="Electricity provider country"
       required
-      tooltip="Same EPA Scope 2 grid countries as the emission calculator (kgCO₂e/kWh)"
+      tooltip="Country whose electricity grid rate we use (kgCO₂e per kWh)"
     >
       <Select
         value={String(formData.factor_grid_country || "")}
@@ -195,7 +195,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
       label="Average grid emission factor"
       value={gridFactorKg > 0 ? gridFactorKg.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—"}
       unit="kgCO₂e/kWh"
-      hint="Provided from EPA Scope 2 grid factors — you don’t need to enter this"
+      hint="Provided automatically from the average grid rate — you don’t need to enter this"
     />
   );
 
@@ -377,7 +377,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
           <FormField
             label="Principal building activity"
             required
-            tooltip="CBECS Table C4 principal building activity (Education, Food sales, Office, …)"
+            tooltip="Building type such as Education, Food sales, Office, and so on"
           >
             <Select
               value={cbecsCategory}
@@ -388,7 +388,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
             >
               <SelectTrigger className={FIELD_INPUT}>
                 <SelectValue
-                  placeholder={loadingCbecs ? "Loading CBECS…" : "Select building type"}
+                  placeholder={loadingCbecs ? "Loading building types…" : "Select building type"}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -406,7 +406,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
 
         <FieldGrid>
           <ComputedBox
-            label={option === "2b" ? "Energy intensity (CBECS)" : "Energy per building (CBECS)"}
+            label={option === "2b" ? "Energy intensity (typical)" : "Energy per building (typical)"}
             value={
               energyIntensity > 0
                 ? energyIntensity.toLocaleString(undefined, { maximumFractionDigits: 4 })

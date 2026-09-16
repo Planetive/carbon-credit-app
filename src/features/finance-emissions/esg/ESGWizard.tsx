@@ -51,42 +51,42 @@ const VEHICLE_METHODS = [
     title: 'Actual fuel consumption',
     score: 'Score 1a',
     description:
-      'User enters actual fuel consumed; Brand / Model / Year from sheet; EPA Mobile Fuel supplies the emission factor',
+      'You enter how much fuel the vehicle used. Pick brand, model, and year — we apply the matching emissions rate for that fuel.',
   },
   {
     id: '1b',
     title: 'Actual distance + make/model',
     score: 'Score 1b',
     description:
-      'Actual km + Brand / Model / Year from sheet (efficiency from Efficiency Average); EPA supplies the emission factor',
+      'You enter kilometres driven and pick brand, model, and year. We use the vehicle’s typical fuel efficiency and apply the matching emissions rate.',
   },
   {
     id: '2a',
     title: 'Local distance statistics',
     score: 'Score 2',
     description:
-      'Private/public (+ intercity/outercity), Brand / Model / Year for efficiency; distance from stats; EF from EPA fuel type',
+      'You pick private or public use and brand, model, and year. Distance comes from local averages; we apply fuel efficiency and the matching emissions rate.',
   },
   {
     id: '2b',
     title: 'Regional distance statistics',
     score: 'Score 3',
     description:
-      'Same as Score 2 with regional distance; Brand / Model / Year efficiency from sheet; EF from EPA fuel type',
+      'Same as Score 2, but distance comes from regional averages instead of local ones.',
   },
   {
     id: '3a',
     title: 'Vehicle-type efficiency',
     score: 'Score 4',
     description:
-      'Private/public + local/regional distance; vehicle type efficiency (Hatchback/Sedan/…); EPA Table 3/4/Mobile/Non-Road for EF',
+      'You pick private or public use and a broad vehicle type (e.g. hatchback, sedan). Distance and efficiency come from averages; we apply the matching emissions rate.',
   },
   {
     id: '3b',
-    title: 'Efficiency by engine CC',
+    title: 'Efficiency by engine size',
     score: 'Score 5',
     description:
-      'Private/public, local or regional; fuel type from EPA Mobile Fuel; efficiency from CC-band sheet (Pakistan local / regional)',
+      'You pick private or public use, local or regional distance, fuel type, and engine size band. We use average efficiency and the matching emissions rate.',
   },
 ];
 
@@ -202,8 +202,7 @@ function VehicleProgressiveCapabilityPicker({
   return (
     <div className="space-y-4">
       <p className="text-xs text-[#64748B] leading-relaxed">
-        Answer in order. The platform picks the highest PCAF score your data supports. Emission factors are
-        EPA by fuel type (DEFRA available later in the form).
+        Answer in order. We pick the strongest result your data supports — better data means a higher quality score.
       </p>
 
       <div className="space-y-2">
@@ -249,7 +248,7 @@ function VehicleProgressiveCapabilityPicker({
             <ChoiceTile
               selected={answers.hasKmAndModel === 'yes'}
               title="Yes — Score 1b"
-              description="Odometer km, make/model, and fuel efficiency — EPA supplies the emission factor"
+              description="Kilometres driven plus brand, model, and year"
               onClick={() =>
                 applyAnswers({
                   ...answers,
@@ -317,7 +316,7 @@ function VehicleProgressiveCapabilityPicker({
             <ChoiceTile
               selected={answers.distanceScope === 'local'}
               title="Local — Score 2"
-              description="Local statistical distance (e.g. NTRC local)"
+              description="Average distance for local / city driving"
               onClick={() => applyAnswers({ ...answers, distanceScope: 'local', hasVehicleType: '' })}
             />
             <ChoiceTile
@@ -384,20 +383,20 @@ const PROPERTY_METHODS = [
 const SOVEREIGN_METHODS = [
   { id: '1a', title: 'Verified country GHG', score: 'Score 1', description: 'Climate TRACE country emissions (Pakistan & UAE)' },
   { id: '1b', title: 'Unverified country GHG', score: 'Score 2', description: 'Unverified country GHG emissions' },
-  { id: '2a', title: 'Country energy consumption', score: 'Score 3', description: 'Country energy × EPA/DEFRA factor (+ process emissions)' },
+  { id: '2a', title: 'Country energy consumption', score: 'Score 3', description: 'Country energy use × standard emissions rate (+ process emissions)' },
   { id: '3a', title: 'Country sector intensity', score: 'Score 4', description: 'PPP-GDP × sector intensity from the reference table' },
   { id: '3b', title: 'Proxy country intensity', score: 'Score 5', description: 'Target PPP-GDP × (proxy GHG / proxy PPP-GDP)' },
 ];
 
 const BOND_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
   { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
   { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
 ];
 
 const FACILITATED_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor × weight factor' },
+  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate × weight factor' },
   { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × emission factor × weight factor' },
   { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table) × weight factor' },
   { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Facilitated amount × ATR × sector intensity (GHG / revenue from table) × weight factor' },
@@ -2120,7 +2119,7 @@ export const ESGWizard: React.FC = () => {
             );
           }
           const corporateBondMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × EPA/DEFRA emission factor' },
+            { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate' },
             { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
             { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
             { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },

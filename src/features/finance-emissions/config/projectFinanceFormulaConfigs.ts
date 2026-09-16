@@ -17,6 +17,7 @@
  * - Option 1b: Unverified GHG emissions data (Score 2) - Good quality
  * - Option 2a: Energy consumption + emission factors (Score 2) - Good quality
  * - Option 2b: Production data + emission factors (Score 3) - Fair quality
+ * - Option 2b: Production data + emission factors (Score 3) - Fair quality
  * 
  * Attribution Factor: Outstanding Amount / Total Assets (consistent across all formulas)
  * Financed Emissions: Uses Total Project Equity + Debt as denominator
@@ -226,7 +227,7 @@ export const OPTION_1B_PROJECT_FINANCE: FormulaConfig = {
 
 /**
  * OPTION 2A - ENERGY CONSUMPTION DATA (PROJECT FINANCE)
- * Data Quality Score: 2 (Good)
+ * Data Quality Score: 2 (Good) — PCAF Option 2a (same score band as Option 1b)
  * Uses: Primary physical activity data for project's energy consumption + emission factors
  * Formula: Σ (Outstanding amount_p / (Total equity + debt)_p) × Energy consumption_p × Emission factor
  */

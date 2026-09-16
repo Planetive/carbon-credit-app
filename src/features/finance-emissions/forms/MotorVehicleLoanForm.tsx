@@ -1390,20 +1390,20 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   }, [vehicleEntries, outstandingLoan]);
 
   const sectionDescription = fuelPath
-    ? "Score 1a — pick Brand / Model / Year from the sheet, then enter fuel type and fuel used. Emission factor from EPA Mobile Fuel."
+    ? "Score 1a — pick brand, model, and year, then enter fuel type and how much fuel was used. We apply the matching emissions rate."
     : score1bPath
-      ? "Score 1b — pick Brand / Model / Year from the sheet (efficiency from Efficiency Average). Enter actual km. EF from EPA fuel type."
+      ? "Score 1b — pick brand, model, and year for fuel efficiency, then enter kilometres driven. We apply the matching emissions rate."
       : distanceStatsPath
       ? score3Path
-        ? "Score 3 — vehicle use + class for regional distance; Brand / Model / Year for efficiency from the make/model sheet. EF from EPA fuel type."
-        : "Score 2 — vehicle use + class for local distance; Brand / Model / Year for efficiency from the make/model sheet. EF from EPA fuel type."
+        ? "Score 3 — pick vehicle use and class for regional average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
+        : "Score 2 — pick vehicle use and class for local average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
       : typeEfficiencyPath
-        ? "Score 4 — distance from vehicle-use stats. Pick market vehicle type (Hatchback/Sedan/…) for efficiency; EPA Table 3/4/Mobile/Non-Road for emission factor."
+        ? "Score 4 — distance from vehicle-use averages. Pick a market vehicle type (hatchback, sedan, and so on) for efficiency; we apply the matching emissions rate."
         : averageEfficiencyPath
-          ? "Score 5 — same vehicle use/class stats as Score 2–3, plus local or regional scope. Efficiency from CC-band sheet (local Pakistan / regional); EF from EPA fuel type."
+          ? "Score 5 — pick vehicle use, class, and local or regional scope. Efficiency comes from engine size band; we apply the matching emissions rate."
           : activeLibrary === "DEFRA"
-            ? "DEFRA passenger or delivery vehicles — distance × UK factor"
-            : "EPA vehicle and fuel options";
+            ? "Passenger or delivery vehicles — distance × standard emissions rate"
+            : "Choose fuel type and vehicle details; we apply the matching emissions rate.";
 
   const fuelConsumptionLabel = (entry: VehicleEntry, baseUnit: string) => {
     if (supportsInputUnitConversion(baseUnit, entry.fuelType)) {
@@ -2013,7 +2013,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Fuel type
-            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline). May auto-match from the make/model sheet." />
+            <FieldTooltip content="Motor Gasoline means petrol (gasoline). May auto-match from brand, model, and year." />
           </Label>
           <Select
             value={entry.fuelType || undefined}
@@ -2021,7 +2021,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             disabled={libraryLocked}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Select fuel (EPA)" />
+              <SelectValue placeholder="Select fuel type" />
             </SelectTrigger>
             <SelectContent>
               {epaFuelTypes.map((f) => (
@@ -2049,7 +2049,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         {renderMakeModelEfficiencyField(entry)}
 
         <div className="space-y-1.5">
-          <Label>Emission factor (EPA)</Label>
+          <Label>Emission factor</Label>
           <Input
             type="number"
             value={factorKg > 0 ? factorKg : ""}
@@ -2058,8 +2058,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
           <p className="text-xs text-[#94A3B8]">
             {factorKg > 0
-              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
-              : "Select a fuel type to load the EPA factor"}
+              ? `kg CO₂e / ${factorUnit} — applied for this fuel type`
+              : "Select a fuel type to load the emissions rate"}
           </p>
         </div>
       </>
@@ -2078,7 +2078,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Fuel type
-            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline). May auto-match from the make/model sheet." />
+            <FieldTooltip content="Motor Gasoline means petrol (gasoline). May auto-match from brand, model, and year." />
           </Label>
           <Select
             value={entry.fuelType || undefined}
@@ -2086,7 +2086,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             disabled={libraryLocked}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Select fuel (EPA)" />
+              <SelectValue placeholder="Select fuel type" />
             </SelectTrigger>
             <SelectContent>
               {epaFuelTypes.map((f) => (
@@ -2101,7 +2101,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         {renderMakeModelEfficiencyField(entry)}
 
         <div className="space-y-1.5">
-          <Label>Emission factor (EPA)</Label>
+          <Label>Emission factor</Label>
           <Input
             type="number"
             value={factorKg > 0 ? factorKg : ""}
@@ -2110,8 +2110,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
           <p className="text-xs text-[#94A3B8]">
             {factorKg > 0
-              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
-              : "Select a fuel type to load the EPA factor"}
+              ? `kg CO₂e / ${factorUnit} — applied for this fuel type`
+              : "Select a fuel type to load the emissions rate"}
           </p>
         </div>
       </>
@@ -2175,7 +2175,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Fuel (for efficiency)
-            <FieldTooltip content="Fuel options for this vehicle type from the type-efficiency sheet. Also soft-matches EPA fuel for the emission factor." />
+            <FieldTooltip content="Fuel options for this vehicle type. Used to load fuel efficiency and match the emissions rate." />
           </Label>
           <Select
             value={entry.typeSheetFuel || undefined}
@@ -2217,7 +2217,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="flex items-center gap-2">
             Emission factor source
-            <FieldTooltip content="EPA Table 3 / 4 / Mobile Fuel / Non-Road in one list. Used for the emission factor (separate from type-efficiency above)." />
+            <FieldTooltip content="Choose how the emissions rate is looked up for this vehicle. Separate from the fuel-efficiency selection above." />
           </Label>
           <Select
             value={selectedKey || undefined}
@@ -2225,7 +2225,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             disabled={libraryLocked || score4CombinedOptions.length === 0}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Select EPA factor source" />
+              <SelectValue placeholder="Select emissions rate source" />
             </SelectTrigger>
             <SelectContent className="max-h-80">
               {Array.from(score4OptionsByGroup.entries()).map(([group, opts]) => (
@@ -2333,18 +2333,18 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
           <p className="text-xs text-[#94A3B8]">
             {!selectedOpt
-              ? "Select an EPA factor source to load the emission factor"
+              ? "Select an emissions rate source to continue"
               : isMobile
                 ? mobileFactorKg > 0
                   ? `kg CO₂e / ${mobileFactorUnit}`
-                  : "Select an EPA factor source to load the emission factor"
+                  : "Select an emissions rate source to continue"
                 : isNonRoad
                   ? entry.factorKg > 0
                     ? "g CO₂e / gallon"
-                    : "Select an EPA factor source to load the emission factor"
+                    : "Select an emissions rate source to continue"
                   : entry.factorKg > 0
                     ? "g CO₂e / mile"
-                    : "Select model year if required to load the emission factor"}
+                    : "Select model year if required to load the emissions rate"}
           </p>
         </div>
       </>
@@ -2362,7 +2362,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Fuel type
-            <FieldTooltip content="Emission factor is loaded from the EPA Mobile Fuel table for this fuel type." />
+            <FieldTooltip content="We load the emissions rate that matches this fuel type." />
           </Label>
           <Select
             value={entry.fuelType || undefined}
@@ -2370,7 +2370,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             disabled={libraryLocked}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Select fuel (EPA)" />
+              <SelectValue placeholder="Select fuel type" />
             </SelectTrigger>
             <SelectContent>
               {epaFuelTypes.map((f) => (
@@ -2425,7 +2425,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Emission factor (EPA Mobile Fuel)</Label>
+          <Label>Emission factor</Label>
           <Input
             type="number"
             value={factorKg > 0 ? factorKg : ""}
@@ -2434,8 +2434,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
           <p className="text-xs text-[#94A3B8]">
             {factorKg > 0
-              ? `kg CO₂e / ${factorUnit} — from EPA Mobile Fuel for this fuel type`
-              : "Select a fuel type to load the EPA factor"}
+              ? `kg CO₂e / ${factorUnit} — applied for this fuel type`
+              : "Select a fuel type to load the emissions rate"}
           </p>
         </div>
       </>
@@ -2452,7 +2452,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Fuel type
-            <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline)." />
+            <FieldTooltip content="Motor Gasoline means petrol (gasoline)." />
           </Label>
           <Select
             value={entry.fuelType || undefined}
@@ -2460,7 +2460,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             disabled={libraryLocked}
           >
             <SelectTrigger className={FIELD_INPUT}>
-              <SelectValue placeholder="Select fuel (EPA)" />
+              <SelectValue placeholder="Select fuel type" />
             </SelectTrigger>
             <SelectContent>
               {epaFuelTypes.map((f) => (
@@ -2486,7 +2486,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Emission factor (EPA)</Label>
+          <Label>Emission factor</Label>
           <Input
             type="number"
             value={factorKg > 0 ? factorKg : ""}
@@ -2495,8 +2495,8 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
           />
           <p className="text-xs text-[#94A3B8]">
             {factorKg > 0
-              ? `kg CO₂e / ${mobileBaseUnit || "unit"} — from EPA Mobile Fuel for this fuel type`
-              : "Select a fuel type to load the EPA factor"}
+              ? `kg CO₂e / ${mobileBaseUnit || "unit"} — applied for this fuel type`
+              : "Select a fuel type to load the emissions rate"}
           </p>
         </div>
       </>
@@ -2518,7 +2518,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       <>
         {showSourcePicker && (
         <div className="space-y-1.5 sm:col-span-2">
-          <Label>EPA data source</Label>
+          <Label>Data source</Label>
           <Select
             value={entry.vehicleSource}
             onValueChange={(v) => updateVehicleEntry(entry.id, "vehicleSource", v as VehicleSource)}
@@ -2543,7 +2543,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2">
                 Fuel type
-                <FieldTooltip content="Motor Gasoline is the EPA name for petrol (gasoline)." />
+                <FieldTooltip content="Motor Gasoline means petrol (gasoline)." />
               </Label>
               <Select
                 value={entry.fuelType || undefined}
@@ -2866,7 +2866,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                   className={`px-2.5 py-1 text-xs rounded-md ${activeLibrary === lib ? "bg-[#0F6E56] text-white" : "text-[#64748B]"}`}
                   onClick={() => setLibrary(lib)}
                 >
-                  {lib}
+                  {lib === "EPA" ? "Standard" : "UK"}
                 </button>
               ))}
             </div>
@@ -2887,7 +2887,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
     >
       {!libraryReady && (
         <p className="text-sm text-[#64748B]">
-          Loading {epaLockedPath || activeLibrary === "EPA" ? "EPA vehicle emission factors" : "DEFRA passenger & delivery factors"}…
+          Loading vehicle emissions rates…
         </p>
       )}
       {libraryError && (
@@ -2898,18 +2898,18 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         {vehicleEntries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#E2E8F0] bg-white py-8 text-center text-sm text-[#94A3B8]">
             {fuelPath
-              ? "Add a vehicle — pick Brand / Model / Year, then fuel type and fuel consumed. EPA supplies the emission factor."
+              ? "Add a vehicle — pick brand, model, and year, then fuel type and fuel used. We apply the matching emissions rate."
               : score1bPath
-                ? "Add a vehicle — pick Brand / Model / Year for efficiency, then enter actual km."
+                ? "Add a vehicle — pick brand, model, and year for efficiency, then enter kilometres driven."
                 : distanceStatsPath
                 ? score3Path
-                  ? "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
-                  : "Add a vehicle — pick use/class for distance, then Brand / Model / Year for efficiency."
+                  ? "Add a vehicle — pick use and class for distance, then brand, model, and year for efficiency."
+                  : "Add a vehicle — pick use and class for distance, then brand, model, and year for efficiency."
                 : typeEfficiencyPath
-                  ? "Add a vehicle — pick use/class for distance, then vehicle type (Hatchback/Sedan/…) for efficiency, then EPA factor source."
+                  ? "Add a vehicle — pick use and class for distance, then vehicle type (hatchback, sedan, and so on) for efficiency."
                   : averageEfficiencyPath
-                    ? "Add a vehicle — same use/class stats as Score 2–3, then fuel type and engine CC."
-                    : "Add a vehicle — choose an EPA or DEFRA data source per row."}
+                    ? "Add a vehicle — pick use and class, then fuel type and engine size."
+                    : "Add a vehicle — choose the factor set that matches your data."}
           </div>
         ) : (
           <div className="space-y-4">
@@ -2938,7 +2938,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-2">
                       Value at origination (PKR)
-                      <FieldTooltip content="Vehicle value at origination for PCAF attribution." />
+                      <FieldTooltip content="Vehicle value when the loan started — used to share emissions fairly across the loan." />
                     </Label>
                     <Input
                       type="number"

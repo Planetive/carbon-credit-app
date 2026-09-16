@@ -271,7 +271,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
    * 
    * Formula: Σ (Outstanding amount_c / EVIC_c) × Energy consumption_c × Emission factor_c
    * 
-   * Data Quality Score: 2 (Good)
+   * Data Quality Score: 2 (Good) — PCAF Option 2a (same score band as Option 1b)
    * Applicable Scopes: 1, 2 (Scope 3 cannot be estimated by this option)
    * 
    * When to use: When you have energy consumption data (MWh) and corresponding emission factors
@@ -690,7 +690,7 @@ export const LISTED_EQUITY_FORMULAS: FormulaConfig[] = [
    * 
    * Formula: Σ (Outstanding amount_c / (Total equity + debt)_c) × Energy consumption_c × Emission factor_c
    * 
-   * Data Quality Score: 2 (Good)
+   * Data Quality Score: 2 (Good) — PCAF Option 2a (same score band as Option 1b)
    * Applicable Scopes: 1, 2 (Scope 3 cannot be estimated by this option)
    * 
    * When to use: When you have energy consumption data (MWh) and corresponding emission factors for unlisted companies

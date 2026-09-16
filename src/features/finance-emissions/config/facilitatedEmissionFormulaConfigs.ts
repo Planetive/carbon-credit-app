@@ -19,6 +19,7 @@
  * - Option 1b: Unverified GHG Emissions (Score 2)
  * - Option 2a: Energy Consumption Data (Score 2)
  * - Option 2b: Production Data (Score 3)
+ * - Option 2b: Production Data (Score 3)
  * - Option 3a: Revenue-based sector intensity (Score 4)
  * - Option 3c: Asset turnover ratio (Score 5)
  */
@@ -410,7 +411,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
    * OPTION 2A - ENERGY CONSUMPTION DATA (FACILITATED - LISTED)
    * 
    * Formula: Σ (Facilitated amount_c / EVIC_c) × Weighting factor × Energy consumption_c × Emission factor
-   * Data Quality Score: 2 (Good)
+   * Data Quality Score: 2 (Good) — PCAF Option 2a (same score band as Option 1b)
    */
   {
     id: '2a-facilitated-energy-listed',
@@ -524,7 +525,7 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
    * OPTION 2A - ENERGY CONSUMPTION DATA (FACILITATED - UNLISTED)
    * 
    * Formula: Σ (Facilitated amount_c / (Total equity + debt)_c) × Weighting factor × Energy consumption_c × Emission factor
-   * Data Quality Score: 2 (Good)
+   * Data Quality Score: 2 (Good) — PCAF Option 2a (same score band as Option 1b)
    */
   {
     id: '2a-facilitated-energy-unlisted',
