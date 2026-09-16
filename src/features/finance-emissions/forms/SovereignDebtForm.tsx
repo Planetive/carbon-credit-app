@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FormulaConfig } from '../types/formula';
@@ -9,7 +9,6 @@ import { SovereignCountrySelect } from './SovereignCountrySelect';
 import { SovereignSectorSelect } from './SovereignSectorSelect';
 import { SovereignVerifiedEmissionSelect } from './SovereignVerifiedEmissionSelect';
 import { useClimateTraceVerifiedEmissions } from '../hooks/useClimateTraceVerifiedEmissions';
-import { findClimateTraceEmissions } from '../api/climateTraceCountryEmissions';
 import type { SectorOption } from '../types/countrySectorIntensity';
 import { FIELD_INPUT, FieldGrid, FormField, InputSection } from "./InputLayout";
 
@@ -43,28 +42,28 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
 
   const pickersDisabled = loading || !!error;
 
-  useEffect(() => {
-    if (option !== '1a' || climateTraceRows.length === 0) return;
-    const current = String(formData.sovereign_country_name || '');
-    if (!current) return;
-    const climate = findClimateTraceEmissions(current, climateTraceRows);
-    if (!climate) return;
-    if (
-      formData.verified_emissions_country_name === climate.countryName &&
-      Number(formData.verified_country_emissions) === climate.emissionsTons
-    ) {
-      return;
-    }
-    onUpdateFormData('verified_emissions_country_name', climate.countryName);
-    onUpdateFormData('verified_country_emissions', climate.emissionsTons);
-  }, [option, climateTraceRows, formData.sovereign_country_name]);
-
   const clearSector = () => {
     onUpdateFormData('sector_code', '');
     onUpdateFormData('sector_name', '');
     onUpdateFormData('sector_key', '');
     onUpdateFormData('sector_intensity', 0);
     onUpdateFormData('sector_intensity_unit', '');
+  };
+
+  /** Option 1a: one country pick drives both verified emissions and PPP-GDP. */
+  const handleVerifiedCountrySelect = async (row: {
+    countryName: string;
+    emissionsTons: number;
+  }) => {
+    onUpdateFormData('verified_emissions_country_name', row.countryName);
+    onUpdateFormData('verified_country_emissions', row.emissionsTons);
+
+    const resolved = await applyCountrySelection(row.countryName);
+    if (!resolved) return;
+    onUpdateFormData('sovereign_country_name', resolved.sovereign_country_name);
+    onUpdateFormData('pp_adjusted_gdp', resolved.pp_adjusted_gdp);
+    onUpdateFormData('ppp_gdp_year', resolved.ppp_gdp_year);
+    onUpdateFormData('ppp_gdp_used_fallback', resolved.ppp_gdp_used_fallback);
   };
 
   const handleCountrySelect = async (selectedName: string, prefix: 'sovereign' | 'proxy_sovereign') => {
@@ -77,17 +76,6 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
       onUpdateFormData('ppp_gdp_year', resolved.ppp_gdp_year);
       onUpdateFormData('ppp_gdp_used_fallback', resolved.ppp_gdp_used_fallback);
       clearSector();
-
-      if (option === '1a') {
-        const climate = findClimateTraceEmissions(
-          resolved.sovereign_country_name,
-          climateTraceRows
-        );
-        if (climate) {
-          onUpdateFormData('verified_emissions_country_name', climate.countryName);
-          onUpdateFormData('verified_country_emissions', climate.emissionsTons);
-        }
-      }
       return;
     }
 
@@ -100,7 +88,13 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
   return (
     <InputSection
       title="Country data"
-      description={selectedFormula?.optionCode ? `PCAF option ${selectedFormula.optionCode}` : undefined}
+      description={
+        option === '3a'
+          ? 'Pick the country and sector, enter revenue for that sector, and we apply sector intensity (GHG per revenue) from our table.'
+          : option === '1a'
+            ? 'Pick Pakistan or UAE for verified country emissions.'
+            : undefined
+      }
     >
       {error && (
         <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -112,41 +106,49 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
       )}
 
       <FieldGrid>
-        <FormField
-          label="Country"
-          required
-          tooltip="Sovereign country for PPP-adjusted GDP (2025 preferred, 2024 if missing)"
-        >
-          <SovereignCountrySelect
-            value={String(formData.sovereign_country_name || '')}
-            gdpValue={num('pp_adjusted_gdp')}
-            gdpYear={num('ppp_gdp_year')}
-            usedFallback={Boolean(formData.ppp_gdp_used_fallback)}
-            countries={countries}
-            loading={loading}
-            disabled={pickersDisabled}
-            onSelect={(name) => void handleCountrySelect(name, 'sovereign')}
-          />
-        </FormField>
-
-        {option === '1a' && (
+        {/* Option 1a: Pakistan/UAE only — one picker sets emissions + PPP-GDP */}
+        {option === '1a' ? (
           <FormField
             label="Verified country emissions"
             unit="tCO₂e"
             required
-            tooltip="Country GHG (CO₂e 100-yr) from Climate TRACE — Pakistan and UAE only"
+            tooltip="Pick Pakistan or UAE. We load verified country emissions and that country’s PPP-adjusted GDP for attribution."
           >
-            <SovereignVerifiedEmissionSelect
-              value={String(formData.verified_emissions_country_name || '')}
-              emissionsTons={num('verified_country_emissions')}
-              rows={climateTraceRows}
-              loading={climateTraceLoading}
-              error={climateTraceError}
-              onRetry={() => void reloadClimateTrace()}
-              onSelect={(row) => {
-                onUpdateFormData('verified_emissions_country_name', row.countryName);
-                onUpdateFormData('verified_country_emissions', row.emissionsTons);
-              }}
+            <div className="space-y-1.5">
+              <SovereignVerifiedEmissionSelect
+                value={String(formData.verified_emissions_country_name || '')}
+                emissionsTons={num('verified_country_emissions')}
+                rows={climateTraceRows}
+                loading={climateTraceLoading}
+                disabled={pickersDisabled}
+                error={climateTraceError}
+                onRetry={() => void reloadClimateTrace()}
+                onSelect={(row) => void handleVerifiedCountrySelect(row)}
+              />
+              {num('pp_adjusted_gdp') > 0 && (
+                <p className="text-xs text-[#64748B]">
+                  PPP-adjusted GDP: {num('pp_adjusted_gdp').toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {num('ppp_gdp_year') > 0 ? ` · year ${num('ppp_gdp_year')}` : ''}
+                  {formData.ppp_gdp_used_fallback ? ' (fallback year)' : ''}
+                </p>
+              )}
+            </div>
+          </FormField>
+        ) : (
+          <FormField
+            label="Country"
+            required
+            tooltip="Sovereign country for PPP-adjusted GDP (2025 preferred, 2024 if missing)"
+          >
+            <SovereignCountrySelect
+              value={String(formData.sovereign_country_name || '')}
+              gdpValue={num('pp_adjusted_gdp')}
+              gdpYear={num('ppp_gdp_year')}
+              usedFallback={Boolean(formData.ppp_gdp_used_fallback)}
+              countries={countries}
+              loading={loading}
+              disabled={pickersDisabled}
+              onSelect={(name) => void handleCountrySelect(name, 'sovereign')}
             />
           </FormField>
         )}
@@ -172,37 +174,56 @@ export const SovereignDebtForm: React.FC<SovereignDebtFormProps> = ({
         )}
 
         {option === '3a' && (
-          <FormField
-            label="Sector"
-            required
-            tooltip="Sector intensity replaces GHG ÷ revenue. Empty intensities are not listed."
-          >
-            <div className="space-y-2">
-              {sectorsError && (
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-red-700">{sectorsError}</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void reloadSectors()}>
-                    Retry
-                  </Button>
-                </div>
-              )}
-              <SovereignSectorSelect
-                value={String(formData.sector_key || '')}
-                intensity={num('sector_intensity')}
-                unit={String(formData.sector_intensity_unit || 'kgCO2e/PKR')}
-                sectors={sectors}
-                loading={sectorsLoading}
-                disabled={!countryName || !!sectorsError}
-                onSelect={(sector: SectorOption) => {
-                  onUpdateFormData('sector_key', sector.sectorKey);
-                  onUpdateFormData('sector_code', sector.sectorCode);
-                  onUpdateFormData('sector_name', sector.sectorName);
-                  onUpdateFormData('sector_intensity', sector.intensity);
-                  onUpdateFormData('sector_intensity_unit', sector.unit);
-                }}
+          <>
+            <FormField
+              label="Revenue per sector"
+              unit="PKR"
+              required
+              tooltip="Total revenue for the selected country sector"
+            >
+              <Input
+                id="sector_revenue"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="0"
+                value={num('sectorRevenue') || ''}
+                onChange={(e) => onUpdateFormData('sectorRevenue', parseFloat(e.target.value) || 0)}
+                className={FIELD_INPUT}
               />
-            </div>
-          </FormField>
+            </FormField>
+            <FormField
+              label="Sector"
+              required
+              tooltip="Sector intensity (GHG per revenue) comes from our reference table for the country and sector you pick"
+            >
+              <div className="space-y-2">
+                {sectorsError && (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-red-700">{sectorsError}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void reloadSectors()}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                <SovereignSectorSelect
+                  value={String(formData.sector_key || '')}
+                  intensity={num('sector_intensity')}
+                  unit={String(formData.sector_intensity_unit || 'kgCO2e/PKR')}
+                  sectors={sectors}
+                  loading={sectorsLoading}
+                  disabled={!countryName || !!sectorsError}
+                  onSelect={(sector: SectorOption) => {
+                    onUpdateFormData('sector_key', sector.sectorKey);
+                    onUpdateFormData('sector_code', sector.sectorCode);
+                    onUpdateFormData('sector_name', sector.sectorName);
+                    onUpdateFormData('sector_intensity', sector.intensity);
+                    onUpdateFormData('sector_intensity_unit', sector.unit);
+                  }}
+                />
+              </div>
+            </FormField>
+          </>
         )}
 
         {option === '3b' && (

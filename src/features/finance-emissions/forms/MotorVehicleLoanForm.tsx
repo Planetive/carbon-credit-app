@@ -1390,19 +1390,19 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
   }, [vehicleEntries, outstandingLoan]);
 
   const sectionDescription = fuelPath
-    ? "Score 1a — pick brand, model, and year, then enter fuel type and how much fuel was used. We apply the matching emissions rate."
+    ? "Pick brand, model, and year, then enter fuel type and how much fuel was used. We apply the matching emissions rate."
     : score1bPath
-      ? "Score 1b — pick brand, model, and year for fuel efficiency, then enter kilometres driven. We apply the matching emissions rate."
+      ? "Pick brand, model, and year for fuel efficiency, then enter kilometres driven. We apply the matching emissions rate."
       : distanceStatsPath
       ? score3Path
-        ? "Score 3 — pick vehicle use and class for regional average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
-        : "Score 2 — pick vehicle use and class for local average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
+        ? "Pick vehicle use and class for regional average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
+        : "Pick vehicle use and class for local average distance, then brand, model, and year for efficiency. We apply the matching emissions rate."
       : typeEfficiencyPath
-        ? "Score 4 — distance from vehicle-use averages. Pick a market vehicle type (hatchback, sedan, and so on) for efficiency; we apply the matching emissions rate."
+        ? "Distance comes from vehicle-use averages. Pick a market vehicle type (hatchback, sedan, and so on) for efficiency; we apply the matching emissions rate."
         : averageEfficiencyPath
-          ? "Score 5 — pick vehicle use, class, and local or regional scope. Efficiency comes from engine size band; we apply the matching emissions rate."
+          ? "Pick vehicle use, class, and local or regional scope. Efficiency comes from engine size band; we apply the matching emissions rate."
           : activeLibrary === "DEFRA"
-            ? "Passenger or delivery vehicles — distance × standard emissions rate"
+            ? "Passenger or delivery vehicles — distance with a standard emissions rate"
             : "Choose fuel type and vehicle details; we apply the matching emissions rate.";
 
   const fuelConsumptionLabel = (entry: VehicleEntry, baseUnit: string) => {
@@ -2976,14 +2976,11 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
 
                 <div className="mt-4 rounded-lg border border-[#E8EEF0] bg-[#F8FAFC] p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-[#334155]">
-                      {sourceLabel(entry.vehicleSource)} — emissions
-                    </span>
+                    <span className="text-sm font-medium text-[#334155]">Vehicle emissions</span>
                     <span className="text-lg font-semibold text-[#0F172A]">
                       {entry.emissions.toFixed(6)} tCO₂e
                     </span>
                   </div>
-                  <p className="text-xs text-[#94A3B8]">{entry.formulaHint}</p>
                   {pcafPreview && (() => {
                     const vr = pcafPreview.vehicleResults.find((r) => r.id === entry.id);
                     if (!vr) return null;
@@ -2995,10 +2992,6 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
                             {vr.financedEmissions.toFixed(6)} tCO₂e
                           </span>
                         </div>
-                        <p className="text-xs text-[#94A3B8] mt-1">
-                          ({vr.outstandingAllocated.toFixed(2)} / {vr.valueAtOrigination.toFixed(2)}) ×{" "}
-                          {vr.vehicleEmissions.toFixed(6)}
-                        </p>
                       </div>
                     );
                   })()}

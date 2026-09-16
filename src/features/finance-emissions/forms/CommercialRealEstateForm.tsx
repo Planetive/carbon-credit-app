@@ -159,7 +159,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
     : isAverageEfPath
       ? "Enter how much energy the building used. Pick the country for electricity — we provide the average emissions rate for that grid."
       : isLabelsPath
-        ? "Enter estimated energy use for the whole building (from energy labels), then the floor area financed. Emissions = energy × floor area × average grid rate."
+        ? "Enter estimated energy use for the whole building (from energy labels), then the floor area financed. We apply the average grid emissions rate."
         : option === "2b"
           ? "Pick a building type for typical energy use per square foot, enter floor area, and select the electricity country. We provide the average grid emissions rate."
           : "Pick a building type for typical energy use per building, enter building count, and select the electricity country. We provide the average grid emissions rate.";
@@ -249,7 +249,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                 : "—"
             }
             unit="tCO₂e"
-            hint="Energy × emission factor (before loan attribution)"
+            hint="Building emissions before loan share is applied"
           />
         </FieldGrid>
       </InputSection>
@@ -293,7 +293,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                   : "—"
               }
               unit="tCO₂e"
-              hint="Energy × average grid factor (before loan attribution)"
+              hint="Building emissions before loan share is applied"
             />
           </FieldGrid>
         </div>
@@ -348,7 +348,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                   : "—"
               }
               unit="kWh"
-              hint="Whole-building energy (kWh/m²) × floor area financed"
+              hint="Energy use for the financed floor area"
             />
             {gridEfBox}
             <ComputedBox
@@ -359,7 +359,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                   : "—"
               }
               unit="tCO₂e"
-              hint="Total kWh × average grid factor (before loan attribution)"
+              hint="Building emissions before loan share is applied"
             />
           </FieldGrid>
         </div>
@@ -439,7 +439,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                     : "—"
                 }
                 unit="kWh"
-                hint="kWh/sqft × sqft"
+                hint="Estimated energy for the financed floor area"
               />
             </>
           )}
@@ -464,7 +464,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                     : "—"
                 }
                 unit="kWh"
-                hint="kWh/building × buildings"
+                hint="Estimated energy for these buildings"
               />
             </>
           )}
@@ -477,7 +477,7 @@ export const CommercialRealEstateForm: React.FC<CommercialRealEstateFormProps> =
                 : "—"
             }
             unit="tCO₂e"
-            hint="Total kWh × grid EF (before loan attribution)"
+            hint="Building emissions before loan share is applied"
           />
         </FieldGrid>
       </div>

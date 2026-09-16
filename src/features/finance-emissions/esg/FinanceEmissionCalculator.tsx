@@ -34,6 +34,7 @@ import { formatNumberWithCommas, parseFormattedNumber, handleFormattedNumberChan
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import { ComputedBox, FIELD_INPUT, FieldGrid, FormField, InputSection } from "../forms/InputLayout";
+import { methodDisplayLabel } from "../utils/methodDisplayLabels";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { CalculationStepDto, EmissionResultRow, FinanceFormValue, FinanceMode } from "../types/contracts";
@@ -1135,15 +1136,15 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Country energy (EPA/DEFRA) is required for ${loanLabel} (Option 2a)`
+              error: `Country energy is required for ${loanLabel} (Score 3)`
             });
           }
         } else if (formula?.optionCode === '3a') {
-          if (!loanData.sector_intensity || !loanData.sector_key) {
+          if (!loanData.sectorRevenue || !loanData.sector_intensity || !loanData.sector_key) {
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Select a sector with intensity data for ${loanLabel} (Option 3a)`
+              error: `Revenue per sector and a sector with intensity data are required for ${loanLabel} (Score 4)`
             });
           }
         } else if (formula?.optionCode === '3b') {
@@ -1151,14 +1152,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Proxy country GHG is required for ${loanLabel} (Option 3b)`
+              error: `Proxy country GHG is required for ${loanLabel} (Score 5)`
             });
           }
           if (!loanData.proxy_sovereign_country_name && !loanData.proxy_pp_adjusted_gdp) {
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Select a proxy country with PPP-adjusted GDP for ${loanLabel} (Option 3b)`
+              error: `Select a proxy country with PPP-adjusted GDP for ${loanLabel} (Score 5)`
             });
           }
         }
@@ -1185,25 +1186,25 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Energy consumption is required for ${loanLabel} (Option 2a)`
+              error: `Energy consumption is required for ${loanLabel} (Score 2)`
             });
           }
           if (!loanData.emission_factor || loanData.emission_factor === 0) {
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Emission factor is required for ${loanLabel} (Option 2a)`
+              error: `Emission factor is required for ${loanLabel} (Score 2)`
             });
           }
         }
         if (pfOpt === '2b' && (!loanData.production || !loanData.emission_factor)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
+          errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Score 3)` });
         }
         if (pfOpt === '3a' && (!loanData.companyRevenue || !loanData.sector_intensity || !loanData.sector_key)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue and a sector with intensity are required for ${loanLabel} (Option 3a)` });
+          errors.push({ loanKey: inst.key, loanLabel, error: `Project revenue and a sector with intensity are required for ${loanLabel} (Score 4)` });
         }
         if (pfOpt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sector_intensity || !loanData.sector_key)) {
-          errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Option 3c)` });
+          errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Score 5)` });
         }
       } else {
         // For corporate-bond, business-loan, etc.
@@ -1255,14 +1256,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Energy consumption is required for ${loanLabel} (Option 2a)`
+              error: `Energy consumption is required for ${loanLabel} (Score 2)`
             });
           }
           if (!loanData.emission_factor || loanData.emission_factor === 0) {
             errors.push({
               loanKey: inst.key,
               loanLabel,
-              error: `Emission factor is required for ${loanLabel} (Option 2a)`
+              error: `Emission factor is required for ${loanLabel} (Score 2)`
             });
           }
         }
@@ -1270,13 +1271,13 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         if (loanType === 'corporate-bond' || loanType === 'business-loan') {
           const opt = getAvailableFormulasForLoan(loanType).find((f) => f.id === selectedId)?.optionCode;
           if (opt === '2b' && (!loanData.production || !loanData.emission_factor)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Option 2b)` });
+            errors.push({ loanKey: inst.key, loanLabel, error: `Production and emission factor are required for ${loanLabel} (Score 3)` });
           }
           if (opt === '3a' && (!loanData.companyRevenue || !loanData.sector_intensity || !loanData.sector_key)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue and a sector with intensity are required for ${loanLabel} (Option 3a)` });
+            errors.push({ loanKey: inst.key, loanLabel, error: `Company revenue and a sector with intensity are required for ${loanLabel} (Score 4)` });
           }
           if (opt === '3c' && (!loanData.assetTurnoverRatio || !loanData.sector_intensity || !loanData.sector_key)) {
-            errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Option 3c)` });
+            errors.push({ loanKey: inst.key, loanLabel, error: `ATR and a sector with intensity are required for ${loanLabel} (Score 5)` });
           }
         }
       }
@@ -1343,10 +1344,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
     if (isEnergyEfOption2a(loanTypeKey, selectedId)) {
       if (!loanFormData.energy_consumption) {
-        throw new Error('Energy consumption must be greater than 0 for Option 2a.');
+        throw new Error('Energy consumption must be greater than 0 for Score 2.');
       }
       if (!loanFormData.emission_factor) {
-        throw new Error('Emission factor must be greater than 0 for Option 2a. Select an EPA or DEFRA factor.');
+        throw new Error('Emission factor must be greater than 0 for Score 2. Select an emissions rate.');
       }
     }
 
@@ -1494,7 +1495,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     if (!selectedFormula) {
       toast({
         title: "No Formula Selected",
-        description: "Please select a calculation formula first.",
+        description: "Please select a calculation method first.",
         variant: "destructive"
       });
       return;
@@ -1665,20 +1666,20 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         }
         if (formula?.optionCode === '2a') {
           if (!formData.energy_consumption || !formData.emission_factor) {
-            throw new Error('Enter country energy using the EPA/DEFRA form for Option 2a.');
+            throw new Error('Enter country energy using the electricity form for Score 3.');
           }
         }
         if (formula?.optionCode === '3a') {
-          if (!formData.sector_intensity || !formData.sector_key) {
-            throw new Error('Select a sector with intensity data for Option 3a.');
+          if (!formData.sectorRevenue || !formData.sector_intensity || !formData.sector_key) {
+            throw new Error('Revenue per sector and a sector with intensity data are required for Score 4.');
           }
         }
         if (formula?.optionCode === '3b') {
           if (!formData.proxy_country_emissions) {
-            throw new Error('Proxy country GHG is required for Option 3b.');
+            throw new Error('Proxy country GHG is required for Score 5.');
           }
           if (!formData.proxy_sovereign_country_name && !formData.proxy_pp_adjusted_gdp) {
-            throw new Error('Select a proxy country with PPP-adjusted GDP for Option 3b.');
+            throw new Error('Select a proxy country with PPP-adjusted GDP for Score 5.');
           }
         }
       }
@@ -1695,7 +1696,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           throw new Error(
             isCreActualEnergyOption(loanType, selectedFormula)
               ? 'Emission factor must be greater than 0. For Score 2, select an electricity provider country so we can load the average grid factor.'
-              : 'Emission factor must be greater than 0. Select an EPA or DEFRA factor (or enter one manually).'
+              : 'Emission factor must be greater than 0. Select an emissions rate (or enter one manually).'
           );
         }
       }
@@ -1709,17 +1710,17 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           }
         }
         if (opt === '2b' && (!formData.production || !formData.emission_factor)) {
-          throw new Error('Production volume and emission factor must be greater than 0 for Option 2b.');
+          throw new Error('Production volume and emission factor must be greater than 0 for Score 3.');
         }
         if (opt === '3a' && (!formData.companyRevenue || !formData.sector_intensity || !formData.sector_key)) {
           throw new Error(
             loanType === 'project-finance'
-              ? 'Project revenue and a sector with intensity are required for Option 3a.'
-              : 'Company revenue and a sector with intensity are required for Option 3a.'
+              ? 'Project revenue and a sector with intensity are required for Score 4.'
+              : 'Company revenue and a sector with intensity are required for Score 4.'
           );
         }
         if (opt === '3c' && (!formData.assetTurnoverRatio || !formData.sector_intensity || !formData.sector_key)) {
-          throw new Error('ATR and a sector with intensity are required for Option 3c.');
+          throw new Error('ATR and a sector with intensity are required for Score 5.');
         }
       }
 
@@ -2043,7 +2044,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     
         toast({
           title: "Calculation complete",
-          description: `Finance emission calculated using ${pcafResult.methodology}`,
+          description: `Finance emission calculated successfully.`,
           variant: "default"
         });
       } catch (error) {
@@ -2209,7 +2210,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
     if (!formula || formula.optionCode !== "2b") return null;
     return (
-      <InputSection title="Production factor" description="Category, sub-category, and material reference for Option 2b">
+      <InputSection title="Production factor" description="Pick the product category used for the emissions rate">
         <FieldGrid>
           <FormField label="Production category" required tooltip="Material family from ICE embodied-carbon factors">
             <Select
@@ -2616,7 +2617,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                       <span className="font-medium">{typeLabels[loan.type] || loan.type}</span>
                       {method && (
                         <span className={active ? 'ml-1.5 opacity-80' : 'ml-1.5 text-[#64748B]'}>
-                          {method.toUpperCase()}
+                          {methodDisplayLabel(method, loan.type)}
                         </span>
                       )}
                     </button>
@@ -2713,7 +2714,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                     <ComputedBox
                       label="Calculated EVIC"
                       value={((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
-                      hint="(Share price × shares) + debt + minority interest + preferred stock"
+                      hint="Share price, shares, debt, minority interest, and preferred stock"
                     />
                   </>
                 ) : (
@@ -2962,7 +2963,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                       {r.dataQualityScore != null && isFinite(r.dataQualityScore) && (
                         <div className="mt-1">
                           <Badge className={getDataQualityColor(r.dataQualityScore)}>
-                            Data quality score {r.dataQualityScore}
+                            Quality {r.dataQualityScore}
                           </Badge>
                         </div>
                       )}
@@ -2974,29 +2975,13 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
             {result.dataQualityScore != null && isFinite(result.dataQualityScore) && (
               <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">Data Quality Score</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium text-muted-foreground">Data quality</div>
                   <Badge className={getDataQualityColor(result.dataQualityScore)}>
-                    Score {result.dataQualityScore}
+                    Quality {result.dataQualityScore}
                   </Badge>
+                </div>
               </div>
-                <div className="text-sm text-muted-foreground">
-                  {result.methodology}
-              </div>
-            </div>
-            )}
-
-            {result.calculationSteps && result.calculationSteps.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-sm font-medium text-muted-foreground">Calculation Steps</div>
-                {result.calculationSteps.map((step, index) => (
-                  <div key={index} className="p-3 bg-muted/50 rounded-lg">
-                    <div className="text-sm font-medium">{step.step}</div>
-                    <div className="text-lg font-bold text-primary">{step.value.toFixed(6)}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{step.formula}</div>
-                  </div>
-                ))}
-            </div>
             )}
           </CardContent>
         </Card>

@@ -84,10 +84,10 @@ export function SovereignVerifiedEmissionSelect({
           >
             <span className="truncate">
               {loading
-                ? "Loading Climate TRACE…"
+                ? "Loading verified emissions…"
                 : selected
                   ? `${selected.countryName} · ${formatEmissionsMillions(selected.emissionsTons)}`
-                  : "Choose country emissions"}
+                  : "Choose Pakistan or UAE"}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
           </Button>

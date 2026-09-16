@@ -515,7 +515,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
     if (!selectedFormula) {
       toast({
         title: "No Formula Selected",
-        description: "Please select a calculation formula first.",
+        description: "Please select a calculation method first.",
         variant: "destructive"
       });
       return;
@@ -547,25 +547,25 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
         );
       }
       if (selectedOptionCode === '3a' && formData.companyRevenue <= 0) {
-        throw new Error('Company revenue must be greater than 0 for Option 3a.');
+        throw new Error('Company revenue must be greater than 0 for Score 4.');
       }
       if ((selectedOptionCode === '3a' || selectedOptionCode === '3c') && (!formData.sector_intensity || !formData.sector_key)) {
         throw new Error('Select a country and sector with intensity data.');
       }
       if (selectedOptionCode === '3c' && formData.assetTurnoverRatio <= 0) {
-        throw new Error('ATR must be greater than 0 for Option 3c.');
+        throw new Error('ATR must be greater than 0 for Score 5.');
       }
       if (selectedOptionCode === '2a') {
         if (!formData.energy_consumption || formData.energy_consumption <= 0) {
-          throw new Error('Enter electricity using the EPA/DEFRA form for Option 2a.');
+          throw new Error('Enter electricity using the electricity form for Score 2.');
         }
         if (!formData.emission_factor || formData.emission_factor <= 0) {
-          throw new Error('Emission factor must be greater than 0. Select an EPA or DEFRA factor.');
+          throw new Error('Emission factor must be greater than 0. Select an emissions rate.');
         }
       }
       if (selectedOptionCode === '2b') {
         if (!formData.production || formData.production <= 0) {
-          throw new Error('Production must be greater than 0 for Option 2b.');
+          throw new Error('Production must be greater than 0 for Score 3.');
         }
         if (!formData.productionEmissionFactor || formData.productionEmissionFactor <= 0) {
           throw new Error('Select a production material or enter a valid production emission factor.');
@@ -682,7 +682,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       
       toast({
         title: "Facilitated Emission Calculation Complete",
-        description: `Facilitated emission calculated using ${calculationResult.methodology}`,
+        description: `Facilitated emission calculated successfully.`,
         variant: "default"
       });
     } catch (error) {
@@ -727,15 +727,15 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
 
   const optionDescription =
     selectedOptionCode === "1a"
-      ? "Third-party verified company GHG"
+      ? "Third-party checked company emissions"
       : selectedOptionCode === "1b"
-        ? "Company-reported GHG (not yet verified)"
+        ? "Company-reported emissions (not independently checked)"
         : selectedOptionCode === "2a"
-          ? "Same Scope 2 form as finance emissions"
+          ? "Electricity use converted to emissions"
           : selectedOptionCode === "2b"
-            ? "Production volume × emission factor"
+            ? "Production volume with a product emissions rate"
             : selectedOptionCode === "3a" || selectedOptionCode === "3c"
-              ? "Sector intensity from the reference table (GHG ÷ revenue)"
+              ? "Sector intensity from our reference table"
               : undefined;
 
   const unitSelectClass = cn(FIELD_INPUT, "w-[7.5rem] shrink-0");
@@ -745,21 +745,34 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       {formula && (
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-[14px] border border-[#DCEAE2] bg-[#F3FAF6] px-4 py-3.5">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B]">
-              PCAF option {formula.optionCode}
+            <p className="text-sm font-semibold text-[#0F172A]">
+              {formula.optionCode === '1a'
+                ? 'Verified company emissions'
+                : formula.optionCode === '1b'
+                  ? 'Company emissions you enter'
+                  : formula.optionCode === '2a'
+                    ? 'Energy or fuel use'
+                    : formula.optionCode === '2b'
+                      ? 'Production volume'
+                      : formula.optionCode === '3a'
+                        ? 'Company revenue'
+                        : formula.optionCode === '3c'
+                          ? 'Asset turnover estimate'
+                          : 'Selected method'}
             </p>
-            <p className="mt-0.5 text-sm font-semibold text-[#0F172A]">{formula.name}</p>
-            <p className="mt-0.5 text-sm text-[#64748B]">{formula.description}</p>
+            <p className="mt-0.5 text-sm text-[#64748B]">
+              Enter the inputs below. We apply the matching calculation automatically.
+            </p>
           </div>
           <Badge className={cn("shrink-0 border", getDataQualityColor(formula.dataQualityScore))}>
-            Score {formula.dataQualityScore}
+            Quality {formula.dataQualityScore}
           </Badge>
         </div>
       )}
 
       {availableFormulas.length === 0 && (
         <div className="rounded-[14px] border border-red-200 bg-red-50 px-4 py-3.5">
-          <p className="text-sm font-medium text-red-800">No formula available for the current selections</p>
+          <p className="text-sm font-medium text-red-800">No method available for the current selections</p>
           <p className="mt-1 text-xs text-red-700">
             Structure: {corporateStructure || "—"} · Emissions: {hasEmissions || "—"} · Verification:{" "}
             {verificationStatus || "—"} · Method: {calculationMethod || "—"}
@@ -809,12 +822,12 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                 label="Facilitated amount"
                 value={facilitatedAmount.toLocaleString()}
                 unit="PKR"
-                hint={`${formData.underwritingAmount.toLocaleString()} × ${formData.underwritingShare}%`}
+                hint="Calculated from underwriting amount and share"
               />
               <ComputedBox
                 label="Weighting factor"
                 value="33%"
-                hint="Fixed PCAF weighting (0.33)"
+                hint="Standard facilitated weighting (0.33)"
               />
             </FieldGrid>
           </InputSection>
@@ -887,7 +900,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
                     label="EVIC"
                     value={listedEvic.toLocaleString()}
                     unit="PKR"
-                    hint="Share price × shares + debt + minority + preferred"
+                    hint="Share price, shares, debt, minority interest, and preferred stock"
                   />
                 </FieldGrid>
               ) : (
@@ -1267,11 +1280,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
       {result && (
         <InputSection
           title="Results"
-          description={result.methodology}
           action={
             result.dataQualityScore != null && isFinite(result.dataQualityScore) ? (
               <Badge className={cn("border", getDataQualityColor(result.dataQualityScore))}>
-                Score {result.dataQualityScore}
+                Quality {result.dataQualityScore}
               </Badge>
             ) : undefined
           }
@@ -1287,30 +1299,6 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
               unit="tCO₂e"
             />
           </FieldGrid>
-
-          {result.calculationSteps && result.calculationSteps.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B]">
-                Calculation steps
-              </p>
-              {result.calculationSteps.map((step, index) => (
-                <div
-                  key={index}
-                  className="rounded-xl border border-[#E2E8F0] bg-white px-3.5 py-2.5"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-medium text-[#0F172A]">{step.step}</p>
-                    <p className="shrink-0 text-sm font-semibold tabular-nums text-[#0F6E56]">
-                      {step.value.toFixed(4)}
-                    </p>
-                  </div>
-                  <p className="mt-1 break-all font-mono text-[11px] leading-relaxed text-[#94A3B8]">
-                    {step.formula}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </InputSection>
       )}
     </div>

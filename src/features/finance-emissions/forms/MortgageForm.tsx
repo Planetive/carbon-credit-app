@@ -42,7 +42,7 @@ export const MortgageForm: React.FC<MortgageFormProps> = ({
   return (
     <InputSection
       title="Properties"
-      description={selectedFormula?.name || "Value at origination for each mortgaged property"}
+      description="Value at origination for each mortgaged property"
       action={
         <Button type="button" variant="outline" size="sm" onClick={onAddProperty} className="h-8 border-[#E2E8F0]">
           <Plus className="h-3.5 w-3.5 mr-1" />

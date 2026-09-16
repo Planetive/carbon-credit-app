@@ -8,7 +8,7 @@
  * - 1a (score 1): verified country GHG (Climate TRACE — Pakistan & UAE)
  * - 1b (score 2): unverified country GHG
  * - 2a (score 3): energy consumption × emission factor (+ process emissions)
- * - 3a (score 4): PPP-GDP × sector intensity (from country_sector_intensity table)
+ * - 3a (score 4): Revenue per sector × sector intensity (GHG / revenue from reference table)
  * - 3b (score 5): PPP-GDP_c × (proxy GHG / proxy PPP-GDP)
  */
 
@@ -209,7 +209,7 @@ export const OPTION_2A_SOVEREIGN_DEBT: FormulaConfig = {
 export const OPTION_3A_SOVEREIGN_DEBT: FormulaConfig = {
   id: '3a-sovereign-debt',
   name: 'Option 3a - Country Sector Intensity (Sovereign Debt)',
-  description: 'PPP-GDP × sector intensity (GHG / revenue from reference table)',
+  description: 'Revenue per sector × sector intensity (GHG / revenue from reference table)',
   dataQualityScore: 4,
   category: 'sovereign-debt',
   optionCode: '3a',
@@ -217,27 +217,37 @@ export const OPTION_3A_SOVEREIGN_DEBT: FormulaConfig = {
     COMMON_INPUTS.outstanding_amount,
     pppGdpInput,
     {
+      name: 'sector_revenue',
+      label: 'Revenue per sector',
+      type: 'number',
+      required: true,
+      unit: 'PKR',
+      description: 'Revenue of the country sector',
+    },
+    {
       name: 'sector_intensity',
       label: 'Sector intensity',
       type: 'number',
       required: true,
       unit: 'kgCO2e/PKR',
-      description: 'Country-sector GHG intensity from reference table (replaces GHG / revenue)',
+      description: 'Country-sector GHG intensity from reference table (GHG / revenue)',
     },
   ],
   calculate: (inputs, companyType) => {
     const outstandingAmount = num(inputs.outstanding_amount);
     const ppAdjustedGDP = num(inputs.pp_adjusted_gdp);
+    const sectorRevenue = num(inputs.sector_revenue);
     const rawIntensity = num(inputs.sector_intensity);
+    if (!sectorRevenue) throw new Error('Revenue per sector must be greater than 0');
     if (!rawIntensity) throw new Error('Select a sector with intensity data');
     const unit = String(inputs.sector_intensity_unit || 'kgCO2e/PKR');
     const intensityT = unit.toLowerCase().includes('kg') ? rawIntensity / 1000 : rawIntensity;
     const attributionFactor = attribution(outstandingAmount, ppAdjustedGDP);
-    const countryEmissions = ppAdjustedGDP * intensityT;
-    const financedEmissions = attributionFactor * countryEmissions;
+    const sectorEmissions = sectorRevenue * intensityT;
+    const financedEmissions = attributionFactor * sectorEmissions;
     return {
       attributionFactor,
-      emissionFactor: countryEmissions,
+      emissionFactor: sectorEmissions,
       financedEmissions,
       dataQualityScore: 4,
       methodology: 'PCAF Option 3a - Country Sector Intensity (Sovereign Debt)',
@@ -245,21 +255,22 @@ export const OPTION_3A_SOVEREIGN_DEBT: FormulaConfig = {
         { step: 'PPP-Adjusted GDP', value: ppAdjustedGDP, formula: `PPP-Adjusted GDP = ${ppAdjustedGDP.toFixed(2)}` },
         { step: 'Attribution Factor', value: attributionFactor, formula: `${outstandingAmount} / ${ppAdjustedGDP.toFixed(2)} = ${attributionFactor.toFixed(6)}` },
         { step: 'Sector Intensity', value: intensityT, formula: `${rawIntensity} ${unit} → ${intensityT.toExponential(6)} tCO2e/PKR` },
-        { step: 'Country Sector Emissions', value: countryEmissions, formula: `PPP-GDP × intensity = ${countryEmissions.toFixed(2)} tCO2e` },
-        { step: 'Financed Emissions', value: financedEmissions, formula: `${attributionFactor.toFixed(6)} × ${countryEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e` },
+        { step: 'Sector Emissions', value: sectorEmissions, formula: `${sectorRevenue} × ${intensityT.toExponential(6)} = ${sectorEmissions.toFixed(2)} tCO2e` },
+        { step: 'Financed Emissions', value: financedEmissions, formula: `${attributionFactor.toFixed(6)} × ${sectorEmissions.toFixed(2)} = ${financedEmissions.toFixed(2)} tCO2e` },
       ],
       metadata: {
         companyType,
         optionCode: '3a',
         category: 'sovereign-debt',
         ppAdjustedGDP,
+        sectorRevenue,
         intensity: intensityT,
-        countryEmissions,
-        formula: 'Σ (Outstanding / PPP-adjusted GDP) × PPP-GDP × sector intensity',
+        sectorEmissions,
+        formula: 'Σ (Outstanding / PPP-adjusted GDP) × Revenue per sector × sector intensity',
       },
     };
   },
-  notes: ['Lower data quality score (4)', 'Uses reference table intensity instead of GHG and revenue'],
+  notes: ['Lower data quality score (4)', 'Revenue per sector × reference-table intensity (GHG / revenue)'],
 };
 
 export const OPTION_3B_SOVEREIGN_DEBT: FormulaConfig = {

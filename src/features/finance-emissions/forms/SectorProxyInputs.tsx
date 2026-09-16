@@ -50,8 +50,8 @@ const SectorProxyInputs: React.FC<Props> = ({
       title="Sector proxy"
       description={
         needsFetchedIntensity
-          ? "Company revenue / ATR plus sector intensity (GHG ÷ revenue) from the reference table"
-          : "Financial and intensity inputs for this PCAF option"
+          ? "Company revenue or asset turnover, plus sector intensity from our reference table"
+          : "Financial and intensity inputs for this method"
       }
     >
       <FieldGrid>
@@ -60,7 +60,7 @@ const SectorProxyInputs: React.FC<Props> = ({
             <FormField
               label="Country"
               required
-              tooltip="Country used to look up sector GHG/revenue intensity"
+              tooltip="Country used to look up sector emissions intensity"
             >
               <div className="space-y-2">
                 {countriesError && (

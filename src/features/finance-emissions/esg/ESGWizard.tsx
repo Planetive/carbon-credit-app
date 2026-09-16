@@ -48,51 +48,45 @@ const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
 const VEHICLE_METHODS = [
   {
     id: '1a',
-    title: 'Actual fuel consumption',
-    score: 'Score 1a',
-    description:
-      'You enter how much fuel the vehicle used. Pick brand, model, and year — we apply the matching emissions rate for that fuel.',
+    title: 'I have fuel use data',
+    score: 'Score 1',
+    description: 'Enter how much fuel the vehicle used. Pick brand, model, and year — we handle the rest.',
   },
   {
     id: '1b',
-    title: 'Actual distance + make/model',
-    score: 'Score 1b',
-    description:
-      'You enter kilometres driven and pick brand, model, and year. We use the vehicle’s typical fuel efficiency and apply the matching emissions rate.',
+    title: 'I have kilometres and make/model',
+    score: 'Score 1',
+    description: 'Enter kilometres driven and the vehicle’s brand, model, and year. We estimate fuel use from typical efficiency.',
   },
   {
     id: '2a',
-    title: 'Local distance statistics',
+    title: 'Local average distance',
     score: 'Score 2',
-    description:
-      'You pick private or public use and brand, model, and year. Distance comes from local averages; we apply fuel efficiency and the matching emissions rate.',
+    description: 'Use local average kilometres for this vehicle type, plus brand, model, and year for efficiency.',
   },
   {
     id: '2b',
-    title: 'Regional distance statistics',
+    title: 'Regional average distance',
     score: 'Score 3',
-    description:
-      'Same as Score 2, but distance comes from regional averages instead of local ones.',
+    description: 'Same as local averages, but using regional or national average kilometres instead.',
   },
   {
     id: '3a',
-    title: 'Vehicle-type efficiency',
+    title: 'Vehicle type only',
     score: 'Score 4',
-    description:
-      'You pick private or public use and a broad vehicle type (e.g. hatchback, sedan). Distance and efficiency come from averages; we apply the matching emissions rate.',
+    description: 'Pick private or public use and a broad type (hatchback, sedan, and so on). Distance and efficiency come from averages.',
   },
   {
     id: '3b',
-    title: 'Efficiency by engine size',
+    title: 'Engine size estimate',
     score: 'Score 5',
-    description:
-      'You pick private or public use, local or regional distance, fuel type, and engine size band. We use average efficiency and the matching emissions rate.',
+    description: 'Pick use, local or regional averages, fuel type, and engine size. We use average efficiency for that band.',
   },
 ];
 
 const vehicleMethodLabel = (id: string) => {
   const m = VEHICLE_METHODS.find((x) => x.id === id);
-  return m ? `${m.score} — ${m.title}` : id.toUpperCase();
+  return m ? `${m.score.replace(/^Score\s+/i, 'Quality ')} — ${m.title}` : id;
 };
 
 type YesNo = 'yes' | 'no' | '';
@@ -210,8 +204,8 @@ function VehicleProgressiveCapabilityPicker({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <ChoiceTile
             selected={answers.hasFuel === 'yes'}
-            title="Yes — Score 1a"
-            description="Actual fuel consumed for the year"
+            title="Yes — I have fuel use"
+            description="How much fuel the vehicle used over the year"
             onClick={() =>
               applyAnswers({
                 hasFuel: 'yes',
@@ -247,7 +241,7 @@ function VehicleProgressiveCapabilityPicker({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <ChoiceTile
               selected={answers.hasKmAndModel === 'yes'}
-              title="Yes — Score 1b"
+              title="Yes — I have kilometres and make/model"
               description="Kilometres driven plus brand, model, and year"
               onClick={() =>
                 applyAnswers({
@@ -282,8 +276,8 @@ function VehicleProgressiveCapabilityPicker({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <ChoiceTile
               selected={answers.hasModelOnly === 'yes'}
-              title="Yes — Score 2 or 3"
-              description="Efficiency from make/model; distance from statistics"
+              title="Yes — make/model only"
+              description="Brand, model, and year; distance comes from averages"
               onClick={() =>
                 applyAnswers({
                   ...answers,
@@ -315,14 +309,14 @@ function VehicleProgressiveCapabilityPicker({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <ChoiceTile
               selected={answers.distanceScope === 'local'}
-              title="Local — Score 2"
+              title="Local averages"
               description="Average distance for local / city driving"
               onClick={() => applyAnswers({ ...answers, distanceScope: 'local', hasVehicleType: '' })}
             />
             <ChoiceTile
               selected={answers.distanceScope === 'regional'}
-              title="Regional — Score 3"
-              description="Regional / national average distance"
+              title="Regional averages"
+              description="Regional or national average distance"
               onClick={() => applyAnswers({ ...answers, distanceScope: 'regional', hasVehicleType: '' })}
             />
           </div>
@@ -339,14 +333,14 @@ function VehicleProgressiveCapabilityPicker({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <ChoiceTile
                 selected={answers.hasVehicleType === 'yes'}
-                title="Yes — Score 4"
-                description="Motorcycle / small car / large car / LCV / truck / bus"
+                title="Yes — I know the vehicle type"
+                description="Motorcycle, small car, large car, van, truck, or bus"
                 onClick={() => applyAnswers({ ...answers, hasVehicleType: 'yes' })}
               />
               <ChoiceTile
                 selected={answers.hasVehicleType === 'no'}
-                title="No — Score 5"
-                description="Use average vehicle distance and efficiency"
+                title="No — use a broad estimate"
+                description="Average distance and efficiency when type is unknown"
                 onClick={() => applyAnswers({ ...answers, hasVehicleType: 'no' })}
               />
             </div>
@@ -356,7 +350,7 @@ function VehicleProgressiveCapabilityPicker({
       {resolvedMeta && (
         <div className="rounded-[14px] border border-[#BFE3D3] bg-[#EAF7F1]/70 px-4 py-3">
           <p className="text-sm font-semibold text-[#0F6E56]">
-            Using {resolvedMeta.score} — {resolvedMeta.title}
+            Using {resolvedMeta.score.replace(/^Score\s+/i, 'Quality ')} — {resolvedMeta.title}
           </p>
           <p className="text-xs text-[#64748B] mt-1 leading-relaxed">{resolvedMeta.description}</p>
         </div>
@@ -373,34 +367,147 @@ function VehicleProgressiveCapabilityPicker({
 }
 
 const PROPERTY_METHODS = [
-  { id: '1a', title: 'Actual energy + supplier factor', score: 'Score 1', description: 'Actual building energy (kWh) × user-supplied supplier-specific emission factor' },
-  { id: '1b', title: 'Actual energy + average factor', score: 'Score 2', description: 'Actual building energy (kWh) × average grid emission factor (we provide)' },
-  { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Estimated whole-building energy × floor area financed × average grid factor' },
-  { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
-  { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
+  {
+    id: '1a',
+    title: 'Measured energy — your supplier’s rate',
+    score: 'Score 1',
+    description: 'You know how much energy the building used, and you have the emissions rate from the electricity supplier.',
+  },
+  {
+    id: '1b',
+    title: 'Measured energy — our average rate',
+    score: 'Score 2',
+    description: 'You know how much energy the building used. Pick the country and we apply the average grid rate.',
+  },
+  {
+    id: '2a',
+    title: 'Energy label estimate',
+    score: 'Score 3',
+    description: 'Use the building’s energy label, the floor area covered by the loan, and our average grid rate.',
+  },
+  {
+    id: '2b',
+    title: 'Building type by floor area',
+    score: 'Score 4',
+    description: 'Pick a building type (office, retail, and so on), enter floor area, and we estimate from typical use.',
+  },
+  {
+    id: '3',
+    title: 'Building type by number of buildings',
+    score: 'Score 5',
+    description: 'Pick a building type, enter how many buildings, and we estimate from typical use per building.',
+  },
 ];
 
 const SOVEREIGN_METHODS = [
-  { id: '1a', title: 'Verified country GHG', score: 'Score 1', description: 'Climate TRACE country emissions (Pakistan & UAE)' },
-  { id: '1b', title: 'Unverified country GHG', score: 'Score 2', description: 'Unverified country GHG emissions' },
-  { id: '2a', title: 'Country energy consumption', score: 'Score 3', description: 'Country energy use × standard emissions rate (+ process emissions)' },
-  { id: '3a', title: 'Country sector intensity', score: 'Score 4', description: 'PPP-GDP × sector intensity from the reference table' },
-  { id: '3b', title: 'Proxy country intensity', score: 'Score 5', description: 'Target PPP-GDP × (proxy GHG / proxy PPP-GDP)' },
+  {
+    id: '1a',
+    title: 'Verified country emissions',
+    score: 'Score 1',
+    description: 'Use independently verified country emissions (Pakistan or UAE).',
+  },
+  {
+    id: '1b',
+    title: 'Country emissions you enter',
+    score: 'Score 2',
+    description: 'Enter the country’s total emissions yourself when you do not have verified figures.',
+  },
+  {
+    id: '2a',
+    title: 'Country energy use',
+    score: 'Score 3',
+    description: 'Enter the country’s energy use; we convert it using a standard emissions rate.',
+  },
+  {
+    id: '3a',
+    title: 'Sector revenue estimate',
+    score: 'Score 4',
+    description: 'Enter revenue for a country sector. We apply that sector’s emissions intensity from our table.',
+  },
+  {
+    id: '3b',
+    title: 'Similar-country estimate',
+    score: 'Score 5',
+    description: 'Use a similar country’s emissions relative to the size of its economy as a proxy.',
+  },
 ];
 
 const BOND_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate' },
-  { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
-  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
-  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
+  {
+    id: '2a',
+    title: 'Energy or fuel use',
+    score: 'Score 2',
+    description: 'Enter how much energy or fuel the company used; we apply a standard emissions rate.',
+  },
+  {
+    id: '2b',
+    title: 'Production volume',
+    score: 'Score 3',
+    description: 'Enter how much the company produced; we apply a product emissions rate.',
+  },
+  {
+    id: '3a',
+    title: 'Company revenue',
+    score: 'Score 4',
+    description: 'Enter company revenue. We apply sector emissions intensity from our reference table.',
+  },
+  {
+    id: '3c',
+    title: 'Asset turnover estimate',
+    score: 'Score 5',
+    description: 'Use the outstanding amount and a sector asset-turnover rate with intensity from our table.',
+  },
 ];
 
 const FACILITATED_NO_GHG_METHODS = [
-  { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate × weight factor' },
-  { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × emission factor × weight factor' },
-  { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table) × weight factor' },
-  { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Facilitated amount × ATR × sector intensity (GHG / revenue from table) × weight factor' },
+  {
+    id: '2a',
+    title: 'Energy or fuel use',
+    score: 'Score 2',
+    description: 'Enter energy or fuel use; we apply a standard emissions rate and your share of the deal.',
+  },
+  {
+    id: '2b',
+    title: 'Production volume',
+    score: 'Score 3',
+    description: 'Enter production volume; we apply a product emissions rate and your share of the deal.',
+  },
+  {
+    id: '3a',
+    title: 'Company revenue',
+    score: 'Score 4',
+    description: 'Enter company revenue with sector intensity from our table, plus your share of the deal.',
+  },
+  {
+    id: '3c',
+    title: 'Asset turnover estimate',
+    score: 'Score 5',
+    description: 'Use the facilitated amount and sector asset-turnover intensity, plus your share of the deal.',
+  },
 ];
+
+const ALL_METHOD_LOOKUPS = [
+  ...PROPERTY_METHODS,
+  ...SOVEREIGN_METHODS,
+  ...BOND_NO_GHG_METHODS,
+  ...FACILITATED_NO_GHG_METHODS,
+  ...VEHICLE_METHODS,
+];
+
+const methodDisplayLabel = (methodId: string, loanType?: string) => {
+  // Re-export pattern kept local for wizard; prefer shared util below when used elsewhere
+  if (loanType === 'motor-vehicle-loan') return vehicleMethodLabel(methodId);
+  const family =
+    loanType === 'commercial-real-estate' || loanType === 'mortgage'
+      ? PROPERTY_METHODS
+      : loanType === 'sovereign-debt'
+        ? SOVEREIGN_METHODS
+        : loanType === 'facilitated-emission'
+          ? FACILITATED_NO_GHG_METHODS
+          : BOND_NO_GHG_METHODS;
+  const m = family.find((x) => x.id === methodId) || ALL_METHOD_LOOKUPS.find((x) => x.id === methodId);
+  return m ? `${m.score.replace(/^Score\s+/i, 'Quality ')} — ${m.title}` : methodId;
+};
 
 const TILE =
   'w-full text-left rounded-[14px] border p-4 transition-all duration-200';
@@ -433,7 +540,7 @@ function MethodOptionGrid({
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-[#0F172A] tracking-[-0.01em]">{method.title}</p>
                 <span className="shrink-0 text-[11px] font-semibold text-[#0F6E56] bg-[#EAF7F1] px-2 py-0.5 rounded-full">
-                  {method.score}
+                  {method.score.replace(/^Score\s+/i, 'Quality ')}
                 </span>
               </div>
               <p className="text-sm text-[#64748B] mt-1.5 leading-relaxed">{method.description}</p>
@@ -910,8 +1017,8 @@ export const ESGWizard: React.FC = () => {
         .map((s) =>
           s.id === 'verification'
             ? isMixedFamilies
-              ? { ...s, title: 'Methods by loan', description: 'Each asset class has its own PCAF options' }
-              : { ...s, title: 'Calculation method', description: 'Select the PCAF data-quality option' }
+              ? { ...s, title: 'Methods by loan', description: 'Choose how you will estimate emissions for each loan type' }
+              : { ...s, title: 'How will you estimate emissions?', description: 'Pick the option that best matches the data you have' }
             : s
         );
     } else if (isMixedFamilies) {
@@ -1581,23 +1688,23 @@ export const ESGWizard: React.FC = () => {
             errors.verifierName = 'Please enter the verifier name';
           }
           if (hasBondFamily && dataToValidate.hasEmissions === 'no' && !BOND_FAMILY.some((t) => dataToValidate.calculationMethods?.[t])) {
-            errors.calculationMethod = 'Select a PCAF option for the corporate bond / business loan';
+            errors.calculationMethod = 'Select a calculation method for the corporate bond / business loan';
           }
           if (hasVehicleFamily && !dataToValidate.calculationMethods?.['motor-vehicle-loan']) {
-            errors.vehicleMethod = 'Answer the motor vehicle data questions to determine the PCAF score';
+            errors.vehicleMethod = 'Answer the motor vehicle data questions to choose a method';
           }
           if (hasPropertyFamily && !PROPERTY_FAMILY.some((t) => dataToValidate.calculationMethods?.[t])) {
-            errors.propertyMethod = 'Select a PCAF option for the property loan';
+            errors.propertyMethod = 'Select a calculation method for the property loan';
           }
           if (hasSovereignFamily && !dataToValidate.calculationMethods?.['sovereign-debt']) {
-            errors.sovereignMethod = 'Select a PCAF option for sovereign debt';
+            errors.sovereignMethod = 'Select a calculation method for sovereign debt';
           }
           break;
         }
         if (isDirectMethod) {
           if (!dataToValidate.calculationMethod) {
             errors.calculationMethod = isVehicleDirect
-              ? 'Answer the motor vehicle data questions to determine the PCAF score'
+              ? 'Answer the motor vehicle data questions to choose a method'
               : 'Please select a calculation method';
           }
           break;
@@ -1817,7 +1924,7 @@ export const ESGWizard: React.FC = () => {
             </div>
             {isMixedFamilies && (
               <p className="text-sm text-[#64748B]">
-                Mixed asset classes each use their own PCAF table. You will pick a method for each on the next steps.
+                Mixed loan types each use their own calculation options. You will pick a method for each on the next steps.
               </p>
             )}
             {validationErrors.loanTypes && (
@@ -1838,7 +1945,7 @@ export const ESGWizard: React.FC = () => {
                 <p className="text-sm font-semibold text-[#0F172A]">This question is only for the bond / business loan</p>
                 <p className="text-sm text-[#64748B]">
                   {activityMixPhrase.charAt(0).toUpperCase() + activityMixPhrase.slice(1)} never use company GHG.
-                  They get their own PCAF options on the next step.
+                  They get their own calculation options on the next step.
                 </p>
               </div>
             )}
@@ -1848,7 +1955,7 @@ export const ESGWizard: React.FC = () => {
                 title={isMixedFamilies ? 'Yes — the company has GHG data' : 'Yes — we have company GHG data'}
                 description={
                   isMixedFamilies
-                    ? 'Used for the corporate bond / business loan only (Option 1a / 1b).'
+                    ? 'Used for the corporate bond / business loan only.'
                     : 'Enter Scope 1, 2 and 3 totals in tCO₂e.'
                 }
                 onClick={() => updateFormData('hasEmissions', 'yes')}
@@ -1927,7 +2034,7 @@ export const ESGWizard: React.FC = () => {
               <p className="text-sm text-[#64748B]">
                 {hasBondFamily && formData.hasEmissions === 'yes'
                   ? `Bond uses the company GHG you just entered. ${activityMixPhrase.charAt(0).toUpperCase() + activityMixPhrase.slice(1)} still need their own activity option.`
-                  : 'Each asset class has its own PCAF table. Pick an option for every group below.'}
+                  : 'Each loan type has its own options. Pick a method for every group below.'}
               </p>
               {hasBondFamily && formData.hasEmissions === 'yes' && (
                 <div className="space-y-3">
@@ -1936,13 +2043,13 @@ export const ESGWizard: React.FC = () => {
                     <ChoiceTile
                       selected={formData.verificationStatus === 'verified'}
                       title="Verified by a third party"
-                      description="Company GHG is independently verified (Option 1a)."
+                      description="Company GHG has been independently checked."
                       onClick={() => updateFormData('verificationStatus', 'verified')}
                     />
                     <ChoiceTile
                       selected={formData.verificationStatus === 'unverified'}
                       title="Not verified"
-                      description="Use unverified company GHG (Option 1b)."
+                      description="Use company GHG totals that have not been independently checked."
                       onClick={() => updateFormData('verificationStatus', 'unverified')}
                     />
                   </div>
@@ -2103,31 +2210,20 @@ export const ESGWizard: React.FC = () => {
               item.type === 'business-loan' ||
               item.type === 'project-finance'
           );
-          const creMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy labels', score: 'Score 3', description: 'Estimated whole-building energy × floor area financed × average grid factor' },
-            { id: '2b', title: 'Statistics + floor area', score: 'Score 4', description: 'CBECS principal building type (kWh/sqft) × floor area (sqft) × grid EF' },
-            { id: '3', title: 'Statistics + buildings', score: 'Score 5', description: 'CBECS principal building type (kWh/building) × building count × grid EF' },
-          ];
           if (hasCommercialRealEstate) {
             return (
               <MethodOptionGrid
-                methods={creMethods}
+                methods={PROPERTY_METHODS.filter((m) => m.id === '2a' || m.id === '2b' || m.id === '3')}
                 selectedId={formData.calculationMethod}
                 onSelect={(id) => applyMethods(PROPERTY_FAMILY, id)}
                 error={validationErrors.calculationMethod}
               />
             );
           }
-          const corporateBondMethods: Array<{ id: string; title: string; score: string; description: string }> = [
-            { id: '2a', title: 'Energy consumption', score: 'Score 2', description: 'Energy or fuel use × standard emissions rate' },
-            { id: '2b', title: 'Production', score: 'Score 3', description: 'Production volume × product emission factor' },
-            { id: '3a', title: 'Revenue-based', score: 'Score 4', description: 'Company revenue × sector intensity (GHG / revenue from table)' },
-            { id: '3c', title: 'Asset turnover (ATR)', score: 'Score 5', description: 'Outstanding × ATR × sector intensity (GHG / revenue from table)' },
-          ];
           if (usesBondLoanMethods) {
             return (
               <MethodOptionGrid
-                methods={corporateBondMethods}
+                methods={BOND_NO_GHG_METHODS}
                 selectedId={formData.calculationMethod}
                 onSelect={(id) => applyMethods(BOND_FAMILY, id)}
                 error={validationErrors.calculationMethod}
@@ -2466,8 +2562,8 @@ export const ESGWizard: React.FC = () => {
             </h1>
             <p className="mt-1.5 text-sm text-[#64748B]">
               {mode === 'finance'
-                ? 'PCAF calculation for this counterparty'
-                : 'PCAF facilitated emissions for this counterparty'}
+                ? 'Calculation for this counterparty'
+                : 'Facilitated emissions for this counterparty'}
             </p>
           </div>
           <div className="w-full shrink-0 sm:w-[220px] sm:pt-10">
@@ -2648,10 +2744,7 @@ export const ESGWizard: React.FC = () => {
                     {formData.loanTypes.map((lt) => {
                       const method = formData.calculationMethods?.[lt.type] || formData.calculationMethod;
                       if (!method) return null;
-                      const label =
-                        lt.type === 'motor-vehicle-loan'
-                          ? vehicleMethodLabel(method)
-                          : method.toUpperCase();
+                      const label = methodDisplayLabel(method, lt.type);
                       return (
                         <div key={lt.type}>
                           {loanTypeLabel(lt.type)} · {label}
@@ -2664,9 +2757,11 @@ export const ESGWizard: React.FC = () => {
                 <div>
                   <dt className="text-xs text-[#64748B]">Method</dt>
                   <dd className="mt-0.5 text-sm font-medium text-[#0F172A]">
-                    {hasVehicleFamily || isVehicleDirect
-                      ? vehicleMethodLabel(formData.calculationMethod)
-                      : formData.calculationMethod.toUpperCase()}
+                    {methodDisplayLabel(
+                      formData.calculationMethod,
+                      formData.loanTypes[0]?.type ||
+                        (hasVehicleFamily || isVehicleDirect ? 'motor-vehicle-loan' : undefined)
+                    )}
                   </dd>
                 </div>
               ) : null}

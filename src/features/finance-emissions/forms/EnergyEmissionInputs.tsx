@@ -54,7 +54,7 @@ const EnergyEmissionInputs: React.FC<Props> = ({ formData, onUpdateFormData }) =
   return (
     <InputSection
       title="Electricity"
-      description="Same Scope 2 form as the emission calculator. Grid uses country factors; other sources use EPA or DEFRA fuel tables."
+      description="Enter electricity use. We convert it to emissions using the country grid or fuel factors."
       action={
         <div className="inline-flex rounded-lg border border-[#E2E8F0] bg-white p-0.5">
           {(["EPA", "DEFRA"] as const).map((lib) => (
@@ -64,7 +64,7 @@ const EnergyEmissionInputs: React.FC<Props> = ({ formData, onUpdateFormData }) =
               className={`px-2.5 py-1 text-xs rounded-md ${factorLibrary === lib ? "bg-[#0F6E56] text-white" : "text-[#64748B]"}`}
               onClick={() => setLibrary(lib)}
             >
-              {lib}
+              {lib === "EPA" ? "Standard" : "UK"}
             </button>
           ))}
         </div>
@@ -106,7 +106,7 @@ const EnergyEmissionInputs: React.FC<Props> = ({ formData, onUpdateFormData }) =
             />
           </FormField>
           <ComputedBox
-            label="Electricity used in PCAF"
+            label="Electricity emissions"
             value={`${previewTco2e.toFixed(6)} tCO₂e`}
           />
         </FieldGrid>
