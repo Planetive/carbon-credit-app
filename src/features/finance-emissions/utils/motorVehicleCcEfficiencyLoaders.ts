@@ -3,14 +3,14 @@
  * Dataset: motor_vehicle_cc_efficiency (ref.factor_rows).
  * Fallback: public.staging_motor_vehicle_cc_efficiency
  *
- * Lookup: geography (local | regional) + engine CC + fuel type → efficiency (+ unit → L/km).
+ * Lookup: engine CC + fuel type → efficiency (+ unit → L/km).
+ * Same sheet for local and regional distance scope.
  * Emission factor remains EPA Mobile Fuel (not this sheet).
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 import { efficiencyToLPerKm } from "./motorVehicleMakeModelLoaders";
-import type { DistanceScope } from "./motorVehicleDistanceLoaders";
 import { efficiencyForEngineCc } from "./motorVehicleFactorLoaders";
 
 export const CC_EFFICIENCY_DATASET_CODE = "motor_vehicle_cc_efficiency";
@@ -18,7 +18,6 @@ export const CC_EFFICIENCY_STAGING_TABLE = "staging_motor_vehicle_cc_efficiency"
 
 export type VehicleCcEfficiencyRow = {
   key: string;
-  geography: DistanceScope;
   ccBand: string;
   ccMin: number;
   ccMax: number;
@@ -39,11 +38,16 @@ function parseNumericLoose(v: unknown): number {
   return m ? Number(m[0]) : 0;
 }
 
-function parseGeography(raw: string): DistanceScope | null {
+/** True if value looks like a geography label, not a CC band. */
+function isGeographyLabel(raw: string): boolean {
   const n = normalize(raw);
-  if (n.includes("local") || n.includes("pakistan")) return "local";
-  if (n.includes("regional") || n.includes("national")) return "regional";
-  return null;
+  return (
+    n === "local" ||
+    n === "regional" ||
+    n === "national" ||
+    n === "all" ||
+    n.includes("pakistan")
+  );
 }
 
 /** Parse "0-660", "1001–1300", "Under 1000cc", "Above 3000" into inclusive min/max. */
@@ -110,13 +114,12 @@ export function ccFuelsMatch(sheetFuel: string, formFuel: string): boolean {
 
 function parseRow(row: Record<string, unknown>): VehicleCcEfficiencyRow | null {
   const attrs = (row.attributes ?? {}) as Record<string, unknown>;
-  const geographyRaw = String(
-    attrs.geography ?? row.geography ?? row.category ?? ""
-  ).trim();
-  const geography = parseGeography(geographyRaw);
-  if (!geography) return null;
 
-  const ccBand = String(attrs.cc_band ?? row.cc_band ?? "").trim();
+  // Prefer explicit cc_band; allow category only when it looks like a CC band (not geography).
+  const categoryRaw = String(attrs.category ?? row.category ?? "").trim();
+  const ccBand = String(
+    attrs.cc_band ?? row.cc_band ?? (!isGeographyLabel(categoryRaw) ? categoryRaw : "") ?? ""
+  ).trim();
   const bounds = parseCcBand(ccBand);
   if (!bounds) return null;
 
@@ -133,8 +136,7 @@ function parseRow(row: Record<string, unknown>): VehicleCcEfficiencyRow | null {
   if (!(efficiencyLPerKm > 0)) return null;
 
   return {
-    key: `${geography}::${ccBand}::${fuelType}`,
-    geography,
+    key: `${ccBand}::${fuelType}`,
     ccBand,
     ccMin: bounds.min,
     ccMax: bounds.max,
@@ -194,27 +196,23 @@ export async function loadVehicleCcEfficiencyRows(): Promise<VehicleCcEfficiency
 }
 
 /**
- * Find efficiency for Score 5: geography + engine CC + fuel type.
+ * Find efficiency for Score 5: engine CC + fuel type (same sheet for local/regional).
  * Prefers the narrowest CC band that contains the engine size.
- * Falls back to provisional hardcoded bands if sheet has no match.
  */
 export function findCcEfficiency(
   rows: VehicleCcEfficiencyRow[],
   opts: {
-    geography?: DistanceScope | "";
     engineCc: number;
     fuelType: string;
+    /** Ignored — kept for call-site compatibility. */
+    geography?: string;
   }
 ): VehicleCcEfficiencyRow | null {
   const cc = opts.engineCc;
   if (!(cc > 0) || rows.length === 0) return null;
 
-  const scope = opts.geography === "local" || opts.geography === "regional" ? opts.geography : "";
-  let pool = scope ? rows.filter((r) => r.geography === scope) : rows;
-  if (pool.length === 0) pool = rows;
-
-  const fuelMatched = pool.filter((r) => ccFuelsMatch(r.fuelType, opts.fuelType));
-  const candidates = (fuelMatched.length > 0 ? fuelMatched : pool).filter(
+  const fuelMatched = rows.filter((r) => ccFuelsMatch(r.fuelType, opts.fuelType));
+  const candidates = (fuelMatched.length > 0 ? fuelMatched : rows).filter(
     (r) => cc >= r.ccMin && cc <= r.ccMax
   );
   if (candidates.length === 0) return null;
@@ -232,9 +230,10 @@ export function findCcEfficiency(
 export function efficiencyForScore5Cc(
   rows: VehicleCcEfficiencyRow[],
   opts: {
-    geography?: DistanceScope | "";
     engineCc: number;
     fuelType: string;
+    /** Ignored — kept for call-site compatibility. */
+    geography?: string;
   }
 ): number {
   const hit = findCcEfficiency(rows, opts);
@@ -247,7 +246,6 @@ export function formatCcEfficiencyHint(row: VehicleCcEfficiencyRow): string {
     `${row.efficiencyRaw} ${row.efficiencyUnit}`,
     `→ ${row.efficiencyLPerKm.toFixed(4)} L/km`,
     row.ccBand,
-    row.geography,
     row.fuelType,
   ].join(" · ");
 }

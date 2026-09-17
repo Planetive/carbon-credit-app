@@ -1,11 +1,8 @@
 # Motor vehicle CC-band efficiency — import for Score 5
 
-Source sheets of **fuel efficiency by engine CC band + fuel type**.
+Source sheet of **fuel efficiency by engine CC band + fuel type**.
 
-| Excel sheet | Geography | Used when Score 5 distance scope is |
-|---|---|---|
-| LOCAL: Pakistan (real-world efficiency by CC) | `local` | Local |
-| Regional by CC | `regional` | Regional |
+One sheet for both local and regional Score 5 distance scope (geography is optional on import).
 
 | PCAF UI score | Option code | App field | Value from sheet |
 |---|---|---|---|

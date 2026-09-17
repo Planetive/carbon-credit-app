@@ -328,13 +328,13 @@ export const OPTION_3A_MOTOR_VEHICLE = buildDistanceOption(
 export const OPTION_3B_MOTOR_VEHICLE = buildDistanceOption(
   '3b-motor-vehicle',
   'Option 3b - Average Vehicle Efficiency (Motor Vehicle Loan)',
-  'Distance from vehicle-use stats × efficiency by engine CC band (local/regional sheet) × EPA Mobile Fuel emission factor',
+  'Distance from vehicle-use stats × efficiency by engine CC band × EPA Mobile Fuel emission factor',
   '3b',
   5,
   'PCAF Option 3b - Average Vehicle Efficiency (Motor Vehicle Loan)',
   'Distance Traveled',
   'Local or regional statistical km from the distance stats sheet by vehicle use and class',
-  'Fuel efficiency from CC-band sheet (local Pakistan / regional) by engine cc + fuel type',
+  'Fuel efficiency from CC-band sheet by engine cc + fuel type (same sheet for local and regional)',
   'Σ_v (Outstanding_v / Value_v) × Distance_v × Efficiency_cc × EF_f (EPA by fuel type)'
 );
 

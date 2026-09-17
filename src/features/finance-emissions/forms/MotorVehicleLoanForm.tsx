@@ -1400,7 +1400,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
       : typeEfficiencyPath
         ? "Distance comes from vehicle-use averages. Pick a market vehicle type (hatchback, sedan, and so on) for efficiency; we apply the matching emissions rate."
         : averageEfficiencyPath
-          ? "Pick vehicle use, class, and local or regional scope. Efficiency comes from engine size band; we apply the matching emissions rate."
+          ? "Pick vehicle use, class, and local or regional distance. Efficiency comes from the engine-size sheet (same for both); we apply the matching emissions rate."
           : activeLibrary === "DEFRA"
             ? "Passenger or delivery vehicles — distance with a standard emissions rate"
             : "Choose fuel type and vehicle details; we apply the matching emissions rate.";
@@ -2385,7 +2385,7 @@ export const MotorVehicleLoanForm: React.FC<MotorVehicleLoanFormProps> = ({
         <div className="space-y-1.5">
           <Label className="flex items-center gap-2">
             Engine CC
-            <FieldTooltip content="Engine cubic capacity in cc. Efficiency is looked up from the CC-band sheet for local (Pakistan) or regional, matched to fuel type." />
+            <FieldTooltip content="Engine cubic capacity in cc. Efficiency is looked up from the CC-band sheet by engine size and fuel type (same sheet for local and regional)." />
           </Label>
           <Input
             type="number"
