@@ -3,7 +3,8 @@
  * Dataset: motor_vehicle_distance_stats (ref.factor_rows).
  * Fallback: public.staging_motor_vehicle_distance_stats
  *
- * Lookup: vehicle_use (private / public) + vehicle_class
+ * Lookup: vehicle_use (private / public; commercial rows map to public)
+ *         + vehicle_class
  *         + public operation_type (intercity / outercity≈intracity)
  *         + distance_geography (local vs regional).
  */
@@ -39,8 +40,8 @@ const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 function parseUse(raw: string): DistanceUseClass | null {
   const n = normalize(raw);
   if (n === "private") return "private";
-  if (n === "public") return "public";
-  // Commercial rows in the sheet are intentionally ignored for motor vehicle loans.
+  // Commercial vehicles are grouped under Public in the UI (no separate Commercial type).
+  if (n === "public" || n === "commercial") return "public";
   return null;
 }
 

@@ -2,7 +2,7 @@
 
 Source CSV of **statistical annual / monthly kilometres** by vehicle segment.
 
-Used to pre-load **distance travelled** for motor vehicle loans (Scores 2–5). Lookup is **vehicle use** (private / public) + **vehicle class**, plus public **intercity / outercity** (sheet Intracity) and local vs regional geography.
+Used to pre-load **distance travelled** for motor vehicle loans (Scores 2–5). Lookup is **vehicle use** (private / public) + **vehicle class**, plus public **intercity / outercity** (sheet Intracity) and local vs regional geography. Sheet rows labeled **commercial** are treated as **public** in the app (no separate Commercial option).
 
 | PCAF UI score | Option code | App field | Value from sheet |
 |---|---|---|---|
