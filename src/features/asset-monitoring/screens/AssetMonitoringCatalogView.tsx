@@ -186,7 +186,7 @@ function SectionBlock({ section }: { section: MrvCatalogSection }) {
   const openModule = (mod: MrvCatalogModule) => {
     // Paste real module URLs here when ready
     const MODULE_URLS: Record<string, string> = {
-      "vert-os": "https://hydroponics-planetive.vercel.app",
+      "vert-os": "https://hydroponics-cxmync1ud-planetive.vercel.app",
       terra: "https://bio-char-mrv-api-server.vercel.app",
       "helios-solar": "https://bess-beacon-core.vercel.app/login",
       "helios-terra": "https://bess-beacon-core.vercel.app/login",
