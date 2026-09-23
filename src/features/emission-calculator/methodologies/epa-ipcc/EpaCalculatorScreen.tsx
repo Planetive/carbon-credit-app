@@ -115,9 +115,9 @@ const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
   { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "flaringVenting" },
   {
     id: "ukRefrigerant",
-    title: "Refrigerant",
+    title: "Refrigerant & F-gas leakage",
     icon: Snowflake,
-    description: "Refrigerant leakage using GWP-based calculations",
+    description: "Fugitive leaks from AC, refrigeration, vehicles, and other F-gas systems",
     group: "fugitive",
   },
   {

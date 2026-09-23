@@ -3,7 +3,15 @@ import { Plus, Save, Trash2, ChevronRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,19 +28,27 @@ import { USE_JWT_AUTH } from "@/api/config";
 import { resolveEpaRefrigerantEmissionsKg } from "@/api/calcConnection";
 import {
   calculateEpaRefrigerantEmissions,
+  DEFAULT_AC_REFRIGERANT_TYPE,
   EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS,
-  EPA_REFRIGERANT_GWP,
-  EPA_REFRIGERANT_TYPE_OPTIONS,
+  EPA_EQUIPMENT_TYPE_GROUPS,
   formatEpaRefrigerantLabel,
+  getDefaultRefrigerantForUseCase,
+  getEquipmentGroupsForUseCase,
+  getGasGroupsForUseCase,
+  isEquipmentAllowedForUseCase,
+  isGasAllowedForUseCase,
   resolveRefrigerantGwp,
+  resolveUseCaseFromEntry,
   type EpaRefrigerantCalculationMethod,
   type EpaRefrigerantEquipmentType,
+  type EpaRefrigerantUseCase,
 } from "@/features/emission-calculator/scope1/constants/epaRefrigerantGwp";
 
 export interface EpaRefrigerantRow {
   id: string;
   dbId?: string;
   isExisting?: boolean;
+  useCase: EpaRefrigerantUseCase;
   method: EpaRefrigerantCalculationMethod;
   refrigerantType: string;
   customGwp?: number;
@@ -52,31 +68,37 @@ interface EpaRefrigerantEmissionsProps {
 
 const newRow = (): EpaRefrigerantRow => ({
   id: crypto.randomUUID(),
+  useCase: "ac_hvac",
   method: "leakage_record",
-  refrigerantType: "R-410A",
+  refrigerantType: DEFAULT_AC_REFRIGERANT_TYPE,
 });
 
-const mapDbRow = (entry: any): EpaRefrigerantRow => ({
-  id: crypto.randomUUID(),
-  dbId: String(entry.id),
-  isExisting: true,
-  method: (entry.calculation_method as EpaRefrigerantCalculationMethod) || "leakage_record",
-  refrigerantType: entry.refrigerant_type || "",
-  customGwp: undefined,
-  leakageKg:
-    entry.leakage_kg != null
-      ? Number(entry.leakage_kg)
-      : entry.calculation_method === "leakage_record"
-        ? Number(entry.quantity)
-        : undefined,
-  chargeKg: entry.charge_kg != null ? Number(entry.charge_kg) : undefined,
-  leakageRatePercent:
-    entry.leakage_rate_percent != null ? Number(entry.leakage_rate_percent) : undefined,
-  equipmentType: entry.equipment_type || undefined,
-  gwp: entry.gwp != null ? Number(entry.gwp) : Number(entry.emission_factor),
-  emissionsKg: Number(entry.emissions),
-  emissionsTonnes: Number(entry.emissions) / 1000,
-});
+const mapDbRow = (entry: any): EpaRefrigerantRow => {
+  const refrigerantType = entry.refrigerant_type || "";
+  const equipmentType = entry.equipment_type || undefined;
+  return {
+    id: crypto.randomUUID(),
+    dbId: String(entry.id),
+    isExisting: true,
+    useCase: resolveUseCaseFromEntry(refrigerantType, equipmentType),
+    method: (entry.calculation_method as EpaRefrigerantCalculationMethod) || "leakage_record",
+    refrigerantType,
+    customGwp: undefined,
+    leakageKg:
+      entry.leakage_kg != null
+        ? Number(entry.leakage_kg)
+        : entry.calculation_method === "leakage_record"
+          ? Number(entry.quantity)
+          : undefined,
+    chargeKg: entry.charge_kg != null ? Number(entry.charge_kg) : undefined,
+    leakageRatePercent:
+      entry.leakage_rate_percent != null ? Number(entry.leakage_rate_percent) : undefined,
+    equipmentType,
+    gwp: entry.gwp != null ? Number(entry.gwp) : Number(entry.emission_factor),
+    emissionsKg: Number(entry.emissions),
+    emissionsTonnes: Number(entry.emissions) / 1000,
+  };
+};
 
 const computeRow = (row: EpaRefrigerantRow): EpaRefrigerantRow => {
   const gwp = resolveRefrigerantGwp(row.refrigerantType, row.customGwp);
@@ -288,9 +310,14 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Refrigerant</h4>
+          <h4 className="text-lg font-semibold text-gray-900">Fugitive refrigerant & F-gas leakage</h4>
           <p className="text-sm text-gray-600 mt-1">
-            Enter leaked refrigerant gas and the calculator will estimate emissions automatically.
+            Scope 1 fugitive emissions from leaked refrigerants and F-gases. Choose{" "}
+            <span className="font-medium text-gray-800">AC / HVAC only</span> for a short common-blend
+            list, or{" "}
+            <span className="font-medium text-gray-800">Other systems</span> for cold rooms, vehicles,
+            industrial refrigeration, and other F-gases. Estimated leakage still works when you have
+            no leak records.
           </p>
         </div>
         <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
@@ -306,22 +333,32 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
             Typical annual leakage rate assumptions
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 space-y-3">
+          <p className="text-xs text-amber-800">
+            Use these rates only when you estimate leakage (no measured leak record). Rates apply to
+            the equipment you select — AC or otherwise.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="border-b border-amber-200/80">
+                  <th className="py-2 pr-4 font-medium text-amber-950">Category</th>
                   <th className="py-2 pr-4 font-medium text-amber-950">Equipment type</th>
                   <th className="py-2 font-medium text-amber-950">Typical annual leakage rate</th>
                 </tr>
               </thead>
               <tbody>
-                {EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS.map((row) => (
-                  <tr key={row.id} className="border-b border-amber-100 last:border-0">
-                    <td className="py-2 pr-4 text-amber-900">{row.label}</td>
-                    <td className="py-2 text-amber-800">{row.rateRange}</td>
-                  </tr>
-                ))}
+                {EPA_EQUIPMENT_TYPE_GROUPS.map((group) =>
+                  group.options.map((row, idx) => (
+                    <tr key={row.id} className="border-b border-amber-100 last:border-0">
+                      <td className="py-2 pr-4 text-amber-900 align-top">
+                        {idx === 0 ? group.label : ""}
+                      </td>
+                      <td className="py-2 pr-4 text-amber-900">{row.label}</td>
+                      <td className="py-2 text-amber-800">{row.rateRange}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -340,31 +377,68 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
               <Card key={row.id} className="border-gray-200">
                 <CardContent className="p-5 space-y-4">
                   <div className="flex items-start justify-between gap-2">
-                    <RadioGroup
-                      value={row.method}
-                      onValueChange={(v) =>
-                        updateRow(row.id, {
-                          method: v as EpaRefrigerantCalculationMethod,
-                          leakageKg: undefined,
-                          chargeKg: undefined,
-                          leakageRatePercent: undefined,
-                        })
-                      }
-                      className="flex flex-col sm:flex-row gap-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="leakage_record" id={`${row.id}-leakage-record`} />
-                        <Label htmlFor={`${row.id}-leakage-record`} className="font-normal cursor-pointer">
-                          I know how much gas leaked
-                        </Label>
+                    <div className="space-y-3 flex-1 min-w-0">
+                      <div>
+                        <Label className="text-gray-600 mb-2 block">Leak source category</Label>
+                        <RadioGroup
+                          value={row.useCase}
+                          onValueChange={(v) => {
+                            const useCase = v as EpaRefrigerantUseCase;
+                            const nextGas = isGasAllowedForUseCase(row.refrigerantType, useCase)
+                              ? row.refrigerantType
+                              : getDefaultRefrigerantForUseCase(useCase);
+                            const keepEquipment = isEquipmentAllowedForUseCase(row.equipmentType, useCase);
+                            updateRow(row.id, {
+                              useCase,
+                              refrigerantType: nextGas,
+                              customGwp: undefined,
+                              equipmentType: keepEquipment ? row.equipmentType : undefined,
+                              leakageRatePercent: keepEquipment ? row.leakageRatePercent : undefined,
+                            });
+                          }}
+                          className="flex flex-col sm:flex-row gap-3"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="ac_hvac" id={`${row.id}-use-ac`} />
+                            <Label htmlFor={`${row.id}-use-ac`} className="font-normal cursor-pointer">
+                              AC / HVAC only
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="other" id={`${row.id}-use-other`} />
+                            <Label htmlFor={`${row.id}-use-other`} className="font-normal cursor-pointer">
+                              Other systems (cold rooms, vehicles, industrial, F-gases)
+                            </Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="estimated_leakage" id={`${row.id}-estimated`} />
-                        <Label htmlFor={`${row.id}-estimated`} className="font-normal cursor-pointer">
-                          I do not have leakage records (estimate leakage)
-                        </Label>
-                      </div>
-                    </RadioGroup>
+
+                      <RadioGroup
+                        value={row.method}
+                        onValueChange={(v) =>
+                          updateRow(row.id, {
+                            method: v as EpaRefrigerantCalculationMethod,
+                            leakageKg: undefined,
+                            chargeKg: undefined,
+                            leakageRatePercent: undefined,
+                          })
+                        }
+                        className="flex flex-col sm:flex-row gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="leakage_record" id={`${row.id}-leakage-record`} />
+                          <Label htmlFor={`${row.id}-leakage-record`} className="font-normal cursor-pointer">
+                            I know how much gas leaked
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="estimated_leakage" id={`${row.id}-estimated`} />
+                          <Label htmlFor={`${row.id}-estimated`} className="font-normal cursor-pointer">
+                            I do not have leakage records (estimate leakage)
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
                     {row.isExisting ? (
                       <Button
                         size="sm"
@@ -389,19 +463,32 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                      <Label className="text-gray-600">Refrigerant gas type</Label>
+                      <Label className="text-gray-600">
+                        {row.useCase === "ac_hvac" ? "AC / HVAC refrigerant" : "Refrigerant / F-gas type"}
+                      </Label>
                       <Select
                         value={row.refrigerantType}
                         onValueChange={(v) => updateRow(row.id, { refrigerantType: v, customGwp: undefined })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose refrigerant gas" />
+                          <SelectValue
+                            placeholder={
+                              row.useCase === "ac_hvac"
+                                ? "Choose common AC / HVAC blend"
+                                : "Choose refrigeration or other F-gas"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          {EPA_REFRIGERANT_TYPE_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {formatEpaRefrigerantLabel(t)}
-                            </SelectItem>
+                          {getGasGroupsForUseCase(row.useCase).map((group) => (
+                            <SelectGroup key={group.group}>
+                              <SelectLabel>{group.label}</SelectLabel>
+                              {group.options.map((t) => (
+                                <SelectItem key={t} value={t}>
+                                  {formatEpaRefrigerantLabel(t)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
@@ -454,13 +541,24 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
                             }}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Choose equipment type" />
+                              <SelectValue
+                                placeholder={
+                                  row.useCase === "ac_hvac"
+                                    ? "Split AC, packaged AC, or chiller"
+                                    : "Cold room, vehicle, industrial, or other"
+                                }
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS.map((e) => (
-                                <SelectItem key={e.id} value={e.id}>
-                                  {e.label} ({e.rateRange})
-                                </SelectItem>
+                              {getEquipmentGroupsForUseCase(row.useCase).map((group) => (
+                                <SelectGroup key={group.group}>
+                                  <SelectLabel>{group.label}</SelectLabel>
+                                  {group.options.map((e) => (
+                                    <SelectItem key={e.id} value={e.id}>
+                                      {e.label} ({e.rateRange})
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
                               ))}
                             </SelectContent>
                           </Select>
