@@ -53,6 +53,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let cancelled = false;
 
       const restoreJwtSession = async () => {
+        // Drop any leftover Supabase Auth session so the client does not keep
+        // hitting a retired Supabase project host (ERR_NAME_NOT_RESOLVED).
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith("sb-") || key.includes("supabase")) {
+              localStorage.removeItem(key);
+            }
+          });
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {
+          // ignore — JWT path does not depend on Supabase Auth
+        }
+
         const token = getAccessToken();
         if (!token) {
           if (!cancelled) {

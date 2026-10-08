@@ -594,7 +594,7 @@ const UKCalculatorScreen = () => {
         { id: 'franchises', title: 'Franchises', icon: Building2, description: 'Franchise operations', group: 'downstream' },
         {
           id: 'facilitatedEmissions',
-          title: 'Category 16: Facilitated emissions',
+          title: 'Facilitated emissions',
           icon: HandCoins,
           description: 'Underwriting, advisory, or other facilitated emissions',
           group: 'downstream',

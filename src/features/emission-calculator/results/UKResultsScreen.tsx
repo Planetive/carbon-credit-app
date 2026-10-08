@@ -264,7 +264,7 @@ const UKResultsScreen = () => {
       { key: 'scope3_use_of_sold', label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
       { key: 'scope3_end_of_life', label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
       { key: 'scope3_investments', label: 'Category 15 — Investments & finance', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
-      { key: 'scope3_facilitated', label: 'Category 16 — Facilitated emissions', value: scope3Facilitated, color: 'bg-[#1D9E75]', category: 'downstream' },
+      { key: 'scope3_facilitated', label: 'Facilitated emissions', value: scope3Facilitated, color: 'bg-[#1D9E75]', category: 'downstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
@@ -515,8 +515,11 @@ const UKResultsScreen = () => {
     const scope1 = breakdown.map(({ key, label, value }) => ({ key, label, value }));
     const scope2 = scope2Breakdown.map(({ key, label, value }) => ({ key, label, value }));
     const scope3 = scope3Breakdown.map(({ key, label, value }) => ({ key, label, value }));
+    // Lazy import avoided — group at module level via dynamic require pattern not needed;
+    // UK results keep flat scope1; empty activity rollup satisfies the shared type.
     return {
       scope1,
+      scope1ByActivity: [],
       scope2,
       scope3,
       totals: {

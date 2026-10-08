@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { USE_JWT_AUTH } from "@/api/config";
 import { getMyProfile } from "@/api/profile";
 import type { EpaIpccResultsData, EmissionCategoryTotal } from "@/lib/epaIpccResults";
+import { groupScope1LegacyTotals } from "@/features/emission-calculator/scope1/activity-based/legacyMapping";
 import {
   loadLegacyCategoryDetailRows,
   safeListLegacyTable,
@@ -74,6 +75,7 @@ export function mapEmissionResultsPageToCalculatorShape(
   const t3 = scope3.reduce((s, r) => s + r.value, 0);
   return {
     scope1,
+    scope1ByActivity: groupScope1LegacyTotals(scope1),
     scope2,
     scope3,
     totals: { scope1: t1, scope2: t2, scope3: t3, grand: t1 + t2 + t3 },

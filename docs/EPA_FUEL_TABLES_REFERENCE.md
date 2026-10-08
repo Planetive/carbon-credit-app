@@ -2,7 +2,7 @@
 
 The app loads fuel emission factors from three Supabase tables: **"Fuel EPA 1"**, **"Fuel EPA 2"**, and **"Fuel EPA 3"**. There is no migration that creates these tables in this repo; they are assumed to exist in your project (e.g. created in Supabase dashboard or by another process).
 
-## How the app reads the tables
+## How the app reads the tables 
 
 - **Tables:** `Fuel EPA 1`, `Fuel EPA 2`, `Fuel EPA 3`
 - **Query:** `supabase.from(table).select("*")` for each table; all rows are merged and processed together.

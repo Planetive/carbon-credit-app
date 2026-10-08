@@ -42,19 +42,32 @@ import {
   loadCalculatorPreferences,
   saveCalculatorPreferences,
 } from "@/integrations/supabase/calculatorPreferencesClient";
-import FuelEmissions from "@/components/emissions/scope1/FuelEmissions";
-import MobileFuelEmissions from "@/components/emissions/scope1/MobileFuelEmissions";
-import OnRoadGasolineEmissions from "@/components/emissions/scope1/OnRoadGasolineEmissions";
-import OnRoadDieselAltFuelEmissions from "@/components/emissions/scope1/OnRoadDieselAltFuelEmissions";
-import NonRoadVehicleEmissions from "@/components/emissions/scope1/NonRoadVehicleEmissions";
 import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmissions";
-import EpaRefrigerantEmissions from "@/components/emissions/scope1/EpaRefrigerantEmissions";
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
-import EmissionCalculatorIPCC from "@/features/emission-calculator/methodologies/epa-ipcc/IpccCalculatorScreen";
+import { SourceScreeningPanel } from "@/features/emission-calculator/scope1/activity-based/components/SourceScreeningPanel";
+import { StationaryCombustionSection } from "@/features/emission-calculator/scope1/activity-based/components/StationaryCombustionSection";
+import { VehiclesMobileSection } from "@/features/emission-calculator/scope1/activity-based/components/VehiclesMobileSection";
+import { LeaksReleasesSection } from "@/features/emission-calculator/scope1/activity-based/components/LeaksReleasesSection";
+import { IndustrialOtherSection } from "@/features/emission-calculator/scope1/activity-based/components/IndustrialOtherSection";
+import {
+  DEFAULT_SCOPE1_SCREENING,
+  type Scope1ScreeningState,
+} from "@/features/emission-calculator/scope1/activity-based/types";
+import {
+  loadScope1Screening,
+  saveScope1Screening,
+  inventoryHasUnresolvedSources,
+  isScreeningFullyAnswered,
+  firstApplicableCategoryId,
+  markGroupCalculated,
+} from "@/features/emission-calculator/scope1/activity-based/screeningStorage";
+import { isGroupVisible } from "@/features/emission-calculator/scope1/activity-based/components/SourceScreeningPanel";
+import type { Scope1ActivityGroupId } from "@/features/emission-calculator/scope1/activity-based/types";
 
-type Scope1GroupId = "stationary" | "mobile" | "flaringVenting" | "fugitive" | "facility";
+/** Activity-based Scope 1 nav (methodology sheet names removed from user navigation). */
+type Scope1GroupId = "activity";
 
 type EpaSidebarCategory = {
   id: string;
@@ -66,80 +79,56 @@ type EpaSidebarCategory = {
 };
 
 const SCOPE1_NAV_GROUPS: { id: Scope1GroupId; label: string; headerClass: string }[] = [
-  { id: "stationary", label: "Stationary combustion", headerClass: "text-[#0F6E56]/90 hover:bg-[#EAF7F1]/50" },
-  { id: "mobile", label: "Mobile combustion & vehicles", headerClass: "text-blue-700/90 hover:bg-blue-50/50" },
-  { id: "flaringVenting", label: "Flaring & venting", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
-  { id: "fugitive", label: "Fugitive emissions", headerClass: "text-amber-700/90 hover:bg-amber-50/50" },
-  { id: "facility", label: "On-site fuel use", headerClass: "text-orange-700/90 hover:bg-orange-50/50" },
+  {
+    id: "activity",
+    label: "Direct emission sources",
+    headerClass: "text-[#0F6E56]/90 hover:bg-[#EAF7F1]/50",
+  },
 ];
 
+const SCOPE1_CATEGORY_TO_ACTIVITY: Record<string, Scope1ActivityGroupId | null> = {
+  scope1Screening: null,
+  stationaryCombustion: "stationary",
+  vehiclesMobile: "vehicles_mobile",
+  leaksReleases: "leaks_releases",
+  industrialOther: "industrial_other",
+};
+
 const EPA_SCOPE1_CATEGORIES: EpaSidebarCategory[] = [
-  { id: "fuel", title: "Fuel", icon: Flame, description: "Stationary combustion fuels (EPA factors)", group: "stationary" },
   {
-    id: "scope1HeatSteam",
-    title: "Heat and Steam",
-    icon: Thermometer,
-    description: "Heat and steam (Scope 1, same form as Fuel)",
-    group: "stationary",
-  },
-  { id: "mobileFuel", title: "Mobile Fuel", icon: Truck, description: "Mobile fuel using Mobile Combustion table", group: "mobile" },
-  {
-    id: "onRoadGasoline",
-    title: "On-Road Gasoline",
-    icon: Car,
-    description: "On-road gasoline using On-Road Gasoline table",
-    group: "mobile",
+    id: "scope1Screening",
+    title: "Source screening",
+    icon: Info,
+    description: "Which Scope 1 sources apply to your organization",
+    group: "activity",
   },
   {
-    id: "onRoadDieselAltFuel",
-    title: "On-Road Diesel & Alt Fuel",
-    icon: Car,
-    description: "On-road diesel/alt fuel using On-Road Diesel & Alt Fuel table",
-    group: "mobile",
-  },
-  {
-    id: "nonRoadVehicle",
-    title: "Non-Road Vehicle",
-    icon: Truck,
-    description: "Non-road vehicle fuel using Non-Road Vehicle table",
-    group: "mobile",
-  },
-  {
-    id: "vehicularCarbonFootprints",
-    title: "Vehicular Carbon Footprints",
-    icon: Car,
-    description: "Scope 1 vehicular emissions calculator (IPCC)",
-    group: "mobile",
-  },
-  { id: "flaring", title: "Flaring", icon: Flame, description: "Scope 1 flaring calculator (IPCC)", group: "flaringVenting" },
-  { id: "venting", title: "Venting", icon: Wind, description: "Scope 1 venting calculator (IPCC)", group: "flaringVenting" },
-  {
-    id: "ukRefrigerant",
-    title: "Refrigerant & F-gas leakage",
-    icon: Snowflake,
-    description: "Fugitive leaks from AC, refrigeration, vehicles, and other F-gas systems",
-    group: "fugitive",
-  },
-  {
-    id: "kitchenFootprints",
-    title: "Kitchen Footprints",
+    id: "stationaryCombustion",
+    title: "Stationary Combustion",
     icon: Flame,
-    description: "Scope 1 kitchen emissions calculator (IPCC)",
-    group: "facility",
+    description: "Fuel burned in generators, boilers, heaters, furnaces, and cooking equipment",
+    group: "activity",
   },
   {
-    id: "powerFuelConsumption",
-    title: "Fuel Consumption for Power",
+    id: "vehiclesMobile",
+    title: "Vehicles and Mobile Equipment",
+    icon: Car,
+    description: "Fuel burned in company vehicles and mobile equipment",
+    group: "activity",
+  },
+  {
+    id: "leaksReleases",
+    title: "Leaks and Gas Releases",
+    icon: Snowflake,
+    description: "GHGs from cooling equipment and other gas-containing systems",
+    group: "activity",
+  },
+  {
+    id: "industrialOther",
+    title: "Industrial and Other Direct",
     icon: Factory,
-    description: "Scope 1 power fuel emissions calculator (IPCC)",
-    group: "facility",
-  },
-  {
-    id: "heatingFootprints",
-    title: "Heating",
-    icon: Thermometer,
-    description: "Scope 1 heating emissions calculator (IPCC)",
-    group: "facility",
+    description: "Flaring, venting, process and other direct sources",
+    group: "activity",
   },
 ];
 
@@ -291,18 +280,12 @@ const EmissionCalculatorEPA = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const defaultManualCategory = "fuel";
-  const ipccScope1CategoryIds = [
-    "flaring",
-    "venting",
-    "vehicularCarbonFootprints",
-    "kitchenFootprints",
-    "powerFuelConsumption",
-    "heatingFootprints",
-  ];
+  const defaultManualCategory = "scope1Screening";
 
   const [activeScope, setActiveScope] = useState("scope1");
   const [activeCategory, setActiveCategory] = useState(defaultManualCategory);
+  const [scope1Screening, setScope1Screening] =
+    useState<Scope1ScreeningState>(DEFAULT_SCOPE1_SCREENING);
   const [resetKey, setResetKey] = useState(0);
   const [hasWizardContext, setHasWizardContext] = useState(false);
   const [wizardMode, setWizardMode] = useState<"finance" | "facilitated">("finance");
@@ -321,11 +304,7 @@ const EmissionCalculatorEPA = () => {
     downstream: false,
   });
   const [scope1GroupsExpanded, setScope1GroupsExpanded] = useState<Record<Scope1GroupId, boolean>>({
-    stationary: true,
-    mobile: false,
-    flaringVenting: false,
-    fugitive: false,
-    facility: false,
+    activity: true,
   });
   const [initialQuestionnaireCompleted, setInitialQuestionnaireCompleted] = useState(false);
   const [calculationMode, setCalculationMode] = useState<"lca" | "manual" | null>(null);
@@ -349,6 +328,12 @@ const EmissionCalculatorEPA = () => {
   const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
   const [ipccScope1Totals, setIpccScope1Totals] = useState<Record<string, number>>({});
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setScope1Screening(loadScope1Screening(user.id));
+  }, [user?.id]);
+
   // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
     scope1:
@@ -377,12 +362,24 @@ const EmissionCalculatorEPA = () => {
   };
   scopeTotals.total = scopeTotals.scope1 + scopeTotals.scope2 + scopeTotals.scope3;
 
+  const markScope1ScreeningCalculated = (groupId: Scope1ActivityGroupId) => {
+    setScope1Screening((prev) => {
+      const next = markGroupCalculated(prev, groupId);
+      if (next === prev) return prev;
+      if (user?.id) saveScope1Screening(user.id, next);
+      return next;
+    });
+  };
+
   // Handlers for Scope 1 fuel and Scope 2 electricity
   const handleFuelDataChange = (data: any[]) => {
     setEmissionData((prev) => ({
       ...prev,
       scope1: { ...prev.scope1, fuel: data },
     }));
+    if (data.some((r) => (r.emissions || 0) > 0)) {
+      markScope1ScreeningCalculated("stationary");
+    }
   };
 
   const handleElectricityDataChange = (total: number) => {
@@ -400,7 +397,16 @@ const EmissionCalculatorEPA = () => {
   };
 
   const handleMobileFuelDataChange = (rows: Array<{ emissions?: number }>) => {
+    const liveTotal = rows.reduce((s, r) => s + (r.emissions || 0), 0);
+    // Unified vehicles form reports one assembled activity total. When live input exists,
+    // park it in mobileFuelRows and clear sheet buckets so sidebar does not double-count.
     setMobileFuelRows(rows);
+    if (liveTotal > 0) {
+      setOnRoadGasolineRows([]);
+      setOnRoadDieselAltFuelRows([]);
+      setNonRoadVehicleRows([]);
+      markScope1ScreeningCalculated("vehicles_mobile");
+    }
   };
 
   const handleOnRoadGasolineDataChange = (rows: Array<{ emissions?: number }>) => {
@@ -422,8 +428,18 @@ const EmissionCalculatorEPA = () => {
   const handleRefrigerantDataChange = (data: Array<{ emissions?: number }>) => {
     setEmissionData((prev) => ({
       ...prev,
-      scope1: { ...prev.scope1, refrigerant: data },
+      scope1: {
+        ...prev.scope1,
+        refrigerant: data.map((row, index) => ({
+          id: prev.scope1.refrigerant[index]?.id ?? `uk-refrigerant-${index}`,
+          emissions: row.emissions,
+          isExisting: prev.scope1.refrigerant[index]?.isExisting,
+        })),
+      },
     }));
+    if (data.some((r) => (r.emissions || 0) > 0)) {
+      markScope1ScreeningCalculated("leaks_releases");
+    }
   };
 
   const handleHeatSteamTotalChange = (total: number) => {
@@ -458,6 +474,40 @@ const EmissionCalculatorEPA = () => {
         const refrigerantTotal = Number(
           (results.scope1.find((r) => r.key === "uk_refrigerant")?.value ?? 0).toFixed(6)
         );
+        const fuelTotal = Number(
+          (results.scope1.find((r) => r.key === "fuel")?.value ?? 0).toFixed(6)
+        );
+        const heatSteamS1 = Number(
+          (results.scope1.find((r) => r.key === "heatsteam")?.value ?? 0).toFixed(6)
+        );
+        const mobileTotal = Number(
+          (results.scope1.find((r) => r.key === "mobile")?.value ?? 0).toFixed(6)
+        );
+        const onRoadGas = Number(
+          (results.scope1.find((r) => r.key === "onroad_gas")?.value ?? 0).toFixed(6)
+        );
+        const onRoadDiesel = Number(
+          (results.scope1.find((r) => r.key === "onroad_diesel")?.value ?? 0).toFixed(6)
+        );
+        const nonRoad = Number(
+          (results.scope1.find((r) => r.key === "nonroad")?.value ?? 0).toFixed(6)
+        );
+        const kg = (key: string) =>
+          Number((results.scope1.find((r) => r.key === key)?.value ?? 0).toFixed(6));
+
+        setMobileFuelRows(mobileTotal > 0 ? [{ emissions: mobileTotal }] : []);
+        setOnRoadGasolineRows(onRoadGas > 0 ? [{ emissions: onRoadGas }] : []);
+        setOnRoadDieselAltFuelRows(onRoadDiesel > 0 ? [{ emissions: onRoadDiesel }] : []);
+        setNonRoadVehicleRows(nonRoad > 0 ? [{ emissions: nonRoad }] : []);
+        setScope1HeatSteamRows(heatSteamS1 > 0 ? [{ emissions: heatSteamS1 }] : []);
+        setIpccScope1Totals({
+          flaring: kg("flaring"),
+          venting: kg("venting"),
+          vehicularCarbonFootprints: kg("vehicular"),
+          kitchenFootprints: kg("kitchen"),
+          powerFuelConsumption: kg("power"),
+          heatingFootprints: kg("heating"),
+        });
 
         const scope3CategoryByKey: Record<string, string> = {
           purchased_goods: "purchased_goods_services",
@@ -468,7 +518,6 @@ const EmissionCalculatorEPA = () => {
           business_travel: "business_travel",
           employee_commuting: "employee_commuting",
           investments: "investments",
-          facilitated: "scope3_facilitated_emissions",
           facilitated: "facilitated_emissions",
           downstream_transport: "downstream_transportation",
           end_of_life: "end_of_life_treatment",
@@ -488,6 +537,10 @@ const EmissionCalculatorEPA = () => {
           ...prev,
           scope1: {
             ...prev.scope1,
+            fuel:
+              fuelTotal > 0
+                ? [{ id: "fuel-hydrated", emissions: fuelTotal, isExisting: true } as any]
+                : prev.scope1.fuel,
             refrigerant:
               refrigerantTotal > 0
                 ? [{ id: "uk-refrigerant-hydrated", emissions: refrigerantTotal, isExisting: true } as any]
@@ -700,6 +753,12 @@ const EmissionCalculatorEPA = () => {
       if (prev[categoryId] === totalMeT) return prev;
       return { ...prev, [categoryId]: totalMeT };
     });
+    if (
+      (categoryId === "flaring" || categoryId === "venting") &&
+      totalMeT > 0
+    ) {
+      markScope1ScreeningCalculated("industrial_other");
+    }
   };
 
   const expandScope1GroupForCategory = (categoryId: string) => {
@@ -714,7 +773,7 @@ const EmissionCalculatorEPA = () => {
       id: "scope1",
       title: "Scope 1",
       icon: Factory,
-      description: "Direct emissions from fuel combustion and related activities (EPA factors)",
+      description: "Direct emissions by activity source (stationary, vehicles, leaks, industrial)",
       categories: EPA_SCOPE1_CATEGORIES,
     },
     {
@@ -755,7 +814,7 @@ const EmissionCalculatorEPA = () => {
         { id: "franchises", title: "Franchises", icon: Building2, description: "Franchise operations", group: "downstream" },
         {
           id: "facilitatedEmissions",
-          title: "Category 16: Facilitated emissions",
+          title: "Facilitated emissions",
           icon: HandCoins,
           description: "Underwriting, advisory, or other facilitated emissions",
           group: "downstream",
@@ -1192,9 +1251,13 @@ const EmissionCalculatorEPA = () => {
                       {scope.id === "scope1" ? (
                         <div className="space-y-3">
                           {SCOPE1_NAV_GROUPS.map((group, groupIndex) => {
-                            const groupCategories = scope.categories.filter(
-                              (c) => (c as EpaSidebarCategory).group === group.id,
-                            );
+                            const groupCategories = scope.categories.filter((c) => {
+                              if ((c as EpaSidebarCategory).group !== group.id) return false;
+                              const activityId = SCOPE1_CATEGORY_TO_ACTIVITY[c.id];
+                              if (activityId == null) return true; // screening always visible
+                              // Hide forms marked not applicable; screening remains editable.
+                              return isGroupVisible(scope1Screening, activityId);
+                            });
                             if (groupCategories.length === 0) return null;
                             return (
                               <div key={group.id} className={groupIndex > 0 ? "pt-3 border-t border-gray-200/50" : ""}>
@@ -1499,21 +1562,80 @@ const EmissionCalculatorEPA = () => {
 
           {calculationMode === "manual" && (
             <>
-              {activeScope === "scope1" && ipccScope1CategoryIds.includes(activeCategory) && (
-                <div className="w-full" key={`ipcc-embedded-${activeCategory}-${resetKey}`}>
-                  <EmissionCalculatorIPCC
-                    embedded
-                    forcedCategory={activeCategory}
-                    onScope1CategoryTotalChange={handleIpccScope1TotalChange}
-                  />
+              {activeScope === "scope1" &&
+                isScreeningFullyAnswered(scope1Screening) &&
+                inventoryHasUnresolvedSources(scope1Screening) &&
+                activeCategory !== "scope1Screening" && (
+                  <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/50 px-3.5 py-2 text-xs text-amber-900/90">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Some Yes sources still need data — that gap is not counted as zero.
+                  </div>
+                )}
+
+              {activeScope === "scope1" && activeCategory === "scope1Screening" && (
+                <div className="w-full" key={`scope1-screening-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-4 sm:p-6">
+                      <SourceScreeningPanel
+                        screening={scope1Screening}
+                        onChange={(next) => {
+                          setScope1Screening(next);
+                          if (user?.id) saveScope1Screening(user.id, next);
+                        }}
+                        onContinue={() => {
+                          const nextId = firstApplicableCategoryId(scope1Screening);
+                          setActiveCategory(nextId || "scope1Screening");
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
-              {activeScope === "scope1" && activeCategory === "ukRefrigerant" && (
-                <div className="w-full" key={`epa-refrigerant-${resetKey}`}>
+              {activeScope === "scope1" &&
+                isScreeningFullyAnswered(scope1Screening) &&
+                activeCategory === "stationaryCombustion" &&
+                isGroupVisible(scope1Screening, "stationary") && (
+                <div className="w-full" key={`stationary-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
-                      <EpaRefrigerantEmissions
+                      <StationaryCombustionSection
+                        onDataChange={handleFuelDataChange}
+                        companyContext={!!companyContext}
+                        counterpartyId={companyContext?.counterpartyId}
+                        onSaveAndNext={navigateToNextCategory}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {activeScope === "scope1" &&
+                isScreeningFullyAnswered(scope1Screening) &&
+                activeCategory === "vehiclesMobile" &&
+                isGroupVisible(scope1Screening, "vehicles_mobile") && (
+                <div className="w-full" key={`vehicles-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-4 sm:p-6">
+                      <VehiclesMobileSection
+                        onDataChange={(kg) =>
+                          handleMobileFuelDataChange([{ emissions: kg }])
+                        }
+                        onSaveAndNext={navigateToNextCategory}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {activeScope === "scope1" &&
+                isScreeningFullyAnswered(scope1Screening) &&
+                activeCategory === "leaksReleases" &&
+                isGroupVisible(scope1Screening, "leaks_releases") && (
+                <div className="w-full" key={`leaks-${resetKey}`}>
+                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                    <CardContent className="p-4 sm:p-6">
+                      <LeaksReleasesSection
                         onDataChange={handleRefrigerantDataChange}
                         onSaveAndNext={navigateToNextCategory}
                       />
@@ -1522,107 +1644,22 @@ const EmissionCalculatorEPA = () => {
                 </div>
               )}
 
-              {/* Scope 1 – Fuel only (EPA factors handled inside FuelEmissions) */}
-              {activeScope === "scope1" && activeCategory === "fuel" && (
-                <div className="w-full" key={`fuel-${resetKey}`}>
+              {activeScope === "scope1" &&
+                isScreeningFullyAnswered(scope1Screening) &&
+                activeCategory === "industrialOther" &&
+                isGroupVisible(scope1Screening, "industrial_other") && (
+                <div className="w-full" key={`industrial-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
-                      <FuelEmissions
-                        onDataChange={handleFuelDataChange}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                        onSaveAndNext={navigateToNextCategory}
-                        sectionDescription="Add your organization's fuel consumption data"
+                      <IndustrialOtherSection
+                        onScope1CategoryTotalChange={handleIpccScope1TotalChange}
                       />
                     </CardContent>
                   </Card>
                 </div>
               )}
 
-              {/* Scope 1 – Heat and Steam (same as Fuel, different name; no hover icon) */}
-              {activeScope === "scope1" && activeCategory === "scope1HeatSteam" && (
-                <div className="w-full" key={`scope1-heat-steam-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-4 sm:p-6">
-                      <FuelEmissions
-                        onDataChange={handleScope1HeatSteamDataChange}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                        onSaveAndNext={navigateToNextCategory}
-                        sectionTitle="Heat and Steam"
-                        sectionDescription="Add your organization's heat and steam consumption data"
-                        variant="scope1HeatSteam"
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Scope 1 – Mobile Fuel (Mobile Combustion reference) */}
-              {activeScope === "scope1" && activeCategory === "mobileFuel" && (
-                <div className="w-full" key={`mobile-fuel-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-4 sm:p-6">
-                      <MobileFuelEmissions
-                        onDataChange={handleMobileFuelDataChange}
-                        onSaveAndNext={navigateToNextCategory}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Scope 1 – On-Road Gasoline (On-Road Gasoline reference) */}
-              {activeScope === "scope1" && activeCategory === "onRoadGasoline" && (
-                <div className="w-full" key={`on-road-gasoline-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-4 sm:p-6">
-                      <OnRoadGasolineEmissions
-                        onDataChange={handleOnRoadGasolineDataChange}
-                        onSaveAndNext={navigateToNextCategory}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Scope 1 – On-Road Diesel & Alt Fuel */}
-              {activeScope === "scope1" && activeCategory === "onRoadDieselAltFuel" && (
-                <div className="w-full" key={`on-road-diesel-alt-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-4 sm:p-6">
-                      <OnRoadDieselAltFuelEmissions
-                        onDataChange={handleOnRoadDieselAltFuelDataChange}
-                        onSaveAndNext={navigateToNextCategory}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Scope 1 – Non-Road Vehicle */}
-              {activeScope === "scope1" && activeCategory === "nonRoadVehicle" && (
-                <div className="w-full" key={`non-road-vehicle-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
-                    <CardContent className="p-4 sm:p-6">
-                      <NonRoadVehicleEmissions
-                        onDataChange={handleNonRoadVehicleDataChange}
-                        onSaveAndNext={navigateToNextCategory}
-                        companyContext={!!companyContext}
-                        counterpartyId={companyContext?.counterpartyId}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Scope 2 – Heat & Steam (EPA Standard) */}
+              {/* Scope 2 – Heat & Steam (EPA Standard) — purchased energy only */}
               {activeScope === "scope2" && activeCategory === "heatSteam" && (
                 <div className="w-full" key={`heat-steam-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">

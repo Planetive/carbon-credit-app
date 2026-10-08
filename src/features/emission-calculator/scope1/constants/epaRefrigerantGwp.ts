@@ -1,6 +1,6 @@
 import { REFRIGERANT_FACTORS } from "@/components/emissions/shared/EmissionFactors";
 
-/** Common R-designation blends and HFC names → GWP (AR5-style, 100-year). */
+/** Common R-designation blends and HFC names → GWP (AR5-style, 100-year). Internal keys only. */
 const R_DESIGNATION_GWP: Record<string, number> = {
   "R-410A": 1924,
   "R-404A": 3922,
@@ -23,13 +23,13 @@ export const EPA_REFRIGERANT_GWP: Record<string, number> = {
 
 export type EpaRefrigerantGasGroup = "ac_hvac" | "refrigeration_vehicle" | "other_fgas";
 
+/** Broad classification for use-case filtering (AC vs other). HFC-32 is excluded from AC UI (duplicate of R-32). */
 const EPA_REFRIGERANT_GAS_GROUP: Record<string, EpaRefrigerantGasGroup> = {
   "R-410A": "ac_hvac",
   "R-32": "ac_hvac",
   "R-407C": "ac_hvac",
   "R-407A": "ac_hvac",
   "R-22": "ac_hvac",
-  "HFC-32": "ac_hvac",
   "R-134a": "refrigeration_vehicle",
   "R-404A": "refrigeration_vehicle",
   "R-502": "refrigeration_vehicle",
@@ -43,7 +43,7 @@ const EPA_REFRIGERANT_GAS_GROUP: Record<string, EpaRefrigerantGasGroup> = {
 const GAS_GROUP_ORDER: EpaRefrigerantGasGroup[] = ["ac_hvac", "refrigeration_vehicle", "other_fgas"];
 
 export const EPA_REFRIGERANT_GAS_GROUP_LABELS: Record<EpaRefrigerantGasGroup, string> = {
-  ac_hvac: "Common AC / HVAC blends",
+  ac_hvac: "AC / HVAC",
   refrigeration_vehicle: "Commercial refrigeration & vehicle AC",
   other_fgas: "Other refrigerants & F-gases",
 };
@@ -67,17 +67,85 @@ export const EPA_REFRIGERANT_TYPE_GROUPS: {
   options: EPA_REFRIGERANT_TYPE_OPTIONS.filter((t) => getEpaRefrigerantGasGroup(t) === group),
 })).filter((g) => g.options.length > 0);
 
-/** Short usage hints — not exclusive; any gas can be used for any leak source. */
+/** UI subgroups for the AC path — short lists, plain-language labels. */
+export type EpaRefrigerantUiGroupId =
+  | "ac_most_common"
+  | "ac_retrofit"
+  | "ac_legacy"
+  | "refrigeration_vehicle"
+  | "other_fgas";
+
+export type EpaRefrigerantUiGroup = {
+  id: EpaRefrigerantUiGroupId;
+  label: string;
+  options: string[];
+};
+
+const AC_UI_GROUPS: EpaRefrigerantUiGroup[] = [
+  {
+    id: "ac_most_common",
+    label: "Most common AC / heat pumps",
+    options: ["R-410A", "R-32"],
+  },
+  {
+    id: "ac_retrofit",
+    label: "Other / retrofit HVAC",
+    options: ["R-407C", "R-407A"],
+  },
+  {
+    id: "ac_legacy",
+    label: "Older / legacy systems",
+    options: ["R-22"],
+  },
+];
+
+/** Plain-language names shown in the UI — never lead with R-/HFC codes. */
 const EPA_REFRIGERANT_FRIENDLY_NAMES: Record<string, string> = {
-  "R-410A": "Common AC / heat-pump blend (Puron)",
-  "R-32": "Lower-GWP AC / heat-pump refrigerant",
-  "R-134a": "Vehicle AC & commercial refrigeration",
-  "R-404A": "Commercial / freezer refrigeration blend",
-  "R-407C": "HVAC retrofit blend",
-  "R-407A": "Commercial refrigeration / retrofit blend",
-  "R-22": "Legacy HCFC (older AC & refrigeration)",
-  "R-12": "Legacy CFC (older refrigeration / vehicle AC)",
-  "R-502": "Legacy commercial refrigeration blend",
+  "R-410A": "Common AC / heat-pump gas (Puron)",
+  "R-32": "Lower-impact AC / heat-pump gas",
+  "R-407C": "HVAC retrofit gas",
+  "R-407A": "Commercial refrigeration / retrofit gas",
+  "R-22": "Older AC & refrigeration gas (legacy)",
+  "R-134a": "Vehicle AC & commercial refrigeration gas",
+  "R-404A": "Commercial freezer refrigeration gas",
+  "R-502": "Older commercial refrigeration gas (legacy)",
+  "R-12": "Older refrigeration / vehicle AC gas (legacy)",
+  "R-125": "Specialty cooling blend component",
+  "R-143a": "Specialty cooling blend component",
+  "R-152a": "Low-impact specialty cooling gas",
+  "HFC-32": "Lower-impact AC / heat-pump gas",
+  "HFC-134a": "Vehicle AC & commercial refrigeration gas",
+  "HFC-125": "Specialty cooling gas",
+  "HFC-143a": "Specialty cooling gas",
+  "HFC-152a": "Low-impact specialty cooling gas",
+  "HFC-23": "Specialty high-impact cooling gas",
+  "HFC-41": "Specialty cooling gas",
+  "HFC-134": "Specialty cooling gas",
+  "HFC-143": "Specialty cooling gas",
+  "HFC-152": "Low-impact specialty cooling gas",
+  "HFC-161": "Low-impact specialty cooling gas",
+  "HFC-227ea": "Specialty fire-suppressant / cooling gas",
+  "HFC-236fa": "Specialty cooling gas",
+  "HFC-236cb": "Specialty cooling gas",
+  "HFC-236ea": "Specialty cooling gas",
+  "HFC-245fa": "Specialty cooling / foam gas",
+  "HFC-245ca": "Specialty cooling gas",
+  "HFC-365mfc": "Specialty foam / solvent gas",
+  "HFC-43-I0mee": "Specialty solvent gas",
+  "Carbon dioxide": "Carbon dioxide",
+  Methane: "Methane",
+  "Nitrous oxide": "Nitrous oxide",
+  "Perfluoromethane (PFC-14)": "Industrial process gas",
+  "Perfluoroethane (PFC-116)": "Industrial process gas",
+  "Perfluoropropane (PFC-218)": "Industrial process gas",
+  "Perfluorocyclobutane (PFC-318)": "Industrial process gas",
+  "Perfluorobutane (PFC-3-1-10)": "Industrial process gas",
+  "Perfluoropentane (PFC-4-1-12)": "Industrial process gas",
+  "Perfluorohexane (PFC-5-1-14)": "Industrial process gas",
+  "PFC-9-1-18": "Industrial process gas",
+  Perfluorocyclopropane: "Industrial process gas",
+  "Sulphur hexafluoride (SF6)": "Electrical insulating gas",
+  "Nitrogen trifluoride": "Electronics manufacturing gas",
 };
 
 export type EpaRefrigerantCalculationMethod = "leakage_record" | "estimated_leakage";
@@ -120,7 +188,7 @@ export const EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS = [
   },
   {
     id: "vehicle_ac",
-    label: "Vehicle air conditioning (MAC)",
+    label: "Vehicle air conditioning",
     rateRange: "5–15%",
     suggestedRatePercent: 10,
     group: "refrigeration_other" as const,
@@ -157,6 +225,7 @@ export const EPA_EQUIPMENT_TYPE_GROUPS: {
 export type EpaRefrigerantUseCase = "ac_hvac" | "other";
 
 export const DEFAULT_AC_REFRIGERANT_TYPE = "R-410A";
+export const DEFAULT_AC_EQUIPMENT_TYPE: EpaRefrigerantEquipmentType = "small_split_ac";
 
 export function resolveUseCaseFromEntry(
   refrigerantType?: string,
@@ -172,11 +241,14 @@ export function resolveUseCaseFromEntry(
   return "ac_hvac";
 }
 
-export function getGasGroupsForUseCase(useCase: EpaRefrigerantUseCase) {
-  if (useCase === "ac_hvac") {
-    return EPA_REFRIGERANT_TYPE_GROUPS.filter((g) => g.group === "ac_hvac");
-  }
-  return EPA_REFRIGERANT_TYPE_GROUPS.filter((g) => g.group !== "ac_hvac");
+/** Dropdown groups for the selected path — AC uses Most common / Retrofit / Legacy. */
+export function getGasGroupsForUseCase(useCase: EpaRefrigerantUseCase): EpaRefrigerantUiGroup[] {
+  if (useCase === "ac_hvac") return AC_UI_GROUPS;
+  return EPA_REFRIGERANT_TYPE_GROUPS.filter((g) => g.group !== "ac_hvac").map((g) => ({
+    id: g.group as EpaRefrigerantUiGroupId,
+    label: g.label,
+    options: g.options,
+  }));
 }
 
 export function getEquipmentGroupsForUseCase(useCase: EpaRefrigerantUseCase) {
@@ -192,9 +264,23 @@ export function getDefaultRefrigerantForUseCase(useCase: EpaRefrigerantUseCase):
   return firstOther || DEFAULT_AC_REFRIGERANT_TYPE;
 }
 
+export function getDefaultEquipmentForUseCase(
+  useCase: EpaRefrigerantUseCase
+): EpaRefrigerantEquipmentType | undefined {
+  if (useCase === "ac_hvac") return DEFAULT_AC_EQUIPMENT_TYPE;
+  return undefined;
+}
+
+export function getSuggestedLeakageRate(equipmentType?: EpaRefrigerantEquipmentType): number | undefined {
+  if (!equipmentType) return undefined;
+  return EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS.find((e) => e.id === equipmentType)?.suggestedRatePercent;
+}
+
 export function isGasAllowedForUseCase(refrigerantType: string, useCase: EpaRefrigerantUseCase): boolean {
-  const group = getEpaRefrigerantGasGroup(refrigerantType);
-  return useCase === "ac_hvac" ? group === "ac_hvac" : group !== "ac_hvac";
+  if (useCase === "ac_hvac") {
+    return AC_UI_GROUPS.some((g) => g.options.includes(refrigerantType));
+  }
+  return getEpaRefrigerantGasGroup(refrigerantType) !== "ac_hvac";
 }
 
 export function isEquipmentAllowedForUseCase(
@@ -213,12 +299,13 @@ export function resolveRefrigerantGwp(refrigerantType: string, customGwp?: numbe
   return typeof hit === "number" ? hit : undefined;
 }
 
+/** Plain-language label for dropdowns — no R-/HFC codes in the primary text. */
 export function formatEpaRefrigerantLabel(refrigerantType: string): string {
   const gwp = EPA_REFRIGERANT_GWP[refrigerantType];
-  const friendly = EPA_REFRIGERANT_FRIENDLY_NAMES[refrigerantType];
-  const typeWithName = friendly ? `${refrigerantType} — ${friendly}` : refrigerantType;
-  if (typeof gwp !== "number") return typeWithName;
-  return `${typeWithName} (GWP ${gwp.toLocaleString()})`;
+  const friendly =
+    EPA_REFRIGERANT_FRIENDLY_NAMES[refrigerantType] ?? "Specialty cooling or F-gas";
+  if (typeof gwp !== "number") return friendly;
+  return `${friendly} (GWP ${gwp.toLocaleString()})`;
 }
 
 export function calculateEpaRefrigerantEmissions(input: {

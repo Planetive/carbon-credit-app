@@ -7,6 +7,10 @@ import {
   sumResultKgField,
   sumRowDataEmissions,
 } from "@/integrations/supabase/ghgEntryAggregates";
+import {
+  groupScope1LegacyTotals,
+  type GroupedScope1Total,
+} from "@/features/emission-calculator/scope1/activity-based/legacyMapping";
 
 export interface EmissionCategoryTotal {
   key: string;
@@ -16,6 +20,8 @@ export interface EmissionCategoryTotal {
 
 export interface EpaIpccResultsData {
   scope1: EmissionCategoryTotal[];
+  /** Activity-based rollup of scope1 legacy lines (each legacy key once). */
+  scope1ByActivity: GroupedScope1Total[];
   scope2: EmissionCategoryTotal[];
   scope3: EmissionCategoryTotal[];
   totals: {
@@ -56,7 +62,12 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     scope3ProcessingSoldRows,
     scope3UseOfSoldRows,
   ] = await Promise.all([
-    safeListLegacyTable("scope1_fuel_entries", userId),
+    // EPA-only fuel rows (exclude UK framework — shared table).
+    safeListLegacyTable("scope1_fuel_entries", userId, {}, (row) => {
+      const fw = row.emission_framework;
+      if (fw == null || fw === "") return true; // legacy null treated as EPA
+      return String(fw) === "epa";
+    }),
     safeListLegacyTable("scope1_epa_mobile_fuel_entries", userId),
     safeListLegacyTable("scope1_epa_on_road_gasoline_entries", userId),
     safeListLegacyTable("scope1_epa_on_road_diesel_alt_fuel_entries", userId),
@@ -88,24 +99,50 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
   const scope2Electricity = await calculateLegacyScope2ElectricityTotal(userId);
 
   const scope1: EmissionCategoryTotal[] = [
-    { key: "fuel", label: "Fuel", value: sumEmissionsField(scope1FuelRows) },
-    { key: "mobile", label: "Mobile Fuel", value: sumEmissionsField(scope1MobileRows) },
-    { key: "onroad_gas", label: "On-road Gasoline", value: sumEmissionsField(scope1OnRoadGasRows) },
-    { key: "onroad_diesel", label: "On-road Diesel & Alt Fuel", value: sumEmissionsField(scope1OnRoadDieselRows) },
-    { key: "nonroad", label: "Non-road Vehicle", value: sumEmissionsField(scope1NonRoadRows) },
-    { key: "heatsteam", label: "Heat & Steam (Scope 1)", value: sumEmissionsField(scope1HeatSteamRows) },
+    { key: "fuel", label: "Fuel (legacy / stationary)", value: sumEmissionsField(scope1FuelRows) },
+    { key: "mobile", label: "Mobile Fuel (legacy)", value: sumEmissionsField(scope1MobileRows) },
+    { key: "onroad_gas", label: "On-road Gasoline (legacy)", value: sumEmissionsField(scope1OnRoadGasRows) },
+    {
+      key: "onroad_diesel",
+      label: "On-road Diesel & Alt Fuel (legacy)",
+      value: sumEmissionsField(scope1OnRoadDieselRows),
+    },
+    { key: "nonroad", label: "Non-road Vehicle (legacy)", value: sumEmissionsField(scope1NonRoadRows) },
+    {
+      key: "heatsteam",
+      label: "Heat & Steam Scope 1 (legacy)",
+      value: sumEmissionsField(scope1HeatSteamRows),
+    },
     {
       key: "uk_refrigerant",
-      label: "Refrigerant",
+      label: "Refrigerant / leaks",
       value: sumEmissionsField(scope1UkRefrigerantRows),
     },
     { key: "flaring", label: "Flaring", value: sumResultKgField(scope1FlaringRows) },
     { key: "venting", label: "Venting", value: sumResultKgField(scope1VentingRows) },
-    { key: "vehicular", label: "Vehicular Footprints", value: sumResultKgField(scope1VehicularRows) },
-    { key: "kitchen", label: "Kitchen Footprints", value: sumResultKgField(scope1KitchenRows) },
-    { key: "power", label: "Power Fuel Consumption", value: sumResultKgField(scope1PowerRows) },
-    { key: "heating", label: "Heating Footprints", value: sumResultKgField(scope1HeatingRows) },
+    {
+      key: "vehicular",
+      label: "Vehicular Footprints (historical)",
+      value: sumResultKgField(scope1VehicularRows),
+    },
+    {
+      key: "kitchen",
+      label: "Kitchen Footprints (historical)",
+      value: sumResultKgField(scope1KitchenRows),
+    },
+    {
+      key: "power",
+      label: "Power Fuel Consumption (historical)",
+      value: sumResultKgField(scope1PowerRows),
+    },
+    {
+      key: "heating",
+      label: "Heating Footprints (historical)",
+      value: sumResultKgField(scope1HeatingRows),
+    },
   ];
+
+  const scope1ByActivity = groupScope1LegacyTotals(scope1);
 
   const scope2: EmissionCategoryTotal[] = [
     { key: "electricity", label: "Electricity", value: scope2Electricity },
@@ -134,6 +171,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
 
   return {
     scope1,
+    scope1ByActivity,
     scope2,
     scope3,
     totals: {

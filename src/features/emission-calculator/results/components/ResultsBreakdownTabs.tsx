@@ -240,11 +240,69 @@ const ResultsBreakdownTabs = ({
           </div>
         </div>
 
-        <TabsContent value="scope1" className="mt-0">
-          {renderTable(
-            results.scope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
-            5
+        <TabsContent value="scope1" className="mt-0 space-y-4">
+          {results.scope1ByActivity && results.scope1ByActivity.length > 0 && (
+            <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-[#0F6E56]">
+                  Scope 1 by activity group
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Historical entries are mapped into these groups at their original calculated
+                  values (not recalculated with current factors). Each legacy line is counted once.
+                </p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Activity</th>
+                      <th className="text-right px-4 py-2.5 font-semibold text-slate-600">kg CO₂e</th>
+                      <th className="text-right px-4 py-2.5 font-semibold text-slate-600">tCO₂e</th>
+                      <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Legacy sources</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.scope1ByActivity.map((g) => (
+                      <tr key={g.groupId} className="border-t border-slate-100">
+                        <td className="px-4 py-2.5">
+                          <div className="font-medium text-slate-800">{g.label}</div>
+                          {g.provenanceNotes.length > 0 && (
+                            <div className="text-xs text-amber-800 mt-1">
+                              {g.provenanceNotes.join(" ")}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">
+                          {formatKg(g.valueKg)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">
+                          {formatTonnes(g.valueKg)}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">
+                          {g.legacyParts.filter((p) => p.value > 0).length
+                            ? g.legacyParts
+                                .filter((p) => p.value > 0)
+                                .map((p) => p.label)
+                                .join("; ")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+              Legacy category detail (same totals, not double-counted)
+            </p>
+            {renderTable(
+              results.scope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
+              5
+            )}
+          </div>
         </TabsContent>
         <TabsContent value="scope2" className="mt-0">
           {renderTable(

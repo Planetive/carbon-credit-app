@@ -6,7 +6,7 @@ This file documents the `Finance_production_Unit_.csv` dataset so Cursor (or any
 
 Derived from the **ICE (Inventory of Carbon & Energy) Educational Database V5.0 (Jun 2026)**, published by Circular Ecology.
 This file represents a **hand-consolidated** flat file across multiple material categories (concrete, steel, aluminium, timber, glass, etc).
-
+the problem with this is that it
 ## License note (important)
 
 ICE Educational is licensed for **educational use only** — not for commercial/professional use.
@@ -23,7 +23,7 @@ This is a legal consideration for the product; it is not a technical constraint.
   - Read with `encoding='latin-1'` in Python
   - Or `client_encoding=LATIN1` / explicit encoding on COPY/load to avoid decode errors.
 
-## Columns
+## Columns 
 
 | Column | Type | Notes |
 |---|---|---|

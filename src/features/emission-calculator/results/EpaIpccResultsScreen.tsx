@@ -144,6 +144,12 @@ const EpaIpccResultsScreen = () => {
     rows.push([]);
     rows.push(["Scope", "Category", "Emissions (kg CO2e)", "Emissions (t CO2e)"]);
 
+    rows.push(["Scope 1", "— Activity groups —", "", ""]);
+    (results.scope1ByActivity || []).forEach((g) =>
+      rows.push(["Scope 1 (activity)", g.label, g.valueKg.toFixed(6), (g.valueKg / 1000).toFixed(6)])
+    );
+    rows.push([]);
+    rows.push(["Scope 1", "— Legacy categories (same kg, counted once in total) —", "", ""]);
     results.scope1.forEach((r) => rows.push(["Scope 1", r.label, r.value.toFixed(6), (r.value / 1000).toFixed(6)]));
     rows.push(["Scope 1", "Total", results.totals.scope1.toFixed(6), (results.totals.scope1 / 1000).toFixed(6)]);
     rows.push([]);

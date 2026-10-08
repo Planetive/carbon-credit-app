@@ -251,7 +251,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     } catch (e: unknown) {
       const error = e as { code?: string; message?: string };
       if (error.code === "23505") {
-        toast({ title: "Already added", description: "This portfolio result is already in Category 16." });
+        toast({ title: "Already added", description: "This portfolio result is already in Facilitated emissions." });
       } else {
         toast({ title: "Import failed", description: error.message || "Failed to import", variant: "destructive" });
       }
@@ -299,7 +299,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       await loadRows();
       toast({
         title: "Updated from questionnaire",
-        description: `${added} facilitated line${added > 1 ? "s" : ""} added to Category 16.`,
+        description: `${added} facilitated line${added > 1 ? "s" : ""} added to Facilitated emissions.`,
       });
     }
   }, [isCorporateUser, user.id, companyContext, counterpartyId, loadRows]);
@@ -515,8 +515,13 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Category 16: Facilitated emissions</h4>
+          <h4 className="text-lg font-semibold text-gray-900">Facilitated emissions</h4>
           <p className="text-sm text-gray-600">Manual entries or portfolio import</p>
+          {userTypeResolved && isCorporateUser && (
+            <p className="mt-1 text-xs text-gray-500">
+              Usually used by financial institutions, but corporate organizations may also use this category.
+            </p>
+          )}
         </div>
         {!isCorporateUser && (
           <div className="flex flex-wrap gap-2">
@@ -715,7 +720,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
           <DialogHeader>
             <DialogTitle>Import facilitated emissions</DialogTitle>
             <DialogDescription>
-              Completed calculations from your portfolio. Selecting one adds it to Category 16.
+              Completed calculations from your portfolio. Selecting one adds it to Facilitated emissions.
             </DialogDescription>
           </DialogHeader>
           {importLoading ? (

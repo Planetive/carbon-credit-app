@@ -30,19 +30,24 @@ import {
   calculateEpaRefrigerantEmissions,
   DEFAULT_AC_REFRIGERANT_TYPE,
   EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS,
-  EPA_EQUIPMENT_TYPE_GROUPS,
+  EPA_REFRIGERANT_GWP,
   formatEpaRefrigerantLabel,
+  getDefaultEquipmentForUseCase,
   getDefaultRefrigerantForUseCase,
   getEquipmentGroupsForUseCase,
   getGasGroupsForUseCase,
+  getSuggestedLeakageRate,
   isEquipmentAllowedForUseCase,
   isGasAllowedForUseCase,
-  resolveRefrigerantGwp,
   resolveUseCaseFromEntry,
   type EpaRefrigerantCalculationMethod,
   type EpaRefrigerantEquipmentType,
   type EpaRefrigerantUseCase,
 } from "@/features/emission-calculator/scope1/constants/epaRefrigerantGwp";
+import {
+  loadGovernedRefrigerantGwp,
+  snapshotGwp,
+} from "@/features/emission-calculator/scope1/activity-based/calc/refrigerantGwpLoader";
 
 export interface EpaRefrigerantRow {
   id: string;
@@ -100,23 +105,28 @@ const mapDbRow = (entry: any): EpaRefrigerantRow => {
   };
 };
 
-const computeRow = (row: EpaRefrigerantRow): EpaRefrigerantRow => {
-  const gwp = resolveRefrigerantGwp(row.refrigerantType, row.customGwp);
-  if (gwp == null) return { ...row, gwp: undefined, emissionsKg: undefined, emissionsTonnes: undefined };
+const computeRow = (
+  row: EpaRefrigerantRow,
+  gwpMap: Record<string, number> = EPA_REFRIGERANT_GWP
+): EpaRefrigerantRow => {
+  const snap = snapshotGwp(gwpMap, row.refrigerantType, row.customGwp);
+  if (!snap) return { ...row, gwp: undefined, emissionsKg: undefined, emissionsTonnes: undefined };
 
   const result = calculateEpaRefrigerantEmissions({
     method: row.method,
-    gwp,
+    gwp: snap.gwp,
     leakageKg: row.leakageKg,
     chargeKg: row.chargeKg,
     leakageRatePercent: row.leakageRatePercent,
   });
 
-  if (!result) return { ...row, gwp, emissionsKg: undefined, emissionsTonnes: undefined };
+  if (!result) {
+    return { ...row, gwp: snap.gwp, emissionsKg: undefined, emissionsTonnes: undefined };
+  }
 
   return {
     ...row,
-    gwp,
+    gwp: snap.gwp,
     leakageKg: result.leakageKg,
     emissionsKg: result.emissionsKg,
     emissionsTonnes: result.emissionsTonnes,
@@ -133,6 +143,17 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [gwpMap, setGwpMap] = useState<Record<string, number>>(EPA_REFRIGERANT_GWP);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGovernedRefrigerantGwp().then((src) => {
+      if (!cancelled) setGwpMap(src.map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -171,7 +192,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
     setRows((prev) => {
       const next = prev.map((r) => {
         if (r.id !== id) return r;
-        const computed = computeRow({ ...r, ...patch });
+        const computed = computeRow({ ...r, ...patch }, gwpMap);
         snapshot = computed;
         return computed;
       });
@@ -209,7 +230,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
     }
   };
 
-  const addRow = () => setRows((prev) => [...prev, computeRow(newRow())]);
+  const addRow = () => setRows((prev) => [...prev, computeRow(newRow(), gwpMap)]);
 
   const removeRow = (id: string) => {
     setRows((prev) => {
@@ -302,6 +323,22 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
     [rows]
   );
 
+  const showEstimateGuidance = useMemo(
+    () => rows.some((r) => r.method === "estimated_leakage"),
+    [rows]
+  );
+
+  const estimateGuidanceGroups = useMemo(() => {
+    const hasAcEstimate = rows.some((r) => r.method === "estimated_leakage" && r.useCase === "ac_hvac");
+    const hasOtherEstimate = rows.some((r) => r.method === "estimated_leakage" && r.useCase === "other");
+    if (hasAcEstimate && !hasOtherEstimate) return getEquipmentGroupsForUseCase("ac_hvac");
+    if (hasOtherEstimate && !hasAcEstimate) return getEquipmentGroupsForUseCase("other");
+    return [
+      ...getEquipmentGroupsForUseCase("ac_hvac"),
+      ...getEquipmentGroupsForUseCase("other"),
+    ];
+  }, [rows]);
+
   if (loading) {
     return <div className="text-sm text-gray-600">Loading refrigerant entries…</div>;
   }
@@ -310,14 +347,10 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Fugitive refrigerant & F-gas leakage</h4>
-          <p className="text-sm text-gray-600 mt-1">
-            Scope 1 fugitive emissions from leaked refrigerants and F-gases. Choose{" "}
-            <span className="font-medium text-gray-800">AC / HVAC only</span> for a short common-blend
-            list, or{" "}
-            <span className="font-medium text-gray-800">Other systems</span> for cold rooms, vehicles,
-            industrial refrigeration, and other F-gases. Estimated leakage still works when you have
-            no leak records.
+          <h4 className="text-base font-semibold text-gray-900">Refrigerant entries</h4>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Prefer AC / HVAC for a short gas list; use Other systems for cold rooms, vehicles, or
+            industrial F-gases.
           </p>
         </div>
         <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
@@ -326,51 +359,54 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
         </Button>
       </div>
 
-      <Card className="border-amber-100 bg-amber-50/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-900">
-            <Info className="h-4 w-4" />
-            Typical annual leakage rate assumptions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <p className="text-xs text-amber-800">
-            Use these rates only when you estimate leakage (no measured leak record). Rates apply to
-            the equipment you select — AC or otherwise.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b border-amber-200/80">
-                  <th className="py-2 pr-4 font-medium text-amber-950">Category</th>
-                  <th className="py-2 pr-4 font-medium text-amber-950">Equipment type</th>
-                  <th className="py-2 font-medium text-amber-950">Typical annual leakage rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {EPA_EQUIPMENT_TYPE_GROUPS.map((group) =>
-                  group.options.map((row, idx) => (
-                    <tr key={row.id} className="border-b border-amber-100 last:border-0">
-                      <td className="py-2 pr-4 text-amber-900 align-top">
-                        {idx === 0 ? group.label : ""}
-                      </td>
-                      <td className="py-2 pr-4 text-amber-900">{row.label}</td>
-                      <td className="py-2 text-amber-800">{row.rateRange}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {showEstimateGuidance && (
+        <Card className="border-amber-100 bg-amber-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-900">
+              <Info className="h-4 w-4" />
+              Typical annual leakage rate assumptions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-amber-800">
+              Use these rates only when you estimate leakage (no measured leak record). Selecting an
+              equipment type fills a suggested rate you can still edit.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-amber-200/80">
+                    <th className="py-2 pr-4 font-medium text-amber-950">Category</th>
+                    <th className="py-2 pr-4 font-medium text-amber-950">Equipment type</th>
+                    <th className="py-2 font-medium text-amber-950">Typical annual leakage rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estimateGuidanceGroups.map((group) =>
+                    group.options.map((row, idx) => (
+                      <tr key={row.id} className="border-b border-amber-100 last:border-0">
+                        <td className="py-2 pr-4 text-amber-900 align-top">
+                          {idx === 0 ? group.label : ""}
+                        </td>
+                        <td className="py-2 pr-4 text-amber-900">{row.label}</td>
+                        <td className="py-2 text-amber-800">{row.rateRange}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {rows.length === 0 ? (
         <p className="text-sm text-gray-500">No refrigerant entries yet. Click Add entry to begin.</p>
       ) : (
         <div className="space-y-4">
           {rows.map((row) => {
-            const gwp = row.gwp ?? resolveRefrigerantGwp(row.refrigerantType, row.customGwp);
+            const gwp =
+              row.gwp ?? snapshotGwp(gwpMap, row.refrigerantType, row.customGwp)?.gwp;
             const isDeleting = deletingIds.has(row.id);
 
             return (
@@ -415,14 +451,31 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
 
                       <RadioGroup
                         value={row.method}
-                        onValueChange={(v) =>
+                        onValueChange={(v) => {
+                          const method = v as EpaRefrigerantCalculationMethod;
+                          if (method === "estimated_leakage") {
+                            const equipmentType =
+                              row.equipmentType &&
+                              isEquipmentAllowedForUseCase(row.equipmentType, row.useCase)
+                                ? row.equipmentType
+                                : getDefaultEquipmentForUseCase(row.useCase);
+                            updateRow(row.id, {
+                              method,
+                              leakageKg: undefined,
+                              chargeKg: row.chargeKg,
+                              equipmentType,
+                              leakageRatePercent:
+                                row.leakageRatePercent ?? getSuggestedLeakageRate(equipmentType),
+                            });
+                            return;
+                          }
                           updateRow(row.id, {
-                            method: v as EpaRefrigerantCalculationMethod,
+                            method,
                             leakageKg: undefined,
                             chargeKg: undefined,
                             leakageRatePercent: undefined,
-                          })
-                        }
+                          });
+                        }}
                         className="flex flex-col sm:flex-row gap-4"
                       >
                         <div className="flex items-center space-x-2">
@@ -464,7 +517,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label className="text-gray-600">
-                        {row.useCase === "ac_hvac" ? "AC / HVAC refrigerant" : "Refrigerant / F-gas type"}
+                        {row.useCase === "ac_hvac" ? "What kind of AC gas?" : "What kind of gas leaked?"}
                       </Label>
                       <Select
                         value={row.refrigerantType}
@@ -474,14 +527,14 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
                           <SelectValue
                             placeholder={
                               row.useCase === "ac_hvac"
-                                ? "Choose common AC / HVAC blend"
-                                : "Choose refrigeration or other F-gas"
+                                ? "Choose common AC gas"
+                                : "Choose refrigeration or other gas"
                             }
                           />
                         </SelectTrigger>
                         <SelectContent>
                           {getGasGroupsForUseCase(row.useCase).map((group) => (
-                            <SelectGroup key={group.group}>
+                            <SelectGroup key={group.id}>
                               <SelectLabel>{group.label}</SelectLabel>
                               {group.options.map((t) => (
                                 <SelectItem key={t} value={t}>
