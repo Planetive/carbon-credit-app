@@ -1111,10 +1111,10 @@ const EmissionCalculatorEPA = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row">
-      {/* Sidebar (hidden in LCA mode) */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex flex-col lg:flex-row lg:items-start">
+      {/* Sidebar — sticky while the form scrolls; scrolls itself if taller than the viewport */}
       {calculationMode !== "lca" && (
-        <div className="w-full lg:w-80 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm">
+        <div className="w-full lg:w-80 lg:shrink-0 bg-white/80 backdrop-blur-sm border-b lg:border-b-0 lg:border-r border-gray-200/50 flex flex-col shadow-sm lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto custom-scrollbar">
           <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <Button
@@ -1213,7 +1213,7 @@ const EmissionCalculatorEPA = () => {
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 p-4 sm:p-6">
             <nav className="space-y-3">
               {sidebarItems.map((scope) => (
                 <div key={scope.id}>
@@ -1448,8 +1448,8 @@ const EmissionCalculatorEPA = () => {
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      {/* Main content — scrolls with the page */}
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header with mode switch */}
         {(calculationMode === "manual" || calculationMode === "lca") && (
           <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 sm:px-4 py-3 sm:py-4 shadow-sm">

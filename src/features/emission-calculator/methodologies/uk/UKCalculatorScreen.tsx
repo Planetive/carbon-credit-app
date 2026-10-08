@@ -802,10 +802,10 @@ const UKCalculatorScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex">
-      {/* Left Sidebar - Hidden in LCA mode */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-start">
+      {/* Left Sidebar — sticky while the form scrolls; scrolls itself if taller than the viewport */}
       {calculationMode !== 'lca' && (
-      <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-gray-200/50 flex flex-col shadow-sm">
+      <div className="w-80 shrink-0 bg-white/80 backdrop-blur-sm border-r border-gray-200/50 flex flex-col shadow-sm sticky top-0 max-h-screen overflow-y-auto custom-scrollbar">
         {/* Sidebar Header */}
         <div className="p-8 border-b border-gray-200/50 bg-gradient-to-br from-white to-gray-50/50">
           <div className="flex items-center justify-between mb-6">
@@ -910,7 +910,7 @@ const UKCalculatorScreen = () => {
         </div>
 
         {/* Sidebar Navigation - Modern Design */}
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-6">
           <nav className="space-y-3">
             {sidebarItems.map((scope) => (
               <div key={scope.id}>
@@ -1025,7 +1025,8 @@ const UKCalculatorScreen = () => {
       )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col ${calculationMode === 'lca' ? '' : ''}`}>
+      {/* Main content — scrolls with the page */}
+      <div className={`flex-1 flex flex-col min-w-0 ${calculationMode === 'lca' ? '' : ''}`}>
         {/* Top Header - Show in both manual and LCA modes */}
         {(calculationMode === 'manual' || calculationMode === 'lca') && (
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-8 py-6 shadow-sm">
