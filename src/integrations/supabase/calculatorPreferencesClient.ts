@@ -26,7 +26,7 @@ export async function loadCalculatorPreferences(
   const { data, error } = await (supabase as any)
     .from("emission_calculator_preferences")
     .select(
-      "user_id, has_lca_data, calculation_mode, initial_questionnaire_completed, created_at, updated_at"
+      "user_id, has_lca_data, calculation_mode, initial_questionnaire_completed, scope1_screening, created_at, updated_at"
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -55,11 +55,14 @@ export async function saveCalculatorPreferences(
         has_lca_data: prefs.has_lca_data,
         calculation_mode: prefs.calculation_mode,
         initial_questionnaire_completed: prefs.initial_questionnaire_completed,
+        ...(prefs.scope1_screening != null
+          ? { scope1_screening: prefs.scope1_screening }
+          : {}),
       },
       { onConflict: "user_id" }
     )
     .select(
-      "user_id, has_lca_data, calculation_mode, initial_questionnaire_completed, created_at, updated_at"
+      "user_id, has_lca_data, calculation_mode, initial_questionnaire_completed, scope1_screening, created_at, updated_at"
     )
     .maybeSingle();
 

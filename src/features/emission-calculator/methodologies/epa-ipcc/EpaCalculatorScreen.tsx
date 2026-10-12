@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import { 
@@ -57,10 +57,10 @@ import {
 } from "@/features/emission-calculator/scope1/activity-based/types";
 import {
   loadScope1Screening,
-  saveScope1Screening,
+  loadScope1ScreeningResolved,
+  saveScope1ScreeningResolved,
   inventoryHasUnresolvedSources,
   isScreeningFullyAnswered,
-  firstApplicableCategoryId,
   markGroupCalculated,
 } from "@/features/emission-calculator/scope1/activity-based/screeningStorage";
 import { isGroupVisible } from "@/features/emission-calculator/scope1/activity-based/components/SourceScreeningPanel";
@@ -331,8 +331,12 @@ const EmissionCalculatorEPA = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+    // Instant local cache, then merge DB answers once available.
     setScope1Screening(loadScope1Screening(user.id));
-  }, [user?.id]);
+    void loadScope1ScreeningResolved(user.id, companyContext?.counterpartyId).then(
+      setScope1Screening
+    );
+  }, [user?.id, companyContext?.counterpartyId]);
 
   // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
   const scopeTotals: ScopeTotals = {
@@ -366,7 +370,9 @@ const EmissionCalculatorEPA = () => {
     setScope1Screening((prev) => {
       const next = markGroupCalculated(prev, groupId);
       if (next === prev) return prev;
-      if (user?.id) saveScope1Screening(user.id, next);
+      if (user?.id) {
+        saveScope1ScreeningResolved(user.id, next, companyContext?.counterpartyId);
+      }
       return next;
     });
   };
@@ -456,12 +462,14 @@ const EmissionCalculatorEPA = () => {
     });
   };
 
-  // Hydrate sidebar totals from saved DB entries so Scope 2/3 appear immediately.
-  useEffect(() => {
-    const hydrateSavedTotals = async () => {
-      if (!user?.id || hasHydratedSummaryRef.current) return;
-      if (companyContext) return;
-      hasHydratedSummaryRef.current = true;
+  /**
+   * Re-read entry tables and push Scope 1/2 into sidebar cards.
+   * Call after delete/save so totals stay live without a full page reload.
+   * No schema change required — activity groups are a UI map over existing tables.
+   */
+  const refreshSummaryFromDb = useCallback(
+    async (opts?: { seedScope3IfEmpty?: boolean }) => {
+      if (!user?.id || companyContext) return;
 
       try {
         const results = await loadEpaIpccResults(user.id);
@@ -537,29 +545,47 @@ const EmissionCalculatorEPA = () => {
           ...prev,
           scope1: {
             ...prev.scope1,
+            // Always mirror DB (including zero after full delete).
             fuel:
               fuelTotal > 0
                 ? [{ id: "fuel-hydrated", emissions: fuelTotal, isExisting: true } as any]
-                : prev.scope1.fuel,
+                : [],
             refrigerant:
               refrigerantTotal > 0
-                ? [{ id: "uk-refrigerant-hydrated", emissions: refrigerantTotal, isExisting: true } as any]
-                : prev.scope1.refrigerant,
+                ? [
+                    {
+                      id: "uk-refrigerant-hydrated",
+                      emissions: refrigerantTotal,
+                      isExisting: true,
+                    } as any,
+                  ]
+                : [],
           },
           scope2: [
-            ...prev.scope2.filter((item: any) => item.id !== "electricity-total" && item.id !== "heat-total"),
+            ...prev.scope2.filter(
+              (item: any) => item.id !== "electricity-total" && item.id !== "heat-total"
+            ),
             { id: "electricity-total", emissions: electricityTotal },
             { id: "heat-total", emissions: heatTotal },
           ] as any,
-          scope3: prev.scope3.length > 0 ? prev.scope3 : hydratedScope3,
+          scope3:
+            opts?.seedScope3IfEmpty && prev.scope3.length === 0
+              ? hydratedScope3
+              : prev.scope3,
         }));
       } catch (e) {
-        console.warn("Failed to hydrate EPA summary totals:", e);
+        console.warn("Failed to refresh EPA summary totals:", e);
       }
-    };
+    },
+    [user?.id, companyContext]
+  );
 
-    hydrateSavedTotals();
-  }, [user?.id, companyContext]);
+  // Initial hydrate so Scope cards show saved totals immediately.
+  useEffect(() => {
+    if (!user?.id || hasHydratedSummaryRef.current || companyContext) return;
+    hasHydratedSummaryRef.current = true;
+    void refreshSummaryFromDb({ seedScope3IfEmpty: true });
+  }, [user?.id, companyContext, refreshSummaryFromDb]);
 
   // Save company emissions to database (same as main calculator)
   const saveCompanyEmissions = async (totals: ScopeTotals) => {
@@ -1454,27 +1480,45 @@ const EmissionCalculatorEPA = () => {
         {(calculationMode === "manual" || calculationMode === "lca") && (
           <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-3 sm:px-4 py-3 sm:py-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 {calculationMode === "manual" ? (
+                  // Scope 1 activity forms render their own title — avoid a second loud header.
+                  activeScope === "scope1" && activeCategory !== "scope1Screening" ? (
+                    <p className="text-sm text-gray-500">
+                      {sidebarItems
+                        .find((s) => s.id === activeScope)
+                        ?.categories.find((c) => c.id === activeCategory)?.description ||
+                        "Direct emission sources"}
+                    </p>
+                  ) : (
                   <>
-                    <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
                       {(() => {
                         const scope = sidebarItems.find((s) => s.id === activeScope);
                         const category = scope?.categories.find((c) => c.id === activeCategory);
-                        return category ? `${scope?.title} - ${category.title}` : "Select a Category";
+                        if (!category) return "Select a category";
+                        if (activeScope === "scope1" && activeCategory === "scope1Screening") {
+                          return "Scope 1";
+                        }
+                        return `${scope?.title} · ${category.title}`;
                       })()}
                     </h2>
-                    <p className="text-gray-600 text-sm sm:text-base">
+                    <p className="text-gray-500 text-sm">
                       {(() => {
-                        const scope = sidebarItems.find((s) => s.id === activeScope);
-                        const category = scope?.categories.find((c) => c.id === activeCategory);
+                        const category = sidebarItems
+                          .find((s) => s.id === activeScope)
+                          ?.categories.find((c) => c.id === activeCategory);
+                        if (activeScope === "scope1" && activeCategory === "scope1Screening") {
+                          return "Identify which direct emission sources apply";
+                        }
                         return (
                           category?.description ||
-                          "Choose a category from the sidebar to start calculating emissions (EPA variant)"
+                          "Choose a category from the sidebar to start calculating"
                         );
                       })()}
                     </p>
                   </>
+                  )
                 ) : (
                   <>
                     <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
@@ -1568,22 +1612,28 @@ const EmissionCalculatorEPA = () => {
                 activeCategory !== "scope1Screening" && (
                   <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/50 px-3.5 py-2 text-xs text-amber-900/90">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    Some Yes sources still need data — that gap is not counted as zero.
+                    Some sources you marked Yes still need numbers — missing data isn’t treated as
+                    zero.
                   </div>
                 )}
 
               {activeScope === "scope1" && activeCategory === "scope1Screening" && (
                 <div className="w-full" key={`scope1-screening-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                  <Card className="bg-white border border-gray-200/60 shadow-sm rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
                       <SourceScreeningPanel
                         screening={scope1Screening}
                         onChange={(next) => {
                           setScope1Screening(next);
-                          if (user?.id) saveScope1Screening(user.id, next);
+                          if (user?.id) {
+                            saveScope1ScreeningResolved(
+                              user.id,
+                              next,
+                              companyContext?.counterpartyId
+                            );
+                          }
                         }}
-                        onContinue={() => {
-                          const nextId = firstApplicableCategoryId(scope1Screening);
+                        onContinue={(nextId) => {
                           setActiveCategory(nextId || "scope1Screening");
                         }}
                       />
@@ -1597,13 +1647,14 @@ const EmissionCalculatorEPA = () => {
                 activeCategory === "stationaryCombustion" &&
                 isGroupVisible(scope1Screening, "stationary") && (
                 <div className="w-full" key={`stationary-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                  <Card className="bg-white border border-gray-200/60 shadow-sm rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
                       <StationaryCombustionSection
                         onDataChange={handleFuelDataChange}
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
                         onSaveAndNext={navigateToNextCategory}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1615,13 +1666,14 @@ const EmissionCalculatorEPA = () => {
                 activeCategory === "vehiclesMobile" &&
                 isGroupVisible(scope1Screening, "vehicles_mobile") && (
                 <div className="w-full" key={`vehicles-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                  <Card className="bg-white border border-gray-200/60 shadow-sm rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
                       <VehiclesMobileSection
                         onDataChange={(kg) =>
                           handleMobileFuelDataChange([{ emissions: kg }])
                         }
                         onSaveAndNext={navigateToNextCategory}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1633,11 +1685,12 @@ const EmissionCalculatorEPA = () => {
                 activeCategory === "leaksReleases" &&
                 isGroupVisible(scope1Screening, "leaks_releases") && (
                 <div className="w-full" key={`leaks-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                  <Card className="bg-white border border-gray-200/60 shadow-sm rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
                       <LeaksReleasesSection
                         onDataChange={handleRefrigerantDataChange}
                         onSaveAndNext={navigateToNextCategory}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1649,10 +1702,11 @@ const EmissionCalculatorEPA = () => {
                 activeCategory === "industrialOther" &&
                 isGroupVisible(scope1Screening, "industrial_other") && (
                 <div className="w-full" key={`industrial-${resetKey}`}>
-                  <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
+                  <Card className="bg-white border border-gray-200/60 shadow-sm rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
                       <IndustrialOtherSection
                         onScope1CategoryTotalChange={handleIpccScope1TotalChange}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>

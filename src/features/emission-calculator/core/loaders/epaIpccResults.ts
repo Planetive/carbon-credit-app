@@ -33,6 +33,7 @@ export interface EpaIpccResultsData {
 }
 
 export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResultsData> => {
+  // All table reads in one wave — including Scope 2 electricity (was sequential before).
   const [
     scope1FuelRows,
     scope1MobileRows,
@@ -61,6 +62,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     scope3EndOfLifeRows,
     scope3ProcessingSoldRows,
     scope3UseOfSoldRows,
+    scope2Electricity,
   ] = await Promise.all([
     // EPA-only fuel rows (exclude UK framework — shared table).
     safeListLegacyTable("scope1_fuel_entries", userId, {}, (row) => {
@@ -94,9 +96,8 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     safeListLegacyTable("scope3_end_of_life_treatment", userId),
     safeListLegacyTable("scope3_processing_sold_products", userId),
     safeListLegacyTable("scope3_use_of_sold_products", userId),
+    calculateLegacyScope2ElectricityTotal(userId),
   ]);
-
-  const scope2Electricity = await calculateLegacyScope2ElectricityTotal(userId);
 
   const scope1: EmissionCategoryTotal[] = [
     { key: "fuel", label: "Fuel (legacy / stationary)", value: sumEmissionsField(scope1FuelRows) },

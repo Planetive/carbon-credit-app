@@ -23,6 +23,8 @@ interface OverviewEmissionsCardProps {
   donutData: DonutSlice[];
   totalEmissions: number;
   onViewFullResults: () => void;
+  /** True while scope totals are still fetching. */
+  loading?: boolean;
 }
 
 const scopeIcons = [Flame, Zap, Leaf] as const;
@@ -55,6 +57,7 @@ const OverviewEmissionsCard = ({
   donutData,
   totalEmissions,
   onViewFullResults,
+  loading = false,
 }: OverviewEmissionsCardProps) => {
   // Tiny scopes (e.g. 0.25 vs 338k) collapse to 0px without a minAngle,
   // and paddingAngle alone reads as a white cut in the ring.
@@ -77,6 +80,27 @@ const OverviewEmissionsCard = ({
         </button>
       </header>
 
+      {loading ? (
+        <div className="grid grid-cols-[minmax(0,60%)_minmax(0,40%)] gap-4 min-h-[164px] items-center animate-pulse">
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-full bg-slate-100" />
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-16 rounded bg-slate-100" />
+                    <div className="h-2.5 w-24 rounded bg-slate-50" />
+                  </div>
+                </div>
+                <div className="h-3 w-20 rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center">
+            <div className="h-[140px] w-[140px] rounded-full border-[14px] border-slate-100" />
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-[minmax(0,28%)_minmax(0,32%)_minmax(0,40%)] grid-rows-3 gap-x-4 min-h-0 items-stretch">
         {scopeRows.map((row, index) => {
           const Icon = scopeIcons[index] ?? Flame;
@@ -174,6 +198,7 @@ const OverviewEmissionsCard = ({
           </div>
         </div>
       </div>
+      )}
     </article>
   );
 };

@@ -75,9 +75,12 @@ export async function listRefrigerantEpaRows(userId: string): Promise<Record<str
 }
 
 export async function calculateLegacyScope2ElectricityTotal(userId: string): Promise<number> {
-  const mains = await safeListLegacyTable("scope2_electricity_main", userId, {
-    order: { column: "created_at", ascending: false },
-  });
+  const [mains, allSubs] = await Promise.all([
+    safeListLegacyTable("scope2_electricity_main", userId, {
+      order: { column: "created_at", ascending: false },
+    }),
+    safeListLegacyTable("scope2_electricity_subanswers", userId),
+  ]);
   // Prefer a real main row (has kWh); ignore stray subanswer rows if API filter fails.
   const mainRow =
     mains.find((r) => r.total_kwh != null && r.total_kwh !== "") ||
@@ -90,7 +93,7 @@ export async function calculateLegacyScope2ElectricityTotal(userId: string): Pro
   const otherPct = toNumber(mainRow.other_pct);
 
   const mainLegacyId = String(mainRow.legacy_id || mainRow.id);
-  const subs = await safeListLegacyTable("scope2_electricity_subanswers", userId, {}, (row) => {
+  const subs = allSubs.filter((row) => {
     const mid = String(row.main_id ?? "");
     return mid === mainLegacyId || mid === String(mainRow.id);
   });
@@ -181,6 +184,10 @@ const EPA_IPCC_DETAIL_TABLE_BY_KEY: Record<string, DetailConfig> = {
   processing_sold: { table: "scope3_processing_sold_products" },
   use_of_sold: { table: "scope3_use_of_sold_products" },
 };
+
+export function getEpaIpccDetailTableName(key: string): string | null {
+  return EPA_IPCC_DETAIL_TABLE_BY_KEY[key]?.table ?? null;
+}
 
 export async function loadLegacyCategoryDetailRows(
   key: string,

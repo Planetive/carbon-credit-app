@@ -18,6 +18,7 @@ import {
   assembleMobileActivityResult,
   planMobileCalculation,
 } from "../calc/mobileRouting";
+import { buildMobileActivityMeta } from "../activityMeta";
 import {
   MOBILE_EQUIPMENT_OPTIONS,
   type MobileDataAvailable,
@@ -28,10 +29,12 @@ import {
   ChoiceCard,
   FormStep,
 } from "./ActivitySectionShell";
+import { LegacySavedInventory } from "./LegacySavedInventory";
 
 type Props = {
   onDataChange?: (totalKg: number) => void;
   onSaveAndNext?: () => void;
+  onInventoryChanged?: () => void;
 };
 
 function pick(row: Record<string, unknown>, patterns: RegExp[]): unknown {
@@ -48,7 +51,11 @@ function num(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
+export function VehiclesMobileSection({
+  onDataChange,
+  onSaveAndNext,
+  onInventoryChanged,
+}: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [equipment, setEquipment] = useState<MobileEquipmentKind>("passenger_car");
@@ -88,7 +95,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
         if (cancelled) return;
         if (!fuelSheet.rows.length) {
           setFactorError(
-            'Mobile Combustion factor sheet returned no rows. Fuel-based CO2 cannot be calculated until the sheet is available.'
+            "Fuel emission factors aren’t available right now, so we can’t calculate CO₂ from fuel use yet. Try again later or contact support."
           );
           setFuelOptions([]);
         } else {
@@ -116,7 +123,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
             setFactorError(
               (prev) =>
                 prev ||
-                `"${plan.distanceSheet}" returned no rows. CH4/N2O supplementary factors unavailable.`
+                "Distance-based factors for methane and nitrous oxide aren’t available for this equipment yet. Fuel-based CO₂ can still be calculated if you enter fuel use."
             );
           } else {
             const first = dist.rows[0];
@@ -132,7 +139,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
       } catch (e: unknown) {
         if (!cancelled) {
           setFactorError(
-            e instanceof Error ? e.message : "Failed to load mobile factor sheets"
+            "We couldn’t load vehicle emission factors. Check your connection and try again."
           );
         }
       } finally {
@@ -230,27 +237,31 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
         const fuelEmissions = savingSupplementary
           ? result.co2Kg ?? 0
           : result.totalCo2eKg;
+        const activityMeta = buildMobileActivityMeta({
+          equipment,
+          site,
+          sourceId,
+          period,
+          dataAvailable,
+          roadClass: plan.roadClass,
+          completeness: result.completeness,
+          coverage: result.coverage,
+          co2Kg: result.co2Kg,
+          ch4Kg: result.ch4Kg,
+          n2oKg: result.n2oKg,
+          totalCo2eKg: result.totalCo2eKg,
+        });
         await insertLegacyTableEntries("scope1_epa_mobile_fuel_entries", [
           {
             user_id: user.id,
-            fuel_type: [
-              fuelType,
-              `[${equipment}]`,
-              site ? `site:${site}` : null,
-              sourceId ? `id:${sourceId}` : null,
-              period ? `period:${period}` : null,
-              `method:activity_mobile_v1`,
-              `coverage:${result.coverage}`,
-              result.completeness === "estimated" ? "estimated" : null,
-            ]
-              .filter(Boolean)
-              .join(" "),
+            fuel_type: fuelType,
             unit: fuelUnit,
             quantity: fuelQuantity ?? 0,
             factor: selectedFuelFactor,
             emissions: fuelEmissions,
             emissions_output: result.totalCo2eKg,
             emissions_output_unit: "kg",
+            activity_meta: activityMeta,
           },
         ]);
       }
@@ -263,6 +274,20 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
               ? "scope1_epa_on_road_diesel_alt_fuel_entries"
               : "scope1_epa_non_road_vehicle_entries";
 
+        const activityMeta = buildMobileActivityMeta({
+          equipment,
+          site,
+          sourceId,
+          period,
+          dataAvailable,
+          roadClass: plan.roadClass,
+          completeness: result.completeness,
+          coverage: result.coverage,
+          co2Kg: result.co2Kg,
+          ch4Kg: result.ch4Kg,
+          n2oKg: result.n2oKg,
+          totalCo2eKg: result.totalCo2eKg,
+        });
         if (table === "scope1_epa_on_road_gasoline_entries") {
           await insertLegacyTableEntries(table, [
             {
@@ -272,6 +297,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
               emission_selection: "ch4_n2o_co2e",
               miles: distanceUnit.startsWith("km") ? distance * 0.621371 : distance,
               emissions: supplementaryCo2e,
+              activity_meta: activityMeta,
             },
           ]);
         } else if (table === "scope1_epa_on_road_diesel_alt_fuel_entries") {
@@ -283,6 +309,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
               emission_selection: "ch4_n2o_co2e",
               miles: distanceUnit.startsWith("km") ? distance * 0.621371 : distance,
               emissions: supplementaryCo2e,
+              activity_meta: activityMeta,
             },
           ]);
         } else {
@@ -295,6 +322,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
               emission_selection: "ch4_n2o_co2e",
               gallons: fuelQuantity,
               emissions: supplementaryCo2e,
+              activity_meta: activityMeta,
             },
           ]);
         }
@@ -304,6 +332,7 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
         title: "Saved",
         description: `Activity saved (${result.completeness}). Site/source context: ${site || "—"} / ${sourceId || "—"} / ${period}.`,
       });
+      onInventoryChanged?.();
       onSaveAndNext?.();
     } catch (e: unknown) {
       toast({
@@ -332,41 +361,19 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
       subtitle="Company vehicles and mobile equipment that burn fuel."
       details={
         <p>
-          On-road vs non-road follows the equipment you pick. Fuel and distance can contribute
-          different gases — we assemble one result and tell you if anything is missing.
+          Pick your vehicle or equipment — we treat road vehicles and off-road machines
+          differently. Enter fuel, distance, or both; we’ll combine them into one total and
+          tell you if anything is still missing.
         </p>
       }
     >
-      <FormStep step={1} label="Vehicle details">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-          <div>
-            <Label className="text-gray-600 text-xs">Site</Label>
-            <Input
-              className="mt-1.5 rounded-xl border-gray-200"
-              value={site}
-              onChange={(e) => setSite(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-          <div>
-            <Label className="text-gray-600 text-xs">Vehicle ID</Label>
-            <Input
-              className="mt-1.5 rounded-xl border-gray-200"
-              value={sourceId}
-              onChange={(e) => setSourceId(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-          <div>
-            <Label className="text-gray-600 text-xs">Period</Label>
-            <Input
-              type="month"
-              className="mt-1.5 rounded-xl border-gray-200"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-            />
-          </div>
-        </div>
+      <LegacySavedInventory
+        groupId="vehicles_mobile"
+        editableNote="Saved vehicle entries still count in your totals. Use this form to add new ones."
+        onChanged={onInventoryChanged}
+      />
+
+      <FormStep step={1} label="Vehicle / equipment">
         <div>
           <Label className="text-gray-600 text-xs">Equipment type</Label>
           <Select value={equipment} onValueChange={(v) => setEquipment(v as MobileEquipmentKind)}>
@@ -385,6 +392,42 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
             Treated as <span className="font-medium text-gray-600">{roadLabel}</span>
           </p>
         </div>
+
+        <details className="mt-3 group">
+          <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700">
+            Optional details
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+            <div>
+              <Label className="text-gray-600 text-xs">Site</Label>
+              <Input
+                className="mt-1.5 rounded-xl border-gray-200 bg-white"
+                value={site}
+                onChange={(e) => setSite(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-600 text-xs">Vehicle ID</Label>
+              <Input
+                className="mt-1.5 rounded-xl border-gray-200 bg-white"
+                value={sourceId}
+                onChange={(e) => setSourceId(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-600 text-xs">Period</Label>
+              <Input
+                type="month"
+                className="mt-1.5 rounded-xl border-gray-200 bg-white"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+              />
+            </div>
+          </div>
+        </details>
       </FormStep>
 
       <FormStep step={2} label="What data do you have?">
@@ -492,7 +535,8 @@ export function VehiclesMobileSection({ onDataChange, onSaveAndNext }: Props) {
             </summary>
             <div className="px-3.5 pb-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <p className="sm:col-span-3 text-xs text-amber-900/80">
-                Documented value, units, and source required — we don’t invent defaults.
+                Enter a real efficiency value, its unit, and where it came from — we won’t guess
+                a default for you.
               </p>
               <div>
                 <Label className="text-amber-900/80 text-xs">Efficiency</Label>

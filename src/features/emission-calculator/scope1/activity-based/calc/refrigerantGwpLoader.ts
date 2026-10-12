@@ -54,8 +54,9 @@ export async function loadGovernedRefrigerantGwp(): Promise<RefrigerantGwpSource
       if (Object.keys(map).length > 0) {
         return {
           map: { ...EPA_REFRIGERANT_GWP, ...map },
-          sourceName: source || "EPA Refrigerant GWP",
-          gwpBasis: "As published in EPA Refrigerant GWP reference (verify AR assessment basis in source table)",
+          // Friendly label for UI — never expose raw table/API ids (e.g. api:epa_refrigerant_gwp).
+          sourceName: "EPA refrigerant reference",
+          gwpBasis: "EPA published 100-year GWP values",
           loadedFromDb: true,
         };
       }
@@ -66,11 +67,11 @@ export async function loadGovernedRefrigerantGwp(): Promise<RefrigerantGwpSource
 
   return {
     map: { ...EPA_REFRIGERANT_GWP },
-    sourceName: "In-code EPA_REFRIGERANT_GWP / REFRIGERANT_FACTORS",
-    gwpBasis: "AR5-style 100-year values embedded in application (not live DB)",
+    sourceName: "Built-in EPA refrigerant factors",
+    gwpBasis: "Standard 100-year GWP values",
     loadedFromDb: false,
     warning:
-      "Governed table \"EPA Refrigerant GWP\" could not be loaded or had no usable rows. Using embedded GWP map with disclosure — verify values before assurance use.",
+      "Live EPA refrigerant table unavailable. Using built-in EPA factors — verify before formal reporting.",
   };
 }
 

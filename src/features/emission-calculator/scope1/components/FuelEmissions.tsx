@@ -53,6 +53,8 @@ interface FuelEmissionsProps {
   variant?: "fuel" | "scope1HeatSteam";
   /** Select where factor options come from for this screen */
   factorMode?: "epa" | "uk_supabase";
+  /** Activity-based context (equipment, site, period) stored as activity_meta jsonb. */
+  activityMeta?: Record<string, unknown>;
 }
 
 type UkFactorCell = { total?: number; co2?: number; ch4?: number; n2o?: number };
@@ -354,6 +356,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
   sectionDescription = "",
   variant = "fuel",
   factorMode = "epa",
+  activityMeta,
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1006,6 +1009,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             emissions: Number(em),
             emissions_output: convertEmissionNumeric(em, outputUnit),
             emissions_output_unit: outputUnit,
+            ...(activityMeta ? { activity_meta: activityMeta } : {}),
           };
         });
         let created: { id: string }[] = [];
@@ -1031,6 +1035,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
                 emissions: v.emissions!,
                 emissions_output: convertEmissionNumeric(v.emissions, outputUnit),
                 emissions_output_unit: outputUnit,
+                ...(activityMeta ? { activity_meta: activityMeta } : {}),
               })
             )
           );
@@ -1115,6 +1120,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
             ...(factorMode === "uk_supabase"
               ? { uk_factor_basis: v.ukFactorBasis || "total" }
               : {}),
+            ...(activityMeta ? { activity_meta: activityMeta } : {}),
           };
         })
       );
@@ -1146,6 +1152,7 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
               ...(factorMode === "uk_supabase"
                 ? { uk_factor_basis: v.ukFactorBasis || "total" }
                 : {}),
+              ...(activityMeta ? { activity_meta: activityMeta } : {}),
             });
           })
         );
@@ -1204,9 +1211,11 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          {sectionTitle ? (
+            <h4 className="text-lg font-semibold text-gray-900">{sectionTitle}</h4>
+          ) : null}
           {sectionDescription ? (
             <p className="text-sm text-gray-600">{sectionDescription}</p>
           ) : null}
@@ -1219,10 +1228,10 @@ const FuelEmissions: React.FC<FuelEmissionsProps> = ({
         </div>
         <Button
           onClick={addRow}
-          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white rounded-xl shrink-0"
           disabled={factorsLoading}
         >
-          <Plus className="h-4 w-4 mr-2" />Add New Entry
+          <Plus className="h-4 w-4 mr-2" />Add entry
         </Button>
       </div>
 

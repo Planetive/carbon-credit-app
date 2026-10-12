@@ -85,12 +85,12 @@ export function groupScope1LegacyTotals(
   for (const bucket of Object.values(buckets)) {
     if (bucket.legacyParts.some((p) => ["kitchen", "power", "heating", "vehicular"].includes(p.key))) {
       bucket.provenanceNotes.push(
-        "Includes historical IPCC-labelled entries preserved at their original calculated values."
+        "Includes earlier saved entries kept at their original calculated values."
       );
     }
     if (bucket.legacyParts.some((p) => ["onroad_gas", "onroad_diesel", "nonroad"].includes(p.key))) {
       bucket.provenanceNotes.push(
-        "On-road/non-road historical rows may be CH4/N2O-only; do not assume they are complete CO2e."
+        "Some older vehicle entries may only include methane and nitrous oxide — not a full CO₂e total."
       );
     }
   }

@@ -2,6 +2,7 @@ import { Check, CircleDashed, Flame, Car, Snowflake, Factory, X } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  firstApplicableCategoryId,
   inventoryHasUnresolvedSources,
   isScreeningFullyAnswered,
   isScreeningYes,
@@ -12,11 +13,13 @@ import {
   type Scope1ScreeningState,
 } from "../types";
 import { ActivitySectionShell } from "./ActivitySectionShell";
+import { ScreeningExistingDataNotice } from "./ScreeningExistingDataNotice";
 
 type Props = {
   screening: Scope1ScreeningState;
   onChange: (next: Scope1ScreeningState) => void;
-  onContinue?: () => void;
+  /** Called with the first Yes category id (or null if all No). */
+  onContinue?: (nextCategoryId: string | null) => void;
 };
 
 const GROUP_ICONS: Record<Scope1ActivityGroupId, typeof Flame> = {
@@ -28,35 +31,55 @@ const GROUP_ICONS: Record<Scope1ActivityGroupId, typeof Flame> = {
 
 export function SourceScreeningPanel({ screening, onChange, onContinue }: Props) {
   const unresolved = inventoryHasUnresolvedSources(screening);
+  const complete = isScreeningFullyAnswered(screening);
   const answered = SCOPE1_ACTIVITY_GROUPS.filter(
     (g) => screening[g.id] !== "not_assessed"
+  ).length;
+  const yesCount = SCOPE1_ACTIVITY_GROUPS.filter((g) =>
+    isScreeningYes(screening[g.id])
   ).length;
 
   return (
     <ActivitySectionShell
       icon={CircleDashed}
       title="What sources apply?"
-      subtitle="Answer Yes or No for each. Forms appear only after this is done."
+      subtitle="Answer Yes or No for each group. Forms unlock when you’re done."
       details={
         <p>
-          Yes = that source applies (enter data when ready). No = hide it. Until every question is
-          answered, calculation forms stay hidden.
+          Choose Yes to show that source’s form, or No to hide it. You can enter numbers later —
+          answering Yes without data is not the same as zero emissions.
         </p>
       }
     >
-      <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
-        <span>
-          {answered} of {SCOPE1_ACTIVITY_GROUPS.length} answered
+      <ScreeningExistingDataNotice
+        screening={screening}
+        onMarkYes={(groupIds) => {
+          const next = { ...screening };
+          for (const id of groupIds) {
+            if (next[id] !== "calculated") next[id] = "applicable_pending";
+          }
+          onChange(next);
+        }}
+      />
+
+      <div className="flex items-center gap-3 text-xs text-gray-500">
+        <span className="shrink-0 tabular-nums">
+          {answered}/{SCOPE1_ACTIVITY_GROUPS.length}
         </span>
-        <div className="h-1.5 flex-1 max-w-[140px] rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
           <div
-            className="h-full rounded-full bg-[#1D9E75] transition-all"
+            className="h-full rounded-full bg-[#1D9E75] transition-all duration-300"
             style={{ width: `${(answered / SCOPE1_ACTIVITY_GROUPS.length) * 100}%` }}
           />
         </div>
+        {complete && (
+          <span className="shrink-0 text-[#0F6E56] font-medium">
+            {yesCount} active
+          </span>
+        )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {SCOPE1_ACTIVITY_GROUPS.map((group) => {
           const Icon = GROUP_ICONS[group.id];
           const status = screening[group.id];
@@ -66,14 +89,14 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
           return (
             <div
               key={group.id}
-              className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+              className="rounded-2xl border border-gray-100 bg-white p-3.5 sm:p-4"
             >
               <div className="flex items-start gap-3 mb-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-600">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F1] text-[#1D9E75]">
                   <Icon className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900 text-sm">{group.title}</p>
+                <div className="min-w-0 pt-0.5">
+                  <p className="font-medium text-gray-900 text-sm leading-snug">{group.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5 leading-snug">
                     {group.screeningQuestion}
                   </p>
@@ -83,6 +106,7 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
+                  aria-pressed={noSelected}
                   onClick={() =>
                     onChange({
                       ...screening,
@@ -90,15 +114,15 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
                     })
                   }
                   className={cn(
-                    "rounded-xl border px-3 py-3 text-center transition-all",
+                    "rounded-xl border px-3 py-2.5 text-center transition-all",
                     noSelected
-                      ? "border-gray-400 bg-gray-100 text-gray-800"
-                      : "border-gray-200 bg-gray-50/50 text-gray-600 hover:bg-gray-50"
+                      ? "border-gray-300 bg-gray-100 text-gray-800"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                   )}
                 >
                   <X
                     className={cn(
-                      "mx-auto h-4 w-4 mb-1",
+                      "mx-auto h-4 w-4 mb-0.5",
                       noSelected ? "text-gray-700" : "text-gray-400"
                     )}
                   />
@@ -106,30 +130,32 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
                 </button>
                 <button
                   type="button"
+                  aria-pressed={yesSelected}
                   onClick={() =>
                     onChange({
                       ...screening,
-                      // Keep calculated if already entered; otherwise Yes = fill when ready.
                       [group.id]:
                         status === "calculated" ? "calculated" : "applicable_pending",
                     })
                   }
                   className={cn(
-                    "rounded-xl border px-3 py-3 text-center transition-all",
+                    "rounded-xl border px-3 py-2.5 text-center transition-all",
                     yesSelected
                       ? "border-[#1D9E75] bg-[#EAF7F1] text-[#0F6E56]"
-                      : "border-gray-200 bg-gray-50/50 text-gray-600 hover:bg-gray-50"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                   )}
                 >
                   <Check
                     className={cn(
-                      "mx-auto h-4 w-4 mb-1",
+                      "mx-auto h-4 w-4 mb-0.5",
                       yesSelected ? "text-[#1D9E75]" : "text-gray-400"
                     )}
                   />
                   <span className="block text-sm font-semibold">Yes</span>
                   {status === "calculated" && (
-                    <span className="block text-[10px] mt-0.5 opacity-70">Data entered</span>
+                    <span className="block text-[10px] mt-0.5 text-[#0F6E56]/80">
+                      Data entered
+                    </span>
                   )}
                 </button>
               </div>
@@ -138,16 +164,22 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
         })}
       </div>
 
-      {!isScreeningFullyAnswered(screening) && answered > 0 && (
-        <p className="text-xs text-amber-800/90 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2">
-          Answer all four to unlock the matching forms.
+      {!complete && answered > 0 && (
+        <p className="text-xs text-amber-800/90 bg-amber-50/70 border border-amber-100 rounded-xl px-3 py-2">
+          Answer all four to unlock forms.
         </p>
       )}
 
-      {unresolved && isScreeningFullyAnswered(screening) && (
-        <p className="text-xs text-gray-500 px-1">
-          You said Yes to some sources — enter data in those forms when ready. Yes without data is
-          not zero.
+      {complete && unresolved && (
+        <p className="text-xs text-gray-500">
+          {yesCount} source{yesCount === 1 ? "" : "s"} marked Yes — add data in those forms when
+          ready.
+        </p>
+      )}
+
+      {complete && !unresolved && yesCount === 0 && (
+        <p className="text-xs text-gray-500">
+          All sources marked No — no Scope 1 forms to fill for this assessment.
         </p>
       )}
 
@@ -156,10 +188,14 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
           <Button
             type="button"
             className="bg-[#1D9E75] hover:bg-[#22B87E] text-white rounded-xl px-5"
-            disabled={!isScreeningFullyAnswered(screening)}
-            onClick={onContinue}
+            disabled={!complete}
+            onClick={() => onContinue(firstApplicableCategoryId(screening))}
           >
-            {isScreeningFullyAnswered(screening) ? "Continue to forms" : "Answer all first"}
+            {complete
+              ? yesCount > 0
+                ? "Continue to forms"
+                : "Done"
+              : "Answer all first"}
           </Button>
         </div>
       )}

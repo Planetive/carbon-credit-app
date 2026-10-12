@@ -143,7 +143,7 @@ export function assembleMobileActivityResult(input: {
       );
     } else if (wantDistance && !wantFuel) {
       missing.push(
-        "Documented fuel efficiency (value, units, and source) to estimate fuel from distance — CO2 cannot be completed from CH4/N2O tables alone"
+        "Fuel efficiency (value, unit, and source) so we can estimate fuel use from distance"
       );
     }
   }
@@ -151,7 +151,7 @@ export function assembleMobileActivityResult(input: {
   // CO2 from Mobile Combustion fuel factor.
   if (typeof gallons === "number") {
     if (typeof input.factors.mobileCombustionCo2KgPerGallon !== "number") {
-      missing.push("Mobile Combustion CO2 factor (kg CO2 per gallon) for the selected fuel");
+      missing.push("A fuel emission factor for the selected fuel type");
     } else if (input.fuelFactorIsCombinedCo2e) {
       co2eCombinedKg = round6(gallons * input.factors.mobileCombustionCo2KgPerGallon);
       notes.push("Fuel factor treated as combined CO2e — CH4/N2O not added on top.");
@@ -171,12 +171,12 @@ export function assembleMobileActivityResult(input: {
         if (typeof input.factors.ch4GPerActivity === "number") {
           ch4Kg = (input.factors.ch4GPerActivity * miles) / 1000;
         } else if (wantDistance) {
-          missing.push("CH4 factor (g/mile) from the on-road / non-road sheet");
+          missing.push("A methane (CH₄) factor for this vehicle type");
         }
         if (typeof input.factors.n2oGPerActivity === "number") {
           n2oKg = (input.factors.n2oGPerActivity * miles) / 1000;
         } else if (wantDistance) {
-          missing.push("N2O factor (g/mile) from the on-road / non-road sheet");
+          missing.push("A nitrous oxide (N₂O) factor for this vehicle type");
         }
       }
     } else if (basis === "per_gallon" && typeof gallons === "number") {
@@ -213,7 +213,7 @@ export function assembleMobileActivityResult(input: {
       completeness: "blocked_missing_data",
       missing: uniqueMissing.length
         ? uniqueMissing
-        : ["No calculable gas components for the selected data"],
+        : ["Not enough information yet to calculate emissions for this entry"],
       notes,
     };
   }

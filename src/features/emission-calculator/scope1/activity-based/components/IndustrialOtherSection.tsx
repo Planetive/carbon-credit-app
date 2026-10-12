@@ -8,16 +8,21 @@ import {
   FormStep,
   PendingSourcesNote,
 } from "./ActivitySectionShell";
+import { LegacySavedInventory } from "./LegacySavedInventory";
 import { cn } from "@/lib/utils";
 
 type Props = {
   onScope1CategoryTotalChange?: (categoryId: string, totalMeT: number) => void;
+  onInventoryChanged?: () => void;
 };
 
 /**
  * Industrial and other direct emissions — flaring/venting behind simple toggles.
  */
-export function IndustrialOtherSection({ onScope1CategoryTotalChange }: Props) {
+export function IndustrialOtherSection({
+  onScope1CategoryTotalChange,
+  onInventoryChanged,
+}: Props) {
   const [hasFlaring, setHasFlaring] = useState(false);
   const [hasVenting, setHasVenting] = useState(false);
   const [active, setActive] = useState<"flaring" | "venting">("flaring");
@@ -29,12 +34,17 @@ export function IndustrialOtherSection({ onScope1CategoryTotalChange }: Props) {
       subtitle="Flaring, venting, and other industrial releases."
       details={
         <p>
-          Flaring and venting use composition-based methods that should be verified before
-          assurance use. This module does not claim EPA GHGRP compliance. Historical records stay
-          in your totals.
+          For flaring and venting at your operations. Results depend on gas composition — have
+          them checked before formal reporting. Earlier saved entries still count in your totals.
         </p>
       }
     >
+      <LegacySavedInventory
+        groupId="industrial_other"
+        editableNote="Turn on flaring or venting below to add or edit. Earlier saved rows stay in your totals."
+        onChanged={onInventoryChanged}
+      />
+
       <FormStep step={1} label="Which activities apply?">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/40 px-4 py-3.5">
@@ -107,15 +117,16 @@ export function IndustrialOtherSection({ onScope1CategoryTotalChange }: Props) {
       )}
 
       {!hasFlaring && !hasVenting && (
-        <p className="text-sm text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-2xl">
-          Turn on flaring or venting above if they apply — otherwise leave them off.
+        <p className="text-sm text-gray-400 text-center py-5 px-4 border border-dashed border-gray-200 rounded-2xl bg-gray-50/30">
+          Turn on flaring or venting if they apply.
         </p>
       )}
 
       <PendingSourcesNote
+        title="Not covered here yet"
         items={[
-          "Process emissions (cement, metals, chemicals, etc.)",
-          "Wastewater / waste treatment direct CH₄/N₂O",
+          "Process emissions (e.g. cement, metals, chemicals)",
+          "Wastewater or waste treatment gases",
           "Agricultural activities",
         ]}
       />

@@ -61,6 +61,8 @@ export interface CompanyOverviewScreenProps {
   scope1Kg?: number;
   scope2Kg?: number;
   scope3Kg?: number;
+  /** True while scope totals are still loading for Emissions Overview. */
+  emissionsLoading?: boolean;
   monitoringModulesActive?: number;
 }
 
@@ -243,6 +245,7 @@ const CompanyOverviewScreen = ({
   scope1Kg = 0,
   scope2Kg = 0,
   scope3Kg = 0,
+  emissionsLoading = false,
   monitoringModulesActive = 0,
 }: CompanyOverviewScreenProps) => {
   const navigate = useNavigate();
@@ -473,6 +476,7 @@ const CompanyOverviewScreen = ({
           scopeRows={emissionScopeRows}
           donutData={donutData}
           totalEmissions={totalEmissions}
+          loading={emissionsLoading}
           onViewFullResults={() => navigate("/emission-results-calculator")}
         />
         <OverviewEsgProgressCard

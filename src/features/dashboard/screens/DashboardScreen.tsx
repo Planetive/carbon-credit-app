@@ -71,6 +71,7 @@ const Dashboard2 = () => {
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
   const [hasAnyEmissions, setHasAnyEmissions] = useState<boolean>(false);
+  const [emissionsLoading, setEmissionsLoading] = useState<boolean>(true);
   const [scope1Total, setScope1Total] = useState<number>(0);
   const [scope2Total, setScope2Total] = useState<number>(0);
   const [scope3Total, setScope3Total] = useState<number>(0);
@@ -286,232 +287,121 @@ const Dashboard2 = () => {
     if (!user || profileMissing) return;
     const fetchData = async () => {
       setLoading(true);
+      setEmissionsLoading(true);
       setError(null);
-      
-      // Fetch projects
-      try {
-        const projectsData = await listProjectInputs(user.id);
-        setProjects(projectsData || []);
-      } catch {
-        setError("Failed to load projects");
-        setProjects([]);
-      }
 
-      // Fetch ISSB readiness assessment + scores (API when JWT, else Supabase)
-      try {
-        let esgData: EsgAssessment | null = null;
-        let scoresData: EsgScore | null = null;
-
-        if (isEsgApiEnabled()) {
-          esgData = await getLatestEsgAssessment(ESG_READINESS_ASSESSMENT_TYPE);
-          if (esgData?.id) {
-            try {
-              scoresData = await getEsgScoreByAssessment(esgData.id);
-            } catch (scoreErr) {
-              console.warn("Dashboard ESG score fetch failed:", scoreErr);
-              scoresData = null;
-            }
-          }
-        } else {
-          const { data, error: esgError } = await (supabase as any)
-            .from("esg_assessments")
-            .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
-            .eq("user_id", user.id)
-            .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (!esgError && data) {
-            esgData = data as EsgAssessment;
-            const { data: scoresRow, error: scoresError } = await supabase
-              .from("esg_scores")
-              .select(
-                "readiness_overall_score, readiness_maturity_band, readiness_results, scored_at"
-              )
-              .eq("assessment_id", esgData.id)
-              .maybeSingle();
-            if (!scoresError && scoresRow) {
-              scoresData = scoresRow as EsgScore;
-            }
-          }
+      // Kick off emissions immediately so Emissions Overview does not wait on ESG/projects.
+      const emissionsPromise = (async () => {
+        try {
+          const epaResults = await loadEpaIpccResults(user.id);
+          setScope1Total(epaResults.totals.scope1);
+          setScope2Total(epaResults.totals.scope2);
+          setScope3Total(epaResults.totals.scope3);
+          setHasAnyEmissions(epaResults.totals.grand > 0);
+        } catch (error) {
+          console.error("Error loading emission totals:", error);
+          setHasAnyEmissions(false);
+          setScope1Total(0);
+          setScope2Total(0);
+          setScope3Total(0);
+        } finally {
+          setEmissionsLoading(false);
         }
+      })();
 
-        if (esgData) {
-          setEsgAssessment(esgData);
-          if (scoresData) {
-            // Always show stored scores. Migration/ETL often bumps assessment
-            // updated_at without re-scoring; dropping scores left the dashboard at 0%.
-            let results = scoresData.readiness_results;
-            if (typeof results === "string") {
+      const projectsPromise = (async () => {
+        try {
+          const projectsData = await listProjectInputs(user.id);
+          setProjects(projectsData || []);
+        } catch {
+          setError("Failed to load projects");
+          setProjects([]);
+        }
+      })();
+
+      const esgPromise = (async () => {
+        try {
+          let esgData: EsgAssessment | null = null;
+          let scoresData: EsgScore | null = null;
+
+          if (isEsgApiEnabled()) {
+            esgData = await getLatestEsgAssessment(ESG_READINESS_ASSESSMENT_TYPE);
+            if (esgData?.id) {
               try {
-                results = JSON.parse(results);
-              } catch {
-                results = null;
+                scoresData = await getEsgScoreByAssessment(esgData.id);
+              } catch (scoreErr) {
+                console.warn("Dashboard ESG score fetch failed:", scoreErr);
+                scoresData = null;
               }
             }
-            setEsgScores({ ...scoresData, readiness_results: results });
           } else {
+            const { data, error: esgError } = await (supabase as any)
+              .from("esg_assessments")
+              .select("id, status, total_completion, submitted_at, updated_at, assessment_type")
+              .eq("user_id", user.id)
+              .eq("assessment_type", ESG_READINESS_ASSESSMENT_TYPE)
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (!esgError && data) {
+              esgData = data as EsgAssessment;
+              const { data: scoresRow, error: scoresError } = await supabase
+                .from("esg_scores")
+                .select(
+                  "readiness_overall_score, readiness_maturity_band, readiness_results, scored_at"
+                )
+                .eq("assessment_id", esgData.id)
+                .maybeSingle();
+              if (!scoresError && scoresRow) {
+                scoresData = scoresRow as EsgScore;
+              }
+            }
+          }
+
+          if (esgData) {
+            setEsgAssessment(esgData);
+            if (scoresData) {
+              let results = scoresData.readiness_results;
+              if (typeof results === "string") {
+                try {
+                  results = JSON.parse(results);
+                } catch {
+                  results = null;
+                }
+              }
+              setEsgScores({ ...scoresData, readiness_results: results });
+            } else {
+              setEsgScores(null);
+            }
+          } else {
+            setEsgAssessment(null);
             setEsgScores(null);
           }
-        } else {
+        } catch (esgLoadError) {
+          console.error("Dashboard ESG overview load failed:", esgLoadError);
           setEsgAssessment(null);
           setEsgScores(null);
         }
-      } catch (esgLoadError) {
-        console.error("Dashboard ESG overview load failed:", esgLoadError);
-        setEsgAssessment(null);
-        setEsgScores(null);
-      }
+      })();
 
-      // Fetch emission calculator data
-      const { data: emissionData, error: emissionError } = await (supabase as any)
-        .from("emission_calculator")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!emissionError && emissionData) {
-        setEmissionData(emissionData);
-      }
-
-      // Load emission totals for Scope 1, 2, and 3
-      try {
-        // EPA calculator uses unified EPA+IPCC tables for totals.
-        const epaResults = await loadEpaIpccResults(user.id);
-        setScope1Total(epaResults.totals.scope1);
-        setScope2Total(epaResults.totals.scope2);
-        setScope3Total(epaResults.totals.scope3);
-        setHasAnyEmissions(epaResults.totals.grand > 0);
-        if (false) {
-        // Scope 1 - Load all categories
-        const [fuelRes, refRes, passRes, delRes] = await Promise.all([
-          (supabase as any).from('scope1_fuel_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_refrigerant_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_passenger_vehicle_entries').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope1_delivery_vehicle_entries').select('emissions').eq('user_id', user.id),
-        ]);
-
-        const sum = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
-        const scope1 = sum(fuelRes.data) + sum(refRes.data) + sum(passRes.data) + sum(delRes.data);
-        setScope1Total(scope1);
-
-        // Scope 2 - Electricity
-        const { data: mainRow } = await (supabase as any)
-          .from('scope2_electricity_main')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let elecTotal = 0;
-        if (mainRow) {
-          const totalKwh = Number(mainRow.total_kwh) || 0;
-          const gridPct = Number(mainRow.grid_pct) || 0;
-          const otherPct = Number(mainRow.other_pct) || 0;
-
-          const { data: subs } = await (supabase as any)
-            .from('scope2_electricity_subanswers')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('main_id', mainRow.id);
-
-          const gridRow = (subs || []).find((r: any) => r.type === 'grid');
-          const gridFactor = gridRow?.grid_emission_factor ? Number(gridRow.grid_emission_factor) : 0;
-          const gridPart = totalKwh > 0 && gridPct > 0 && gridFactor > 0 ? (gridPct / 100) * totalKwh * gridFactor : 0;
-
-          const otherRows = (subs || []).filter((r: any) => r.type === 'other');
-          const sumOtherEmissions = otherRows.reduce((s: number, r: any) => s + (Number(r.other_sources_emissions) || 0), 0);
-          const otherPart = totalKwh > 0 && otherPct > 0 ? (otherPct / 100) * totalKwh * sumOtherEmissions : 0;
-
-          elecTotal = Number((gridPart + otherPart).toFixed(6));
+      const emissionCalculatorPromise = (async () => {
+        const { data: emissionRow, error: emissionError } = await (supabase as any)
+          .from("emission_calculator")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+        if (!emissionError && emissionRow) {
+          setEmissionData(emissionRow);
         }
+      })();
 
-        // Scope 2 - Heat & Steam
-        const { data: heatRows } = await (supabase as any)
-          .from('scope2_heatsteam_entries')
-          .select('emissions')
-          .eq('user_id', user.id);
-        const heatTotal = (heatRows || []).reduce((s: number, r: any) => s + (Number(r.emissions) || 0), 0);
-        const scope2 = elecTotal + Number(heatTotal.toFixed(6));
-        setScope2Total(scope2);
-
-        // Scope 3 - Load all categories (excluding LCA)
-        const [
-          purchasedGoodsRes,
-          capitalGoodsRes,
-          fuelEnergyRes,
-          upstreamTransportRes,
-          wasteGeneratedRes,
-          businessTravelRes,
-          employeeCommutingRes,
-          investmentsRes,
-          facilitatedRes,
-          downstreamTransportRes,
-          endOfLifeRes,
-          processingSoldRes,
-          useOfSoldRes,
-        ] = await Promise.all([
-          (supabase as any).from('scope3_purchased_goods_services').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_capital_goods').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_fuel_energy_activities').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_upstream_transportation').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_waste_generated').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_business_travel').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_employee_commuting').select('emissions').eq('user_id', user.id),
-          (supabase as any)
-            .from('scope3_investments')
-            .select('calculated_emissions, emissions, ownership_percentage')
-            .eq('user_id', user.id),
-          (supabase as any).from('scope3_facilitated_emissions').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_downstream_transportation').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_end_of_life_treatment').select('emissions').eq('user_id', user.id),
-          (supabase as any).from('scope3_processing_sold_products').select('row_data').eq('user_id', user.id),
-          (supabase as any).from('scope3_use_of_sold_products').select('row_data').eq('user_id', user.id),
-        ]);
-
-        const sumScope3 = (arr: any[] | null | undefined) => (arr || []).reduce((s, r) => s + (Number(r.emissions) || 0), 0);
-        const sumInvestmentAttributed = (arr: any[] | null | undefined) =>
-          (arr || []).reduce((s, r) => {
-            const c = Number(r?.calculated_emissions);
-            if (Number.isFinite(c)) return s + c;
-            const inv = Number(r?.emissions) || 0;
-            const pct = Number(r?.ownership_percentage) || 0;
-            return s + (inv * pct) / 100;
-          }, 0);
-        const processingTotal = (processingSoldRes.data || []).reduce((s: number, r: any) => {
-          const rowData = r.row_data;
-          if (rowData && typeof rowData.emissions === 'number') {
-            return s + rowData.emissions;
-          }
-          return s;
-        }, 0);
-        const useTotal = (useOfSoldRes.data || []).reduce((s: number, r: any) => {
-          const rowData = r.row_data;
-          if (rowData && typeof rowData.emissions === 'number') {
-            return s + rowData.emissions;
-          }
-          return s;
-        }, 0);
-
-        const scope3 = sumScope3(purchasedGoodsRes.data) + sumScope3(capitalGoodsRes.data) + 
-          sumScope3(fuelEnergyRes.data) + sumScope3(upstreamTransportRes.data) + sumScope3(wasteGeneratedRes.data) + 
-          sumScope3(businessTravelRes.data) + sumScope3(employeeCommutingRes.data) + sumInvestmentAttributed(investmentsRes.data) + 
-          sumScope3(facilitatedRes.data) +
-          sumScope3(downstreamTransportRes.data) + sumScope3(endOfLifeRes.data) + processingTotal + useTotal;
-        setScope3Total(scope3);
-
-        // Set hasAnyEmissions based on whether any scope has data
-        setHasAnyEmissions(scope1 > 0 || scope2 > 0 || scope3 > 0);
-        }
-      } catch (error) {
-        console.error('Error loading emission totals:', error);
-        setHasAnyEmissions(false);
-        setScope1Total(0);
-        setScope2Total(0);
-        setScope3Total(0);
-      }
+      await Promise.all([
+        emissionsPromise,
+        projectsPromise,
+        esgPromise,
+        emissionCalculatorPromise,
+      ]);
 
       // Fetch and aggregate all Finance Emission calculations across all portfolios
       // Only fetch for financial_institution users
@@ -1026,6 +916,7 @@ const Dashboard2 = () => {
                   scope1Kg={scope1Total}
                   scope2Kg={scope2Total}
                   scope3Kg={scope3Total}
+                  emissionsLoading={emissionsLoading}
                 />
               </motion.div>
           ) : activeSection === 'portfolio' ? (

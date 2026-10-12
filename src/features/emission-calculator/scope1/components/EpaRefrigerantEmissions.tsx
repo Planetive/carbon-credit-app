@@ -346,14 +346,13 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h4 className="text-base font-semibold text-gray-900">Refrigerant entries</h4>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Prefer AC / HVAC for a short gas list; use Other systems for cold rooms, vehicles, or
-            industrial F-gases.
-          </p>
-        </div>
-        <Button onClick={addRow} className="bg-[#1D9E75] hover:bg-[#22B87E] text-white">
+        <p className="text-sm text-gray-500">
+          Start with AC / HVAC for a short gas list, or Other systems for cold rooms and vehicles.
+        </p>
+        <Button
+          onClick={addRow}
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white rounded-xl shrink-0"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add entry
         </Button>
