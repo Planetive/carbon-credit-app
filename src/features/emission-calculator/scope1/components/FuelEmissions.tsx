@@ -60,7 +60,7 @@ interface FuelEmissionsProps {
 type UkFactorCell = { total?: number; co2?: number; ch4?: number; n2o?: number };
 type UkFactorsMap = Record<string, Record<string, Record<string, UkFactorCell>>>;
 /** Nested fuel map from EPA Supabase tables (Fuel EPA 1/2/3). */
-type EpaFuelFactorsMap = Record<string, Record<string, Record<string, number>>>;
+export type EpaFuelFactorsMap = Record<string, Record<string, Record<string, number>>>;
 
 /** Session cache so Fuel ↔ Heat & Steam switches don't re-fetch / re-parse EPA sheets. */
 let epaFuelFactorsCache: EpaFuelFactorsMap | null = null;
@@ -130,7 +130,7 @@ function parseFactorNumber(value: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function buildEpaFuelFactorsMap(allRows: Record<string, unknown>[]): EpaFuelFactorsMap {
+export function buildEpaFuelFactorsMap(allRows: Record<string, unknown>[]): EpaFuelFactorsMap {
   const map: EpaFuelFactorsMap = {};
 
   for (const row of allRows) {
@@ -221,7 +221,7 @@ function buildEpaFuelFactorsMap(allRows: Record<string, unknown>[]): EpaFuelFact
   return map;
 }
 
-async function ensureEpaFuelFactors(): Promise<EpaFuelFactorsMap | null> {
+export async function ensureEpaFuelFactors(): Promise<EpaFuelFactorsMap | null> {
   if (epaFuelFactorsCache) return epaFuelFactorsCache;
   if (epaFuelFactorsInflight) return epaFuelFactorsInflight;
 

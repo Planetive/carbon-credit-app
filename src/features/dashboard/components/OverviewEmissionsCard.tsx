@@ -7,7 +7,7 @@ const CARD =
 export interface EmissionsScopeRow {
   label: string;
   sub: string;
-  value: number;
+  value: number | null;
   delta?: string;
   up?: boolean;
 }
@@ -21,10 +21,16 @@ interface DonutSlice {
 interface OverviewEmissionsCardProps {
   scopeRows: EmissionsScopeRow[];
   donutData: DonutSlice[];
-  totalEmissions: number;
+  totalEmissions: number | null;
   onViewFullResults: () => void;
   /** True while scope totals are still fetching. */
   loading?: boolean;
+  /** Shown when Scope 1 or the grand total cannot be calculated. */
+  incomplete?: boolean;
+  statusNote?: string | null;
+  periodNote?: string | null;
+  reconciliationNote?: string | null;
+  onRetry?: () => void;
 }
 
 const scopeIcons = [Flame, Zap, Leaf] as const;
@@ -39,6 +45,13 @@ export const OVERVIEW_EMISSIONS_SCOPE_COLORS = [
 const scopeIconBg = OVERVIEW_EMISSIONS_SCOPE_COLORS.map((c) => c.chip);
 
 const rowStartClass = ["row-start-1", "row-start-2", "row-start-3"] as const;
+
+function formatScopeTonnes(value: number | null): string {
+  if (value == null) return "Incomplete";
+  return `${value.toLocaleString(undefined, {
+    maximumFractionDigits: 5,
+  })} tCO₂e`;
+}
 
 function formatDonutCenterTotal(value: number): string {
   if (value > 100_000) {
@@ -58,6 +71,11 @@ const OverviewEmissionsCard = ({
   totalEmissions,
   onViewFullResults,
   loading = false,
+  incomplete = false,
+  statusNote = null,
+  periodNote = null,
+  reconciliationNote = null,
+  onRetry,
 }: OverviewEmissionsCardProps) => {
   // Tiny scopes (e.g. 0.25 vs 338k) collapse to 0px without a minAngle,
   // and paddingAngle alone reads as a white cut in the ring.
@@ -79,6 +97,20 @@ const OverviewEmissionsCard = ({
           <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
         </button>
       </header>
+      {statusNote ? <p className="mb-2 text-[12px] leading-snug text-slate-500">{statusNote}</p> : null}
+      {reconciliationNote ? (
+        <p className="mb-2 text-[12px] leading-snug text-amber-800">{reconciliationNote}</p>
+      ) : null}
+      {periodNote ? <p className="mb-2 text-[11px] leading-snug text-slate-400">{periodNote}</p> : null}
+      {incomplete && onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mb-2 text-[12px] font-medium text-[#1D9E75] hover:text-[#0F6E56]"
+        >
+          Retry emissions
+        </button>
+      ) : null}
 
       {loading ? (
         <div className="grid grid-cols-[minmax(0,60%)_minmax(0,40%)] gap-4 min-h-[164px] items-center animate-pulse">
@@ -132,11 +164,7 @@ const OverviewEmissionsCard = ({
               className={`col-start-2 ${rowStart} flex items-center justify-between gap-2 py-1.5 pl-0.5 min-w-0 ${divider}`}
             >
               <p className="text-[13px] font-semibold text-slate-900 tabular-nums leading-tight whitespace-nowrap">
-                {row.value.toLocaleString(undefined, {
-                  minimumFractionDigits: row.value >= 100 ? 1 : 2,
-                  maximumFractionDigits: row.value >= 100 ? 1 : 3,
-                })}{" "}
-                <span className="font-medium text-slate-500">tCO₂e</span>
+                {formatScopeTonnes(row.value)}
               </p>
               <div className="text-right shrink-0">
                 {row.delta ? (
@@ -159,7 +187,7 @@ const OverviewEmissionsCard = ({
                   </>
                 ) : (
                   <p className="text-[11px] font-normal text-slate-400 leading-tight whitespace-nowrap">
-                    Current inventory
+                    {row.value == null ? "Not loaded" : "Calculated"}
                   </p>
                 )}
               </div>
@@ -169,30 +197,34 @@ const OverviewEmissionsCard = ({
 
         <div className="col-start-3 row-start-1 row-span-3 flex items-center justify-center min-h-[164px]">
           <div className="relative w-full max-w-[188px] aspect-square">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartSlices.length > 0 ? chartSlices : donutData}
-                  innerRadius={68}
-                  outerRadius={86}
-                  paddingAngle={multiSlice ? 1 : 0}
-                  minAngle={multiSlice ? 10 : 0}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {(chartSlices.length > 0 ? chartSlices : donutData).map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+            {chartSlices.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartSlices}
+                    innerRadius={68}
+                    outerRadius={86}
+                    paddingAngle={multiSlice ? 1 : 0}
+                    minAngle={multiSlice ? 10 : 0}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {chartSlices.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : null}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-0.5">
               <p className="text-[19px] font-semibold text-slate-900 leading-none tracking-[-0.03em] tabular-nums">
-                {formatDonutCenterTotal(totalEmissions)}
+                {incomplete || totalEmissions == null ? "—" : formatDonutCenterTotal(totalEmissions)}
               </p>
-              <p className="text-[10px] font-normal text-slate-400 mt-1">tCO₂e</p>
+              <p className="text-[10px] font-normal text-slate-400 mt-1">
+                {incomplete || totalEmissions == null ? "Incomplete" : "tCO₂e"}
+              </p>
               <p className="text-[11px] font-medium text-slate-600 mt-0.5 leading-tight">
-                Total Emissions
+                {incomplete || totalEmissions == null ? "Not a complete total" : "Calculated total"}
               </p>
             </div>
           </div>

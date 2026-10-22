@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EmissionCategoryTotal, EpaIpccResultsData } from "@/lib/epaIpccResults";
+import { buildReportingTotals, isUnreconciledStationaryKey } from "../reportingTotals";
+import { type StationaryResultActivity, type StationaryVerifiedResults } from "../stationaryResults";
 import { formatKg, formatPct, formatTonnes, pctOfTotal } from "./formatters";
 
 export type BreakdownRow = EmissionCategoryTotal & {
@@ -25,6 +27,158 @@ type ResultsBreakdownTabsProps = {
   onTabChange?: (tab: string) => void;
 };
 
+function formatExactTonnes(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+
+function dash(value: string): string {
+  return value || "—";
+}
+
+function VerifiedStationaryPanel({
+  verified,
+}: {
+  verified: StationaryVerifiedResults | undefined;
+}) {
+  if (!verified) return null;
+  if (verified.status === "unavailable") {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        {verified?.error || "Verified stationary records could not be loaded. They are not included in the Scope 1 total."}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#0F6E56]">Stationary combustion (verified)</p>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Calculated by the EPA stationary service. Older fuel entries stay in the legacy list below and are not added to this total.
+          </p>
+        </div>
+        <p className="text-sm font-semibold tabular-nums text-slate-900">
+          {formatExactTonnes(verified.totalTco2e)} tCO₂e
+          <span className="ml-2 text-xs font-medium text-slate-500">
+            {formatKg(verified.totalKgCo2e)} kg CO₂e
+          </span>
+        </p>
+      </div>
+      {verified.status === "empty" ? (
+        <p className="text-sm text-slate-500">No verified stationary combustion records for this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {["Fuel", "Consumption", "Equipment", "Site", "Period", "CO₂", "CH₄", "N₂O", "tCO₂e", "GWP", "Factor source"].map(
+                  (heading) => (
+                    <th key={heading} className="text-left px-3 py-2.5 font-semibold text-slate-600 whitespace-nowrap">
+                      {heading}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {verified.activities.map((activity) => (
+                <ActivityRow key={activity.id} activity={activity} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GasCell({ gas }: { gas: StationaryResultActivity["co2"] }) {
+  return (
+    <td className="px-3 py-2.5 text-xs text-slate-700 whitespace-nowrap">
+      <div>{dash(gas.massKg)} kg</div>
+      <div className="text-slate-500">{dash(gas.co2eKg)} kg CO₂e</div>
+    </td>
+  );
+}
+
+function ActivityRow({ activity }: { activity: StationaryResultActivity }) {
+  return (
+    <tr className="border-t border-slate-100 align-top">
+      <td className="px-3 py-2.5 text-slate-800">
+        <div className="font-medium">{dash(activity.fuel)}</div>
+        {activity.fuelCategory && <div className="text-xs text-slate-500">{activity.fuelCategory}</div>}
+      </td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+        {dash(activity.quantity)} {activity.unit}
+      </td>
+      <td className="px-3 py-2.5 text-slate-700">
+        <div>{dash(activity.equipmentType)}</div>
+        {activity.equipmentId && <div className="text-xs text-slate-500">{activity.equipmentId}</div>}
+      </td>
+      <td className="px-3 py-2.5 text-slate-700">{dash(activity.site)}</td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.period)}</td>
+      <GasCell gas={activity.co2} />
+      <GasCell gas={activity.ch4} />
+      <GasCell gas={activity.n2o} />
+      <td className="px-3 py-2.5 font-medium tabular-nums text-slate-900 whitespace-nowrap">
+        {activity.totalTco2e}
+      </td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.gwpVersion)}</td>
+      <td className="px-3 py-2.5 text-xs text-slate-600 max-w-[220px]">{dash(activity.factorSource)}</td>
+    </tr>
+  );
+}
+
+function reportableActivityGroups(results: EpaIpccResultsData) {
+  return (results.scope1ByActivity || [])
+    .map((group) => {
+      const legacyParts = group.legacyParts.filter((part) => !isUnreconciledStationaryKey(part.key));
+      const valueKg = legacyParts.reduce((sum, part) => sum + (part.value || 0), 0);
+      return { ...group, legacyParts, valueKg };
+    })
+    .filter((group) => group.valueKg > 0);
+}
+
+function LegacyStationaryReconciliation({ rows }: { rows: EmissionCategoryTotal[] }) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-950">
+          Legacy Stationary Combustion — Requires Reconciliation
+        </p>
+        <p className="text-xs text-amber-900 mt-0.5">
+          These historical figures use the earlier calculation method. They stay available here and are excluded from the reportable Scope 1 and grand totals.
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-amber-900">No unreconciled legacy stationary records in this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-amber-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-amber-50">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Source</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-slate-600">kg CO₂e</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-slate-600">tCO₂e</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.key} className="border-t border-amber-100">
+                  <td className="px-4 py-2.5 text-slate-800">{row.label}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatKg(row.value)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatTonnes(row.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ResultsBreakdownTabs = ({
   results,
   detailKey,
@@ -44,6 +198,10 @@ const ResultsBreakdownTabs = ({
   const tab = activeTab ?? internalTab;
   const setTab = onTabChange ?? setInternalTab;
 
+  const verified = results.stationaryVerified;
+  const reporting = buildReportingTotals(results);
+  const grand = reporting.grandKg;
+
   const filterRows = (rows: BreakdownRow[]) => {
     const q = search.trim().toLowerCase();
     return rows
@@ -53,7 +211,7 @@ const ResultsBreakdownTabs = ({
 
   const renderTable = (rows: BreakdownRow[], colSpan: number) => {
     const filtered = filterRows(rows);
-    const grand = results.totals.grand;
+    const pctGrand = grand;
 
     return (
       <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -93,12 +251,15 @@ const ResultsBreakdownTabs = ({
                         {formatKg(row.value)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-slate-900 font-medium">
-                        {formatTonnes(row.value)}
+                        {row.key === "stationary_verified" && verified
+                          ? formatExactTonnes(verified.totalTco2e)
+                          : formatTonnes(row.value)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-slate-600">
-                        {formatPct(pctOfTotal(row.value, grand))}%
+                        {pctGrand == null ? "—" : `${formatPct(pctOfTotal(row.value, pctGrand))}%`}
                       </td>
                       <td className="px-4 py-3 text-right">
+                        {row.key === "stationary_verified" ? null : (
                         <Button
                           type="button"
                           variant="ghost"
@@ -113,6 +274,7 @@ const ResultsBreakdownTabs = ({
                             <ChevronRight className="h-4 w-4" />
                           )}
                         </Button>
+                        )}
                       </td>
                     </tr>
                     {open && detailLoading && (
@@ -241,15 +403,16 @@ const ResultsBreakdownTabs = ({
         </div>
 
         <TabsContent value="scope1" className="mt-0 space-y-4">
-          {results.scope1ByActivity && results.scope1ByActivity.length > 0 && (
+          <VerifiedStationaryPanel verified={verified} />
+          <LegacyStationaryReconciliation rows={reporting.legacyStationary} />
+          {reportableActivityGroups(results).length > 0 && (
             <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-[#0F6E56]">
                   Scope 1 by activity group
                 </p>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Historical entries are mapped into these groups at their original calculated
-                  values (not recalculated with current factors). Each legacy line is counted once.
+                  Reportable groups only. Unreconciled stationary records are listed separately and are not included here.
                 </p>
               </div>
               <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -259,11 +422,11 @@ const ResultsBreakdownTabs = ({
                       <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Activity</th>
                       <th className="text-right px-4 py-2.5 font-semibold text-slate-600">kg CO₂e</th>
                       <th className="text-right px-4 py-2.5 font-semibold text-slate-600">tCO₂e</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Legacy sources</th>
+                      <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Sources</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {results.scope1ByActivity.map((g) => (
+                    {reportableActivityGroups(results).map((g) => (
                       <tr key={g.groupId} className="border-t border-slate-100">
                         <td className="px-4 py-2.5">
                           <div className="font-medium text-slate-800">{g.label}</div>
@@ -296,10 +459,22 @@ const ResultsBreakdownTabs = ({
           )}
           <div>
             <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
-              Legacy category detail (same totals, not double-counted)
+              Reportable Scope 1 categories
             </p>
             {renderTable(
-              results.scope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
+              [
+                ...(verified?.status === "ready" && reporting.verifiedKg != null && reporting.verifiedKg > 0
+                  ? [
+                      {
+                        key: "stationary_verified",
+                        label: "Stationary combustion (verified)",
+                        value: reporting.verifiedKg,
+                        scope: "Scope 1" as const,
+                      },
+                    ]
+                  : []),
+                ...reporting.reportableScope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
+              ],
               5
             )}
           </div>

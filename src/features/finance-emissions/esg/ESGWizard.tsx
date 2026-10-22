@@ -12,6 +12,16 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { EmissionResultRow, FinanceMode, WizardLocationState, WizardResumePayload } from "../types/contracts";
 import type { LucideIcon } from 'lucide-react';
+import {
+  EPA_COMPANY_INVENTORY_MESSAGE,
+  IGNORED_AUTOMATIC_EMISSIONS_NOTICE,
+  hasUntrustedAutomaticEmissions,
+  isEpaCompanyInventoryBlocked,
+  questionnaireScopeAfterHandoff,
+  sanitizeUntrustedWizardSession,
+  wizardScopesAfterResume,
+  wizardShouldApplyResumeScopes,
+} from "@/features/emission-calculator/methodologies/epa-ipcc/epaCompanyHandoff";
 
 type RefreshPortfolioWindow = Window & {
   refreshPortfolioData?: () => Promise<void>;
@@ -692,12 +702,9 @@ export const ESGWizard: React.FC = () => {
       }
 
       const shouldPreserveReturnedScopeValues =
+        wizardShouldApplyResumeScopes(resumePayload) &&
         !!resumePayload &&
-        resumePayload.resumeAtCalculation === true &&
-        resumePayload.mode === mode &&
-        (typeof resumePayload.scope1Emissions === 'number' ||
-          typeof resumePayload.scope2Emissions === 'number' ||
-          typeof resumePayload.scope3Emissions === 'number');
+        resumePayload.mode === mode;
 
       try {
         console.log('Loading existing questionnaire for counterpartyId:', counterpartyId);
@@ -744,12 +751,26 @@ export const ESGWizard: React.FC = () => {
           
           // Prefer fresh values returned from emission calculator when resuming;
           // otherwise use persisted questionnaire scope values.
+          const unsafeHandoff =
+            hasUntrustedAutomaticEmissions(resumePayload) || isEpaCompanyInventoryBlocked(resumePayload);
           const resumedScope1 = Number(resumePayload?.scope1Emissions ?? 0);
           const resumedScope2 = Number(resumePayload?.scope2Emissions ?? 0);
           const resumedScope3 = Number(resumePayload?.scope3Emissions ?? 0);
-          const scope1Emissions = shouldPreserveReturnedScopeValues ? resumedScope1 : (questionnaire.scope1_emissions || 0);
-          const scope2Emissions = shouldPreserveReturnedScopeValues ? resumedScope2 : (questionnaire.scope2_emissions || 0);
-          const scope3Emissions = shouldPreserveReturnedScopeValues ? resumedScope3 : (questionnaire.scope3_emissions || 0);
+          const scope1Emissions = shouldPreserveReturnedScopeValues
+            ? resumedScope1
+            : unsafeHandoff
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope1_emissions, resumePayload) ?? 0)
+              : (questionnaire.scope1_emissions || 0);
+          const scope2Emissions = shouldPreserveReturnedScopeValues
+            ? resumedScope2
+            : unsafeHandoff
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope2_emissions, resumePayload) ?? 0)
+              : (questionnaire.scope2_emissions || 0);
+          const scope3Emissions = shouldPreserveReturnedScopeValues
+            ? resumedScope3
+            : unsafeHandoff
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope3_emissions, resumePayload) ?? 0)
+              : (questionnaire.scope3_emissions || 0);
 
           // Auto-calculate verified/unverified emissions when scope emissions change
           const totalEmissions = scope1Emissions + scope2Emissions + scope3Emissions;
@@ -902,27 +923,59 @@ export const ESGWizard: React.FC = () => {
         // IMPORTANT: Only restore if the mode matches! Don't use finance data for facilitated mode
         if (parsed.resumeAtCalculation === true && parsed.mode === mode) {
           hasRestoredRef.current = true; // Mark as restored to prevent re-runs
+          const sanitized = sanitizeUntrustedWizardSession(parsed);
+          const session = sanitized.state;
+          const sessionForm =
+            session.formData && typeof session.formData === "object"
+              ? (session.formData as Record<string, unknown>)
+              : undefined;
+          if (sanitized.ignoredAutomatic) {
+            toast({
+              title: "Automatic emissions were not used",
+              description: IGNORED_AUTOMATIC_EMISSIONS_NOTICE,
+            });
+          }
+          try {
+            sessionStorage.setItem("esgWizardState", JSON.stringify(session));
+          } catch (storageError) {
+            console.warn("Could not strip untrusted wizard emissions:", storageError);
+          }
           const restoredCounterpartyId =
-            parsed.counterpartyId || parsed.formData?.counterpartyId;
+            (typeof session.counterpartyId === "string" ? session.counterpartyId : undefined) ||
+            (typeof sessionForm?.counterpartyId === "string" ? sessionForm.counterpartyId : undefined);
           if (restoredCounterpartyId) {
             setCounterpartyId(restoredCounterpartyId);
           }
           
           // Restore form data from sessionStorage
-          if (parsed.formData) {
-            setFormData(prev => ({
-              ...prev,
-              ...parsed.formData,
-              // For facilitated mode, ensure loanTypes is empty (facilitated doesn't have loan types)
-              loanTypes: mode === 'facilitated' ? [] : (parsed.formData.loanTypes || []),
-              // Preserve scope emissions that might have been updated
-              scope1Emissions: parsed.scope1Emissions ?? parsed.formData.scope1Emissions ?? prev.scope1Emissions,
-              scope2Emissions: parsed.scope2Emissions ?? parsed.formData.scope2Emissions ?? prev.scope2Emissions,
-              scope3Emissions: parsed.scope3Emissions ?? parsed.formData.scope3Emissions ?? prev.scope3Emissions,
-              verified_emissions: parsed.verified_emissions ?? parsed.formData.verified_emissions ?? prev.verified_emissions,
-              unverified_emissions: parsed.unverified_emissions ?? parsed.formData.unverified_emissions ?? prev.unverified_emissions
-            }));
-            console.log('ESGWizard - Restored form data from sessionStorage for mode:', mode, parsed.formData);
+          if (sessionForm) {
+            setFormData(prev => {
+              const carried = wizardScopesAfterResume(session, sessionForm, {
+                scope1Emissions: prev.scope1Emissions,
+                scope2Emissions: prev.scope2Emissions,
+                scope3Emissions: prev.scope3Emissions,
+                verified_emissions: prev.verified_emissions,
+                unverified_emissions: prev.unverified_emissions,
+              });
+              return {
+                ...prev,
+                ...sessionForm,
+                // For facilitated mode, ensure loanTypes is empty (facilitated doesn't have loan types)
+                loanTypes: mode === 'facilitated' ? [] : (sessionForm.loanTypes || []),
+                scope1Emissions: carried.scope1Emissions,
+                scope2Emissions: carried.scope2Emissions,
+                scope3Emissions: carried.scope3Emissions,
+                verified_emissions: carried.verified_emissions,
+                unverified_emissions: carried.unverified_emissions,
+              };
+            });
+            if (isEpaCompanyInventoryBlocked(session)) {
+              toast({
+                title: "Company inventory not available",
+                description: EPA_COMPANY_INVENTORY_MESSAGE,
+              });
+            }
+            console.log('ESGWizard - Restored form data from sessionStorage for mode:', mode, sessionForm);
           }
           
           if (lastStepIdRef.current !== 'results') {

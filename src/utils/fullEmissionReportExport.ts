@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { USE_JWT_AUTH } from "@/api/config";
 import { getMyProfile } from "@/api/profile";
 import type { EpaIpccResultsData, EmissionCategoryTotal } from "@/lib/epaIpccResults";
+import { officialExportTotals, stationaryReportHtml, withReportableTotals } from "@/features/emission-calculator/results/resultsExport";
 import { groupScope1LegacyTotals } from "@/features/emission-calculator/scope1/activity-based/legacyMapping";
 import {
   loadLegacyCategoryDetailRows,
@@ -368,7 +369,11 @@ const getReportCSS = (): string => `
 
 export async function exportFullEmissionReportPdf(opts: FullEmissionReportExportOptions): Promise<void> {
   const user = opts.user;
-  const results = opts.results;
+  const sourceResults = opts.results;
+  const results = withReportableTotals(sourceResults);
+  const stationaryHtml = stationaryReportHtml(sourceResults);
+  const exportStatus = officialExportTotals(sourceResults);
+  const inventoryIncomplete = exportStatus.incomplete;
       const html2canvas = (await import("html2canvas")).default;
       const { default: jsPDF } = await import("jspdf");
       const isMariUser = opts.isMariUser;
@@ -941,10 +946,11 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
           <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
           <div class="page-content">
             <div class="page-title">Executive Summary</div><div class="page-divider"></div>
+            ${sourceResults.stationaryVerified ? `<p class="body-text">${escapeHtml(exportStatus.statusLabel)}</p>` : ""}
             <div class="exec-grid">
               <div class="exec-card">
                 <div class="exec-card-title">A. Emissions Snapshot</div>
-                <div class="exec-kpi">${fmt(results.totals.grand)} tCO2e</div>
+                <div class="exec-kpi">${inventoryIncomplete ? "Incomplete" : `${fmt(results.totals.grand)} tCO2e`}</div>
 
                 <div class="scope-bar">
                   <div class="scope-bar-top"><span>Scope 1</span><span>${scope1Pct}%</span></div>
@@ -989,7 +995,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               </tbody>
             </table>
 
-            <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(results.totals.grand)} tCO2e</div></div>
+            <div class="grand-total"><div class="grand-total-label">${inventoryIncomplete ? "GRAND TOTAL — NOT A COMPLETE INVENTORY" : "GRAND TOTAL EMISSIONS"}</div><div class="grand-total-value">${inventoryIncomplete ? "Incomplete" : `${fmt(results.totals.grand)} tCO2e`}</div></div>
             <div class="page-number">4</div>
           </div>
         </div>
@@ -1226,10 +1232,10 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
             <table class="inventory-table">
               <thead><tr><th>Scope</th><th>Emissions (tCO2e)</th><th>% Contribution</th></tr></thead>
               <tbody>
-                <tr><td>Scope 1</td><td class="num">${fmt(results.totals.scope1)}</td><td class="num">${scope1Pct}%</td></tr>
+                <tr><td>Scope 1</td><td class="num">${inventoryIncomplete ? "Incomplete" : fmt(results.totals.scope1)}</td><td class="num">${inventoryIncomplete ? "—" : `${scope1Pct}%`}</td></tr>
                 <tr><td>Scope 2</td><td class="num">${fmt(results.totals.scope2)}</td><td class="num">${scope2Pct}%</td></tr>
                 <tr><td>Scope 3</td><td class="num">${fmt(results.totals.scope3)}</td><td class="num">${scope3Pct}%</td></tr>
-                <tr><td><strong>Total</strong></td><td class="num"><strong>${fmt(results.totals.grand)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : fmt(results.totals.grand)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
               </tbody>
             </table>
 
@@ -1271,9 +1277,10 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 1</th></tr></thead>
               <tbody>
                 ${scope1Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope1)}%</td></tr>`).join("")}
-                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope1)}</strong></td><td class="num"><strong>${fmt(results.totals.scope1)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : formatKg(results.totals.scope1)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : fmt(results.totals.scope1)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
               </tbody>
             </table>
+            ${stationaryHtml}
             ${ipccMonthlyRows.length > 0 ? `
             ${ipccMonthlyRows.map((entry) => `
               <table class="scope3-table">

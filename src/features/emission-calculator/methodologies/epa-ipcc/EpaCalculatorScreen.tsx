@@ -39,6 +39,10 @@ import { useToast } from "@/hooks/use-toast";
 import { EmissionData, ScopeTotals } from "@/components/emissions/shared/types";
 import { loadEpaIpccResults } from "@/lib/epaIpccResults";
 import {
+  blockEpaCompanySnapshot,
+  blockEpaWizardHandoff,
+} from "./epaCompanyHandoff";
+import {
   loadCalculatorPreferences,
   saveCalculatorPreferences,
 } from "@/integrations/supabase/calculatorPreferencesClient";
@@ -328,6 +332,7 @@ const EmissionCalculatorEPA = () => {
   const [scope1HeatSteamRows, setScope1HeatSteamRows] = useState<Array<{ emissions?: number }>>([]);
   const [ipccScope1Totals, setIpccScope1Totals] = useState<Record<string, number>>({});
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [companyInventoryNotice, setCompanyInventoryNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -587,35 +592,16 @@ const EmissionCalculatorEPA = () => {
     void refreshSummaryFromDb({ seedScope3IfEmpty: true });
   }, [user?.id, companyContext, refreshSummaryFromDb]);
 
-  // Save company emissions to database (same as main calculator)
-  const saveCompanyEmissions = async (totals: ScopeTotals) => {
-    if (!companyContext) return;
-
-    try {
-      const { PortfolioClient } = await import("@/integrations/supabase/portfolioClient");
-
-      await PortfolioClient.upsertCompanyEmissions({
-        counterparty_id: companyContext.counterpartyId,
-        is_bank_emissions: false,
-        scope1_emissions: totals.scope1,
-        scope2_emissions: totals.scope2,
-        scope3_emissions: totals.scope3,
-        // Reuse the same calculation_source type as the main calculator
-        calculation_source: "emission_calculator",
-        notes: "Calculated using EPA emission calculator version",
-      });
-
-      sessionStorage.removeItem("companyEmissionsContext");
-      const returnUrl = `${companyContext.returnUrl}?counterpartyId=${companyContext.counterpartyId}`;
-      navigate(returnUrl);
-    } catch (error) {
-      console.error("Error saving company emissions (EPA):", error);
-      toast({
-        title: "Error",
-        description: "Failed to save company emissions. Please try again.",
-        variant: "destructive",
-      });
-    }
+  // Session totals are kilograms and are not a complete company inventory.
+  // Do not write them to company_emissions. Stationary activity saves are separate.
+  const refuseCompanyInventorySave = () => {
+    const decision = blockEpaCompanySnapshot();
+    setCompanyInventoryNotice(decision.message);
+    toast({
+      title: "Company inventory not saved",
+      description: decision.message,
+    });
+    return decision;
   };
 
   // Load LCA preferences
@@ -1768,71 +1754,40 @@ const EmissionCalculatorEPA = () => {
 
         {/* Bottom-right continue button (wizard/company flow) */}
         {(hasWizardContext || companyContext) && (
-          <div className="fixed right-6 bottom-6 z-40">
+          <div className="fixed right-6 bottom-6 z-40 max-w-sm">
+            {companyInventoryNotice ? (
+              <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 shadow">
+                {companyInventoryNotice}
+              </p>
+            ) : null}
             <Button
               className="bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-lg px-5 py-2 rounded-lg"
-              onClick={async () => {
+              onClick={() => {
+                refuseCompanyInventorySave();
+                if (!hasWizardContext) return;
                 try {
-                  if (hasWizardContext) {
-                    if (companyContext) {
-                      await saveCompanyEmissions(scopeTotals);
-                    }
-
-                    const saved = sessionStorage.getItem("esgWizardState");
-                    const parsed = saved ? JSON.parse(saved) : {};
-                    const totalEmissions = scopeTotals.total;
-
-                    let verified_emissions = 0;
-                    let unverified_emissions = 0;
-                    const verificationStatus =
-                      parsed.formData?.verificationStatus || parsed.verificationStatus || "";
-                    if (verificationStatus === "verified") {
-                      verified_emissions = totalEmissions;
-                      unverified_emissions = 0;
-                    } else if (verificationStatus === "unverified") {
-                      unverified_emissions = totalEmissions;
-                      verified_emissions = 0;
-                    }
-
-                    const updatedState = {
-                      ...parsed,
-                      mode: wizardMode,
+                  const saved = sessionStorage.getItem("esgWizardState");
+                  const parsed = saved ? JSON.parse(saved) : {};
+                  const blocked = blockEpaWizardHandoff({
+                    ...parsed,
+                    mode: wizardMode || parsed.mode,
+                    counterpartyId:
+                      companyContext?.counterpartyId ||
+                      parsed.counterpartyId ||
+                      parsed.formData?.counterpartyId,
+                    resumeAtCalculation: parsed.resumeAtCalculation === true,
+                    formData: {
+                      ...(parsed.formData || {}),
                       counterpartyId:
                         companyContext?.counterpartyId ||
                         parsed.counterpartyId ||
                         parsed.formData?.counterpartyId,
-                      resumeAtCalculation: true,
-                      scope1Emissions: scopeTotals.scope1,
-                      scope2Emissions: scopeTotals.scope2,
-                      scope3Emissions: scopeTotals.scope3,
-                      verified_emissions,
-                      unverified_emissions,
-                      totalEmissions,
-                      ts: Date.now(),
-                      formData: {
-                        ...(parsed.formData || {}),
-                        counterpartyId:
-                          companyContext?.counterpartyId ||
-                          parsed.counterpartyId ||
-                          parsed.formData?.counterpartyId,
-                      },
-                    };
-
-                    sessionStorage.setItem("esgWizardState", JSON.stringify(updatedState));
-                    navigate("/finance-emission", { state: { mode: wizardMode } });
-                  } else if (companyContext) {
-                    await saveCompanyEmissions(scopeTotals);
-                    navigate(companyContext.returnUrl);
-                  }
+                    },
+                    ts: Date.now(),
+                  });
+                  sessionStorage.setItem("esgWizardState", JSON.stringify(blocked));
                 } catch (error) {
-                  console.error("Error saving EPA calculator state:", error);
-                  if (hasWizardContext) {
-                    navigate("/finance-emission", { state: { mode: wizardMode } });
-                  } else if (companyContext) {
-                    navigate(companyContext.returnUrl);
-                  } else {
-                    navigate("/emission-calculator-epa");
-                  }
+                  console.error("Error blocking EPA wizard handoff:", error);
                 }
               }}
             >

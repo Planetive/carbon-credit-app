@@ -19,30 +19,17 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
 import OverviewEmissionsCard, {
   OVERVIEW_EMISSIONS_SCOPE_COLORS,
 } from "@/features/dashboard/components/OverviewEmissionsCard";
 import OverviewEsgProgressCard from "@/features/dashboard/components/OverviewEsgProgressCard";
-
-const kgToTco2e = (kg = 0) => Math.max(0, Number(kg) || 0) / 1000;
-
-/** Placeholder trend only — historical inventory snapshots are not tracked yet. */
-const MOCK_EMISSIONS_TREND = [
-  { month: "Dec '23", scope1: 780, scope2: 1180, scope3: 210 },
-  { month: "Jan '24", scope1: 800, scope2: 1200, scope3: 220 },
-  { month: "Feb '24", scope1: 815, scope2: 1220, scope3: 235 },
-  { month: "Mar '24", scope1: 830, scope2: 1250, scope3: 248 },
-  { month: "Apr '24", scope1: 838, scope2: 1270, scope3: 260 },
-  { month: "May '24", scope1: 842.5, scope2: 1284.3, scope3: 271.2 },
-];
+import {
+  DASHBOARD_PERIOD_NOTE,
+  DASHBOARD_SCOPE_NOTE,
+  dashboardTrackedLabel,
+  kgToTco2eOrNull,
+  type DashboardEmissionsSummary,
+} from "@/features/dashboard/dashboardEmissions";
 
 export interface CompanyOverviewScreenProps {
   displayName?: string;
@@ -57,12 +44,10 @@ export interface CompanyOverviewScreenProps {
   impactEnvironmentPercent?: number;
   impactSocialPercent?: number;
   impactGovernancePercent?: number;
-  emissionsTracked: boolean;
-  scope1Kg?: number;
-  scope2Kg?: number;
-  scope3Kg?: number;
+  emissionsSummary?: DashboardEmissionsSummary | null;
   /** True while scope totals are still loading for Emissions Overview. */
   emissionsLoading?: boolean;
+  onRetryEmissions?: () => void;
   monitoringModulesActive?: number;
 }
 
@@ -241,11 +226,9 @@ const CompanyOverviewScreen = ({
   impactEnvironmentPercent = 0,
   impactSocialPercent = 0,
   impactGovernancePercent = 0,
-  emissionsTracked,
-  scope1Kg = 0,
-  scope2Kg = 0,
-  scope3Kg = 0,
+  emissionsSummary = null,
   emissionsLoading = false,
+  onRetryEmissions,
   monitoringModulesActive = 0,
 }: CompanyOverviewScreenProps) => {
   const navigate = useNavigate();
@@ -255,24 +238,34 @@ const CompanyOverviewScreen = ({
   const readinessLabel = esgMaturityLabel || "Not scored";
   const assessmentProgress = Math.min(100, Math.max(0, Math.round(assessmentProgressPercent)));
 
-  const s1 = kgToTco2e(scope1Kg);
-  const s2 = kgToTco2e(scope2Kg);
-  const s3 = kgToTco2e(scope3Kg);
-  const totalEmissions = s1 + s2 + s3;
+  const s1 = kgToTco2eOrNull(emissionsSummary?.scope1Kg ?? null);
+  const s2 = kgToTco2eOrNull(emissionsSummary?.scope2Kg ?? null);
+  const s3 = kgToTco2eOrNull(emissionsSummary?.scope3Kg ?? null);
+  const totalEmissions = kgToTco2eOrNull(emissionsSummary?.grandKg ?? null);
+  const emissionsIncomplete =
+    !emissionsLoading &&
+    (emissionsSummary == null ||
+      emissionsSummary.status === "incomplete" ||
+      emissionsSummary.status === "missing_organization" ||
+      emissionsSummary.grandKg == null);
+  const tracked = emissionsSummary
+    ? dashboardTrackedLabel(emissionsSummary)
+    : { value: "Incomplete", sub: "Totals were not shown" };
 
   const envScore = Math.round(impactEnvironmentPercent);
   const socialScore = Math.round(impactSocialPercent);
   const govScore = Math.round(impactGovernancePercent);
 
-  const donutData = useMemo(
-    () =>
-      OVERVIEW_EMISSIONS_SCOPE_COLORS.map((palette, index) => {
-        const values = [s1, s2, s3];
-        const names = ["Scope 1", "Scope 2", "Scope 3"];
-        return { name: names[index], value: values[index], color: palette.chart };
-      }),
-    [s1, s2, s3]
-  );
+  const donutData = useMemo(() => {
+    if (s1 == null || s2 == null || s3 == null) return [];
+    const values = [s1, s2, s3];
+    const names = ["Scope 1", "Scope 2", "Scope 3"];
+    return OVERVIEW_EMISSIONS_SCOPE_COLORS.map((palette, index) => ({
+      name: names[index],
+      value: values[index],
+      color: palette.chart,
+    }));
+  }, [s1, s2, s3]);
 
   const quickActions = [
     { label: "New Project", path: "/project-wizard", icon: Plus },
@@ -315,13 +308,19 @@ const CompanyOverviewScreen = ({
   );
 
   const aiInsight = useMemo(() => {
+    if (emissionsIncomplete || totalEmissions == null || s1 == null || s2 == null || s3 == null) {
+      return {
+        body: "The emissions total is incomplete, so no scope share is shown. Retry the inventory load before using this overview for reporting.",
+        actions: ["Retry the emissions load", "Open the full emission results", "Confirm the organization context"],
+      };
+    }
     if (totalEmissions <= 0) {
       return {
-        body: "No emissions inventory is available yet. Complete your emission calculator to unlock scope-level insights and recommended actions.",
+        body: "The loaded records total zero. This is a calculated result for the available records, not an assured inventory.",
         actions: [
           "Open the emission calculator",
-          "Add Scope 1 fuel and facility data",
-          "Review Scope 2 electricity inputs",
+          "Add activity data for the scopes you report",
+          "Review the full emission results",
         ],
       };
     }
@@ -335,16 +334,18 @@ const CompanyOverviewScreen = ({
     const topPct = Math.round((top.value / totalEmissions) * 100);
 
     return {
-      body: `${top.label} accounts for about ${topPct}% of your current inventory (${totalEmissions.toLocaleString(undefined, {
-        maximumFractionDigits: 2,
-      })} tCO₂e total). Focus reduction and data-quality efforts on that scope first, then validate supporting evidence for reporting.`,
+      body: `${top.label} accounts for about ${topPct}% of the calculated total (${totalEmissions.toLocaleString(undefined, {
+        maximumFractionDigits: 5,
+      })} tCO₂e). This figure is not independently audited.`,
       actions: [
-        `Review ${top.label} category breakdown`,
-        "Validate emission factors and activity data",
-        "Export results for assurance readiness",
+        `Review the ${top.label} category breakdown`,
+        "Check the full emission results",
+        emissionsSummary?.reconciliationPending
+          ? "Reconcile excluded historical stationary records"
+          : "Review activity data for the loaded categories",
       ],
     };
-  }, [s1, s2, s3, totalEmissions]);
+  }, [emissionsIncomplete, emissionsSummary?.reconciliationPending, s1, s2, s3, totalEmissions]);
 
   if (profileLoading) {
     return <OverviewWelcomeLoading />;
@@ -434,8 +435,8 @@ const CompanyOverviewScreen = ({
           },
           {
             label: "Emissions Tracked",
-            value: emissionsTracked ? "Yes" : "No",
-            sub: emissionsTracked ? "Inventory available" : "No emissions data yet",
+            value: emissionsLoading ? "…" : tracked.value,
+            sub: emissionsLoading ? "Loading calculated totals" : tracked.sub,
             subGreen: false,
             icon: Leaf,
           },
@@ -477,6 +478,21 @@ const CompanyOverviewScreen = ({
           donutData={donutData}
           totalEmissions={totalEmissions}
           loading={emissionsLoading}
+          incomplete={emissionsIncomplete}
+          statusNote={emissionsLoading ? null : emissionsSummary?.statusLabel || DASHBOARD_SCOPE_NOTE}
+          periodNote={
+            emissionsLoading
+              ? null
+              : [emissionsSummary?.periodNote || DASHBOARD_PERIOD_NOTE, emissionsSummary?.scopeNote || DASHBOARD_SCOPE_NOTE]
+                  .filter(Boolean)
+                  .join(" ")
+          }
+          reconciliationNote={
+            emissionsSummary?.reconciliationPending
+              ? "Historical stationary combustion is excluded. Reconciliation is pending."
+              : null
+          }
+          onRetry={onRetryEmissions}
           onViewFullResults={() => navigate("/emission-results-calculator")}
         />
         <OverviewEsgProgressCard
@@ -492,21 +508,9 @@ const CompanyOverviewScreen = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6">
           <h2 className="text-sm font-semibold text-gray-900">Emissions Trend</h2>
-          <p className="text-xs text-gray-500 mb-4">
-            Sample 6-month view (mock data — historical tracking coming soon)
+          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+            Period history is not available, so this chart is hidden. Sample figures are not shown as historical emissions.
           </p>
-          <div className="h-[210px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={MOCK_EMISSIONS_TREND} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f2" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <Line type="monotone" dataKey="scope1" stroke="#1D9E75" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="scope2" stroke="#E8C89A" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="scope3" stroke="#4F7FD3" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
         </div>
 
         <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6">

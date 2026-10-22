@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ChevronDown, Flame } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,8 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import FuelEmissions from "@/features/emission-calculator/scope1/components/FuelEmissions";
-import { buildStationaryActivityMeta } from "../activityMeta";
+import { StationaryEntryForm } from "../stationary/StationaryEntryForm";
+import type { StationaryActivityContext } from "../stationary/stationaryEntry";
 import { STATIONARY_EQUIPMENT_OPTIONS, type StationaryEquipmentType } from "../types";
 import { ActivitySectionShell, FormStep } from "./ActivitySectionShell";
 import { LegacySavedInventory } from "./LegacySavedInventory";
@@ -29,10 +29,8 @@ type Props = {
  * Purchased heat/steam remains Scope 2.
  */
 export function StationaryCombustionSection({
-  companyContext,
   counterpartyId,
   onDataChange,
-  onSaveAndNext,
   onInventoryChanged,
 }: Props) {
   const [equipmentType, setEquipmentType] = useState<StationaryEquipmentType>("boiler");
@@ -40,7 +38,25 @@ export function StationaryCombustionSection({
   const [sourceId, setSourceId] = useState("");
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [showOptional, setShowOptional] = useState(false);
-  const [fuelRefreshKey, setFuelRefreshKey] = useState(0);
+  const equipmentLabel =
+    STATIONARY_EQUIPMENT_OPTIONS.find((option) => option.id === equipmentType)?.label ||
+    equipmentType;
+  const reportVerified = useCallback(
+    (kg: number | null) => {
+      onDataChange(kg != null && kg > 0 ? [{ emissions: kg }] : []);
+    },
+    [onDataChange]
+  );
+  const restoreActivity = useCallback((context: StationaryActivityContext) => {
+    const match = STATIONARY_EQUIPMENT_OPTIONS.find(
+      (option) => option.id === context.equipmentType || option.label === context.equipmentType
+    );
+    if (match) setEquipmentType(match.id);
+    setSite(context.site);
+    setSourceId(context.equipmentId);
+    if (context.period) setPeriod(context.period);
+    if (context.site || context.equipmentId) setShowOptional(true);
+  }, []);
 
   return (
     <ActivitySectionShell
@@ -56,9 +72,8 @@ export function StationaryCombustionSection({
     >
       <LegacySavedInventory
         groupId="stationary"
-        editableNote="Open a source to review or delete saved rows. New entries you add below appear here too."
+        editableNote="Historical fuel entries stay here and can be deleted. New calculations are listed with the fuel form and are not copied into this list."
         onChanged={() => {
-          setFuelRefreshKey((k) => k + 1);
           onInventoryChanged?.();
         }}
       />
@@ -83,6 +98,16 @@ export function StationaryCombustionSection({
           </Select>
         </div>
 
+        <div className="mt-3">
+          <Label className="text-gray-600 text-xs">Reporting period</Label>
+          <Input
+            type="month"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="mt-1.5 max-w-xs rounded-xl border-gray-200"
+          />
+        </div>
+
         <button
           type="button"
           onClick={() => setShowOptional((v) => !v)}
@@ -95,7 +120,7 @@ export function StationaryCombustionSection({
         </button>
 
         {showOptional && (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-gray-100 bg-gray-50/40 p-3">
             <div>
               <Label className="text-gray-600 text-xs">Site</Label>
               <Input
@@ -114,34 +139,19 @@ export function StationaryCombustionSection({
                 className="mt-1.5 rounded-xl border-gray-200 bg-white"
               />
             </div>
-            <div>
-              <Label className="text-gray-600 text-xs">Period</Label>
-              <Input
-                type="month"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className="mt-1.5 rounded-xl border-gray-200 bg-white"
-              />
-            </div>
           </div>
         )}
       </FormStep>
 
       <FormStep step={2} label="Fuel use">
-        <FuelEmissions
-          key={fuelRefreshKey}
-          onDataChange={onDataChange}
-          companyContext={companyContext}
+        <StationaryEntryForm
+          equipmentType={equipmentLabel}
+          site={site}
+          equipmentId={sourceId}
+          period={period}
           counterpartyId={counterpartyId}
-          onSaveAndNext={onSaveAndNext}
-          sectionTitle=""
-          sectionDescription=""
-          activityMeta={buildStationaryActivityMeta({
-            equipmentType,
-            site,
-            sourceId,
-            period,
-          })}
+          onVerifiedKgChange={reportVerified}
+          onEditActivity={restoreActivity}
         />
       </FormStep>
     </ActivitySectionShell>

@@ -32,6 +32,93 @@ export function calcUkFuel(
   return apiFetch<CalcResult>("/api/v1/calc/uk/fuel", { method: "POST", body });
 }
 
+export type StationaryGasResult = {
+  mass_kg: string;
+  gwp: string;
+  co2e_kg: string;
+};
+
+export type StationaryCalcResponse = {
+  success: boolean;
+  fuel: string;
+  category: string;
+  quantity: string;
+  unit: string;
+  gases: {
+    co2: StationaryGasResult;
+    ch4: StationaryGasResult;
+    n2o: StationaryGasResult;
+  };
+  total_kg_co2e: string;
+  total_t_co2e: string;
+  factors: Record<string, { value: string; unit: string }>;
+  factor_source: {
+    publisher?: string | null;
+    dataset_code?: string | null;
+    dataset_title?: string | null;
+    version_label?: string | null;
+    effective_from?: string | null;
+    effective_to?: string | null;
+    source_notes?: string | null;
+    gwp_version?: string;
+    gwp?: Record<string, string>;
+    dataset_id?: string | null;
+    factor_row_id?: string | null;
+  };
+  error?: string;
+};
+
+export type StationarySaveBody = {
+  fuel: string;
+  quantity: string;
+  unit: string;
+  assessment_id: string;
+  equipment_type: string;
+  category?: string | null;
+  gwp_version?: string;
+  counterparty_id?: string | null;
+  site?: string | null;
+  equipment_id?: string | null;
+  period?: string | null;
+};
+
+export type StationarySaveResponse = {
+  activity_id: string;
+  assessment_id: string;
+  organization_id: string;
+  counterparty_id?: string | null;
+  emissions_tco2e: string;
+  calculation: StationaryCalcResponse;
+  raw: Record<string, unknown>;
+};
+
+export function calcEpaStationary(body: {
+  fuel: string;
+  quantity: string;
+  unit: string;
+  category?: string | null;
+  gwp_version?: string;
+}) {
+  return apiFetch<StationaryCalcResponse>("/api/v1/calc/epa/stationary", {
+    method: "POST",
+    body,
+  });
+}
+
+export function createEpaStationaryRecord(body: StationarySaveBody) {
+  return apiFetch<StationarySaveResponse>("/api/v1/calc/epa/stationary/records", {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateEpaStationaryRecord(activityId: string, body: StationarySaveBody) {
+  return apiFetch<StationarySaveResponse>(
+    `/api/v1/calc/epa/stationary/records/${activityId}`,
+    { method: "PATCH", body }
+  );
+}
+
 export function calcEpaFuel(
   body: {
     quantity: number;

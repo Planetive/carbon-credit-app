@@ -13,6 +13,8 @@ type ResultsSummaryCardProps = {
   categoriesCalculated: number;
   submittedAt: string;
   methodologyLabel?: string;
+  inventoryStatus?: "reportable" | "provisional" | "incomplete";
+  statusNote?: string;
   onEditAssessment?: () => void;
   onExportPdf?: () => void;
   onExportExcel?: () => void;
@@ -24,6 +26,8 @@ const ResultsSummaryCard = ({
   categoriesCalculated,
   submittedAt,
   methodologyLabel = "GHG Protocol",
+  inventoryStatus,
+  statusNote,
   onEditAssessment,
   onExportPdf,
   onExportExcel,
@@ -53,9 +57,25 @@ const ResultsSummaryCard = ({
           <h1 className="text-2xl sm:text-[26px] font-bold tracking-[-0.02em] text-[#0F172A]">
             Carbon Footprint Assessment
           </h1>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF7F1] px-2.5 py-1 text-xs font-semibold text-[#0F6E56]">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Completed
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              inventoryStatus === "incomplete"
+                ? "bg-amber-100 text-amber-950"
+                : inventoryStatus === "provisional"
+                  ? "bg-amber-100 text-amber-950"
+                  : inventoryStatus === "reportable"
+                    ? "bg-slate-100 text-slate-700"
+                    : "bg-[#EAF7F1] text-[#0F6E56]"
+            }`}
+          >
+            {inventoryStatus ? null : <CheckCircle2 className="h-3.5 w-3.5" />}
+            {inventoryStatus === "incomplete"
+              ? "Incomplete"
+              : inventoryStatus === "provisional"
+                ? "Partial / provisional"
+                : inventoryStatus === "reportable"
+                  ? "Reportable"
+                  : "Completed"}
           </span>
         </div>
         <p className="mt-1.5 text-sm text-slate-500">
@@ -72,12 +92,18 @@ const ResultsSummaryCard = ({
           </p>
           <div className="flex-1 flex items-center py-2">
             <p className="text-5xl sm:text-[60px] leading-none font-bold tracking-[-0.03em] text-[#0F172A] tabular-nums">
-              {formatTonnes(grandTotalKg)}
-              <span className="ml-2.5 text-2xl sm:text-[30px] font-bold text-[#0F172A]">tCO₂e</span>
+              {inventoryStatus === "incomplete" ? (
+                "—"
+              ) : (
+                <>
+                  {formatTonnes(grandTotalKg)}
+                  <span className="ml-2.5 text-2xl sm:text-[30px] font-bold text-[#0F172A]">tCO₂e</span>
+                </>
+              )}
             </p>
           </div>
           <p className="text-sm text-slate-500 max-w-md">
-            This is your total calculated emissions across all scopes.
+            {statusNote || "This is your total calculated emissions across all scopes."}
           </p>
         </div>
 

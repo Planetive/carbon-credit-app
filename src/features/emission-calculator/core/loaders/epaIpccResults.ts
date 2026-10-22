@@ -11,6 +11,12 @@ import {
   groupScope1LegacyTotals,
   type GroupedScope1Total,
 } from "@/features/emission-calculator/scope1/activity-based/legacyMapping";
+import {
+  fetchStationaryVerified,
+  legacyFuelRowsExcludingVerified,
+  type StationaryReadContext,
+  type StationaryVerifiedResults,
+} from "@/features/emission-calculator/results/stationaryResults";
 
 export interface EmissionCategoryTotal {
   key: string;
@@ -24,6 +30,12 @@ export interface EpaIpccResultsData {
   scope1ByActivity: GroupedScope1Total[];
   scope2: EmissionCategoryTotal[];
   scope3: EmissionCategoryTotal[];
+  /**
+   * Backend epa_stationary records. Tonnes live here.
+   * totals.scope1 stays in kilograms and does not include this block, so existing
+   * CSV and PDF export loops keep their previous inputs.
+   */
+  stationaryVerified?: StationaryVerifiedResults;
   totals: {
     scope1: number;
     scope2: number;
@@ -32,7 +44,10 @@ export interface EpaIpccResultsData {
   };
 }
 
-export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResultsData> => {
+export const loadEpaIpccResults = async (
+  userId: string,
+  context: StationaryReadContext = {}
+): Promise<EpaIpccResultsData> => {
   // All table reads in one wave — including Scope 2 electricity (was sequential before).
   const [
     scope1FuelRows,
@@ -63,6 +78,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     scope3ProcessingSoldRows,
     scope3UseOfSoldRows,
     scope2Electricity,
+    stationaryVerified,
   ] = await Promise.all([
     // EPA-only fuel rows (exclude UK framework — shared table).
     safeListLegacyTable("scope1_fuel_entries", userId, {}, (row) => {
@@ -97,10 +113,20 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     safeListLegacyTable("scope3_processing_sold_products", userId),
     safeListLegacyTable("scope3_use_of_sold_products", userId),
     calculateLegacyScope2ElectricityTotal(userId),
+    fetchStationaryVerified(context),
   ]);
 
+  const legacyFuelRows = legacyFuelRowsExcludingVerified(
+    scope1FuelRows,
+    (stationaryVerified.activities || []).map((activity) => activity.id)
+  );
+
   const scope1: EmissionCategoryTotal[] = [
-    { key: "fuel", label: "Fuel (legacy / stationary)", value: sumEmissionsField(scope1FuelRows) },
+    {
+      key: "fuel",
+      label: "Fuel (legacy / stationary)",
+      value: sumEmissionsField(legacyFuelRows),
+    },
     { key: "mobile", label: "Mobile Fuel (legacy)", value: sumEmissionsField(scope1MobileRows) },
     { key: "onroad_gas", label: "On-road Gasoline (legacy)", value: sumEmissionsField(scope1OnRoadGasRows) },
     {
@@ -175,6 +201,7 @@ export const loadEpaIpccResults = async (userId: string): Promise<EpaIpccResults
     scope1ByActivity,
     scope2,
     scope3,
+    stationaryVerified,
     totals: {
       scope1: scope1Total,
       scope2: scope2Total,

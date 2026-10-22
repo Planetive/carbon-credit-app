@@ -29,6 +29,7 @@ import {
   Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +47,13 @@ import {
 import { ApiError } from "@/api/client";
 import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 import { loadEpaIpccResults } from "@/lib/epaIpccResults";
+import {
+  dashboardStationaryContext,
+  failedDashboardSummary,
+  missingOrganizationSummary,
+  summarizeDashboardEmissions,
+  type DashboardEmissionsSummary,
+} from "@/features/dashboard/dashboardEmissions";
 import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
 import DashboardSidebar from "@/components/DashboardSidebar";
@@ -55,6 +63,7 @@ import CompanyOverviewScreen from "@/features/dashboard/CompanyOverviewScreen";
 
 const Dashboard2 = () => {
   const { signOut, user } = useAuth();
+  const { currentOrganization, loading: organizationLoading } = useOrganization();
   const { toast } = useToast();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,11 +79,9 @@ const Dashboard2 = () => {
   const [esgAssessment, setEsgAssessment] = useState<any>(null);
   const [esgScores, setEsgScores] = useState<any>(null);
   const [emissionData, setEmissionData] = useState<any>(null);
-  const [hasAnyEmissions, setHasAnyEmissions] = useState<boolean>(false);
   const [emissionsLoading, setEmissionsLoading] = useState<boolean>(true);
-  const [scope1Total, setScope1Total] = useState<number>(0);
-  const [scope2Total, setScope2Total] = useState<number>(0);
-  const [scope3Total, setScope3Total] = useState<number>(0);
+  const [emissionsRetry, setEmissionsRetry] = useState(0);
+  const [emissionsSummary, setEmissionsSummary] = useState<DashboardEmissionsSummary | null>(null);
   const [financeEmissionData, setFinanceEmissionData] = useState<any>(null);
   const [facilitatedEmissionData, setFacilitatedEmissionData] = useState<any>(null);
   const [riskAssessmentData, setRiskAssessmentData] = useState<any>(null);
@@ -287,27 +294,7 @@ const Dashboard2 = () => {
     if (!user || profileMissing) return;
     const fetchData = async () => {
       setLoading(true);
-      setEmissionsLoading(true);
       setError(null);
-
-      // Kick off emissions immediately so Emissions Overview does not wait on ESG/projects.
-      const emissionsPromise = (async () => {
-        try {
-          const epaResults = await loadEpaIpccResults(user.id);
-          setScope1Total(epaResults.totals.scope1);
-          setScope2Total(epaResults.totals.scope2);
-          setScope3Total(epaResults.totals.scope3);
-          setHasAnyEmissions(epaResults.totals.grand > 0);
-        } catch (error) {
-          console.error("Error loading emission totals:", error);
-          setHasAnyEmissions(false);
-          setScope1Total(0);
-          setScope2Total(0);
-          setScope3Total(0);
-        } finally {
-          setEmissionsLoading(false);
-        }
-      })();
 
       const projectsPromise = (async () => {
         try {
@@ -397,7 +384,6 @@ const Dashboard2 = () => {
       })();
 
       await Promise.all([
-        emissionsPromise,
         projectsPromise,
         esgPromise,
         emissionCalculatorPromise,
@@ -523,6 +509,47 @@ const Dashboard2 = () => {
     };
     fetchData();
     }, [user, profileMissing, userType]);
+
+  useEffect(() => {
+    if (!user || profileMissing || organizationLoading) return;
+    let cancelled = false;
+    const loadEmissions = async () => {
+      setEmissionsLoading(true);
+      const organizationId = currentOrganization?.id;
+      if (!organizationId) {
+        if (!cancelled) {
+          setEmissionsSummary(missingOrganizationSummary());
+          setEmissionsLoading(false);
+        }
+        return;
+      }
+      try {
+        const epaResults = await loadEpaIpccResults(
+          user.id,
+          dashboardStationaryContext(organizationId)
+        );
+        if (cancelled) return;
+        setEmissionsSummary(summarizeDashboardEmissions(epaResults));
+      } catch (loadError) {
+        console.error("Error loading emission totals:", loadError);
+        if (!cancelled) {
+          setEmissionsSummary(
+            failedDashboardSummary(
+              loadError instanceof Error && loadError.message
+                ? loadError.message
+                : undefined
+            )
+          );
+        }
+      } finally {
+        if (!cancelled) setEmissionsLoading(false);
+      }
+    };
+    void loadEmissions();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, profileMissing, organizationLoading, currentOrganization?.id, emissionsRetry]);
 
   // Fetch portfolio companies when portfolio section is active (financial institution)
   useEffect(() => {
@@ -912,11 +939,9 @@ const Dashboard2 = () => {
                       )?.pillarPercent
                     ) || 0
                   }
-                  emissionsTracked={hasAnyEmissions}
-                  scope1Kg={scope1Total}
-                  scope2Kg={scope2Total}
-                  scope3Kg={scope3Total}
+                  emissionsSummary={emissionsSummary}
                   emissionsLoading={emissionsLoading}
+                  onRetryEmissions={() => setEmissionsRetry((count) => count + 1)}
                 />
               </motion.div>
           ) : activeSection === 'portfolio' ? (

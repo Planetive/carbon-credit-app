@@ -95,7 +95,7 @@ export function SourceScreeningPanel({ screening, onChange, onContinue }: Props)
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F1] text-[#1D9E75]">
                   <Icon className="h-4 w-4" />
                 </div>
-                <div className="min-w-0 pt-0.5">
+                <div className="min-w-0 pt-0.5"> 
                   <p className="font-medium text-gray-900 text-sm leading-snug">{group.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5 leading-snug">
                     {group.screeningQuestion}
