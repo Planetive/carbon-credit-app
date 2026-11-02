@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowRight, Flame, Leaf, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 
@@ -31,6 +32,7 @@ interface OverviewEmissionsCardProps {
   statusNote?: string | null;
   periodNote?: string | null;
   reconciliationNote?: string | null;
+  headerExtra?: ReactNode;
   onRetry?: () => void;
 }
 
@@ -76,6 +78,7 @@ const OverviewEmissionsCard = ({
   statusNote = null,
   periodNote = null,
   reconciliationNote = null,
+  headerExtra = null,
   onRetry,
 }: OverviewEmissionsCardProps) => {
   // Tiny scopes (e.g. 0.25 vs 338k) collapse to 0px without a minAngle,
@@ -85,24 +88,31 @@ const OverviewEmissionsCard = ({
 
   return (
     <article className={CARD}>
-      <header className="mb-2.5 flex items-baseline justify-between gap-3">
+      <header className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[20px] font-semibold text-slate-900 leading-tight tracking-[-0.02em]">
           Emissions Overview
         </h2>
-        <button
-          type="button"
-          onClick={onViewFullResults}
-          className="text-[13px] font-medium text-[#1D9E75] hover:text-[#0F6E56] inline-flex items-center gap-1 shrink-0 group"
-        >
-          View full emission results
-          <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          {headerExtra}
+          <button
+            type="button"
+            onClick={onViewFullResults}
+            className="text-[13px] font-medium text-[#1D9E75] hover:text-[#0F6E56] inline-flex items-center gap-1 shrink-0 group"
+          >
+            View full emission results
+            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
       </header>
-      {statusNote ? <p className="mb-2 text-[12px] leading-snug text-slate-500">{statusNote}</p> : null}
-      {reconciliationNote ? (
-        <p className="mb-2 text-[12px] leading-snug text-amber-800">{reconciliationNote}</p>
+      {statusNote ? (
+        <p className="mb-2 text-[12px] leading-snug text-slate-500 line-clamp-2">{statusNote}</p>
       ) : null}
-      {periodNote ? <p className="mb-2 text-[11px] leading-snug text-slate-400">{periodNote}</p> : null}
+      {reconciliationNote ? (
+        <p className="mb-2 text-[12px] leading-snug text-amber-800 line-clamp-2">{reconciliationNote}</p>
+      ) : null}
+      {periodNote ? (
+        <p className="mb-2 text-[11px] leading-snug text-slate-400 line-clamp-2">{periodNote}</p>
+      ) : null}
       {incomplete && onRetry ? (
         <button
           type="button"
@@ -149,7 +159,7 @@ const OverviewEmissionsCard = ({
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-medium text-slate-900 leading-tight">{row.label}</p>
-                <p className="text-[12px] font-normal text-slate-500 leading-tight">{row.sub}</p>
+                <p className="text-[12px] font-normal text-slate-500 leading-tight truncate">{row.sub}</p>
               </div>
             </div>
           );

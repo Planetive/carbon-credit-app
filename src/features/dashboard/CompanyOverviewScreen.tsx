@@ -25,8 +25,7 @@ import OverviewEmissionsCard, {
 } from "@/features/dashboard/components/OverviewEmissionsCard";
 import OverviewEsgProgressCard from "@/features/dashboard/components/OverviewEsgProgressCard";
 import {
-  DASHBOARD_PERIOD_NOTE,
-  DASHBOARD_SCOPE_NOTE,
+  dashboardOverviewNote,
   dashboardTrackedLabel,
   kgToTco2eOrNull,
   type DashboardEmissionsSummary,
@@ -300,12 +299,12 @@ const CompanyOverviewScreen = ({
       },
       {
         label: "Scope 3",
-        sub: "Legacy undated records are excluded",
+        sub: "Value chain",
         value: s3,
         missingLabel: emissionsUnavailable ? "Unavailable" : "Legacy excluded",
       },
     ],
-    [s1, s2, s3, emissionsPartial]
+    [s1, s2, s3, emissionsPartial, emissionsUnavailable]
   );
 
   const esgImpactAreas = useMemo(
@@ -447,7 +446,7 @@ const CompanyOverviewScreen = ({
             label: "Emissions Tracked",
             value: emissionsLoading ? "…" : tracked.value,
             sub: emissionsLoading ? "Loading calculated totals" : tracked.sub,
-            subGreen: false,
+            subGreen: !emissionsLoading && emissionsSummary?.grandKg != null,
             icon: Leaf,
           },
           {
@@ -483,35 +482,26 @@ const CompanyOverviewScreen = ({
 
       {/* Emissions + ESG — 60% / 40% on xl+ */}
       <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 items-stretch">
-        <div className="space-y-3">
-        {reportingYear != null && onReportingYearChange ? (
-          <div className="max-w-xs">
-            <EpaReportingYearControl year={reportingYear} onChange={onReportingYearChange} />
-          </div>
-        ) : null}
         <OverviewEmissionsCard
           scopeRows={emissionScopeRows}
           donutData={donutData}
           totalEmissions={totalEmissions}
           loading={emissionsLoading}
           incomplete={emissionsIncomplete}
-          statusNote={emissionsLoading ? null : emissionsSummary?.statusLabel || DASHBOARD_SCOPE_NOTE}
-          periodNote={
-            emissionsLoading
-              ? null
-              : [emissionsSummary?.periodNote || DASHBOARD_PERIOD_NOTE, emissionsSummary?.scopeNote || DASHBOARD_SCOPE_NOTE]
-                  .filter(Boolean)
-                  .join(" ")
-          }
+          statusNote={emissionsLoading || !emissionsSummary ? null : dashboardOverviewNote(emissionsSummary)}
           reconciliationNote={
             emissionsSummary?.reconciliationPending
-              ? "Historical stationary combustion is excluded. Reconciliation is pending."
+              ? "Historical stationary combustion is excluded until reconciliation."
               : null
+          }
+          headerExtra={
+            reportingYear != null && onReportingYearChange ? (
+              <EpaReportingYearControl compact year={reportingYear} onChange={onReportingYearChange} />
+            ) : null
           }
           onRetry={onRetryEmissions}
           onViewFullResults={() => navigate("/emission-results-calculator")}
         />
-        </div>
         <OverviewEsgProgressCard
           esgScore={esgScore}
           readinessLabel={readinessLabel}
@@ -572,7 +562,7 @@ const CompanyOverviewScreen = ({
       </div>
 
       {/* Monitoring modules — empty state */}
-      <div className="rounded-2xl border border-gray-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] -mt-[8%] overflow-hidden">
+      <div className="rounded-2xl border border-gray-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden">
         <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3 min-w-0">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF7F1] text-[#1D9E75]">

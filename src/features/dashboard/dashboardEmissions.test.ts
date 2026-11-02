@@ -4,12 +4,14 @@ import { buildReportingTotals } from "@/features/emission-calculator/results/rep
 import type { StationaryVerifiedResults } from "@/features/emission-calculator/results/stationaryResults";
 import { productionAnnualAssignment } from "@/features/emission-calculator/results/reportingYear";
 import {
+  dashboardOverviewNote,
   dashboardStationaryContext,
   dashboardTrackedLabel,
   failedDashboardSummary,
   kgToTco2e,
   missingOrganizationSummary,
   summarizeDashboardEmissions,
+  type DashboardEmissionsSummary,
 } from "./dashboardEmissions";
 
 function verified(
@@ -218,5 +220,42 @@ describe("dashboard EPA summary", () => {
     expect(summary.periodNote).toMatch(/Reporting year 2026/);
     expect(summary.periodNote).toMatch(/unassigned/i);
     expect(summary.statusLabel).toMatch(/not an independently verified or audit-approved inventory/i);
+    const overviewNote = dashboardOverviewNote(summary);
+    expect(overviewNote == null || overviewNote.length < 120).toBe(true);
+    expect(overviewNote ?? "").not.toMatch(/location-based/);
+    expect(overviewNote ?? "").not.toMatch(/independently verified/i);
+  });
+
+  it("shows calculated tonnes on the dashboard KPI instead of Partial or Yes", () => {
+    const summary: DashboardEmissionsSummary = {
+      status: "provisional",
+      inventory: "partial",
+      reportingYear: 2026,
+      statusLabel:
+        "Reporting year 2026. Verified Scope 2 includes location-based purchased electricity. This is not an independently verified or audit-approved inventory.",
+      periodNote: "Reporting year 2026. Other years are excluded.",
+      scopeNote: "Stationary combustion uses this organization's calculated records.",
+      reconciliationPending: false,
+      scope1Kg: 5311.45,
+      scope2Kg: 0,
+      scope3Kg: 0,
+      grandKg: 5311.45,
+      verifiedTco2e: 5.31145,
+      biogenicCo2T: 0,
+      biogenicLabel: "Biogenic CO2 not recorded",
+    };
+    expect(dashboardTrackedLabel(summary)).toEqual({
+      value: "5.31",
+      sub: "Partial tCO₂e",
+    });
+    expect(dashboardOverviewNote(summary)).toBeNull();
+  });
+
+  it("does not dump methodology paragraphs onto the dashboard overview", () => {
+    const missing = missingOrganizationSummary();
+    expect(dashboardOverviewNote(missing)).toBe("Select an organization to load emissions.");
+    const failed = failedDashboardSummary("API unavailable");
+    expect(dashboardOverviewNote(failed)).toBe("Emissions could not be loaded for this reporting year.");
+    expect(dashboardOverviewNote(failed)).not.toBe(failed.statusLabel);
   });
 });

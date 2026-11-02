@@ -126,7 +126,30 @@ export function summarizeDashboardEmissions(results: EpaIpccResultsData): Dashbo
   };
 }
 
+/** One-line dashboard copy. Full methodology stays on the results screen. */
+export function dashboardOverviewNote(summary: DashboardEmissionsSummary): string | null {
+  if (summary.status === "missing_organization" || summary.inventory === "missing_organization") {
+    return "Select an organization to load emissions.";
+  }
+  if (summary.status === "incomplete" || summary.inventory === "unavailable") {
+    return "Emissions could not be loaded for this reporting year.";
+  }
+  return null;
+}
+
 export function dashboardTrackedLabel(summary: DashboardEmissionsSummary): { value: string; sub: string } {
+  const tonnes = kgToTco2eOrNull(summary.grandKg);
+  if (tonnes != null) {
+    return {
+      value: tonnes.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+      sub:
+        summary.inventory === "partial"
+          ? "Partial tCO₂e"
+          : summary.reconciliationPending
+            ? "Calculated · reconciliation pending"
+            : "tCO₂e calculated",
+    };
+  }
   if (summary.inventory === "partial") {
     return { value: "Partial", sub: "Annual total is not complete" };
   }
@@ -137,14 +160,6 @@ export function dashboardTrackedLabel(summary: DashboardEmissionsSummary): { val
     summary.grandKg == null
   ) {
     return { value: "Unavailable", sub: "Totals were not shown" };
-  }
-  if (summary.grandKg > 0) {
-    return {
-      value: "Yes",
-      sub: summary.reconciliationPending
-        ? "Calculated · reconciliation pending"
-        : "Calculated total",
-    };
   }
   return {
     value: "No",
