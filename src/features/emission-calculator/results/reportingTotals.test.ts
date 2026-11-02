@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EpaIpccResultsData } from "@/features/emission-calculator/core/loaders/epaIpccResults";
 import type { StationaryVerifiedResults } from "./stationaryResults";
+import { productionAnnualAssignment } from "./reportingYear";
 import { buildReportingTotals } from "./reportingTotals";
 
 function verified(totalTco2e: number, totalKgCo2e: number): StationaryVerifiedResults {
@@ -53,6 +54,7 @@ function results(overrides: Partial<EpaIpccResultsData> = {}): EpaIpccResultsDat
     scope2: overrides.scope2 || [{ key: "electricity", label: "Electricity", value: 30 }],
     scope3: overrides.scope3 || [{ key: "waste", label: "Waste", value: 4 }],
     stationaryVerified: overrides.stationaryVerified,
+    annualReporting: overrides.annualReporting || productionAnnualAssignment(2026),
     totals: overrides.totals || {
       scope1: scope1Total,
       scope2: 30,
@@ -69,9 +71,13 @@ describe("reportable EPA totals", () => {
     );
     expect(reporting.verifiedTco2e).toBe(5.31145);
     expect(reporting.verifiedKg).toBe(5311.45);
-    expect(reporting.scope1Kg).toBe(5311.45 + 20 + 7);
-    expect(reporting.grandKg).toBe(5311.45 + 20 + 7 + 30 + 4);
-    expect(reporting.reportableScope1.map((row) => row.key)).toEqual(["mobile", "flaring"]);
+    expect(reporting.scope1Kg).toBe(5311.45);
+    expect(reporting.biogenicCo2T).toBeNull();
+    expect(reporting.biogenicStatus).toBe("not_recorded");
+    expect(reporting.scope2Kg).toBeNull();
+    expect(reporting.grandKg).toBeNull();
+    expect(reporting.inventory).toBe("partial");
+    expect(reporting.reportableScope1).toEqual([]);
   });
 
   it("keeps a legacy fuel record out of the reportable total and still lists it", () => {
@@ -85,8 +91,8 @@ describe("reportable EPA totals", () => {
         totals: { scope1: 120, scope2: 30, scope3: 4, grand: 154 },
       })
     );
-    expect(reporting.scope1Kg).toBe(5311.45 + 20);
-    expect(reporting.grandKg).toBe(5311.45 + 20 + 30 + 4);
+    expect(reporting.scope1Kg).toBe(5311.45);
+    expect(reporting.grandKg).toBeNull();
     expect(reporting.legacyStationary).toEqual([{ key: "fuel", label: "Fuel", value: 100 }]);
     expect(reporting.status).toBe("provisional");
     expect(reporting.scope1Kg).not.toBe(5311.45 + 20 + 100);
@@ -111,15 +117,16 @@ describe("reportable EPA totals", () => {
       })
     );
     expect(reporting.excludedKg).toBe(5 + 6 + 7 + 8);
-    expect(reporting.scope1Kg).toBe(5311.45 + 20);
-    expect(reporting.grandKg).toBe(5311.45 + 20 + 45 + 4);
+    expect(reporting.scope1Kg).toBe(5311.45);
+    expect(reporting.scope2Kg).toBeNull();
+    expect(reporting.grandKg).toBeNull();
     expect(reporting.legacyStationary.map((row) => row.key)).toEqual([
       "kitchen",
       "power",
       "heating",
       "heatsteam",
     ]);
-    expect(reporting.reportableScope1.map((row) => row.key)).toEqual(["mobile"]);
+    expect(reporting.reportableScope1).toEqual([]);
   });
 
   it("does not turn a failed stationary load into zero or a complete total", () => {
@@ -139,6 +146,7 @@ describe("reportable EPA totals", () => {
       })
     );
     expect(reporting.status).toBe("incomplete");
+    expect(reporting.inventory).toBe("unavailable");
     expect(reporting.scope1Kg).toBeNull();
     expect(reporting.grandKg).toBeNull();
     expect(reporting.verifiedKg).toBeNull();
@@ -159,9 +167,10 @@ describe("reportable EPA totals", () => {
         },
       })
     );
-    expect(reporting.status).toBe("reportable");
+    expect(reporting.inventory).toBe("partial");
     expect(reporting.verifiedTco2e).toBe(0);
-    expect(reporting.scope1Kg).toBe(27);
+    expect(reporting.scope1Kg).toBe(0);
+    expect(reporting.grandKg).toBeNull();
     expect(reporting.statusLabel).toMatch(/not an independently verified or audit-approved inventory/i);
   });
 });

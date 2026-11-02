@@ -4,7 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Save, Trash2, ChevronRight } from "lucide-react";
-import type { EmployeeCommutingRow } from "@/components/emissions/scope3/types/scope3Types";
+import type {
+  CommuteDistanceBasis,
+  EmployeeCommutingRow,
+} from "@/components/emissions/scope3/types/scope3Types";
 import type { BusinessTravelType } from "@/components/emissions/scope3/businessTravelTypes";
 
 interface EmployeeCommutingSectionProps {
@@ -56,7 +59,7 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
             Employee Commuting
           </h4>
           <p className="text-sm text-gray-600">
-            Travel modes, distance, and number of employees
+            One-way distances are doubled per working day; round-trip distances are not.
           </p>
         </div>
         <Button
@@ -68,9 +71,11 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Travel Mode</Label>
         <Label className="text-gray-500 font-medium">Distance (km)</Label>
+        <Label className="text-gray-500 font-medium">Distance type</Label>
+        <Label className="text-gray-500 font-medium">Working days/year</Label>
         <Label className="text-gray-500 font-medium">Employees</Label>
         <Label className="text-gray-500 font-medium">Emissions</Label>
       </div>
@@ -79,7 +84,7 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
         {rows.map((r) => (
           <div
             key={r.id}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
+            className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
           >
             <div className="w-full">
               <Select
@@ -122,6 +127,49 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
                   }
                 }}
                 placeholder="Enter distance"
+                className="w-full"
+              />
+            </div>
+            <div className="w-full">
+              <Select
+                value={r.distanceBasis ?? "annual_total"}
+                onValueChange={(v) =>
+                  onUpdateRow(r.id, { distanceBasis: v as CommuteDistanceBasis })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Distance type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual_total">Already annual total</SelectItem>
+                  <SelectItem value="one_way">One-way (×2 per day)</SelectItem>
+                  <SelectItem value="round_trip">Round-trip (no double)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full">
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                disabled={(r.distanceBasis ?? "annual_total") === "annual_total"}
+                value={r.workingDaysPerYear ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    onUpdateRow(r.id, { workingDaysPerYear: undefined });
+                  } else {
+                    const numValue = Number(value);
+                    if (numValue >= 0) {
+                      onUpdateRow(r.id, { workingDaysPerYear: numValue });
+                    }
+                  }
+                }}
+                placeholder={
+                  (r.distanceBasis ?? "annual_total") === "annual_total"
+                    ? "N/A"
+                    : "e.g. 220"
+                }
                 className="w-full"
               />
             </div>
@@ -198,8 +246,13 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
             {saving ? "Saving..." : `Save (${totalPending})`}
           </Button>
           {onSaveAndNext && (
-            <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75] hover:bg-[#EAF7F1]">
-              Next <ChevronRight className="h-4 w-4 ml-1" />
+            <Button
+              onClick={onSaveAndNext}
+              variant="outline"
+              className="border-[#1D9E75] text-[#1D9E75]"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           )}
         </div>
@@ -207,5 +260,3 @@ export const EmployeeCommutingSection: React.FC<EmployeeCommutingSectionProps> =
     </div>
   );
 };
-
-

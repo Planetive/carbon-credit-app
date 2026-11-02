@@ -1,0 +1,9 @@
+-- NOT CANONICAL. Do not apply this file.
+--
+-- Canonical migration:
+--   carbon-credit-backend/db/migrations/0015_financed_scope_breakdown.sql
+--
+-- Same rule as Phase 2C / 0014: SPA copies are documentation only.
+-- FastAPI owns app.financed_emissions. Apply from the backend repo via pgAdmin
+-- after the GO/NO-GO checklist passes. Do not run against production from this
+-- review. Do not backfill historical totals into a scope split.

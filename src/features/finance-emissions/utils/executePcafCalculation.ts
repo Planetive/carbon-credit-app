@@ -1,12 +1,6 @@
-import type { CalculationStepDto } from "@/features/finance-emissions/types/contracts";
-import { CalculationEngine } from "@/features/finance-emissions/engines/CalculationEngine";
-import {
-  resolveFinancedCalculation,
-  type FinancedLocalResult,
-} from "@/api/financedConnection";
+import type { FinancedLocalResult } from "@/api/financedConnection";
+import { resolveFinancedCalculation } from "@/api/financedConnection";
 import { resolveSovereignFinancedCalculation } from "./sovereignPcafRunner";
-
-const pcafEngine = new CalculationEngine();
 
 export async function executePcafCalculation(opts: {
   loanTypeKey: string;
@@ -35,7 +29,6 @@ export async function executePcafCalculation(opts: {
     });
   }
 
-  const local = pcafEngine.calculate(formulaId, pcafInputs, companyType);
   return resolveFinancedCalculation({
     calc_kind: "finance",
     formula_id: formulaId,
@@ -43,13 +36,5 @@ export async function executePcafCalculation(opts: {
     inputs: pcafInputs,
     counterparty_id,
     persist,
-    local: {
-      attributionFactor: local.attributionFactor,
-      financedEmissions: local.financedEmissions,
-      dataQualityScore: local.dataQualityScore,
-      methodology: local.methodology,
-      calculationSteps: local.calculationSteps as CalculationStepDto[],
-      emissionFactor: local.emissionFactor,
-    },
   });
 }

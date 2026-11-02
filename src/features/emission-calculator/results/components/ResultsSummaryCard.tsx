@@ -9,11 +9,12 @@ import {
 import { formatTonnes } from "./formatters";
 
 type ResultsSummaryCardProps = {
-  grandTotalKg: number;
+  grandTotalKg: number | null;
   categoriesCalculated: number;
   submittedAt: string;
   methodologyLabel?: string;
   inventoryStatus?: "reportable" | "provisional" | "incomplete";
+  reportingYear?: number | null;
   statusNote?: string;
   onEditAssessment?: () => void;
   onExportPdf?: () => void;
@@ -27,6 +28,7 @@ const ResultsSummaryCard = ({
   submittedAt,
   methodologyLabel = "GHG Protocol",
   inventoryStatus,
+  reportingYear = null,
   statusNote,
   onEditAssessment,
   onExportPdf,
@@ -34,7 +36,8 @@ const ResultsSummaryCard = ({
   isGeneratingPdf = false,
 }: ResultsSummaryCardProps) => {
   const submitted = new Date(submittedAt);
-  const reportingYear = `FY${submitted.getFullYear()}`;
+  const reportingYearLabel =
+    reportingYear != null ? String(reportingYear) : `FY${submitted.getFullYear()}`;
 
   const submittedLabel = submitted.toLocaleDateString("en-US", {
     year: "numeric",
@@ -70,7 +73,7 @@ const ResultsSummaryCard = ({
           >
             {inventoryStatus ? null : <CheckCircle2 className="h-3.5 w-3.5" />}
             {inventoryStatus === "incomplete"
-              ? "Incomplete"
+              ? "Unavailable"
               : inventoryStatus === "provisional"
                 ? "Partial / provisional"
                 : inventoryStatus === "reportable"
@@ -79,7 +82,7 @@ const ResultsSummaryCard = ({
           </span>
         </div>
         <p className="mt-1.5 text-sm text-slate-500">
-          Reporting Year: {reportingYear}
+          Reporting Year: {reportingYearLabel}
           <span className="mx-1.5 text-slate-300">•</span>
           Submitted on {submittedLabel}
         </p>
@@ -92,8 +95,8 @@ const ResultsSummaryCard = ({
           </p>
           <div className="flex-1 flex items-center py-2">
             <p className="text-5xl sm:text-[60px] leading-none font-bold tracking-[-0.03em] text-[#0F172A] tabular-nums">
-              {inventoryStatus === "incomplete" ? (
-                "—"
+              {grandTotalKg == null ? (
+                inventoryStatus === "incomplete" ? "Unavailable" : "Partial"
               ) : (
                 <>
                   {formatTonnes(grandTotalKg)}
@@ -114,7 +117,7 @@ const ResultsSummaryCard = ({
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm flex-1 min-w-0">
               <div>
                 <dt className="text-slate-500 mb-0.5">Reporting Year</dt>
-                <dd className="font-semibold text-[#0F172A]">{reportingYear}</dd>
+                <dd className="font-semibold text-[#0F172A]">{reportingYearLabel}</dd>
               </div>
               <div>
                 <dt className="text-slate-500 mb-0.5">Methodology</dt>

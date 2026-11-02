@@ -19,12 +19,32 @@ import {
   updateScope3CategoryEntry,
 } from "@/features/scope3/adapters/scope3SupabaseAdapter";
 import { USE_JWT_AUTH } from "@/api/config";
+import { ApiError } from "@/api/client";
+import { getOrCreateDraftAssessment } from "@/api/ghg";
 import {
-  resolveBusinessTravelEmissionsKg,
-  resolveEmployeeCommutingEmissionsKg,
-  resolveFreightEmissionsKg,
-  resolveWasteEmissionsKg,
-} from "@/api/calcConnection";
+  calcScope3BusinessTravel,
+  calcScope3EmployeeCommuting,
+  calcScope3Freight,
+  calcScope3Waste,
+  saveScope3BusinessTravel,
+  saveScope3EmployeeCommuting,
+  saveScope3Freight,
+  saveScope3Waste,
+  verifiedActivityId,
+} from "@/api/scope3Verified";
+import {
+  annualizeCommutingDistanceKm,
+  classifyFreightFactorUnit,
+  freightEmissionsKg,
+  travelDistanceEmissionsKg,
+  wasteEmissionsKg,
+  WASTE_DATASET_FACTOR_UNIT,
+} from "@/lib/emissions/scope3FactorUnits";
+import {
+  Scope3PeriodFields,
+  scope3Period,
+} from "@/features/emission-calculator/scope3/verified/Scope3PeriodFields";
+import { readSelectedReportingYear } from "@/features/emission-calculator/results/reportingYear";
 import { WasteMaterial, getAvailableDisposalMethods, getEmissionFactor, DisposalMethod, getAllWasteMaterials } from "./wasteTypes";
 import { getAllBusinessTravelTypes, BusinessTravelType } from "./businessTravelTypes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -76,11 +96,24 @@ type Props = {
   onSaveAndNext?: () => void;
   companyContext?: boolean;
   counterpartyId?: string;
+  /** Assessment framework for verified Scope 3 saves (must match the calculator). */
+  framework?: "uk" | "epa";
 };
 
-export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData, onSaveAndNext, companyContext = false, counterpartyId }) => {
+export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData, onSaveAndNext, companyContext = false, counterpartyId, framework = "uk" }) => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [year, setYear] = useState(readSelectedReportingYear);
+  const [month, setMonth] = useState("01");
+  const [factorError, setFactorError] = useState<string | null>(null);
+  const period = scope3Period(year, month);
+  const verifiedCpId = companyContext && counterpartyId ? counterpartyId : null;
+  const apiErr = (err: unknown, fallback: string) =>
+    err instanceof ApiError
+      ? err.message
+      : err instanceof Error
+        ? err.message
+        : fallback;
   
   // Shared data for multiple categories
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
@@ -101,14 +134,31 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateUpstreamTransportRow = (id: string, patch: Partial<UpstreamTransportRow>) => {
     let snapshot: UpstreamTransportRow | null = null;
-    let factor = 0;
+    let vehicleLabel = "";
     setUpstreamTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
-      if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
-        factor = vehicleType.co2_factor;
-        updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
+      const kind = vehicleType ? classifyFreightFactorUnit(vehicleType.unit) : null;
+      const weightOk =
+        kind === "vehicle_mile" ||
+        (typeof updated.weight === "number" && updated.weight > 0);
+      if (
+        vehicleType &&
+        kind &&
+        typeof updated.distance === "number" &&
+        updated.distance > 0 &&
+        weightOk
+      ) {
+        vehicleLabel = vehicleType.vehicle_type;
+        updated.emissions = USE_JWT_AUTH
+          ? undefined
+          : freightEmissionsKg({
+              distanceKm: updated.distance,
+              weightKg: typeof updated.weight === "number" ? updated.weight : 0,
+              co2Factor: vehicleType.co2_factor,
+              factorUnit: vehicleType.unit,
+            }) ?? undefined;
       } else {
         updated.emissions = undefined;
       }
@@ -119,25 +169,35 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      vehicleLabel &&
       typeof snapshot.distance === "number" &&
-      typeof snapshot.weight === "number" &&
-      snapshot.emissions != null
+      snapshot.distance > 0
     ) {
       const snap = snapshot;
+      const label = vehicleLabel;
       void (async () => {
-        const kg = await resolveFreightEmissionsKg({
-          distance: snap.distance!,
-          weight: snap.weight!,
-          co2_factor: factor,
-        });
-        setUpstreamTransportRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3Freight({
+            vehicle_type: label,
+            distance_km: snap.distance!,
+            weight_kg: typeof snap.weight === "number" ? snap.weight : 0,
+            period,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setUpstreamTransportRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified freight factor unavailable"));
+          setUpstreamTransportRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -227,14 +287,31 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateDownstreamTransportRow = (id: string, patch: Partial<DownstreamTransportRow>) => {
     let snapshot: DownstreamTransportRow | null = null;
-    let factor = 0;
+    let vehicleLabel = "";
     setDownstreamTransportRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const vehicleType = vehicleTypes.find(vt => vt.id === updated.vehicleTypeId);
-      if (vehicleType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.weight === 'number' && updated.weight > 0) {
-        factor = vehicleType.co2_factor;
-        updated.emissions = vehicleType.co2_factor * updated.distance * updated.weight;
+      const kind = vehicleType ? classifyFreightFactorUnit(vehicleType.unit) : null;
+      const weightOk =
+        kind === "vehicle_mile" ||
+        (typeof updated.weight === "number" && updated.weight > 0);
+      if (
+        vehicleType &&
+        kind &&
+        typeof updated.distance === "number" &&
+        updated.distance > 0 &&
+        weightOk
+      ) {
+        vehicleLabel = vehicleType.vehicle_type;
+        updated.emissions = USE_JWT_AUTH
+          ? undefined
+          : freightEmissionsKg({
+              distanceKm: updated.distance,
+              weightKg: typeof updated.weight === "number" ? updated.weight : 0,
+              co2Factor: vehicleType.co2_factor,
+              factorUnit: vehicleType.unit,
+            }) ?? undefined;
       } else {
         updated.emissions = undefined;
       }
@@ -245,25 +322,35 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      vehicleLabel &&
       typeof snapshot.distance === "number" &&
-      typeof snapshot.weight === "number" &&
-      snapshot.emissions != null
+      snapshot.distance > 0
     ) {
       const snap = snapshot;
+      const label = vehicleLabel;
       void (async () => {
-        const kg = await resolveFreightEmissionsKg({
-          distance: snap.distance!,
-          weight: snap.weight!,
-          co2_factor: factor,
-        });
-        setDownstreamTransportRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3Freight({
+            vehicle_type: label,
+            distance_km: snap.distance!,
+            weight_kg: typeof snap.weight === "number" ? snap.weight : 0,
+            period,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setDownstreamTransportRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.distance !== snap.distance || r.weight !== snap.weight) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified freight factor unavailable"));
+          setDownstreamTransportRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -353,7 +440,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateWasteGeneratedRow = (id: string, patch: Partial<WasteGeneratedRow>) => {
     let snapshot: WasteGeneratedRow | null = null;
-    let factorVal = 0;
     let materialLabel = "";
     setWasteGeneratedRows(prev => prev.map(r => {
       if (r.id !== id) return r;
@@ -361,9 +447,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       const material = wasteMaterials.find(m => m.id === updated.materialId);
       if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
         const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
-        factorVal = factor ?? 0;
         materialLabel = String(material[" Material "] || "");
-        updated.emissions = factor !== null ? updated.volume * factor : undefined;
+        updated.emissions = USE_JWT_AUTH
+          ? undefined
+          : factor !== null
+            ? wasteEmissionsKg({
+                mass: updated.volume,
+                massUnit: "kg",
+                factor,
+                factorUnit: WASTE_DATASET_FACTOR_UNIT,
+              }) ?? undefined
+            : undefined;
       } else {
         updated.emissions = undefined;
       }
@@ -374,26 +468,36 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      materialLabel &&
       typeof snapshot.volume === "number" &&
-      snapshot.disposalMethod &&
-      snapshot.emissions != null
+      snapshot.volume > 0 &&
+      snapshot.disposalMethod
     ) {
       const snap = snapshot;
+      const label = materialLabel;
       void (async () => {
-        const kg = await resolveWasteEmissionsKg({
-          volume: snap.volume!,
-          disposal_method: String(snap.disposalMethod),
-          factor: factorVal,
-          material: materialLabel || undefined,
-        });
-        setWasteGeneratedRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3Waste({
+            material: label,
+            disposal_method: String(snap.disposalMethod),
+            mass_kg: snap.volume!,
+            period,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setWasteGeneratedRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified waste factor unavailable"));
+          setWasteGeneratedRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -483,20 +587,20 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateBusinessTravelRow = (id: string, patch: Partial<BusinessTravelRow>) => {
     let snapshot: BusinessTravelRow | null = null;
-    let co2Factor = 0;
-    let unit: string | undefined;
+    let travelLabel = "";
     setBusinessTravelRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
       if (travelType && typeof updated.distance === 'number' && updated.distance > 0) {
-        co2Factor = travelType.co2_factor;
-        unit = travelType.unit;
-        let factorPerKm = travelType.co2_factor;
-        if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
-          factorPerKm = travelType.co2_factor / 1.60934;
-        }
-        updated.emissions = updated.distance * factorPerKm;
+        travelLabel = travelType.vehicle_type;
+        updated.emissions = USE_JWT_AUTH
+          ? undefined
+          : travelDistanceEmissionsKg({
+              distanceKm: updated.distance,
+              co2Factor: travelType.co2_factor,
+              factorUnit: travelType.unit,
+            }) ?? undefined;
       } else {
         updated.emissions = undefined;
       }
@@ -507,24 +611,34 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      travelLabel &&
       typeof snapshot.distance === "number" &&
-      snapshot.emissions != null
+      snapshot.distance > 0
     ) {
       const snap = snapshot;
+      const label = travelLabel;
       void (async () => {
-        const kg = await resolveBusinessTravelEmissionsKg({
-          distance: snap.distance!,
-          co2_factor: co2Factor,
-          unit,
-        });
-        setBusinessTravelRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.distance !== snap.distance || r.travelTypeId !== snap.travelTypeId) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3BusinessTravel({
+            vehicle_type: label,
+            distance_km: snap.distance!,
+            period,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setBusinessTravelRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.distance !== snap.distance || r.travelTypeId !== snap.travelTypeId) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified business travel factor unavailable"));
+          setBusinessTravelRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -613,21 +727,38 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateEmployeeCommutingRow = (id: string, patch: Partial<EmployeeCommutingRow>) => {
     let snapshot: EmployeeCommutingRow | null = null;
-    let co2Factor = 0;
-    let unit: string | undefined;
+    let travelLabel = "";
     setEmployeeCommutingRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const updated = { ...r, ...patch };
       const travelType = businessTravelTypes.find(bt => bt.id === updated.travelTypeId);
-      // Formula: employees * distance * emission_factor
-      if (travelType && typeof updated.distance === 'number' && updated.distance > 0 && typeof updated.employees === 'number' && updated.employees > 0) {
-        co2Factor = travelType.co2_factor;
-        unit = travelType.unit;
-        let factorPerKm = travelType.co2_factor;
-        if (travelType.unit && travelType.unit.toLowerCase().includes('mile')) {
-          factorPerKm = travelType.co2_factor / 1.60934;
+      if (
+        travelType &&
+        typeof updated.distance === "number" &&
+        updated.distance > 0 &&
+        typeof updated.employees === "number" &&
+        updated.employees > 0
+      ) {
+        travelLabel = travelType.vehicle_type;
+        if (USE_JWT_AUTH) {
+          updated.emissions = undefined;
+        } else {
+          const annualKm = annualizeCommutingDistanceKm({
+            distanceKm: updated.distance,
+            distanceBasis: updated.distanceBasis ?? "annual_total",
+            workingDaysPerYear: updated.workingDaysPerYear,
+          });
+          const tripKg =
+            annualKm == null
+              ? null
+              : travelDistanceEmissionsKg({
+                  distanceKm: annualKm,
+                  co2Factor: travelType.co2_factor,
+                  factorUnit: travelType.unit,
+                });
+          updated.emissions =
+            tripKg == null ? undefined : updated.employees * tripKg;
         }
-        updated.emissions = updated.employees * updated.distance * factorPerKm;
       } else {
         updated.emissions = undefined;
       }
@@ -638,27 +769,42 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      travelLabel &&
       typeof snapshot.distance === "number" &&
       typeof snapshot.employees === "number" &&
-      snapshot.emissions != null
+      snapshot.distance > 0 &&
+      snapshot.employees > 0
     ) {
       const snap = snapshot;
+      const label = travelLabel;
       void (async () => {
-        const kg = await resolveEmployeeCommutingEmissionsKg({
-          employees: snap.employees!,
-          distance: snap.distance!,
-          co2_factor: co2Factor,
-          unit,
-        });
-        setEmployeeCommutingRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.distance !== snap.distance || r.employees !== snap.employees) return r;
-            if (r.travelTypeId !== snap.travelTypeId) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3EmployeeCommuting({
+            vehicle_type: label,
+            distance_km: snap.distance!,
+            employees: snap.employees!,
+            period,
+            distance_basis: snap.distanceBasis ?? "annual_total",
+            working_days_per_year: snap.workingDaysPerYear,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setEmployeeCommutingRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.distance !== snap.distance || r.employees !== snap.employees) return r;
+              if (r.travelTypeId !== snap.travelTypeId) return r;
+              if (r.distanceBasis !== snap.distanceBasis) return r;
+              if (r.workingDaysPerYear !== snap.workingDaysPerYear) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified commuting factor unavailable"));
+          setEmployeeCommutingRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -743,7 +889,6 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
   
   const updateEndOfLifeRow = (id: string, patch: Partial<EndOfLifeRow>) => {
     let snapshot: EndOfLifeRow | null = null;
-    let factorVal = 0;
     let materialLabel = "";
     setEndOfLifeRows(prev => prev.map(r => {
       if (r.id !== id) return r;
@@ -751,9 +896,17 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
       const material = wasteMaterials.find(m => m.id === updated.materialId);
       if (material && updated.disposalMethod && typeof updated.volume === 'number' && updated.volume > 0) {
         const factor = getEmissionFactor(material, updated.disposalMethod as DisposalMethod);
-        factorVal = factor ?? 0;
         materialLabel = String(material[" Material "] || "");
-        updated.emissions = factor !== null ? updated.volume * factor : undefined;
+        updated.emissions = USE_JWT_AUTH
+          ? undefined
+          : factor !== null
+            ? wasteEmissionsKg({
+                mass: updated.volume,
+                massUnit: "kg",
+                factor,
+                factorUnit: WASTE_DATASET_FACTOR_UNIT,
+              }) ?? undefined
+            : undefined;
       } else {
         updated.emissions = undefined;
       }
@@ -764,26 +917,36 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      materialLabel &&
       typeof snapshot.volume === "number" &&
-      snapshot.disposalMethod &&
-      snapshot.emissions != null
+      snapshot.volume > 0 &&
+      snapshot.disposalMethod
     ) {
       const snap = snapshot;
+      const label = materialLabel;
       void (async () => {
-        const kg = await resolveWasteEmissionsKg({
-          volume: snap.volume!,
-          disposal_method: String(snap.disposalMethod),
-          factor: factorVal,
-          material: materialLabel || undefined,
-        });
-        setEndOfLifeRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          })
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3Waste({
+            material: label,
+            disposal_method: String(snap.disposalMethod),
+            mass_kg: snap.volume!,
+            period,
+          });
+          const kg = Number(calculated.emissions_kg);
+          setEndOfLifeRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.volume !== snap.volume || r.disposalMethod !== snap.disposalMethod) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            })
+          );
+        } catch (err) {
+          setFactorError(apiErr(err, "Verified waste factor unavailable"));
+          setEndOfLifeRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -980,7 +1143,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingUpstreamTransport(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const vehicleType = vehicleTypes.find((vt) => vt.id === r.vehicleTypeId);
+          if (!vehicleType || typeof r.distance !== "number") continue;
+          const saved = await saveScope3Freight({
+            vehicle_type: vehicleType.vehicle_type,
+            distance_km: r.distance,
+            weight_kg: typeof r.weight === "number" ? r.weight : 0,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            category: "upstream_transportation",
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setUpstreamTransportRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified upstream freight saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
@@ -1041,8 +1243,9 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         setUpstreamTransportRows(updatedRows);
       }
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast({ title: "Error", description: err.message || "Failed to save", variant: "destructive" });
+      const message = apiErr(e, "Failed to save");
+      setFactorError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setSavingUpstreamTransport(false);
     }
@@ -1107,7 +1310,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingWasteGenerated(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const material = wasteMaterials.find((m) => m.id === r.materialId);
+          if (!material || typeof r.volume !== "number" || !r.disposalMethod) continue;
+          const saved = await saveScope3Waste({
+            material: String(material[" Material "] || ""),
+            disposal_method: String(r.disposalMethod),
+            mass_kg: r.volume,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            category: "waste_generated",
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setWasteGeneratedRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified waste generated saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const material = wasteMaterials.find(m => m.id === r.materialId);
@@ -1235,7 +1477,44 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingBusinessTravel(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const travelType = businessTravelTypes.find((bt) => bt.id === r.travelTypeId);
+          if (!travelType || typeof r.distance !== "number") continue;
+          const saved = await saveScope3BusinessTravel({
+            vehicle_type: travelType.vehicle_type,
+            distance_km: r.distance,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setBusinessTravelRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified business travel saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
@@ -1367,7 +1646,47 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingEmployeeCommuting(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const travelType = businessTravelTypes.find((bt) => bt.id === r.travelTypeId);
+          if (!travelType || typeof r.distance !== "number" || typeof r.employees !== "number") continue;
+          const saved = await saveScope3EmployeeCommuting({
+            vehicle_type: travelType.vehicle_type,
+            distance_km: r.distance,
+            employees: r.employees,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            distance_basis: r.distanceBasis ?? "annual_total",
+            working_days_per_year: r.workingDaysPerYear,
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setEmployeeCommutingRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified employee commuting saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const travelType = businessTravelTypes.find(bt => bt.id === r.travelTypeId);
@@ -1500,7 +1819,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingDownstreamTransport(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const vehicleType = vehicleTypes.find((vt) => vt.id === r.vehicleTypeId);
+          if (!vehicleType || typeof r.distance !== "number") continue;
+          const saved = await saveScope3Freight({
+            vehicle_type: vehicleType.vehicle_type,
+            distance_km: r.distance,
+            weight_kg: typeof r.weight === "number" ? r.weight : 0,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            category: "downstream_transportation",
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setDownstreamTransportRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified downstream freight saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const vehicleType = vehicleTypes.find(vt => vt.id === r.vehicleTypeId);
@@ -1630,7 +1988,46 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     }
 
     setSavingEndOfLife(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          const material = wasteMaterials.find((m) => m.id === r.materialId);
+          if (!material || typeof r.volume !== "number" || !r.disposalMethod) continue;
+          const saved = await saveScope3Waste({
+            material: String(material[" Material "] || ""),
+            disposal_method: String(r.disposalMethod),
+            mass_kg: r.volume,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: verifiedCpId,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            category: "end_of_life",
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setEndOfLifeRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified end-of-life waste saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map(r => {
           const material = wasteMaterials.find(m => m.id === r.materialId);
@@ -1743,6 +2140,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         user={user}
         companyContext={companyContext}
         counterpartyId={counterpartyId}
+        framework={framework}
         setEmissionData={setEmissionData}
         onSaveAndNext={onSaveAndNext}
       />
@@ -1756,6 +2154,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         user={user}
         companyContext={companyContext}
         counterpartyId={counterpartyId}
+        framework={framework}
         setEmissionData={setEmissionData}
         onSaveAndNext={onSaveAndNext}
       />
@@ -1778,26 +2177,45 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     );
   }
 
+  const verifiedPeriodBanner = USE_JWT_AUTH ? (
+    <div className="space-y-3 mb-4">
+      <Scope3PeriodFields
+        year={year}
+        month={month}
+        onYearChange={setYear}
+        onMonthChange={setMonth}
+      />
+      {factorError ? (
+        <p className="text-sm text-red-600" role="alert">
+          {factorError}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
+
   // Upstream Transportation
   if (activeCategory === 'upstreamTransportation') {
     const totalEmissions = upstreamTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
     const totalWeight = upstreamTransportRows.reduce((sum, r) => sum + (r.weight || 0), 0);
     
     return (
-      <UpstreamTransportationSection
-        rows={upstreamTransportRows}
-        vehicleTypes={vehicleTypes}
-        deletingIds={deletingUpstreamTransport}
-        totalEmissions={totalEmissions}
-        totalWeight={totalWeight}
-        onAddRow={addUpstreamTransportRow}
-        onUpdateRow={updateUpstreamTransportRow}
-        onRemoveRow={removeUpstreamTransportRow}
-        onDeleteRow={deleteUpstreamTransportRow}
-        onSave={saveUpstreamTransport}
-        saving={savingUpstreamTransport}
-        onSaveAndNext={onSaveAndNext}
-      />
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <UpstreamTransportationSection
+          rows={upstreamTransportRows}
+          vehicleTypes={vehicleTypes}
+          deletingIds={deletingUpstreamTransport}
+          totalEmissions={totalEmissions}
+          totalWeight={totalWeight}
+          onAddRow={addUpstreamTransportRow}
+          onUpdateRow={updateUpstreamTransportRow}
+          onRemoveRow={removeUpstreamTransportRow}
+          onDeleteRow={deleteUpstreamTransportRow}
+          onSave={saveUpstreamTransport}
+          saving={savingUpstreamTransport}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
 
@@ -1806,21 +2224,24 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     const totalEmissions = downstreamTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
     const totalWeight = downstreamTransportRows.reduce((sum, r) => sum + (r.weight || 0), 0);
     
-            return (
-      <DownstreamTransportationSection
-        rows={downstreamTransportRows}
-        vehicleTypes={vehicleTypes}
-        deletingIds={deletingDownstreamTransport}
-        totalEmissions={totalEmissions}
-        totalWeight={totalWeight}
-        onAddRow={addDownstreamTransportRow}
-        onUpdateRow={updateDownstreamTransportRow}
-        onRemoveRow={removeDownstreamTransportRow}
-        onDeleteRow={deleteDownstreamTransportRow}
-        onSave={saveDownstreamTransport}
-        saving={savingDownstreamTransport}
-        onSaveAndNext={onSaveAndNext}
-      />
+    return (
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <DownstreamTransportationSection
+          rows={downstreamTransportRows}
+          vehicleTypes={vehicleTypes}
+          deletingIds={deletingDownstreamTransport}
+          totalEmissions={totalEmissions}
+          totalWeight={totalWeight}
+          onAddRow={addDownstreamTransportRow}
+          onUpdateRow={updateDownstreamTransportRow}
+          onRemoveRow={removeDownstreamTransportRow}
+          onDeleteRow={deleteDownstreamTransportRow}
+          onSave={saveDownstreamTransport}
+          saving={savingDownstreamTransport}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
 
@@ -1830,20 +2251,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     const totalVolume = wasteGeneratedRows.reduce((sum, r) => sum + (r.volume || 0), 0);
     
     return (
-      <WasteGeneratedSection
-        rows={wasteGeneratedRows}
-        wasteMaterials={wasteMaterials}
-        deletingIds={deletingWasteGenerated}
-        totalEmissions={totalEmissions}
-        totalVolume={totalVolume}
-        onAddRow={addWasteGeneratedRow}
-        onUpdateRow={updateWasteGeneratedRow}
-        onRemoveRow={removeWasteGeneratedRow}
-        onDeleteRow={deleteWasteGeneratedRow}
-        onSave={saveWasteGenerated}
-        saving={savingWasteGenerated}
-        onSaveAndNext={onSaveAndNext}
-      />
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <WasteGeneratedSection
+          rows={wasteGeneratedRows}
+          wasteMaterials={wasteMaterials}
+          deletingIds={deletingWasteGenerated}
+          totalEmissions={totalEmissions}
+          totalVolume={totalVolume}
+          onAddRow={addWasteGeneratedRow}
+          onUpdateRow={updateWasteGeneratedRow}
+          onRemoveRow={removeWasteGeneratedRow}
+          onDeleteRow={deleteWasteGeneratedRow}
+          onSave={saveWasteGenerated}
+          saving={savingWasteGenerated}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
 
@@ -1853,20 +2277,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     const totalDistance = businessTravelRows.reduce((sum, r) => sum + (r.distance || 0), 0);
     
     return (
-      <BusinessTravelSection
-        rows={businessTravelRows}
-        businessTravelTypes={businessTravelTypes}
-        deletingIds={deletingBusinessTravel}
-        totalEmissions={totalEmissions}
-        totalDistance={totalDistance}
-        onAddRow={addBusinessTravelRow}
-        onUpdateRow={updateBusinessTravelRow}
-        onRemoveRow={removeBusinessTravelRow}
-        onDeleteRow={deleteBusinessTravelRow}
-        onSave={saveBusinessTravel}
-        saving={savingBusinessTravel}
-        onSaveAndNext={onSaveAndNext}
-      />
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <BusinessTravelSection
+          rows={businessTravelRows}
+          businessTravelTypes={businessTravelTypes}
+          deletingIds={deletingBusinessTravel}
+          totalEmissions={totalEmissions}
+          totalDistance={totalDistance}
+          onAddRow={addBusinessTravelRow}
+          onUpdateRow={updateBusinessTravelRow}
+          onRemoveRow={removeBusinessTravelRow}
+          onDeleteRow={deleteBusinessTravelRow}
+          onSave={saveBusinessTravel}
+          saving={savingBusinessTravel}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
 
@@ -1876,20 +2303,23 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     const totalDistance = employeeCommutingRows.reduce((sum, r) => sum + (r.distance || 0), 0);
     
     return (
-      <EmployeeCommutingSection
-        rows={employeeCommutingRows}
-        businessTravelTypes={businessTravelTypes}
-        deletingIds={deletingEmployeeCommuting}
-        totalEmissions={totalEmissions}
-        totalDistance={totalDistance}
-        onAddRow={addEmployeeCommutingRow}
-        onUpdateRow={updateEmployeeCommutingRow}
-        onRemoveRow={removeEmployeeCommutingRow}
-        onDeleteRow={deleteEmployeeCommutingRow}
-        onSave={saveEmployeeCommuting}
-        saving={savingEmployeeCommuting}
-        onSaveAndNext={onSaveAndNext}
-      />
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <EmployeeCommutingSection
+          rows={employeeCommutingRows}
+          businessTravelTypes={businessTravelTypes}
+          deletingIds={deletingEmployeeCommuting}
+          totalEmissions={totalEmissions}
+          totalDistance={totalDistance}
+          onAddRow={addEmployeeCommutingRow}
+          onUpdateRow={updateEmployeeCommutingRow}
+          onRemoveRow={removeEmployeeCommutingRow}
+          onDeleteRow={deleteEmployeeCommutingRow}
+          onSave={saveEmployeeCommuting}
+          saving={savingEmployeeCommuting}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
   // Upstream Leased Assets - Category-based implementation (same as Downstream)
@@ -1968,21 +2398,24 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
     const savePendingCount = pendingNew + pendingUpdates;
 
     return (
-      <EndOfLifeTreatmentSection
-        rows={endOfLifeRows}
-        wasteMaterials={wasteMaterials}
-        deletingIds={deletingEndOfLife}
-        totalEmissions={totalEmissions}
-        totalVolume={totalVolume}
-        savePendingCount={savePendingCount}
-        onAddRow={addEndOfLifeRow}
-        onUpdateRow={updateEndOfLifeRow}
-        onRemoveRow={removeEndOfLifeRow}
-        onDeleteRow={deleteEndOfLifeRow}
-        onSave={saveEndOfLife}
-        saving={savingEndOfLife}
-        onSaveAndNext={onSaveAndNext}
-      />
+      <div className="space-y-4">
+        {verifiedPeriodBanner}
+        <EndOfLifeTreatmentSection
+          rows={endOfLifeRows}
+          wasteMaterials={wasteMaterials}
+          deletingIds={deletingEndOfLife}
+          totalEmissions={totalEmissions}
+          totalVolume={totalVolume}
+          savePendingCount={savePendingCount}
+          onAddRow={addEndOfLifeRow}
+          onUpdateRow={updateEndOfLifeRow}
+          onRemoveRow={removeEndOfLifeRow}
+          onDeleteRow={deleteEndOfLifeRow}
+          onSave={saveEndOfLife}
+          saving={savingEndOfLife}
+          onSaveAndNext={onSaveAndNext}
+        />
+      </div>
     );
   }
 

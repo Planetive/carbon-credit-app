@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EpaIpccResultsData } from "@/features/emission-calculator/core/loaders/epaIpccResults";
 import { buildReportingTotals } from "@/features/emission-calculator/results/reportingTotals";
 import type { StationaryVerifiedResults } from "@/features/emission-calculator/results/stationaryResults";
+import { productionAnnualAssignment } from "@/features/emission-calculator/results/reportingYear";
 import {
   dashboardStationaryContext,
   dashboardTrackedLabel,
@@ -66,6 +67,7 @@ function results(overrides: Partial<EpaIpccResultsData> = {}): EpaIpccResultsDat
     scope3: overrides.scope3 || [{ key: "waste", label: "Waste", value: scope3 }],
     stationaryVerified:
       "stationaryVerified" in overrides ? overrides.stationaryVerified : verified(5.31145, 5311.45),
+    annualReporting: overrides.annualReporting || productionAnnualAssignment(2026),
     totals: overrides.totals || {
       scope1: scope1Total,
       scope2,
@@ -80,8 +82,11 @@ describe("dashboard EPA summary", () => {
     const data = results();
     const summary = summarizeDashboardEmissions(data);
     expect(summary.verifiedTco2e).toBe(5.31145);
-    expect(summary.scope1Kg).toBe(5311.45 + 20 + 7);
-    expect(kgToTco2e(summary.scope1Kg!)).toBe(5.33845);
+    expect(summary.scope1Kg).toBe(5311.45);
+    expect(summary.scope2Kg).toBeNull();
+    expect(summary.grandKg).toBeNull();
+    expect(summary.inventory).toBe("partial");
+    expect(kgToTco2e(summary.scope1Kg!)).toBe(5.31145);
   });
 
   it("aggregates multiple stationary records once and leaves Scope 2 and 3 unchanged", () => {
@@ -91,11 +96,11 @@ describe("dashboard EPA summary", () => {
     const summary = summarizeDashboardEmissions(data);
     const screen = buildReportingTotals(data);
     expect(summary.scope1Kg).toBe(screen.scope1Kg);
-    expect(summary.scope1Kg).toBe(7931.778 + 20 + 7);
-    expect(summary.scope2Kg).toBe(30);
-    expect(summary.scope3Kg).toBe(4);
+    expect(summary.scope1Kg).toBe(7931.778);
+    expect(summary.scope2Kg).toBeNull();
+    expect(summary.scope3Kg).toBeNull();
+    expect(summary.grandKg).toBeNull();
     expect(summary.grandKg).toBe(screen.grandKg);
-    expect(summary.grandKg).toBe(7931.778 + 20 + 7 + 30 + 4);
   });
 
   it("excludes historical stationary and does not count a verified record twice", () => {
@@ -113,11 +118,11 @@ describe("dashboard EPA summary", () => {
     const summary = summarizeDashboardEmissions(data);
     expect(summary.reconciliationPending).toBe(true);
     expect(summary.status).toBe("provisional");
-    expect(summary.scope1Kg).toBe(5311.45 + 20 + 7);
+    expect(summary.scope1Kg).toBe(5311.45);
     expect(summary.scope1Kg).not.toBe(data.totals.scope1);
-    expect(summary.scope1Kg).not.toBe(5311.45 + 5311.45 + 20 + 7);
-    expect(summary.scope2Kg).toBe(data.totals.scope2);
-    expect(summary.scope3Kg).toBe(data.totals.scope3);
+    expect(summary.scope1Kg).not.toBe(5311.45 + 5311.45);
+    expect(summary.scope2Kg).toBeNull();
+    expect(summary.scope3Kg).toBeNull();
     expect(summary.grandKg).toBe(buildReportingTotals(data).grandKg);
   });
 
@@ -128,13 +133,16 @@ describe("dashboard EPA summary", () => {
   });
 
   it("loads the organization and does not set a counterparty", () => {
-    expect(dashboardStationaryContext("org-1")).toEqual({ organizationId: "org-1" });
-    expect(dashboardStationaryContext("org-1").counterpartyId).toBeUndefined();
+    expect(dashboardStationaryContext("org-1", 2026)).toEqual({
+      organizationId: "org-1",
+      reportingYear: 2026,
+    });
+    expect(dashboardStationaryContext("org-1", 2026).counterpartyId).toBeUndefined();
     const missing = missingOrganizationSummary();
     expect(missing.status).toBe("missing_organization");
     expect(missing.scope1Kg).toBeNull();
     expect(missing.grandKg).toBeNull();
-    expect(dashboardTrackedLabel(missing).value).toBe("Incomplete");
+    expect(dashboardTrackedLabel(missing).value).toBe("Unavailable");
   });
 
   it("does not turn a failed stationary request into zero", () => {
@@ -151,11 +159,12 @@ describe("dashboard EPA summary", () => {
     expect(summary.status).toBe("incomplete");
     expect(summary.scope1Kg).toBeNull();
     expect(summary.grandKg).toBeNull();
-    expect(summary.scope2Kg).toBe(30);
-    expect(summary.scope3Kg).toBe(4);
+    expect(summary.scope2Kg).toBeNull();
+    expect(summary.scope3Kg).toBeNull();
     expect(summary.verifiedTco2e).toBeNull();
     expect(summary.scope1Kg).not.toBe(0);
-    expect(dashboardTrackedLabel(summary).value).toBe("Incomplete");
+    expect(summary.inventory).toBe("unavailable");
+    expect(dashboardTrackedLabel(summary).value).toBe("Unavailable");
 
     const thrown = failedDashboardSummary("API unavailable");
     expect(thrown.scope1Kg).toBeNull();
@@ -179,13 +188,13 @@ describe("dashboard EPA summary", () => {
       totals: { scope1: 0, scope2: 0, scope3: 0, grand: 0 },
     });
     const summary = summarizeDashboardEmissions(data);
-    expect(summary.status).toBe("reportable");
+    expect(summary.inventory).toBe("partial");
     expect(summary.scope1Kg).toBe(0);
-    expect(summary.grandKg).toBe(0);
-    expect(kgToTco2e(summary.grandKg!)).toBe(0);
+    expect(summary.grandKg).toBeNull();
+    expect(summary.scope1Kg).not.toBeNull();
     expect(dashboardTrackedLabel(summary)).toEqual({
-      value: "No",
-      sub: "No emissions in the loaded records",
+      value: "Partial",
+      sub: "Annual total is not complete",
     });
   });
 
@@ -203,10 +212,11 @@ describe("dashboard EPA summary", () => {
     const summary = summarizeDashboardEmissions(data);
     expect(summary.scope1Kg).toBe(screen.scope1Kg);
     expect(summary.grandKg).toBe(screen.grandKg);
-    expect(summary.scope2Kg).toBe(45);
-    expect(summary.scope3Kg).toBe(4);
+    expect(summary.scope2Kg).toBeNull();
+    expect(summary.scope3Kg).toBeNull();
     expect(summary.statusLabel).toBe(screen.statusLabel);
-    expect(summary.periodNote).toMatch(/not limited to a reporting year/i);
-    expect(summary.statusLabel).toMatch(/not an audit-approved inventory/i);
+    expect(summary.periodNote).toMatch(/Reporting year 2026/);
+    expect(summary.periodNote).toMatch(/unassigned/i);
+    expect(summary.statusLabel).toMatch(/not an independently verified or audit-approved inventory/i);
   });
 });

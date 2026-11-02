@@ -4,7 +4,7 @@ import { SCOPE_COLORS, formatPct, formatTonnes, pctOfTotal } from "./formatters"
 type ScopeHighlightCardsProps = {
   scope1Kg: number;
   scope2Kg: number;
-  scope3Kg: number;
+  scope3Kg: number | null;
   grandKg: number;
 };
 
@@ -48,7 +48,8 @@ const ScopeHighlightCards = ({ scope1Kg, scope2Kg, scope3Kg, grandKg }: ScopeHig
       {cards.map(({ key, title, description, Icon }) => {
         const colors = SCOPE_COLORS[key];
         const valueKg = values[key];
-        const pct = key === "total" ? 100 : pctOfTotal(valueKg, grandKg);
+        const excluded = valueKg == null;
+        const pct = key === "total" || excluded ? null : pctOfTotal(valueKg, grandKg);
 
         return (
           <article
@@ -60,14 +61,22 @@ const ScopeHighlightCards = ({ scope1Kg, scope2Kg, scope3Kg, grandKg }: ScopeHig
                 <Icon className="h-5 w-5" strokeWidth={2} />
               </div>
               <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${colors.soft}`}>
-                {formatPct(pct)}% of total
+                {pct == null ? (key === "total" ? "100% of total" : "Excluded") : `${formatPct(pct)}% of total`}
               </span>
             </div>
             <p className="text-sm font-medium text-slate-500">{title}</p>
             <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-slate-900 tabular-nums">
-              {formatTonnes(valueKg)} <span className="text-base font-semibold text-slate-500">tCO₂e</span>
+              {excluded ? (
+                "Excluded"
+              ) : (
+                <>
+                  {formatTonnes(valueKg)} <span className="text-base font-semibold text-slate-500">tCO₂e</span>
+                </>
+              )}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">{description}</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {excluded ? "Legacy undated records are excluded from the verified annual total." : description}
+            </p>
           </article>
         );
       })}

@@ -45,6 +45,15 @@ import {
   type CalcResult,
 } from "./calc";
 import { getOrCreateDraftAssessment } from "./ghg";
+import {
+  annualizeCommutingDistanceKm,
+  freightEmissionsKg,
+  scope3GridElectricityKg,
+  spendEmissionsKg,
+  travelDistanceEmissionsKg,
+  wasteEmissionsKg,
+  WASTE_DATASET_FACTOR_UNIT,
+} from "@/lib/emissions/scope3FactorUnits";
 
 export type CalcFramework = "uk" | "epa" | "ipcc" | "mixed";
 
@@ -390,17 +399,45 @@ export async function resolveWasteEmissionsKg(opts: {
   disposal_method: string;
   factor: number;
   material?: string;
-} & CalcPersistOpts): Promise<number> {
-  const local = opts.volume * opts.factor;
-  return withApi("waste", local, (p) => calcWaste({ ...opts, ...p }), persistMeta(opts, "uk"));
+  factor_unit?: string;
+  mass_unit?: string;
+} & CalcPersistOpts): Promise<number | null> {
+  const factorUnit = opts.factor_unit ?? WASTE_DATASET_FACTOR_UNIT;
+  const massUnit = opts.mass_unit ?? "kg";
+  const local = wasteEmissionsKg({
+    mass: opts.volume,
+    massUnit,
+    factor: opts.factor,
+    factorUnit,
+  });
+  if (local == null) return null;
+  return withApi(
+    "waste",
+    local,
+    (p) =>
+      calcWaste({
+        ...opts,
+        factor_unit: factorUnit,
+        mass_unit: massUnit,
+        ...p,
+      }),
+    persistMeta(opts, "uk"),
+  );
 }
 
 export async function resolveFreightEmissionsKg(opts: {
   distance: number;
   weight: number;
   co2_factor: number;
-} & CalcPersistOpts): Promise<number> {
-  const local = opts.distance * opts.weight * opts.co2_factor;
+  factor_unit?: string;
+} & CalcPersistOpts): Promise<number | null> {
+  const local = freightEmissionsKg({
+    distanceKm: opts.distance,
+    weightKg: opts.weight,
+    co2Factor: opts.co2_factor,
+    factorUnit: opts.factor_unit,
+  });
+  if (local == null) return null;
   return withApi("freight", local, (p) => calcFreight({ ...opts, ...p }), persistMeta(opts, "uk"));
 }
 
@@ -459,35 +496,66 @@ export async function resolveEmployeeCommutingEmissionsKg(opts: {
   distance: number;
   co2_factor: number;
   unit?: string;
-} & CalcPersistOpts): Promise<number> {
-  let factor = opts.co2_factor;
-  if (opts.unit && String(opts.unit).toLowerCase().includes("mile")) {
-    factor = opts.co2_factor / 1.60934;
-  }
-  const local = opts.employees * opts.distance * factor;
-  return withApi("employee commuting", local, (p) => calcEmployeeCommuting({ ...opts, ...p }), persistMeta(opts, "uk"));
+  distance_basis?: string;
+  working_days_per_year?: number;
+} & CalcPersistOpts): Promise<number | null> {
+  const annualKm = annualizeCommutingDistanceKm({
+    distanceKm: opts.distance,
+    distanceBasis: opts.distance_basis,
+    workingDaysPerYear: opts.working_days_per_year,
+  });
+  if (annualKm == null) return null;
+  const tripKg = travelDistanceEmissionsKg({
+    distanceKm: annualKm,
+    co2Factor: opts.co2_factor,
+    factorUnit: opts.unit,
+  });
+  if (tripKg == null) return null;
+  const local = opts.employees * tripKg;
+  return withApi(
+    "employee commuting",
+    local,
+    (p) => calcEmployeeCommuting({ ...opts, ...p }),
+    persistMeta(opts, "uk"),
+  );
 }
 
 export async function resolveBusinessTravelEmissionsKg(opts: {
   distance: number;
   co2_factor: number;
   unit?: string;
-} & CalcPersistOpts): Promise<number> {
-  let factor = opts.co2_factor;
-  if (opts.unit && String(opts.unit).toLowerCase().includes("mile")) {
-    factor = opts.co2_factor / 1.60934;
-  }
-  const local = opts.distance * factor;
+} & CalcPersistOpts): Promise<number | null> {
+  const local = travelDistanceEmissionsKg({
+    distanceKm: opts.distance,
+    co2Factor: opts.co2_factor,
+    factorUnit: opts.unit,
+  });
+  if (local == null) return null;
   return withApi("business travel", local, (p) => calcBusinessTravel({ ...opts, ...p }), persistMeta(opts, "uk"));
 }
 
 export async function resolveSpendBasedEmissionsKg(opts: {
   amount: number;
   emission_factor: number;
+  factor_unit?: string;
+  activity_currency?: string;
+  activity_price_year?: number;
   category?: string;
-} & CalcPersistOpts): Promise<number> {
-  const local = opts.amount * opts.emission_factor;
-  return withApi("spend-based", local, (p) => calcSpendBased({ ...opts, ...p }), persistMeta(opts, "uk"));
+} & CalcPersistOpts): Promise<number | null> {
+  const local = spendEmissionsKg({
+    amount: opts.amount,
+    emissionFactor: opts.emission_factor,
+    factorUnit: opts.factor_unit,
+    activityCurrency: opts.activity_currency,
+    activityPriceYear: opts.activity_price_year,
+  });
+  if (local == null) return null;
+  return withApi(
+    "spend-based",
+    local,
+    (p) => calcSpendBased({ ...opts, ...p }),
+    persistMeta(opts, "uk"),
+  );
 }
 
 export async function resolveSoldProductsQtyFactorKg(opts: {
@@ -504,17 +572,21 @@ export async function resolveSoldProductsElectricityKg(opts: {
   grid_factor?: number;
   other_pct?: number;
   other_row_emissions_sum?: number;
-} & CalcPersistOpts): Promise<number> {
-  const grid =
-    ((opts.grid_pct ?? 0) / 100) *
-    opts.total_kwh *
-    (opts.grid_factor ?? 0);
-  const other =
-    ((opts.other_pct ?? 0) / 100) *
-    opts.total_kwh *
-    (opts.other_row_emissions_sum ?? 0);
-  const local = Number((grid + other).toFixed(6));
-  return withApi("sold-products electricity", local, (p) => calcSoldProductsElectricity({ ...opts, ...p }), persistMeta(opts, "uk"));
+} & CalcPersistOpts): Promise<number | null> {
+  const local = scope3GridElectricityKg({
+    totalKwh: opts.total_kwh,
+    gridPct: opts.grid_pct,
+    gridFactor: opts.grid_factor,
+    otherPct: opts.other_pct,
+    otherRowEmissionsSum: opts.other_row_emissions_sum,
+  });
+  if (local == null) return null;
+  return withApi(
+    "sold-products electricity",
+    local,
+    (p) => calcSoldProductsElectricity({ ...opts, ...p }),
+    persistMeta(opts, "uk"),
+  );
 }
 
 export async function resolveLeasedElectricityKg(opts: {
@@ -524,8 +596,21 @@ export async function resolveLeasedElectricityKg(opts: {
   other_pct?: number;
   other_row_emissions_sum?: number;
   renewable_pct?: number;
-} & CalcPersistOpts): Promise<number> {
-  return withApi("leased electricity", localElectricityEmissionsKg(opts), (p) => calcLeasedElectricity({ ...opts, ...p }), persistMeta(opts, "uk"));
+} & CalcPersistOpts): Promise<number | null> {
+  const local = scope3GridElectricityKg({
+    totalKwh: opts.total_kwh,
+    gridPct: opts.grid_pct,
+    gridFactor: opts.grid_factor,
+    otherPct: opts.other_pct,
+    otherRowEmissionsSum: opts.other_row_emissions_sum,
+  });
+  if (local == null) return null;
+  return withApi(
+    "leased electricity",
+    local,
+    (p) => calcLeasedElectricity({ ...opts, ...p }),
+    persistMeta(opts, "uk"),
+  );
 }
 
 export async function resolveLeasedTransportKg(opts: {

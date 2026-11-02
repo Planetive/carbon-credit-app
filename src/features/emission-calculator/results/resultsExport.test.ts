@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EpaIpccResultsData } from "@/features/emission-calculator/core/loaders/epaIpccResults";
 import type { StationaryVerifiedResults } from "./stationaryResults";
+import { productionAnnualAssignment } from "./reportingYear";
 import { buildReportingTotals } from "./reportingTotals";
 import { buildEpaResultsCsv, officialExportTotals, stationaryReportHtml, withReportableTotals } from "./resultsExport";
 
@@ -52,6 +53,7 @@ function base(overrides: Partial<EpaIpccResultsData> = {}): EpaIpccResultsData {
     scope3: [{ key: "waste", label: "Waste", value: 4 }],
     stationaryVerified:
       "stationaryVerified" in overrides ? overrides.stationaryVerified : verified(5.31145, 5311.45),
+    annualReporting: overrides.annualReporting || productionAnnualAssignment(2026),
     totals: overrides.totals || {
       scope1: scope1Total,
       scope2: 30,
@@ -69,7 +71,9 @@ describe("EPA results export", () => {
     expect(exported.scope1Kg).toBe(screen.scope1Kg);
     expect(exported.grandKg).toBe(screen.grandKg);
     expect(exported.verifiedTco2e).toBe(5.31145);
-    expect(exported.scope1Kg).toBe(5311.45 + 20 + 7);
+    expect(exported.scope1Kg).toBe(5311.45);
+    expect(exported.grandKg).toBeNull();
+    expect(exported.inventory).toBe("partial");
 
     const csv = buildEpaResultsCsv(results);
     expect(csv).toContain("5.31145");
@@ -85,12 +89,13 @@ describe("EPA results export", () => {
     expect(csv).toContain("AR5");
     expect(csv).toContain("imported_from_sheet");
     expect(csv).toContain("Legacy stationary combustion — requires reconciliation");
-    expect(csv).toContain("Mobile");
+    expect(csv).toContain("Unassigned");
+    expect(csv).toContain("Partial");
     expect(csv).toContain("Electricity");
     expect(csv).toContain("Waste");
     const pdf = withReportableTotals(results);
-    expect(pdf.totals.scope1).toBe(screen.scope1Kg);
-    expect(pdf.totals.grand).toBe(screen.grandKg);
+    expect(pdf.totals.scope1).toBe(5311.45);
+    expect(pdf.totals.grand).toBe(0);
     expect(pdf.scope1.some((row) => row.key === "fuel" || row.key === "kitchen")).toBe(false);
     expect(stationaryReportHtml(results)).toContain("Legacy stationary combustion — requires reconciliation");
   });
@@ -113,7 +118,7 @@ describe("EPA results export", () => {
     });
     const exported = officialExportTotals(results);
     expect(exported.verifiedTco2e).toBe(7.931778);
-    expect(exported.scope1Kg).toBe(7931.778 + 20);
+    expect(exported.scope1Kg).toBe(7931.778);
     const csv = buildEpaResultsCsv(results);
     expect(csv.match(/activity-ng/g)).toHaveLength(1);
     expect(csv.match(/activity-anthracite/g)).toHaveLength(1);
@@ -134,17 +139,20 @@ describe("EPA results export", () => {
     expect(exported.scope1Kg).toBeNull();
     expect(exported.grandKg).toBeNull();
     const csv = buildEpaResultsCsv(results);
-    expect(csv).toContain("Incomplete");
+    expect(csv).toContain("Unavailable");
     expect(csv).toContain("API unavailable");
     expect(csv).not.toContain("Stationary combustion (verified),0");
     expect(stationaryReportHtml(results)).toContain("not a complete inventory");
   });
 
-  it("leaves a results object without stationary records on its existing totals", () => {
+  it("excludes legacy Scope 3 when stationary verified is absent (UK-style path)", () => {
     const results = base({ stationaryVerified: undefined });
     const exported = officialExportTotals(results);
     expect(exported.scope1Kg).toBe(results.totals.scope1);
-    expect(exported.grandKg).toBe(results.totals.grand);
+    expect(exported.scope3Kg).toBeNull();
+    expect(exported.grandKg).toBeNull();
+    expect(exported.inventory).toBe("partial");
+    expect(exported.incomplete).toBe(true);
     expect(withReportableTotals(results)).toBe(results);
   });
 });

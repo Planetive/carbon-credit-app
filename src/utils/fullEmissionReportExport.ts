@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { USE_JWT_AUTH } from "@/api/config";
 import { getMyProfile } from "@/api/profile";
 import type { EpaIpccResultsData, EmissionCategoryTotal } from "@/lib/epaIpccResults";
-import { officialExportTotals, stationaryReportHtml, withReportableTotals } from "@/features/emission-calculator/results/resultsExport";
+import { officialExportTotals, reportableScope2Rows, stationaryReportHtml, verifiedScope1GasCo2eKg, withReportableTotals } from "@/features/emission-calculator/results/resultsExport";
 import { groupScope1LegacyTotals } from "@/features/emission-calculator/scope1/activity-based/legacyMapping";
 import {
   loadLegacyCategoryDetailRows,
@@ -385,6 +385,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         const historyRows = await loadEmissionHistoryTrendRows(user.id);
 
         historyRows.forEach((row) => {
+          if (fuelFramework === "epa") return;
           const dt = row?.created_at ? new Date(row.created_at) : null;
           if (!dt || Number.isNaN(dt.getTime())) return;
           const year = dt.getFullYear();
@@ -397,7 +398,22 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       }
 
       const gasTotalsKg: Record<"CO2" | "CH4" | "N2O" | "CO2e", number> = { CO2: 0, CH4: 0, N2O: 0, CO2e: 0 };
-      if ((isMariUser || fuelFramework === "epa") && user?.id) {
+      const epaAnnual = fuelFramework === "epa" && Boolean(sourceResults.stationaryVerified);
+      let verifiedGasNote = "";
+      let refrigerantCo2eKg = 0;
+      if (epaAnnual) {
+        if (exportStatus.scope1Kg != null) {
+          const verifiedGases = verifiedScope1GasCo2eKg(sourceResults);
+          if (verifiedGases) {
+            gasTotalsKg.CO2 = verifiedGases.CO2;
+            gasTotalsKg.CH4 = verifiedGases.CH4;
+            gasTotalsKg.N2O = verifiedGases.N2O;
+            refrigerantCo2eKg = verifiedGases.refrigerantCo2eKg;
+            verifiedGasNote =
+              "Verified Scope 1 gas CO2e. Refrigerant CO2e is fluorinated-gas CO2e, not CO2 mass. Leaked refrigerant kilograms are not included. Legacy refrigerant, legacy mobile, and historical vehicle rows are not included. Biogenic CO2 is not included.";
+          }
+        }
+      } else if ((isMariUser || fuelFramework === "epa") && user?.id) {
         const [
           onRoadGasRows,
           onRoadDieselRows,
@@ -454,14 +470,46 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const { company, headerName } = user?.id
         ? await loadReportProfile(user)
         : { company: "Organization", headerName: "User" };
-      const period = generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-      const year = String(generatedAt.getFullYear());
-      const reportPeriodStart = `01/01/${year}`;
-      const reportPeriodEnd = generatedAt.toLocaleDateString("en-GB");
+      const selectedReportingYear = sourceResults.annualReporting?.reportingYear ?? null;
+      const period =
+        fuelFramework === "epa" && selectedReportingYear
+          ? String(selectedReportingYear)
+          : generatedAt.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      const year =
+        fuelFramework === "epa" && selectedReportingYear
+          ? String(selectedReportingYear)
+          : String(generatedAt.getFullYear());
       const nextIterationStart = new Date(generatedAt);
       nextIterationStart.setDate(nextIterationStart.getDate() + 1);
-      const nextIterationStartText = nextIterationStart.toLocaleDateString("en-GB");
+      let reportPeriodStart = `01/01/${year}`;
+      let reportPeriodEnd = generatedAt.toLocaleDateString("en-GB");
+      let nextIterationStartText = nextIterationStart.toLocaleDateString("en-GB");
       const fmt = (n: number) => (n / 1000).toFixed(2);
+      const scope1AnnualKg = epaAnnual ? exportStatus.scope1Kg : results.totals.scope1;
+      const scope2AnnualKg = epaAnnual ? exportStatus.scope2Kg : results.totals.scope2;
+      // Same verified Scope 3 aggregation as dashboard / CSV (null when unavailable).
+      const scope3AnnualKg = exportStatus.scope3Kg;
+      const grandAnnualKg = epaAnnual
+        ? exportStatus.grandKg
+        : scope1AnnualKg == null || scope2AnnualKg == null
+          ? null
+          : scope1AnnualKg + scope2AnnualKg + (scope3AnnualKg ?? 0);
+      const annualText = (kg: number | null, emptyLabel: string) => (kg == null ? emptyLabel : fmt(kg));
+      const scope2Text = annualText(scope2AnnualKg, "Unassigned");
+      const scope3Text = annualText(scope3AnnualKg, "Legacy excluded");
+      if (epaAnnual && selectedReportingYear) {
+        reportPeriodStart = `reporting year ${year}`;
+        reportPeriodEnd = `only records whose stored period is in ${year}`;
+        nextIterationStartText = "the next selected reporting year";
+      }
+      const scope1Text = annualText(scope1AnnualKg, "Unavailable");
+      const biogenicSentence = epaAnnual
+        ? `${exportStatus.biogenicLabel}. GWP AR5. This quantity is not included in Scope 1 or the total.`
+        : "";
+      const grandText = annualText(
+        grandAnnualKg,
+        exportStatus.inventory === "partial" ? "Partial" : "Unavailable"
+      );
       const pct = (value: number, total: number) => (total > 0 ? ((value / total) * 100).toFixed(1) : "0.0");
       const pctDisplay = (value: number, total: number) => {
         if (total <= 0) return "0.0";
@@ -476,9 +524,9 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         return p.toFixed(1);
       };
       const dominantScope = [
-        { name: "Scope 1", value: results.totals.scope1 },
-        { name: "Scope 2", value: results.totals.scope2 },
-        { name: "Scope 3", value: results.totals.scope3 },
+        { name: "Scope 1", value: scope1AnnualKg ?? 0 },
+        { name: "Scope 2", value: scope2AnnualKg ?? 0 },
+        { name: "Scope 3", value: scope3AnnualKg ?? 0 },
       ].sort((a, b) => b.value - a.value)[0];
       const topScope3Drivers = [...results.scope3]
         .filter((r) => r.value > 0)
@@ -486,13 +534,15 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         .slice(0, 2)
         .map((r) => r.label)
         .join(" and ");
-      const scope1Pct = pct(results.totals.scope1, results.totals.grand);
-      const scope2Pct = pct(results.totals.scope2, results.totals.grand);
-      const scope3Pct = pct(results.totals.scope3, results.totals.grand);
+      const scope1Pct = scope1AnnualKg == null ? "—" : pct(scope1AnnualKg, grandAnnualKg ?? scope1AnnualKg);
+      const scope2Pct = scope2AnnualKg == null ? "—" : pct(scope2AnnualKg, grandAnnualKg ?? 0);
+      const scope3Pct = scope3AnnualKg == null ? "—" : pct(scope3AnnualKg, grandAnnualKg ?? 0);
+      const verifiedScope2 = scope2AnnualKg != null ? reportableScope2Rows(results) : null;
+      const scope2Source = verifiedScope2 ?? results.scope2;
       const allRows = [
         ...results.scope1.map((r) => ({ scope: "Scope 1", label: r.label, value: r.value })),
-        ...results.scope2.map((r) => ({ scope: "Scope 2", label: r.label, value: r.value })),
-        ...results.scope3.map((r) => ({ scope: "Scope 3", label: r.label, value: r.value })),
+        ...scope2Source.map((r) => ({ scope: "Scope 2", label: r.label, value: r.value })),
+        ...(scope3AnnualKg == null ? [] : results.scope3.map((r) => ({ scope: "Scope 3", label: r.label, value: r.value }))),
       ].filter((r) => r.value > 0);
 
       const classifyBucket = (label: string, scope: string) => {
@@ -514,7 +564,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       );
 
       const scope1Rows = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
-      const scope2Rows = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+      const scope2Rows = [...scope2Source].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
       const scope3Sorted = [...results.scope3].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
       const topCount = Math.max(1, Math.ceil(scope3Sorted.length * 0.2));
       const topShare = scope3Sorted.slice(0, topCount).reduce((sum, r) => sum + r.value, 0);
@@ -541,7 +591,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       };
 
       const ipccMonthlySources = [
-        { label: "Vehicular", table: "ipcc_scope1_vehicular_entries" },
+        ...(epaAnnual ? [] : [{ label: "Vehicular", table: "ipcc_scope1_vehicular_entries" }]),
         { label: "Kitchen", table: "ipcc_scope1_kitchen_entries" },
         { label: "Power", table: "ipcc_scope1_power_entries" },
         { label: "Heating", table: "ipcc_scope1_heating_entries" },
@@ -592,12 +642,13 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
         { gas: "CH4", value: gasTotalsKg.CH4 },
         { gas: "N2O", value: gasTotalsKg.N2O },
         { gas: "CO2e (other/mixed)", value: gasTotalsKg.CO2e },
+        { gas: "Fluorinated gases / refrigerant CO2e", value: refrigerantCo2eKg },
       ].filter((r) => r.value > 0);
       const gasGrand = gasRows.reduce((sum, r) => sum + r.value, 0);
       const hasGasBreakdown = (isMariUser || fuelFramework === "epa") && gasGrand > 0;
 
       const topScope1Category = [...results.scope1].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
-      const topScope2Category = [...results.scope2].filter((r) => r.value > 0).sort((a, b) => b.value - a.value)[0];
+      const topScope2Category = scope2Rows[0];
       const upstreamScope3Rows = [...results.scope3]
         .filter((r) => ["purchased_goods", "capital_goods", "fuel_energy", "upstream_transport", "waste", "business_travel", "employee_commuting"].includes(r.key) && r.value > 0)
         .sort((a, b) => b.value - a.value);
@@ -613,7 +664,9 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       ].sort((a, b) => b.value - a.value)[0].name;
 
       const keyInsights = [
-        `${dominantScope.name} emissions dominate (${pct(dominantScope.value, results.totals.grand)}%) and are currently the main decarbonization lever.`,
+        grandAnnualKg != null && grandAnnualKg > 0
+          ? `${dominantScope.name} emissions dominate (${pct(dominantScope.value, grandAnnualKg)}%) and are currently the main decarbonization lever.`
+          : `${dominantScope.name} is the largest reported scope. A share of a complete inventory is not shown.`,
         topScope3Drivers
           ? `Scope 3 concentration is highest in ${topScope3Drivers}, indicating value-chain hotspots.`
           : "Scope 3 activity is currently limited; data coverage expansion can improve hotspot precision.",
@@ -732,7 +785,11 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       };
 
       const scopeTotalByName = (scopeName: string) =>
-        scopeName === "Scope 1" ? results.totals.scope1 : scopeName === "Scope 2" ? results.totals.scope2 : results.totals.scope3;
+        scopeName === "Scope 1"
+          ? (scope1AnnualKg ?? results.totals.scope1)
+          : scopeName === "Scope 2"
+            ? (scope2AnnualKg ?? results.totals.scope2)
+            : (scope3AnnualKg ?? results.totals.scope3);
 
       const buildCategoryDrilldown = async (
         category: { key: string; label: string; value: number } | undefined,
@@ -841,7 +898,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
       const scope1Insight = topScope1Category
         ? `${topScope1Category.label} contributes the largest share of Scope 1 (${pct(topScope1Category.value, results.totals.scope1)}%).`
         : "Scope 1 emissions are currently low or unavailable.";
-      const scope2Insight = results.totals.scope2 > 0
+      const scope2Insight = (scope2AnnualKg ?? results.totals.scope2) > 0
         ? `Scope 2 is split across available electricity/heat sources; cleaner procurement can reduce ${scope2Pct}% of total emissions.`
         : "Scope 2 emissions are currently not significant in this reporting period.";
       const scope1Second = scope1Rows[1];
@@ -950,7 +1007,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
             <div class="exec-grid">
               <div class="exec-card">
                 <div class="exec-card-title">A. Emissions Snapshot</div>
-                <div class="exec-kpi">${inventoryIncomplete ? "Incomplete" : `${fmt(results.totals.grand)} tCO2e`}</div>
+                <div class="exec-kpi">${grandAnnualKg == null ? grandText : `${grandText} tCO2e`}</div>
 
                 <div class="scope-bar">
                   <div class="scope-bar-top"><span>Scope 1</span><span>${scope1Pct}%</span></div>
@@ -995,7 +1052,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               </tbody>
             </table>
 
-            <div class="grand-total"><div class="grand-total-label">${inventoryIncomplete ? "GRAND TOTAL — NOT A COMPLETE INVENTORY" : "GRAND TOTAL EMISSIONS"}</div><div class="grand-total-value">${inventoryIncomplete ? "Incomplete" : `${fmt(results.totals.grand)} tCO2e`}</div></div>
+            <div class="grand-total"><div class="grand-total-label">${grandAnnualKg == null ? "GRAND TOTAL — NOT A COMPLETE ANNUAL TOTAL" : "GRAND TOTAL EMISSIONS"}</div><div class="grand-total-value">${grandAnnualKg == null ? grandText : `${grandText} tCO2e`}</div></div>
             <div class="page-number">4</div>
           </div>
         </div>
@@ -1011,6 +1068,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               The purpose of this report is to disseminate the inventory of greenhouse gas (GHG) emissions with great attention to the accounting principles of
               relevance, accuracy, consistency, completeness and transparency.
             </p>
+            ${biogenicSentence ? `<p class="body-text">${escapeHtml(biogenicSentence)}</p>` : ""}
 
             <p class="body-text">
               This report is intended for all stakeholders interested in the GHG emissions inventory and the associated reporting structure and explanations.
@@ -1232,15 +1290,16 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
             <table class="inventory-table">
               <thead><tr><th>Scope</th><th>Emissions (tCO2e)</th><th>% Contribution</th></tr></thead>
               <tbody>
-                <tr><td>Scope 1</td><td class="num">${inventoryIncomplete ? "Incomplete" : fmt(results.totals.scope1)}</td><td class="num">${inventoryIncomplete ? "—" : `${scope1Pct}%`}</td></tr>
-                <tr><td>Scope 2</td><td class="num">${fmt(results.totals.scope2)}</td><td class="num">${scope2Pct}%</td></tr>
-                <tr><td>Scope 3</td><td class="num">${fmt(results.totals.scope3)}</td><td class="num">${scope3Pct}%</td></tr>
-                <tr><td><strong>Total</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : fmt(results.totals.grand)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
+                <tr><td>Scope 1</td><td class="num">${inventoryIncomplete ? "Incomplete" : scope1Text}</td><td class="num">${inventoryIncomplete ? "—" : `${scope1Pct}%`}</td></tr>
+                <tr><td>Scope 2</td><td class="num">${scope2Text}</td><td class="num">${scope2Pct}%</td></tr>
+                <tr><td>Scope 3</td><td class="num">${scope3Text}</td><td class="num">${scope3Pct}%</td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : grandText}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
               </tbody>
             </table>
 
             ${hasGasBreakdown ? `
             <div class="subsection-title" style="margin-top:14px;">A.1 Gas Breakdown</div>
+            ${verifiedGasNote ? `<p class="body-text">${escapeHtml(verifiedGasNote)}</p>` : ""}
             <table class="inventory-table">
               <thead><tr><th>Gas</th><th>Emissions (kg CO2e)</th><th>% Contribution</th></tr></thead>
               <tbody>
@@ -1277,11 +1336,12 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 1</th></tr></thead>
               <tbody>
                 ${scope1Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope1)}%</td></tr>`).join("")}
-                <tr><td><strong>Total</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : formatKg(results.totals.scope1)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : fmt(results.totals.scope1)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${scope1AnnualKg == null ? "Unavailable" : formatKg(scope1AnnualKg)}</strong></td><td class="num"><strong>${inventoryIncomplete ? "Incomplete" : scope1Text}</strong></td><td class="num"><strong>${inventoryIncomplete ? "—" : "100.0%"}</strong></td></tr>
               </tbody>
             </table>
             ${stationaryHtml}
             ${ipccMonthlyRows.length > 0 ? `
+            ${epaAnnual ? `<div class="subsection-title" style="margin-top:16px;">Legacy monthly records — excluded from annual totals</div>` : ""}
             ${ipccMonthlyRows.map((entry) => `
               <table class="scope3-table">
                 <thead><tr><th colspan="3">${escapeHtml(entry.label)}</th></tr></thead>
@@ -1307,17 +1367,18 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               ${scope2Rows.slice(0, 8).map((r) => `
                 <div class="chart-row">
                   <div class="chart-meta"><span>${escapeHtml(r.label)}</span><span>${fmt(r.value)} tCO2e</span></div>
-                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, results.totals.scope2)}%;background:#f59e0b;"></div></div>
+                  <div class="chart-track"><div class="chart-fill" style="width:${pct(r.value, scope2AnnualKg ?? results.totals.scope2)}%;background:#f59e0b;"></div></div>
                 </div>
               `).join("")}
             </div>
             <table class="scope3-table">
               <thead><tr><th>Category</th><th>Emissions (kg CO2e)</th><th>Emissions (tCO2e)</th><th>% of Scope 2</th></tr></thead>
               <tbody>
-                ${scope2Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope2)}%</td></tr>`).join("")}
-                <tr><td><strong>Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope2)}</strong></td><td class="num"><strong>${fmt(results.totals.scope2)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+                ${scope2Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, scope2AnnualKg ?? results.totals.scope2)}%</td></tr>`).join("")}
+                <tr><td><strong>Total</strong></td><td class="num"><strong>${scope2AnnualKg == null ? "Unassigned" : formatKg(scope2AnnualKg)}</strong></td><td class="num"><strong>${scope2Text}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
               </tbody>
             </table>
+            ${verifiedScope2 ? `<p class="body-text">Purchased cooling is not included. Legacy Scope 2 records are excluded from this total.</p>` : ""}
             <div class="insight-box"><div class="insight-text">${escapeHtml(scope2Insight)}</div></div>
             <div class="insight-box"><div class="insight-text">${escapeHtml(scope2ManagementInsight)}</div></div>
             ${scope2ContributorInsight ? `<div class="insight-box"><div class="insight-text">${escapeHtml(scope2ContributorInsight)}</div></div>` : ""}
@@ -1329,6 +1390,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
           <div class="page-header"><div class="page-header-logo">Rethink Carbon</div><div class="page-header-meta">${escapeHtml(company)} &nbsp;|&nbsp; ${escapeHtml(period)}</div></div>
           <div class="page-content">
             <div class="section-title">9. Scope 3 Analysis</div>
+            <p class="body-text">Stored Scope 3 figures below are legacy and have no reporting period. They are excluded from the verified annual total. Franchises, upstream leased assets, and downstream leased assets are not calculated.</p>
             <div class="subsection-title">9.1 Upstream Breakdown</div>
             <div class="chart-bars">
               ${upstreamScope3Rows.slice(0, 6).map((r) => `
@@ -1359,7 +1421,7 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
               <tbody>
                 ${downstreamScope3Rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${formatKg(r.value)}</td><td class="num">${fmt(r.value)}</td><td class="num">${pct(r.value, results.totals.scope3)}%</td></tr>`).join("")}
                 <tr><td><strong>Downstream Total</strong></td><td class="num"><strong>${formatKg(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${fmt(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0))}</strong></td><td class="num"><strong>${pct(downstreamScope3Rows.reduce((sum, r) => sum + r.value, 0), results.totals.scope3)}%</strong></td></tr>
-                <tr><td><strong>Scope 3 Total</strong></td><td class="num"><strong>${formatKg(results.totals.scope3)}</strong></td><td class="num"><strong>${fmt(results.totals.scope3)}</strong></td><td class="num"><strong>100.0%</strong></td></tr>
+                <tr><td><strong>Scope 3 Total</strong></td><td class="num"><strong>${scope3AnnualKg == null ? "Legacy excluded" : formatKg(scope3AnnualKg)}</strong></td><td class="num"><strong>${scope3Text}</strong></td><td class="num"><strong>${scope3AnnualKg == null ? "Excluded" : "100.0%"}</strong></td></tr>
               </tbody>
             </table>
             <div class="insight-box"><div class="insight-text">Top 20% of categories contribute ${topSharePct}% of Scope 3 emissions.</div></div>
@@ -1408,10 +1470,10 @@ export async function exportFullEmissionReportPdf(opts: FullEmissionReportExport
                 </tr>
               </thead>
               <tbody>
-                <tr><td>Scope 1 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope1 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope1 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope1)}</td></tr>
-                <tr><td>Scope 2 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope2 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope2 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope2)}</td></tr>
-                <tr><td>Scope 3 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope3 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope3 * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.scope3)}</td></tr>
-                <tr><td>Grand Total Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.total * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.total * 1000) : "N/A"}</td><td class="num">${fmt(results.totals.grand)}</td></tr>
+                <tr><td>Scope 1 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope1 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope1 * 1000) : "N/A"}</td><td class="num">${scope1Text}</td></tr>
+                <tr><td>Scope 2 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope2 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope2 * 1000) : "N/A"}</td><td class="num">${scope2Text}</td></tr>
+                <tr><td>Scope 3 Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.scope3 * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.scope3 * 1000) : "N/A"}</td><td class="num">${scope3Text}</td></tr>
+                <tr><td>Grand Total Emissions (tCO2e)</td><td class="num">${y1 ? fmt(y1.total * 1000) : "N/A"}</td><td class="num">${y2 ? fmt(y2.total * 1000) : "N/A"}</td><td class="num">${grandText}</td></tr>
               </tbody>
             </table>
             <div class="insight-box"><div class="insight-text">Historic year-wise values can be populated automatically as prior-year inventory snapshots are stored in the platform.</div></div>

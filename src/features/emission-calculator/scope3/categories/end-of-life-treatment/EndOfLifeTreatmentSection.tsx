@@ -53,7 +53,7 @@ export const EndOfLifeTreatmentSection: React.FC<EndOfLifeTreatmentSectionProps>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Material</Label>
-        <Label className="text-gray-500 font-medium">Volume (kg)</Label>
+        <Label className="text-gray-500 font-medium">Mass (kg)</Label>
         <Label className="text-gray-500 font-medium">Disposal Method</Label>
         <Label className="text-gray-500 font-medium">Recycle (%)</Label>
         <Label className="text-gray-500 font-medium">Composition</Label>

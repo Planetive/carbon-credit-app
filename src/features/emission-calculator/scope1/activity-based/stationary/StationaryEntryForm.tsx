@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { activityMatchesReportingYear, matchesVerifiedCounterparty } from "@/features/emission-calculator/results/reportingYear";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError } from "@/api/client";
 import {
@@ -46,8 +48,10 @@ type Props = {
   site: string;
   equipmentId: string;
   period: string;
+  reportingYear?: number;
   counterpartyId?: string;
   onVerifiedKgChange?: (kg: number | null) => void;
+  onSaved?: () => void;
   onEditActivity?: (context: StationaryActivityContext) => void;
 };
 
@@ -83,11 +87,15 @@ export function StationaryEntryForm({
   site,
   equipmentId,
   period,
+  reportingYear,
   counterpartyId,
   onVerifiedKgChange,
+  onSaved,
   onEditActivity,
 }: Props) {
   const { toast } = useToast();
+  const { currentOrganization } = useOrganization();
+  const organizationId = currentOrganization?.id || null;
   const onVerifiedRef = useRef(onVerifiedKgChange);
   onVerifiedRef.current = onVerifiedKgChange;
   const [factors, setFactors] = useState<EpaFuelFactorsMap | null>(null);
@@ -135,7 +143,18 @@ export function StationaryEntryForm({
       category: "stationary_combustion",
       legacy_source: "epa_stationary",
     })
-      .then((rows) => setRecords((rows || []).filter(isEpaStationaryActivity)))
+      .then((rows) =>
+        setRecords(
+          (rows || []).filter((row) => {
+            if (!isEpaStationaryActivity(row) || !organizationId || row.organization_id !== organizationId) return false;
+            const meta = (row.raw?.activity_meta || {}) as Record<string, unknown>;
+            return (
+              activityMatchesReportingYear(meta.period, reportingYear) &&
+              matchesVerifiedCounterparty(row.counterparty_id, counterpartyId)
+            );
+          })
+        )
+      )
       .catch((err) => {
         setRecords([]);
         setRecordsError(errorMessage(err, "Saved stationary entries could not be loaded."));
@@ -144,8 +163,11 @@ export function StationaryEntryForm({
 
   useEffect(() => {
     loadCatalog();
-    loadRecords();
   }, []);
+
+  useEffect(() => {
+    loadRecords();
+  }, [organizationId, reportingYear, counterpartyId]);
 
   useEffect(() => {
     const kg = canSave(entry) && entry.result ? Number(entry.result.total_kg_co2e) : null;
@@ -213,6 +235,7 @@ export function StationaryEntryForm({
         : await createEpaStationaryRecord(body);
       setEntry((current) => applySaveSuccess(current, saved));
       loadRecords();
+      onSaved?.();
       toast({
         title: saveUsesUpdate(entry) ? "Entry updated" : "Entry saved",
         description: `${saved.calculation.total_t_co2e} t CO2e`,
@@ -246,7 +269,10 @@ export function StationaryEntryForm({
               <li key={record.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-gray-800">
                   {String((record.raw?.inputs as { fuel?: string } | undefined)?.fuel || record.unit || "Entry")}
-                  {record.emissions_tco2e != null ? ` · ${record.emissions_tco2e} t CO2e` : ""}
+                  {record.emissions_tco2e != null ? ` · Scope 1 ${record.emissions_tco2e} tCO2e` : ""}
+                  {typeof record.raw?.biogenic_co2_t === "string"
+                    ? ` · Biogenic ${record.raw.biogenic_co2_t} t CO2`
+                    : ""}
                 </span>
                 <Button
                   type="button"
@@ -390,10 +416,12 @@ export function StationaryEntryForm({
             <GasLine label="N2O" gas={result.gases.n2o} />
           </div>
           <div className="text-sm text-gray-800">
-            <p>Total {result.total_kg_co2e} kg CO2e</p>
-            <p>Total {result.total_t_co2e} t CO2e</p>
+            <p>Scope 1 {result.total_t_co2e} tCO2e ({result.total_kg_co2e} kg CO2e)</p>
+            <p>
+              Biogenic CO2 {result.biogenic_co2_t ?? "not recorded"} t CO2, outside Scope 1
+            </p>
             <p className="text-xs text-gray-500 mt-1">
-              GWP {result.factor_source.gwp_version || "AR5"}
+              GWP {result.factor_source.gwp_version || result.accounting?.gwp_version || "AR5"}
               {result.factor_source.dataset_title
                 ? ` · ${result.factor_source.dataset_title}`
                 : ""}
@@ -401,6 +429,9 @@ export function StationaryEntryForm({
                 ? ` · ${result.factor_source.version_label}`
                 : ""}
             </p>
+            {result.accounting?.methodology ? (
+              <p className="text-xs text-gray-500 mt-1">{result.accounting.methodology}</p>
+            ) : null}
           </div>
         </div>
       )}

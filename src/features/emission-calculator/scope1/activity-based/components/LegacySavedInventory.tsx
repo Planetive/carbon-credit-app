@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   groupId: Scope1ActivityGroupId;
   editableNote?: string;
+  /** Historical rows stay visible, with no delete control. */
+  readOnly?: boolean;
   /** Fired after a successful delete so parent forms can refresh. */
   onChanged?: () => void;
 };
@@ -88,7 +90,7 @@ function preserveOpenState(
  * Lists saved Scope 1 rows for this activity group and allows deleting them.
  * Historical data was never removed from the DB — only the old tabs were merged.
  */
-export function LegacySavedInventory({ groupId, editableNote, onChanged }: Props) {
+export function LegacySavedInventory({ groupId, editableNote, readOnly = false, onChanged }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [group, setGroup] = useState<GroupedScope1Total | null>(null);
@@ -232,8 +234,9 @@ export function LegacySavedInventory({ groupId, editableNote, onChanged }: Props
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#0F6E56]">Already in your inventory</p>
             <p className="text-xs text-gray-600 mt-0.5">
-              Open a source to review or delete saved rows. Deleting removes them from your
-              Scope 1 total.
+              {readOnly
+                ? "These are legacy entries. They stay unchanged and are not edited here."
+                : "Open a source to review or delete saved rows. Deleting removes them from your Scope 1 total."}
             </p>
           </div>
         </div>
@@ -297,7 +300,11 @@ export function LegacySavedInventory({ groupId, editableNote, onChanged }: Props
                             {formatKg(entry.kg)} kg CO₂e
                           </p>
                         </div>
-                        {confirming ? (
+                        {readOnly ? (
+                          <span className="shrink-0 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                            Legacy
+                          </span>
+                        ) : confirming ? (
                           <div className="flex items-center gap-1.5 shrink-0">
                             <Button
                               type="button"

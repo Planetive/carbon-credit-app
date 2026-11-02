@@ -48,6 +48,10 @@ import { ApiError } from "@/api/client";
 import { ESG_READINESS_ASSESSMENT_TYPE } from "@/features/esg-readiness/constants";
 import { loadEpaIpccResults } from "@/lib/epaIpccResults";
 import {
+  readSelectedReportingYear,
+  writeSelectedReportingYear,
+} from "@/features/emission-calculator/results/reportingYear";
+import {
   dashboardStationaryContext,
   failedDashboardSummary,
   missingOrganizationSummary,
@@ -58,6 +62,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PortfolioClient, Counterparty, Exposure } from "@/integrations/supabase/portfolioClient";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { exportPortfolioPdfReport, formatDataQualityScoresFromStoredResults } from "@/utils/portfolioPdfExport";
+import { summarizeFinancedPortfolio } from "@/utils/financedEmissionsReporting";
 import CompanyOverviewScreen from "@/features/dashboard/CompanyOverviewScreen";
 // Onboarding wizard gate removed; users go straight to dashboard
 
@@ -81,6 +86,7 @@ const Dashboard2 = () => {
   const [emissionData, setEmissionData] = useState<any>(null);
   const [emissionsLoading, setEmissionsLoading] = useState<boolean>(true);
   const [emissionsRetry, setEmissionsRetry] = useState(0);
+  const [reportingYear, setReportingYear] = useState(readSelectedReportingYear);
   const [emissionsSummary, setEmissionsSummary] = useState<DashboardEmissionsSummary | null>(null);
   const [financeEmissionData, setFinanceEmissionData] = useState<any>(null);
   const [facilitatedEmissionData, setFacilitatedEmissionData] = useState<any>(null);
@@ -389,110 +395,29 @@ const Dashboard2 = () => {
         emissionCalculatorPromise,
       ]);
 
-      // Fetch and aggregate all Finance Emission calculations across all portfolios
-      // Only fetch for financial_institution users
       if (userType === 'financial_institution') {
         try {
-          // Query emission_calculations table - same as CompanyDetail does
-          const { data: financeData, error: financeError } = await (supabase as any)
-            .from('emission_calculations')
-            .select('financed_emissions, counterparty_id, calculation_type, status, updated_at')
-            .eq('user_id', user.id)
-            .eq('calculation_type', 'finance')
-            .neq('status', 'failed');
-
-          if (financeError) {
-            console.error('❌ Dashboard - Error fetching finance emissions:', financeError);
-            setFinanceEmissionData(null);
-          } else {
-            console.log('🔍 Dashboard - Finance emission records:', financeData?.length || 0, financeData);
-
-            // Filter out any invalid records and sum emissions
-            const validFinanceData = (financeData || []).filter((r: any) => {
-              const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
-              return emissions > 0 && isFinite(emissions);
-            });
-
-            // Get unique counterparty IDs to count companies
-            const uniqueCounterparties = new Set(
-              validFinanceData
-                .map((r: any) => r.counterparty_id)
-                .filter((id: any) => id !== null && id !== undefined)
-            );
-
-            if (validFinanceData.length > 0) {
-              // Sum all finance emissions from all companies
-              const totalFinanceEmissions = validFinanceData.reduce((sum: number, record: any) => {
-                const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
-                console.log('  ✅ Adding emissions:', emissions, 'from counterparty:', record.counterparty_id);
-                return sum + emissions;
-              }, 0);
-              
-              console.log('💰 Dashboard - Total finance emissions:', totalFinanceEmissions, 'from', uniqueCounterparties.size, 'companies');
-              
-              if (totalFinanceEmissions > 0) {
-                setFinanceEmissionData({
-                  financed_emissions: totalFinanceEmissions,
-                  total_companies: uniqueCounterparties.size || validFinanceData.length
-                });
-              } else {
-                setFinanceEmissionData(null);
-              }
-            } else {
-              console.log('❌ Dashboard - No valid finance data found');
-              setFinanceEmissionData(null);
-            }
-          }
-        } catch (error) {
-          console.error('💥 Error fetching finance emissions:', error);
-          setFinanceEmissionData(null);
-        }
-
-        // Fetch and aggregate all Facilitated Emission calculations across all portfolios
-        try {
-          // Query emission_calculations table only
-          const { data: facilitatedData, error: facilitatedError } = await (supabase as any)
-            .from('emission_calculations')
-            .select('financed_emissions, status, counterparty_id, calculation_type')
-            .eq('user_id', user.id)
-            .eq('calculation_type', 'facilitated')
-            .neq('status', 'failed');
-
-          console.log('🔍 Dashboard - Facilitated emissions:', facilitatedData?.length || 0, facilitatedData);
-
-          // Filter out invalid records
-          const validFacilitatedData = (facilitatedData || []).filter((r: any) => {
-            const emissions = parseFloat(String(r.financed_emissions || 0)) || 0;
-            return emissions > 0 && isFinite(emissions);
-          });
-
-          // Get unique counterparty IDs to count companies
-          const uniqueCounterparties = new Set(
-            validFacilitatedData
-              .map((r: any) => r.counterparty_id)
-              .filter((id: any) => id !== null && id !== undefined)
+          const reportingRows = await PortfolioClient.listFinancedReportingRows();
+          const summary = summarizeFinancedPortfolio(reportingRows);
+          setFinanceEmissionData(
+            summary.financeTotal > 0
+              ? {
+                  financed_emissions: summary.financeTotal,
+                  total_companies: summary.financeCounterparties,
+                }
+              : null
           );
-
-          if (validFacilitatedData.length > 0) {
-            // Sum all facilitated emissions from all companies
-            const totalFacilitatedEmissions = validFacilitatedData.reduce((sum: number, record: any) => {
-              const emissions = parseFloat(String(record.financed_emissions || 0)) || 0;
-              return sum + emissions;
-            }, 0);
-            
-            if (totalFacilitatedEmissions > 0) {
-              setFacilitatedEmissionData({
-                financed_emissions: totalFacilitatedEmissions,
-                total_companies: uniqueCounterparties.size || validFacilitatedData.length
-              });
-            } else {
-              setFacilitatedEmissionData(null);
-            }
-          } else {
-            setFacilitatedEmissionData(null);
-          }
+          setFacilitatedEmissionData(
+            summary.facilitatedTotal > 0
+              ? {
+                  financed_emissions: summary.facilitatedTotal,
+                  total_companies: summary.facilitatedCounterparties,
+                }
+              : null
+          );
         } catch (error) {
-          console.error('Error fetching facilitated emissions:', error);
+          console.error('Error fetching financed emissions totals:', error);
+          setFinanceEmissionData(null);
           setFacilitatedEmissionData(null);
         }
 
@@ -526,7 +451,7 @@ const Dashboard2 = () => {
       try {
         const epaResults = await loadEpaIpccResults(
           user.id,
-          dashboardStationaryContext(organizationId)
+          dashboardStationaryContext(organizationId, reportingYear)
         );
         if (cancelled) return;
         setEmissionsSummary(summarizeDashboardEmissions(epaResults));
@@ -549,7 +474,7 @@ const Dashboard2 = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, profileMissing, organizationLoading, currentOrganization?.id, emissionsRetry]);
+  }, [user, profileMissing, organizationLoading, currentOrganization?.id, emissionsRetry, reportingYear]);
 
   // Fetch portfolio companies when portfolio section is active (financial institution)
   useEffect(() => {
@@ -691,21 +616,26 @@ const Dashboard2 = () => {
 
       const dataQualityScoresByCounterparty = new Map<string, { finance: string; facilitated: string }>();
       if (user?.id && portfolioCompanies.length > 0) {
-        const { data: aggRows } = await (supabase as any)
-          .from("emission_calculations")
-          .select("counterparty_id, calculation_type, results, data_quality_score")
-          .eq("user_id", user.id)
-          .eq("formula_id", "aggregate")
-          .in("calculation_type", ["finance", "facilitated"]);
-
-        for (const row of aggRows || []) {
-          const cid = row.counterparty_id as string | null;
-          if (!cid) continue;
+        const reportingRows = await PortfolioClient.listFinancedReportingRows();
+        const summary = summarizeFinancedPortfolio(reportingRows);
+        for (const group of summary.groups) {
+          const cid = group.counterpartyId;
+          if (!cid || group.reason === "empty") continue;
+          const displayRow = group.selectedRows[0];
+          const formatted = formatDataQualityScoresFromStoredResults(
+            group.reason === "aggregate"
+              ? displayRow?.results
+              : {
+                  allResults: group.selectedRows.map((row) => ({
+                    dataQualityScore: row.dataQualityScore ?? null,
+                  })),
+                },
+            displayRow?.dataQualityScore
+          );
           const prev = dataQualityScoresByCounterparty.get(cid) || { finance: "—", facilitated: "—" };
-          const formatted = formatDataQualityScoresFromStoredResults(row.results, row.data_quality_score);
-          if (row.calculation_type === "finance") {
+          if (group.calcKind === "finance") {
             dataQualityScoresByCounterparty.set(cid, { ...prev, finance: formatted });
-          } else if (row.calculation_type === "facilitated") {
+          } else if (group.calcKind === "facilitated") {
             dataQualityScoresByCounterparty.set(cid, { ...prev, facilitated: formatted });
           }
         }
@@ -941,6 +871,11 @@ const Dashboard2 = () => {
                   }
                   emissionsSummary={emissionsSummary}
                   emissionsLoading={emissionsLoading}
+                  reportingYear={reportingYear}
+                  onReportingYearChange={(year) => {
+                    writeSelectedReportingYear(year);
+                    setReportingYear(year);
+                  }}
                   onRetryEmissions={() => setEmissionsRetry((count) => count + 1)}
                 />
               </motion.div>

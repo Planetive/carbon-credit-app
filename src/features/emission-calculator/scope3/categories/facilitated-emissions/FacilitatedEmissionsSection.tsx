@@ -16,7 +16,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
+import {
+  loadScope3FinancedImportContext,
+  scope3ImportLinkPayload,
+  type PortfolioCalculationForScope3,
+} from "@/utils/portfolioCalculationsForScope3";
+import {
+  assessScope3FinancedImport,
+  assessScope3FinancedImportBatch,
+  importedActivityFromRecord,
+  selectCategory15ReportableActivities,
+  type Scope3ImportedActivity,
+} from "@/utils/scope3FinancedImportSafety";
+import type { FinancedCalculationRow } from "@/utils/financedEmissionsReporting";
 import { confirmAction } from "@/utils/confirmAction";
 import {
   deleteScope3FacilitatedEmission,
@@ -38,6 +50,19 @@ export interface FacilitatedEmissionRow {
   emissions: number | undefined;
   linkedEmissionCalculationId?: string | null;
   linkedFinanceEmissionCalculationId?: string | null;
+  linkedFinancedEmissionsId?: string | null;
+}
+
+function facilitatedToImportedActivity(row: FacilitatedEmissionRow): Scope3ImportedActivity {
+  return {
+    id: row.dbId || row.id,
+    label: row.activityLabel || "Facilitated line",
+    lineType: "financed",
+    attributedEmissions: row.emissions ?? null,
+    linkedEmissionCalculationId: row.linkedEmissionCalculationId ?? null,
+    linkedFinanceEmissionCalculationId: row.linkedFinanceEmissionCalculationId ?? null,
+    linkedFinancedEmissionsId: row.linkedFinancedEmissionsId ?? null,
+  };
 }
 
 interface FacilitatedEmissionsSectionProps {
@@ -131,9 +156,8 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
   const [userTypeResolved, setUserTypeResolved] = useState(false);
   const [corporateCompanyName, setCorporateCompanyName] = useState("");
   const [creatingCorporateJourney, setCreatingCorporateJourney] = useState(false);
-  const [portfolioRows, setPortfolioRows] = useState<Awaited<
-    ReturnType<typeof fetchPortfolioCalculationsForScope3>
-  >>([]);
+  const [portfolioRows, setPortfolioRows] = useState<PortfolioCalculationForScope3[]>([]);
+  const [reportingRows, setReportingRows] = useState<FinancedCalculationRow[]>([]);
   const isCorporateUser = userTypeResolved ? userType === "corporate" : true;
 
   useEffect(() => {
@@ -145,22 +169,38 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     if (companyContext && !counterpartyId) {
       setRows([]);
       setExisting([]);
+      setReportingRows([]);
       setInitialLoad(false);
       return;
     }
     try {
       const data = await fetchScope3FacilitatedEmissions(user.id, companyContext, counterpartyId);
-      const mapped: FacilitatedEmissionRow[] = data.map((e) => ({
-        id: crypto.randomUUID(),
-        dbId: e.id,
-        isExisting: true,
-        activityLabel: e.activity_label || "",
-        emissions: Number(e.emissions) || 0,
-        linkedEmissionCalculationId: e.linked_emission_calculation_id ?? null,
-        linkedFinanceEmissionCalculationId: e.linked_finance_emission_calculation_id ?? null,
-      }));
+      const mapped: FacilitatedEmissionRow[] = data.map((e) => {
+        const imported = importedActivityFromRecord(e as Record<string, unknown>);
+        return {
+          id: crypto.randomUUID(),
+          dbId: e.id,
+          isExisting: true,
+          activityLabel: e.activity_label || "",
+          emissions: Number(e.emissions) || 0,
+          linkedEmissionCalculationId: imported.linkedEmissionCalculationId,
+          linkedFinanceEmissionCalculationId: imported.linkedFinanceEmissionCalculationId,
+          linkedFinancedEmissionsId: imported.linkedFinancedEmissionsId,
+        };
+      });
       setExisting(mapped);
       setRows(mapped.length ? mapped : []);
+      try {
+        const context = await loadScope3FinancedImportContext(
+          supabase,
+          user.id,
+          "facilitated",
+          companyContext && counterpartyId ? counterpartyId : null,
+        );
+        setReportingRows(context.reportingRows);
+      } catch {
+        setReportingRows([]);
+      }
     } catch (e: unknown) {
       console.error(e);
       toast({ title: "Error", description: "Failed to load facilitated emissions", variant: "destructive" });
@@ -200,6 +240,15 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     isInitialLoad: initialLoad,
     mapRowToEntry: (r) => {
       if (!r.activityLabel?.trim() || typeof r.emissions !== "number" || r.emissions < 0) return null;
+      const reportable = selectCategory15ReportableActivities(
+        rows.map(facilitatedToImportedActivity),
+        reportingRows,
+        "facilitated",
+      );
+      const activityId = r.dbId || r.id;
+      if (reportable.overlapping.some((item) => item.id === activityId) && !reportable.reportableIds.has(activityId)) {
+        return null;
+      }
       return {
         id: r.id,
         category: "facilitated_emissions",
@@ -216,13 +265,14 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     setImportOpen(true);
     setImportLoading(true);
     try {
-      const list = await fetchPortfolioCalculationsForScope3(
+      const context = await loadScope3FinancedImportContext(
         supabase,
         user.id,
         "facilitated",
         companyContext && counterpartyId ? counterpartyId : null,
       );
-      setPortfolioRows(list);
+      setPortfolioRows(context.candidates);
+      setReportingRows(context.reportingRows);
     } catch (e: unknown) {
       const err = e as { message?: string };
       toast({ title: "Could not load portfolio", description: err.message || "Failed to load", variant: "destructive" });
@@ -231,7 +281,25 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     }
   };
 
-  const importOne = async (p: (typeof portfolioRows)[0]) => {
+  const importOne = async (p: PortfolioCalculationForScope3) => {
+    const safety = assessScope3FinancedImport({
+      candidate: p,
+      existing: rows.map(facilitatedToImportedActivity),
+      reportingRows,
+      calcKind: "facilitated",
+    });
+    if (safety.status === "already-imported") {
+      toast({ title: "Already added", description: "This portfolio result is already in Facilitated emissions." });
+      return;
+    }
+    if (safety.blocked) {
+      toast({
+        title: safety.status === "unresolved" ? "Import needs reconciliation" : "Import blocked",
+        description: safety.message,
+        variant: "destructive",
+      });
+      return;
+    }
     const label =
       [p.counterpartyName, p.formulaName || p.formulaId || "Facilitated"].filter(Boolean).join(" · ") ||
       "Facilitated emissions";
@@ -241,11 +309,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
       activity_label: label.slice(0, 500),
       emissions: p.financedEmissions,
     };
-    if (p.source === "emission_calculations") {
-      payload.linked_emission_calculation_id = p.id;
-    } else {
-      payload.linked_finance_emission_calculation_id = p.id;
-    }
+    Object.assign(payload, scope3ImportLinkPayload(p));
     try {
       await insertScope3FacilitatedEmission(payload);
     } catch (e: unknown) {
@@ -264,27 +328,38 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
 
   const syncCorporateFacilitatedResults = useCallback(async () => {
     if (!isCorporateUser) return;
-    const list = await fetchPortfolioCalculationsForScope3(
+    const context = await loadScope3FinancedImportContext(
       supabase,
       user.id,
       "facilitated",
       companyContext && counterpartyId ? counterpartyId : null,
     );
-    if (!list.length) return;
+    setReportingRows(context.reportingRows);
+    if (!context.candidates.length) return;
+
+    const batch = assessScope3FinancedImportBatch({
+      candidates: context.candidates,
+      existing: rows.map(facilitatedToImportedActivity),
+      reportingRows: context.reportingRows,
+      calcKind: "facilitated",
+    });
+    if (batch.blocked.length > 0) {
+      toastRef.current({
+        title: "Facilitated import needs reconciliation",
+        description: batch.blocked.map((item) => item.decision.message).join(" "),
+        variant: "destructive",
+      });
+    }
 
     let added = 0;
-    for (const p of list) {
+    for (const p of batch.allowed) {
       const payload: Record<string, unknown> = {
         user_id: user.id,
         counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
         activity_label: [p.counterpartyName, p.formulaName || p.formulaId || "Facilitated"].filter(Boolean).join(" · ").slice(0, 500),
         emissions: p.financedEmissions,
       };
-      if (p.source === "emission_calculations") {
-        payload.linked_emission_calculation_id = p.id;
-      } else {
-        payload.linked_finance_emission_calculation_id = p.id;
-      }
+      Object.assign(payload, scope3ImportLinkPayload(p));
       try {
         await insertScope3FacilitatedEmission(payload);
         added += 1;
@@ -302,10 +377,10 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         description: `${added} facilitated line${added > 1 ? "s" : ""} added to Facilitated emissions.`,
       });
     }
-  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadRows]);
+  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadRows, rows, toast]);
 
   useEffect(() => {
-    if (!userTypeResolved || !isCorporateUser) return;
+    if (!userTypeResolved || !isCorporateUser || initialLoad) return;
     syncCorporateFacilitatedResults().catch((e: unknown) => {
       const err = e as { message?: string };
       toastRef.current({
@@ -314,7 +389,7 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
         variant: "destructive",
       });
     });
-  }, [userTypeResolved, isCorporateUser, syncCorporateFacilitatedResults]);
+  }, [userTypeResolved, isCorporateUser, initialLoad, syncCorporateFacilitatedResults]);
 
   const startCorporateFacilitatedJourney = async () => {
     const name = corporateCompanyName.trim();
@@ -421,7 +496,29 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
     }
   };
 
-  const total = rows.reduce((s, r) => s + (typeof r.emissions === "number" ? r.emissions : 0), 0);
+  const facilitatedImportSafety = useMemo(
+    () =>
+      selectCategory15ReportableActivities(
+        rows.map(facilitatedToImportedActivity),
+        reportingRows,
+        "facilitated",
+      ),
+    [rows, reportingRows],
+  );
+  const overlappingFacilitatedIds = useMemo(
+    () =>
+      new Set(
+        facilitatedImportSafety.overlapping
+          .filter((item) => !facilitatedImportSafety.reportableIds.has(item.id))
+          .map((item) => item.id),
+      ),
+    [facilitatedImportSafety],
+  );
+  const total = rows.reduce((s, r) => {
+    const activityId = r.dbId || r.id;
+    if (overlappingFacilitatedIds.has(activityId)) return s;
+    return s + (typeof r.emissions === "number" ? r.emissions : 0);
+  }, 0);
   const rowDetailsKey = useMemo(
     () =>
       rows
@@ -536,6 +633,17 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
           </div>
         )}
       </div>
+
+      {facilitatedImportSafety.overlapping.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Facilitated lines need reconciliation</p>
+          <p className="mt-1">
+            These records overlap an aggregate and component calculations for the same counterparty.
+            They were not deleted. The total counts the facilitated total once:{" "}
+            {facilitatedImportSafety.overlapping.map((item) => item.label).join("; ")}.
+          </p>
+        </div>
+      )}
 
       {isCorporateUser && (
         <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-4">
@@ -732,7 +840,14 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
             </p>
           ) : (
             <ul className="space-y-2">
-              {portfolioRows.map((p) => (
+              {portfolioRows.map((p) => {
+                const safety = assessScope3FinancedImport({
+                  candidate: p,
+                  existing: rows.map(facilitatedToImportedActivity),
+                  reportingRows,
+                  calcKind: "facilitated",
+                });
+                return (
                 <li
                   key={`${p.source}-${p.id}`}
                   className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
@@ -742,12 +857,22 @@ export const FacilitatedEmissionsSection: React.FC<FacilitatedEmissionsSectionPr
                     <div className="text-muted-foreground text-xs">
                       {p.financedEmissions.toFixed(2)} tCO₂e · {new Date(p.createdAt).toLocaleDateString()}
                     </div>
+                    {safety.blocked && (
+                      <div className="mt-1 text-xs text-amber-800">{safety.message}</div>
+                    )}
                   </div>
-                  <Button type="button" size="sm" className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => importOne(p)}>
-                    Add
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]"
+                    disabled={safety.blocked || safety.status === "already-imported"}
+                    onClick={() => importOne(p)}
+                  >
+                    {safety.status === "already-imported" ? "Added" : safety.blocked ? "Blocked" : "Add"}
                   </Button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </DialogContent>

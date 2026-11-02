@@ -7,7 +7,9 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { loadEpaIpccResults, EpaIpccResultsData } from "@/lib/epaIpccResults";
 import { loadLegacyCategoryDetailRows } from "@/integrations/supabase/ghgEntryAggregates";
 import { buildReportingTotals } from "./reportingTotals";
-import { buildEpaResultsCsv } from "./resultsExport";
+import { EpaReportingYearControl } from "./EpaReportingYearControl";
+import { readSelectedReportingYear, writeSelectedReportingYear } from "./reportingYear";
+import { buildEpaResultsCsv, reportableScope2Rows } from "./resultsExport";
 import { exportFullEmissionReportPdf } from "@/utils/fullEmissionReportExport";
 import ResultsSummaryCard from "./components/ResultsSummaryCard";
 import ScopeHighlightCards from "./components/ScopeHighlightCards";
@@ -57,6 +59,7 @@ function readResultsCounterpartyId(): string | undefined {
 const EpaIpccResultsScreen = () => {
   const { user } = useAuth();
   const { currentOrganization } = useOrganization();
+  const [reportingYear, setReportingYear] = useState(readSelectedReportingYear);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<EpaIpccResultsData | null>(null);
@@ -151,6 +154,7 @@ const EpaIpccResultsScreen = () => {
         const data = await loadEpaIpccResults(user.id, {
           organizationId: currentOrganization?.id,
           counterpartyId: readResultsCounterpartyId(),
+          reportingYear,
         });
         if (cancelled) return;
         setResults(data);
@@ -168,7 +172,7 @@ const EpaIpccResultsScreen = () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user, navigate, currentOrganization?.id]);
+  }, [user, navigate, currentOrganization?.id, reportingYear]);
 
   const exportCsv = () => {
     if (!results) return;
@@ -239,11 +243,13 @@ const EpaIpccResultsScreen = () => {
             },
           ]
         : [];
+    const verifiedScope2 = reportableScope2Rows(results);
     return [
       ...verifiedRow,
       ...reporting.reportableScope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
-      ...results.scope2.map((r) => ({ ...r, scope: "Scope 2" as const })),
-      ...results.scope3.map((r) => ({ ...r, scope: "Scope 3" as const })),
+      ...(verifiedScope2
+        ? verifiedScope2.map((r) => ({ ...r, scope: "Scope 2" as const }))
+        : results.scope2.map((r) => ({ ...r, scope: "Scope 2" as const }))),
     ];
   }, [results, reporting]);
 
@@ -283,10 +289,20 @@ const EpaIpccResultsScreen = () => {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <div className="w-full px-3 sm:px-4 py-5 sm:py-6 space-y-6">
+        <div className="max-w-xs">
+          <EpaReportingYearControl
+            year={reportingYear}
+            onChange={(year) => {
+              writeSelectedReportingYear(year);
+              setReportingYear(year);
+            }}
+          />
+        </div>
         <ResultsSummaryCard
-          grandTotalKg={reporting.grandKg ?? 0}
+          grandTotalKg={reporting.grandKg}
           categoriesCalculated={categoriesCalculated}
           submittedAt={submittedAt}
+          reportingYear={reporting.reportingYear ?? reportingYear}
           inventoryStatus={reporting.status}
           statusNote={reporting.statusLabel}
           onEditAssessment={() => navigate("/emission-calculator-epa")}
@@ -295,24 +311,24 @@ const EpaIpccResultsScreen = () => {
           isGeneratingPdf={isGeneratingPdf}
         />
 
-        {reporting.status === "incomplete" ? null : (
+        {reporting.inventory === "complete" && reporting.scope1Kg != null && reporting.scope2Kg != null && reporting.scope3Kg != null && reporting.grandKg != null ? (
           <>
             <ScopeHighlightCards
-              scope1Kg={reporting.scope1Kg ?? 0}
-              scope2Kg={results.totals.scope2}
-              scope3Kg={results.totals.scope3}
-              grandKg={reporting.grandKg ?? 0}
+              scope1Kg={reporting.scope1Kg}
+              scope2Kg={reporting.scope2Kg}
+              scope3Kg={reporting.scope3Kg}
+              grandKg={reporting.grandKg}
             />
 
             <EmissionsAnalyticsRow
-              scope1Kg={reporting.scope1Kg ?? 0}
-              scope2Kg={results.totals.scope2}
-              scope3Kg={results.totals.scope3}
-              grandKg={reporting.grandKg ?? 0}
+              scope1Kg={reporting.scope1Kg}
+              scope2Kg={reporting.scope2Kg}
+              scope3Kg={reporting.scope3Kg}
+              grandKg={reporting.grandKg}
               categories={categoriesWithScope}
             />
           </>
-        )}
+        ) : null}
 
         <ResultsBreakdownTabs
           results={results}

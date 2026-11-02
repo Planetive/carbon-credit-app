@@ -6,7 +6,7 @@ import { SCOPE_COLORS, formatPct, formatTonnes, pctOfTotal } from "./formatters"
 type EmissionsAnalyticsRowProps = {
   scope1Kg: number;
   scope2Kg: number;
-  scope3Kg: number;
+  scope3Kg: number | null;
   grandKg: number;
   categories: Array<EmissionCategoryTotal & { scope: "Scope 1" | "Scope 2" | "Scope 3" }>;
 };
@@ -21,7 +21,7 @@ const EmissionsAnalyticsRow = ({
   const donutData = [
     { name: "Scope 1", value: scope1Kg, color: SCOPE_COLORS.scope1.solid },
     { name: "Scope 2", value: scope2Kg, color: SCOPE_COLORS.scope2.solid },
-    { name: "Scope 3", value: scope3Kg, color: SCOPE_COLORS.scope3.solid },
+    ...(scope3Kg == null ? [] : [{ name: "Scope 3", value: scope3Kg, color: SCOPE_COLORS.scope3.solid }]),
   ];
   const chartSlices = donutData.filter((s) => s.value > 0);
   const multiSlice = chartSlices.length > 1;
@@ -45,6 +45,9 @@ const EmissionsAnalyticsRow = ({
     insights.push(
       `${dominant.name} accounts for ${formatPct(pctOfTotal(dominant.value, grandKg))}% of your footprint.`
     );
+  }
+  if (scope3Kg == null) {
+    insights.push("Legacy Scope 3 records are excluded from this verified annual total.");
   }
   for (const slice of donutData) {
     if (slice.value <= 0) {
@@ -97,6 +100,15 @@ const EmissionsAnalyticsRow = ({
                 </span>
               </li>
             ))}
+            {scope3Kg == null ? (
+              <li className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-slate-600 min-w-0">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: SCOPE_COLORS.scope3.solid }} />
+                  Scope 3
+                </span>
+                <span className="tabular-nums text-slate-900 font-medium shrink-0">Excluded</span>
+              </li>
+            ) : null}
           </ul>
         </div>
       </article>

@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EmissionCategoryTotal, EpaIpccResultsData } from "@/lib/epaIpccResults";
-import { buildReportingTotals, isUnreconciledStationaryKey } from "../reportingTotals";
+import { biogenicReportLabel, buildReportingTotals, isLegacyMobileKey, isLegacyRefrigerantKey, isUnreconciledStationaryKey, verifiedScope1Lines } from "../reportingTotals";
+import type { MobileResultActivity, MobileVerifiedResults } from "../mobileResults";
+import {
+  refrigerantMethodLabel,
+  refrigerantRateDisclosure,
+  type RefrigerantResultActivity,
+  type RefrigerantVerifiedResults,
+} from "../refrigerantResults";
 import { type StationaryResultActivity, type StationaryVerifiedResults } from "../stationaryResults";
 import { formatKg, formatPct, formatTonnes, pctOfTotal } from "./formatters";
 
@@ -58,12 +65,17 @@ function VerifiedStationaryPanel({
             Calculated by the EPA stationary service. Older fuel entries stay in the legacy list below and are not added to this total.
           </p>
         </div>
-        <p className="text-sm font-semibold tabular-nums text-slate-900">
-          {formatExactTonnes(verified.totalTco2e)} tCO₂e
-          <span className="ml-2 text-xs font-medium text-slate-500">
-            {formatKg(verified.totalKgCo2e)} kg CO₂e
-          </span>
-        </p>
+        <div className="text-right">
+          <p className="text-sm font-semibold tabular-nums text-slate-900">
+            Scope 1 {formatExactTonnes(verified.totalTco2e)} tCO₂e
+            <span className="ml-2 text-xs font-medium text-slate-500">
+              {formatKg(verified.totalKgCo2e)} kg CO₂e
+            </span>
+          </p>
+          <p className="text-xs text-slate-600">
+            {biogenicReportLabel(verified.biogenicCo2Tonnes ?? null, verified.biogenicStatus || "not_recorded")}. GWP AR5.
+          </p>
+        </div>
       </div>
       {verified.status === "empty" ? (
         <p className="text-sm text-slate-500">No verified stationary combustion records for this view.</p>
@@ -122,7 +134,10 @@ function ActivityRow({ activity }: { activity: StationaryResultActivity }) {
       <GasCell gas={activity.ch4} />
       <GasCell gas={activity.n2o} />
       <td className="px-3 py-2.5 font-medium tabular-nums text-slate-900 whitespace-nowrap">
-        {activity.totalTco2e}
+        <div>{activity.totalTco2e}</div>
+        <div className="text-xs font-normal text-slate-500">
+          Biogenic {activity.biogenicCo2Tonnes || "not recorded"} t CO2
+        </div>
       </td>
       <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.gwpVersion)}</td>
       <td className="px-3 py-2.5 text-xs text-slate-600 max-w-[220px]">{dash(activity.factorSource)}</td>
@@ -131,13 +146,252 @@ function ActivityRow({ activity }: { activity: StationaryResultActivity }) {
 }
 
 function reportableActivityGroups(results: EpaIpccResultsData) {
+  const assigned = new Set(results.annualReporting?.scope1Keys ?? []);
   return (results.scope1ByActivity || [])
     .map((group) => {
-      const legacyParts = group.legacyParts.filter((part) => !isUnreconciledStationaryKey(part.key));
+      const legacyParts = group.legacyParts.filter(
+        (part) =>
+          assigned.has(part.key) &&
+          !isUnreconciledStationaryKey(part.key) &&
+          !isLegacyMobileKey(part.key) &&
+          !isLegacyRefrigerantKey(part.key)
+      );
       const valueKg = legacyParts.reduce((sum, part) => sum + (part.value || 0), 0);
       return { ...group, legacyParts, valueKg };
     })
     .filter((group) => group.valueKg > 0);
+}
+
+function LegacyMobileExcluded({ rows }: { rows: EmissionCategoryTotal[] }) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-950">
+          Legacy Mobile Combustion — Excluded from Annual Totals
+        </p>
+        <p className="text-xs text-amber-900 mt-0.5">
+          Historical mobile tables stay visible here. They are not migrated, recalculated, or included in Scope 1.
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-amber-900">No legacy mobile combustion records in this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-amber-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-amber-50">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Source</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-slate-600">kg CO₂e</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-slate-600">tCO₂e</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.key} className="border-t border-amber-100">
+                  <td className="px-4 py-2.5 text-slate-800">{row.label}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatKg(row.value)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatTonnes(row.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegacyRefrigerantExcluded({ rows }: { rows: EmissionCategoryTotal[] }) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-amber-950">
+          Legacy Refrigerant Leakage — Excluded from Annual Totals
+        </p>
+        <p className="text-xs text-amber-900 mt-0.5">
+          Historical EPA, UK-EPA, and earlier refrigerant rows stay here as stored kilograms of CO2e. They are not verified tonnes, and they are not recalculated or included in Scope 1.
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-amber-900">No legacy refrigerant leakage records in this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-amber-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-amber-50">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Source</th>
+                <th className="text-right px-4 py-2.5 font-semibold text-slate-600">Stored kg CO2e</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.key} className="border-t border-amber-100">
+                  <td className="px-4 py-2.5 text-slate-800">{row.label}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{formatKg(row.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerifiedRefrigerantPanel({ verified }: { verified: RefrigerantVerifiedResults | undefined }) {
+  if (!verified) return null;
+  if (verified.status === "unavailable") {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        {verified.error || "Verified refrigerant records could not be loaded. They are not included in the Scope 1 total."}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#0F6E56]">Refrigerant leakage (verified)</p>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Calculated by the EPA refrigerant service. The total is refrigerant CO2e. Leaked kilograms are not added again.
+          </p>
+        </div>
+        <p className="text-sm font-semibold tabular-nums text-slate-900">
+          Scope 1 {formatExactTonnes(verified.totalTco2e)} tCO₂e
+          <span className="ml-2 text-xs font-medium text-slate-500">{formatKg(verified.totalKgCo2e)} kg CO₂e</span>
+        </p>
+      </div>
+      {verified.status === "empty" ? (
+        <p className="text-sm text-slate-500">No verified refrigerant leakage records for this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {["Refrigerant", "Method", "Leaked kg", "Equipment", "Month", "GWP", "Factor source", "tCO₂e"].map((heading) => (
+                  <th key={heading} className="text-left px-3 py-2.5 font-semibold text-slate-600 whitespace-nowrap">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {verified.activities.map((activity) => (
+                <RefrigerantActivityRow key={activity.id} activity={activity} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RefrigerantActivityRow({ activity }: { activity: RefrigerantResultActivity }) {
+  const rate = refrigerantRateDisclosure(activity);
+  const equipment = [activity.equipmentType, activity.equipmentId, activity.site].filter(Boolean).join(" · ");
+  return (
+    <tr className="border-t border-slate-100 align-top">
+      <td className="px-3 py-2.5 font-medium text-slate-800">{activity.refrigerant}</td>
+      <td className="px-3 py-2.5 text-slate-700">
+        <div>{refrigerantMethodLabel(activity.method)}</div>
+        {rate && <div className="text-xs text-slate-500">{rate}</div>}
+      </td>
+      <td className="px-3 py-2.5 tabular-nums text-slate-700">{activity.leakageKg}</td>
+      <td className="px-3 py-2.5 text-slate-700">{dash(equipment)}</td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.period)}</td>
+      <td className="px-3 py-2.5 text-slate-700">
+        <div>{activity.gwp}</div>
+        <div className="text-xs text-slate-500">{activity.gwpPublication}</div>
+      </td>
+      <td className="px-3 py-2.5 text-xs text-slate-600 max-w-[220px]">
+        <div>{activity.factorProvenance}</div>
+        <div className="mt-1">{activity.methodology}</div>
+      </td>
+      <td className="px-3 py-2.5 font-medium tabular-nums text-slate-900 whitespace-nowrap">{activity.totalTco2e}</td>
+    </tr>
+  );
+}
+
+function VerifiedMobilePanel({ verified }: { verified: MobileVerifiedResults | undefined }) {
+  if (!verified) return null;
+  if (verified.status === "unavailable") {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        {verified.error || "Verified mobile records could not be loaded. They are not included in the Scope 1 total."}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#0F6E56]">Mobile combustion (verified)</p>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Calculated by the EPA mobile service. Older mobile entries stay in the legacy list and are not added to this total.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold tabular-nums text-slate-900">
+            Scope 1 {formatExactTonnes(verified.totalTco2e)} tCO₂e
+            <span className="ml-2 text-xs font-medium text-slate-500">{formatKg(verified.totalKgCo2e)} kg CO₂e</span>
+          </p>
+          <p className="text-xs text-slate-600">
+            {biogenicReportLabel(verified.biogenicCo2Tonnes ?? null, verified.biogenicStatus || "not_recorded")}. GWP AR5.
+          </p>
+        </div>
+      </div>
+      {verified.status === "empty" ? (
+        <p className="text-sm text-slate-500">No verified mobile combustion records for this view.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {["Vehicle or equipment", "Fuel", "Period", "CO₂", "CH₄", "N₂O", "Scope 1 tCO₂e", "Biogenic CO₂", "GWP", "Factor provenance"].map(
+                  (heading) => (
+                    <th key={heading} className="text-left px-3 py-2.5 font-semibold text-slate-600 whitespace-nowrap">
+                      {heading}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {verified.activities.map((activity) => (
+                <MobileActivityRow key={activity.id} activity={activity} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileActivityRow({ activity }: { activity: MobileResultActivity }) {
+  return (
+    <tr className="border-t border-slate-100 align-top">
+      <td className="px-3 py-2.5 text-slate-800">
+        <div className="font-medium">{dash(activity.vehicleType || activity.roadClass)}</div>
+        {activity.equipmentId && <div className="text-xs text-slate-500">{activity.equipmentId}</div>}
+      </td>
+      <td className="px-3 py-2.5 text-slate-700">
+        <div>{dash(activity.fuel)}</div>
+        <div className="text-xs text-slate-500">
+          {dash(activity.fuelQuantity)} {activity.fuelUnit}
+        </div>
+      </td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.period)}</td>
+      <GasCell gas={activity.co2} />
+      <GasCell gas={activity.ch4} />
+      <GasCell gas={activity.n2o} />
+      <td className="px-3 py-2.5 font-medium tabular-nums text-slate-900 whitespace-nowrap">{activity.totalTco2e}</td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{activity.biogenicCo2Tonnes || "not recorded"} t CO2</td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">{dash(activity.gwpVersion)}</td>
+      <td className="px-3 py-2.5 text-xs text-slate-600 max-w-[220px]">{dash(activity.factorSource)}</td>
+    </tr>
+  );
 }
 
 function LegacyStationaryReconciliation({ rows }: { rows: EmissionCategoryTotal[] }) {
@@ -199,7 +453,10 @@ const ResultsBreakdownTabs = ({
   const setTab = onTabChange ?? setInternalTab;
 
   const verified = results.stationaryVerified;
+  const mobile = results.mobileVerified;
+  const refrigerant = results.refrigerantVerified;
   const reporting = buildReportingTotals(results);
+  const verifiedLines = verifiedScope1Lines(results);
   const grand = reporting.grandKg;
 
   const filterRows = (rows: BreakdownRow[]) => {
@@ -404,15 +661,19 @@ const ResultsBreakdownTabs = ({
 
         <TabsContent value="scope1" className="mt-0 space-y-4">
           <VerifiedStationaryPanel verified={verified} />
+          <VerifiedMobilePanel verified={mobile} />
+          <VerifiedRefrigerantPanel verified={refrigerant} />
           <LegacyStationaryReconciliation rows={reporting.legacyStationary} />
-          {reportableActivityGroups(results).length > 0 && (
+          <LegacyMobileExcluded rows={reporting.legacyMobile} />
+          <LegacyRefrigerantExcluded rows={reporting.legacyRefrigerant} />
+          {(verifiedLines.length > 0 || reportableActivityGroups(results).length > 0) && (
             <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/40 p-4 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-[#0F6E56]">
                   Scope 1 by activity group
                 </p>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Reportable groups only. Unreconciled stationary records are listed separately and are not included here.
+                  Reportable groups only. Verified stationary, mobile, and refrigerant leakage records are listed here. Legacy refrigerant, legacy mobile, and unreconciled stationary records are listed separately.
                 </p>
               </div>
               <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -426,6 +687,14 @@ const ResultsBreakdownTabs = ({
                     </tr>
                   </thead>
                   <tbody>
+                    {verifiedLines.map((line) => (
+                      <tr key={line.key} className="border-t border-slate-100">
+                        <td className="px-4 py-2.5 font-medium text-slate-800">{line.label}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{formatKg(line.value)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatTonnes(line.value)}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">Verified EPA record</td>
+                      </tr>
+                    ))}
                     {reportableActivityGroups(results).map((g) => (
                       <tr key={g.groupId} className="border-t border-slate-100">
                         <td className="px-4 py-2.5">
@@ -463,16 +732,7 @@ const ResultsBreakdownTabs = ({
             </p>
             {renderTable(
               [
-                ...(verified?.status === "ready" && reporting.verifiedKg != null && reporting.verifiedKg > 0
-                  ? [
-                      {
-                        key: "stationary_verified",
-                        label: "Stationary combustion (verified)",
-                        value: reporting.verifiedKg,
-                        scope: "Scope 1" as const,
-                      },
-                    ]
-                  : []),
+                ...verifiedLines.map((row) => ({ ...row, scope: "Scope 1" as const })),
                 ...reporting.reportableScope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
               ],
               5
@@ -480,14 +740,46 @@ const ResultsBreakdownTabs = ({
           </div>
         </TabsContent>
         <TabsContent value="scope2" className="mt-0">
+          <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+            Verified location-based purchased electricity
+          </p>
           {renderTable(
-            results.scope2.map((r) => ({ ...r, scope: "Scope 2" as const })),
+            (results.electricityVerified?.activities || []).map((activity) => ({
+              key: activity.id,
+              label: `${activity.country} ${activity.gridRegion} ${activity.period}`,
+              value: Number(activity.totalTco2e) * 1000,
+              scope: "Scope 2" as const,
+            })),
+            5
+          )}
+          <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">
+            Verified purchased heat and steam
+          </p>
+          {renderTable(
+            (results.heatSteamVerified?.activities || []).map((activity) => ({
+              key: activity.id,
+              label: `${activity.energyForm === "purchased_steam" ? "Purchased steam" : "Purchased heat"} ${activity.period}`,
+              value: Number(activity.totalTco2e) * 1000,
+              scope: "Scope 2" as const,
+            })),
+            5
+          )}
+          <p className="text-xs text-slate-500 mt-3 mb-2">
+            {results.heatSteamVerified
+              ? "Purchased cooling is not included. Legacy Scope 2 records are excluded from the verified annual total. The heat and steam factor assumes natural-gas production at 80 percent thermal efficiency and is not supplier-specific."
+              : "Legacy Scope 2 records are excluded from the verified annual total. Heat, steam, and cooling are not included. Contractual renewable claims are not added to this total."}
+          </p>
+          {renderTable(
+            results.scope2.map((r) => ({ ...r, label: `${r.label} (legacy, excluded)`, scope: "Scope 2" as const })),
             5
           )}
         </TabsContent>
         <TabsContent value="scope3" className="mt-0">
+          <p className="text-xs text-slate-500 mb-3">
+            Legacy undated Scope 3 records are excluded from the verified annual total. Franchises, upstream leased assets, and downstream leased assets are not calculated. A stored zero is not a verified result.
+          </p>
           {renderTable(
-            results.scope3.map((r) => ({ ...r, scope: "Scope 3" as const })),
+            results.scope3.map((r) => ({ ...r, label: `${r.label} (legacy, excluded)`, scope: "Scope 3" as const })),
             5
           )}
         </TabsContent>

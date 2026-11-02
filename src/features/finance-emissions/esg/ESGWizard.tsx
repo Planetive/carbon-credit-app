@@ -11,7 +11,16 @@ import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { EmissionResultRow, FinanceMode, WizardLocationState, WizardResumePayload } from "../types/contracts";
+import { assertReportableResults } from "../utils/pcafAuthority";
+import { serializeFinancedScopeBreakdown, sumReportedScopes } from "../utils/financedScopeBreakdown";
+import { FinancedScopeBreakdownPanel } from "../components/FinancedScopeBreakdownPanel";
 import type { LucideIcon } from 'lucide-react';
+import {
+  countResultsForFormula,
+  extractFinancingInstanceId,
+  identityFieldsForSave,
+  loanTypeQuantitiesFromCalculations,
+} from "@/utils/financedExposureIdentity";
 import {
   EPA_COMPANY_INVENTORY_MESSAGE,
   IGNORED_AUTOMATIC_EMISSIONS_NOTICE,
@@ -656,9 +665,9 @@ export const ESGWizard: React.FC = () => {
         calculationMethod: '',
         calculationMethods: {} as Record<string, string>,
         score: 0,
-        scope1Emissions: 0,
-        scope2Emissions: 0,
-        scope3Emissions: 0,
+        scope1Emissions: null as number | null,
+        scope2Emissions: null as number | null,
+        scope3Emissions: null as number | null,
         verifierName: '',
         verified_emissions: 0,
         unverified_emissions: 0
@@ -714,38 +723,12 @@ export const ESGWizard: React.FC = () => {
           console.log('Found existing questionnaire:', questionnaire);
           
           // Load loan types from emission calculations for this counterparty (only for finance mode)
-          const loanTypes: Array<{ type: string; quantity: number }> = [];
+          let loanTypes: Array<{ type: string; quantity: number }> = [];
           if (mode === 'finance') {
             const emissionCalculations = (
               await PortfolioClient.getEmissionCalculations(counterpartyId)
             ).filter((c) => c.calculation_type === 'finance');
-            
-            // Extract loan types from emission calculations (only for finance mode)
-            if (emissionCalculations.length > 0) {
-              const loanTypeMap = new Map<string, number>();
-              emissionCalculations.forEach((calc) => {
-                if (calc.inputs && typeof calc.inputs === 'object') {
-                  const inputs = calc.inputs as Record<string, unknown>;
-                  if (Array.isArray(inputs.loanTypes) && inputs.loanTypes.length > 0) {
-                    inputs.loanTypes.forEach((loanType: unknown) => {
-                      const normalizedType = typeof loanType === 'string' ? loanType : '';
-                      if (!normalizedType) return;
-                      const count = loanTypeMap.get(normalizedType) || 0;
-                      loanTypeMap.set(normalizedType, count + 1);
-                    });
-                    return;
-                  }
-                  if (inputs.loanType) {
-                    const count = loanTypeMap.get(String(inputs.loanType)) || 0;
-                    loanTypeMap.set(String(inputs.loanType), count + 1);
-                  }
-                }
-              });
-              
-              loanTypeMap.forEach((quantity, type) => {
-                loanTypes.push({ type, quantity });
-              });
-            }
+            loanTypes = loanTypeQuantitiesFromCalculations(emissionCalculations);
           }
           // For facilitated mode, loanTypes should always be empty array
           
@@ -753,27 +736,32 @@ export const ESGWizard: React.FC = () => {
           // otherwise use persisted questionnaire scope values.
           const unsafeHandoff =
             hasUntrustedAutomaticEmissions(resumePayload) || isEpaCompanyInventoryBlocked(resumePayload);
-          const resumedScope1 = Number(resumePayload?.scope1Emissions ?? 0);
-          const resumedScope2 = Number(resumePayload?.scope2Emissions ?? 0);
-          const resumedScope3 = Number(resumePayload?.scope3Emissions ?? 0);
+          const asScope = (value: unknown): number | null => {
+            if (value == null || value === "") return null;
+            const n = Number(value);
+            return Number.isFinite(n) ? n : null;
+          };
+          const resumedScope1 = asScope(resumePayload?.scope1Emissions);
+          const resumedScope2 = asScope(resumePayload?.scope2Emissions);
+          const resumedScope3 = asScope(resumePayload?.scope3Emissions);
           const scope1Emissions = shouldPreserveReturnedScopeValues
             ? resumedScope1
             : unsafeHandoff
-              ? (questionnaireScopeAfterHandoff(questionnaire.scope1_emissions, resumePayload) ?? 0)
-              : (questionnaire.scope1_emissions || 0);
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope1_emissions, resumePayload) ?? null)
+              : asScope(questionnaire.scope1_emissions);
           const scope2Emissions = shouldPreserveReturnedScopeValues
             ? resumedScope2
             : unsafeHandoff
-              ? (questionnaireScopeAfterHandoff(questionnaire.scope2_emissions, resumePayload) ?? 0)
-              : (questionnaire.scope2_emissions || 0);
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope2_emissions, resumePayload) ?? null)
+              : asScope(questionnaire.scope2_emissions);
           const scope3Emissions = shouldPreserveReturnedScopeValues
             ? resumedScope3
             : unsafeHandoff
-              ? (questionnaireScopeAfterHandoff(questionnaire.scope3_emissions, resumePayload) ?? 0)
-              : (questionnaire.scope3_emissions || 0);
+              ? (questionnaireScopeAfterHandoff(questionnaire.scope3_emissions, resumePayload) ?? null)
+              : asScope(questionnaire.scope3_emissions);
 
           // Auto-calculate verified/unverified emissions when scope emissions change
-          const totalEmissions = scope1Emissions + scope2Emissions + scope3Emissions;
+          const totalEmissions = sumReportedScopes(scope1Emissions, scope2Emissions, scope3Emissions) ?? 0;
           let verified_emissions = 0;
           let unverified_emissions = 0;
           
@@ -1009,9 +997,9 @@ export const ESGWizard: React.FC = () => {
     calculationMethods: {} as Record<string, string>,
     score: 0,
     // Emission scopes (tCO2e)
-    scope1Emissions: 0,
-    scope2Emissions: 0,
-    scope3Emissions: 0,
+    scope1Emissions: null as number | null,
+    scope2Emissions: null as number | null,
+    scope3Emissions: null as number | null,
     // Verification details
     verifierName: '',
     // Auto-calculated emissions
@@ -1167,9 +1155,9 @@ export const ESGWizard: React.FC = () => {
       counterparty_id: counterpartyId,
       corporate_structure: formData.corporateStructure || 'unlisted',
       has_emissions: formData.hasEmissions === 'yes',
-      scope1_emissions: formData.scope1Emissions || null,
-      scope2_emissions: formData.scope2Emissions || null,
-      scope3_emissions: formData.scope3Emissions || null,
+      scope1_emissions: formData.scope1Emissions ?? null,
+      scope2_emissions: formData.scope2Emissions ?? null,
+      scope3_emissions: formData.scope3Emissions ?? null,
       verification_status: formData.verificationStatus || 'unverified',
       verifier_name: formData.verifierName || null,
       // These fields are not captured in the current questionnaire but are required by the schema
@@ -1242,9 +1230,9 @@ export const ESGWizard: React.FC = () => {
       counterparty_id: counterpartyId,
       corporate_structure: formData.corporateStructure || 'unlisted',
       has_emissions: formData.hasEmissions === 'yes',
-      scope1_emissions: formData.scope1Emissions || null,
-      scope2_emissions: formData.scope2Emissions || null,
-      scope3_emissions: formData.scope3Emissions || null,
+      scope1_emissions: formData.scope1Emissions ?? null,
+      scope2_emissions: formData.scope2Emissions ?? null,
+      scope3_emissions: formData.scope3Emissions ?? null,
       verification_status: formData.verificationStatus || 'unverified',
       verifier_name: formData.verifierName || null,
       // These fields are not captured in the current questionnaire but are required by the schema
@@ -1296,13 +1284,17 @@ export const ESGWizard: React.FC = () => {
       denominatorLabel: string;
       denominatorValue: number;
       dataQualityScore?: number;
+      financingInstanceId?: string;
     }>
   ) => {
     try {
       await PortfolioClient.cleanupStaleEmissionCalculations(
         counterpartyId,
         mode,
-        currentResults.map((r) => r.type)
+        currentResults.map((r) => r.type),
+        currentResults
+          .map((r) => r.financingInstanceId)
+          .filter((id): id is string => Boolean(id)),
       );
       console.log('Cleaned up old emission calculations');
     } catch (error) {
@@ -1312,18 +1304,7 @@ export const ESGWizard: React.FC = () => {
 
   // Save emission calculations to database
   const saveEmissionCalculations = async (
-    calculationResults: Array<{
-      type: string;
-      label: string;
-      attributionFactor: number;
-      financedEmissions: number;
-      denominatorLabel: string;
-      denominatorValue: number;
-      dataQualityScore?: number;
-      pcafFormulaId?: string;
-      pcafInputs?: Record<string, unknown>;
-      companyType?: string;
-    }>,
+    calculationResults: EmissionResultRow[],
     formData?: Record<string, unknown>
   ) => {
     console.log('🔍 ESGWizard - saveEmissionCalculations called');
@@ -1333,27 +1314,18 @@ export const ESGWizard: React.FC = () => {
     
     if (!counterpartyId) {
       console.warn('❌ ESGWizard - No counterparty ID available for saving emission calculations');
-      toast({
-        title: "Error",
-        description: "No company ID available. Please try again.",
-        variant: "destructive"
-      });
-      return;
+      throw new Error("No company ID available. Please try again.");
     }
 
     // Validate that counterpartyId is a UUID (not a string code)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(counterpartyId)) {
       console.error('❌ ESGWizard - Invalid counterparty ID format (not a UUID):', counterpartyId);
-      toast({
-        title: "Invalid Company ID",
-        description: "The company ID format is invalid. Please try again.",
-        variant: "destructive"
-      });
-      return;
+      throw new Error("The company ID format is invalid. Please try again.");
     }
 
     console.log('✅ ESGWizard - Counterparty ID is valid UUID:', counterpartyId);
+    assertReportableResults(calculationResults);
 
     try {
       // Save questionnaire data first and get the questionnaire ID
@@ -1385,7 +1357,9 @@ export const ESGWizard: React.FC = () => {
 
       // Save individual records for each loan type (for detailed tracking)
       for (const result of calculationResults) {
-        // Also save to finance_emission_calculations table for portfolio integration
+        const instanceId =
+          result.financingInstanceId || extractFinancingInstanceId(result.pcafInputs);
+        const identity = identityFieldsForSave(instanceId, result.instanceKey, result.type);
         await PortfolioClient.saveFinanceEmissionCalculation({
           counterparty_id: counterpartyId,
           outstanding_amount: sanitizeNumericValue(formData?.outstandingLoan || 0),
@@ -1411,7 +1385,13 @@ export const ESGWizard: React.FC = () => {
           minority_interest: sanitizeNumericValue(formData?.minorityInterest || 0),
           preferred_stock: sanitizeNumericValue(formData?.preferredStock || 0),
           pcaf_formula_id: result.pcafFormulaId,
-          pcaf_inputs: result.pcafInputs,
+          pcaf_inputs: {
+            ...(result.pcafInputs || {}),
+            ...identity,
+          },
+          financing_instance_id: instanceId,
+          instance_key: result.instanceKey,
+          current_count_for_formula: countResultsForFormula(calculationResults, result.type),
         });
       }
 
@@ -1463,7 +1443,10 @@ export const ESGWizard: React.FC = () => {
             dataQualityScore:
               r.dataQualityScore != null && isFinite(r.dataQualityScore)
                 ? sanitizeNumericValue(r.dataQualityScore)
-                : null
+                : null,
+            financingInstanceId: r.financingInstanceId || extractFinancingInstanceId(r.pcafInputs),
+            instanceKey: r.instanceKey || null,
+            ...serializeFinancedScopeBreakdown(r.scopeBreakdown),
           })),
           // Use first result for single values (usually same for all)
           attributionFactor: sanitizeNumericValue(averageAttributionFactor),
@@ -1512,7 +1495,10 @@ export const ESGWizard: React.FC = () => {
             dataQualityScore:
               r.dataQualityScore != null && isFinite(r.dataQualityScore)
                 ? sanitizeNumericValue(r.dataQualityScore)
-                : null
+                : null,
+            financingInstanceId: r.financingInstanceId || extractFinancingInstanceId(r.pcafInputs),
+            instanceKey: r.instanceKey || null,
+            ...serializeFinancedScopeBreakdown(r.scopeBreakdown),
           })),
           dataQualityScore:
             averageDataQualityScore != null && isFinite(averageDataQualityScore)
@@ -1580,12 +1566,7 @@ export const ESGWizard: React.FC = () => {
       console.error('Error saving emission calculations:', error);
       console.error('Counterparty ID being used for emission calculations:', counterpartyId);
       console.error('Calculation results being saved:', calculationResults);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({
-        title: "Unable to Save Calculations",
-        description: `Your emission calculations could not be saved: ${errorMessage}. Please check your internet connection and try again. You can recalculate if needed.`,
-        variant: "destructive"
-      });
+      throw error;
     }
   };
 
@@ -1770,9 +1751,13 @@ export const ESGWizard: React.FC = () => {
           errors.calculationMethod = 'Please select a calculation method';
         }
         if (dataToValidate.hasEmissions === 'yes') {
-          const totalEmissions = (dataToValidate.scope1Emissions || 0) + (dataToValidate.scope2Emissions || 0) + (dataToValidate.scope3Emissions || 0);
-          if (totalEmissions <= 0) {
-            errors.scopeEmissions = 'Please enter at least one scope emission value';
+          const reported = sumReportedScopes(
+            dataToValidate.scope1Emissions,
+            dataToValidate.scope2Emissions,
+            dataToValidate.scope3Emissions
+          );
+          if (reported == null) {
+            errors.scopeEmissions = 'Enter at least one scope. Leave a field blank if it is not reported; enter 0 only when emissions are reported as zero.';
           }
         }
         break;
@@ -1783,14 +1768,18 @@ export const ESGWizard: React.FC = () => {
 
   const updateFormData = (
     field: string,
-    value: string | number | Array<{ type: string; quantity: number }>,
+    value: string | number | null | Array<{ type: string; quantity: number }>,
   ) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
       // Auto-calculate verified/unverified emissions when scope emissions change
       if (['scope1Emissions', 'scope2Emissions', 'scope3Emissions', 'verificationStatus'].includes(field)) {
-        const totalEmissions = (updated.scope1Emissions || 0) + (updated.scope2Emissions || 0) + (updated.scope3Emissions || 0);
+        const totalEmissions = sumReportedScopes(
+          updated.scope1Emissions,
+          updated.scope2Emissions,
+          updated.scope3Emissions
+        ) ?? 0;
         
         if (updated.verificationStatus === 'verified') {
           updated.verified_emissions = totalEmissions;
@@ -2035,16 +2024,17 @@ export const ESGWizard: React.FC = () => {
               <div className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 sm:p-5 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-[#0F172A]">Emissions by scope</h3>
-                  <p className="text-sm text-[#64748B] mt-0.5">Values in tCO₂e</p>
+                  <p className="text-sm text-[#64748B] mt-0.5">Values in tCO₂e. Leave blank if not reported. Enter 0 only when the counterparty reported zero emissions.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="scope1" className="text-sm font-medium text-[#334155]">Scope 1</Label>
                     <FormattedNumberInput
                       id="scope1"
-                      placeholder="0"
-                      value={formData.scope1Emissions || 0}
+                      placeholder="Not reported"
+                      value={formData.scope1Emissions}
                       onChange={(value) => updateFormData('scope1Emissions', value)}
+                      onClear={() => updateFormData('scope1Emissions', null)}
                       className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
@@ -2052,9 +2042,10 @@ export const ESGWizard: React.FC = () => {
                     <Label htmlFor="scope2" className="text-sm font-medium text-[#334155]">Scope 2</Label>
                     <FormattedNumberInput
                       id="scope2"
-                      placeholder="0"
-                      value={formData.scope2Emissions || 0}
+                      placeholder="Not reported"
+                      value={formData.scope2Emissions}
                       onChange={(value) => updateFormData('scope2Emissions', value)}
+                      onClear={() => updateFormData('scope2Emissions', null)}
                       className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
@@ -2062,9 +2053,10 @@ export const ESGWizard: React.FC = () => {
                     <Label htmlFor="scope3" className="text-sm font-medium text-[#334155]">Scope 3</Label>
                     <FormattedNumberInput
                       id="scope3"
-                      placeholder="0"
-                      value={formData.scope3Emissions || 0}
+                      placeholder="Not reported"
+                      value={formData.scope3Emissions}
                       onChange={(value) => updateFormData('scope3Emissions', value)}
+                      onClear={() => updateFormData('scope3Emissions', null)}
                       className={`h-11 ${validationErrors.scopeEmissions ? 'border-red-400' : 'border-[#E2E8F0] bg-white'}`}
                     />
                   </div>
@@ -2358,21 +2350,26 @@ export const ESGWizard: React.FC = () => {
           onTabChange={() => {}} // No tab change needed since we only show one form
           onResults={(r, formData) => {
             console.log('✅ ESGWizard - Received results and form data:', { results: r, formData });
-            console.log('✅ ESGWizard - Setting results:', r);
-            setResults(r);
-            const resultsStepIndex = steps.findIndex(s => s.id === 'results');
-            console.log('✅ ESGWizard - Results step index:', resultsStepIndex, 'Current step:', currentStep);
-            if (resultsStepIndex >= 0) {
-              console.log('✅ ESGWizard - Navigating to results step');
-              setCurrentStep(resultsStepIndex);
-            } else {
-              console.error('❌ ESGWizard - Results step not found in steps array');
-            }
-            // Save emission calculations to database (async, don't wait for it)
-            saveEmissionCalculations(r, formData).catch(error => {
-              console.error('Error saving emission calculations:', error);
-              // Don't prevent navigation if save fails
-            });
+            void (async () => {
+              try {
+                await saveEmissionCalculations(r, formData);
+                setResults(r);
+                const resultsStepIndex = steps.findIndex(s => s.id === 'results');
+                if (resultsStepIndex >= 0) {
+                  setCurrentStep(resultsStepIndex);
+                }
+              } catch (error) {
+                console.error('Error saving emission calculations:', error);
+                toast({
+                  title: 'Save failed',
+                  description:
+                    error instanceof Error
+                      ? error.message
+                      : 'The calculation could not be saved. Questionnaire data was kept.',
+                  variant: 'destructive',
+                });
+              }
+            })();
           }}
         />;
 
@@ -2451,6 +2448,24 @@ export const ESGWizard: React.FC = () => {
                     </p>
                   </div>
                 </div>
+
+                <FinancedScopeBreakdownPanel
+                  breakdown={validResults.length === 1 ? validResults[0].scopeBreakdown : undefined}
+                  totalTco2e={totalEmissions}
+                />
+                {validResults.length > 1 && (
+                  <div className="space-y-3">
+                    {validResults.map((result, index) => (
+                      <div key={index}>
+                        <p className="text-xs font-semibold text-[#64748B] mb-1">{result.label}</p>
+                        <FinancedScopeBreakdownPanel
+                          breakdown={result.scopeBreakdown}
+                          totalTco2e={result.financedEmissions}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {validResults.length > 0 && (
                   <div className="rounded-[16px] border border-[rgba(15,23,42,0.06)] overflow-hidden">

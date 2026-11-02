@@ -8,6 +8,7 @@ export interface EmissionsScopeRow {
   label: string;
   sub: string;
   value: number | null;
+  missingLabel?: string;
   delta?: string;
   up?: boolean;
 }
@@ -46,8 +47,8 @@ const scopeIconBg = OVERVIEW_EMISSIONS_SCOPE_COLORS.map((c) => c.chip);
 
 const rowStartClass = ["row-start-1", "row-start-2", "row-start-3"] as const;
 
-function formatScopeTonnes(value: number | null): string {
-  if (value == null) return "Incomplete";
+function formatScopeTonnes(value: number | null, missingLabel = "Unavailable"): string {
+  if (value == null) return missingLabel;
   return `${value.toLocaleString(undefined, {
     maximumFractionDigits: 5,
   })} tCO₂e`;
@@ -164,7 +165,7 @@ const OverviewEmissionsCard = ({
               className={`col-start-2 ${rowStart} flex items-center justify-between gap-2 py-1.5 pl-0.5 min-w-0 ${divider}`}
             >
               <p className="text-[13px] font-semibold text-slate-900 tabular-nums leading-tight whitespace-nowrap">
-                {formatScopeTonnes(row.value)}
+                {formatScopeTonnes(row.value, row.missingLabel)}
               </p>
               <div className="text-right shrink-0">
                 {row.delta ? (
@@ -187,7 +188,13 @@ const OverviewEmissionsCard = ({
                   </>
                 ) : (
                   <p className="text-[11px] font-normal text-slate-400 leading-tight whitespace-nowrap">
-                    {row.value == null ? "Not loaded" : "Calculated"}
+                    {row.value == null
+                      ? row.missingLabel === "Unassigned"
+                        ? "Not in this year"
+                        : row.missingLabel === "Legacy excluded"
+                          ? "Not in the verified annual total"
+                          : "Not loaded"
+                      : "Calculated"}
                   </p>
                 )}
               </div>
@@ -221,10 +228,10 @@ const OverviewEmissionsCard = ({
                 {incomplete || totalEmissions == null ? "—" : formatDonutCenterTotal(totalEmissions)}
               </p>
               <p className="text-[10px] font-normal text-slate-400 mt-1">
-                {incomplete || totalEmissions == null ? "Incomplete" : "tCO₂e"}
+                {incomplete ? "Unavailable" : totalEmissions == null ? "Partial" : "tCO₂e"}
               </p>
               <p className="text-[11px] font-medium text-slate-600 mt-0.5 leading-tight">
-                {incomplete || totalEmissions == null ? "Not a complete total" : "Calculated total"}
+                {incomplete || totalEmissions == null ? "Not a complete annual total" : "Calculated total"}
               </p>
             </div>
           </div>

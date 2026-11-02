@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { FACTORS, SCOPE2_FACTORS, REFRIGERANT_FACTORS } from "@/components/emissions/shared/EmissionFactors";
+import { FACTORS, REFRIGERANT_FACTORS } from "@/components/emissions/shared/EmissionFactors";
+import { scope3GridElectricityKg } from "@/lib/emissions/scope3FactorUnits";
 import type { UkFactorBasis } from "@/components/emissions/shared/types";
 import {
   availableUkPassengerBasises,
@@ -83,7 +84,8 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const [renewablePct, setRenewablePct] = useState<number | undefined>();
   const [otherPct, setOtherPct] = useState<number | undefined>();
   const [gridCountry, setGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
-  const gridFactor = useMemo(() => gridCountry ? SCOPE2_FACTORS.GridCountries[gridCountry] : undefined, [gridCountry]);
+  // Legacy UAE/Pakistan 0.4041/0.425 placeholders are refused for Scope 3 leased electricity.
+  const gridFactor = useMemo(() => undefined as number | undefined, [gridCountry]);
   const [otherRows, setOtherRows] = useState<OtherSourceRow[]>([]);
   
   // Transport & Logistics state
@@ -114,7 +116,10 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const [equipmentRenewablePct, setEquipmentRenewablePct] = useState<number | undefined>();
   const [equipmentOtherPct, setEquipmentOtherPct] = useState<number | undefined>();
   const [equipmentGridCountry, setEquipmentGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
-  const equipmentGridFactor = useMemo(() => equipmentGridCountry ? SCOPE2_FACTORS.GridCountries[equipmentGridCountry] : undefined, [equipmentGridCountry]);
+  const equipmentGridFactor = useMemo(
+    () => undefined as number | undefined,
+    [equipmentGridCountry],
+  );
   const [equipmentOtherRows, setEquipmentOtherRows] = useState<OtherSourceRow[]>([]);
   const [equipmentTransportRows, setEquipmentTransportRows] = useState<TransportRow[]>([]);
   
@@ -124,7 +129,10 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   const [infrastructureRenewablePct, setInfrastructureRenewablePct] = useState<number | undefined>();
   const [infrastructureOtherPct, setInfrastructureOtherPct] = useState<number | undefined>();
   const [infrastructureGridCountry, setInfrastructureGridCountry] = useState<"UAE" | "Pakistan" | undefined>();
-  const infrastructureGridFactor = useMemo(() => infrastructureGridCountry ? SCOPE2_FACTORS.GridCountries[infrastructureGridCountry] : undefined, [infrastructureGridCountry]);
+  const infrastructureGridFactor = useMemo(
+    () => undefined as number | undefined,
+    [infrastructureGridCountry],
+  );
   const [infrastructureOtherRows, setInfrastructureOtherRows] = useState<OtherSourceRow[]>([]);
   const [infrastructureRefrigerantRows, setInfrastructureRefrigerantRows] = useState<RefrigerantRow[]>([]);
   
@@ -198,10 +206,15 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
     );
   };
   
-  // Buildings & Facilities calculations
+  // Buildings & Facilities calculations — placeholders / other×kWh mixing blocked
   const gridEmissions = useMemo(() => {
-    if (!totalKwh || !gridPct || !gridFactor) return 0;
-    return Number(((gridPct / 100) * totalKwh * gridFactor).toFixed(6));
+    return (
+      scope3GridElectricityKg({
+        totalKwh: totalKwh ?? 0,
+        gridPct,
+        gridFactor,
+      }) ?? 0
+    );
   }, [totalKwh, gridPct, gridFactor]);
   
   const totalOtherEmissions = useMemo(() => {
@@ -209,16 +222,17 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   }, [otherRows]);
   
   const computedElectricityEmissions = useMemo(() => {
-    if (!totalKwh) return 0;
-    const gridPart = gridPct && gridCountry && gridFactor ? (gridPct / 100) * totalKwh * gridFactor : 0;
-    const renewablePart = renewablePct ? 0 : 0; // zero by definition
-    let otherPart = 0;
-    if (otherPct && otherPct > 0 && otherRows.length > 0) {
-      const sumOtherEmissions = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
-      otherPart = (otherPct / 100) * totalKwh * sumOtherEmissions;
-    }
-    return Number((gridPart + renewablePart + otherPart).toFixed(6));
-  }, [totalKwh, gridPct, gridCountry, gridFactor, renewablePct, otherPct, otherRows]);
+    const sumOther = otherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    return (
+      scope3GridElectricityKg({
+        totalKwh: totalKwh ?? 0,
+        gridPct,
+        gridFactor,
+        otherPct,
+        otherRowEmissionsSum: sumOther,
+      }) ?? 0
+    );
+  }, [totalKwh, gridPct, gridFactor, otherPct, otherRows]);
   
   // Transport calculations
   const totalTransportEmissions = useMemo(() => {
@@ -227,8 +241,13 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   
   // Equipment & Machinery calculations
   const equipmentGridEmissions = useMemo(() => {
-    if (!equipmentTotalKwh || !equipmentGridPct || !equipmentGridFactor) return 0;
-    return Number(((equipmentGridPct / 100) * equipmentTotalKwh * equipmentGridFactor).toFixed(6));
+    return (
+      scope3GridElectricityKg({
+        totalKwh: equipmentTotalKwh ?? 0,
+        gridPct: equipmentGridPct,
+        gridFactor: equipmentGridFactor,
+      }) ?? 0
+    );
   }, [equipmentTotalKwh, equipmentGridPct, equipmentGridFactor]);
   
   const equipmentTotalOtherEmissions = useMemo(() => {
@@ -236,16 +255,23 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   }, [equipmentOtherRows]);
   
   const equipmentComputedElectricityEmissions = useMemo(() => {
-    if (!equipmentTotalKwh) return 0;
-    const gridPart = equipmentGridPct && equipmentGridCountry && equipmentGridFactor ? (equipmentGridPct / 100) * equipmentTotalKwh * equipmentGridFactor : 0;
-    const renewablePart = equipmentRenewablePct ? 0 : 0; // zero by definition
-    let otherPart = 0;
-    if (equipmentOtherPct && equipmentOtherPct > 0 && equipmentOtherRows.length > 0) {
-      const sumOtherEmissions = equipmentOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
-      otherPart = (equipmentOtherPct / 100) * equipmentTotalKwh * sumOtherEmissions;
-    }
-    return Number((gridPart + renewablePart + otherPart).toFixed(6));
-  }, [equipmentTotalKwh, equipmentGridPct, equipmentGridCountry, equipmentGridFactor, equipmentRenewablePct, equipmentOtherPct, equipmentOtherRows]);
+    const sumOther = equipmentOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    return (
+      scope3GridElectricityKg({
+        totalKwh: equipmentTotalKwh ?? 0,
+        gridPct: equipmentGridPct,
+        gridFactor: equipmentGridFactor,
+        otherPct: equipmentOtherPct,
+        otherRowEmissionsSum: sumOther,
+      }) ?? 0
+    );
+  }, [
+    equipmentTotalKwh,
+    equipmentGridPct,
+    equipmentGridFactor,
+    equipmentOtherPct,
+    equipmentOtherRows,
+  ]);
   
   const equipmentTotalTransportEmissions = useMemo(() => {
     return equipmentTransportRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
@@ -257,8 +283,13 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   
   // Infrastructure & Utilities calculations
   const infrastructureGridEmissions = useMemo(() => {
-    if (!infrastructureTotalKwh || !infrastructureGridPct || !infrastructureGridFactor) return 0;
-    return Number(((infrastructureGridPct / 100) * infrastructureTotalKwh * infrastructureGridFactor).toFixed(6));
+    return (
+      scope3GridElectricityKg({
+        totalKwh: infrastructureTotalKwh ?? 0,
+        gridPct: infrastructureGridPct,
+        gridFactor: infrastructureGridFactor,
+      }) ?? 0
+    );
   }, [infrastructureTotalKwh, infrastructureGridPct, infrastructureGridFactor]);
   
   const infrastructureTotalOtherEmissions = useMemo(() => {
@@ -266,16 +297,23 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
   }, [infrastructureOtherRows]);
   
   const infrastructureComputedElectricityEmissions = useMemo(() => {
-    if (!infrastructureTotalKwh) return 0;
-    const gridPart = infrastructureGridPct && infrastructureGridCountry && infrastructureGridFactor ? (infrastructureGridPct / 100) * infrastructureTotalKwh * infrastructureGridFactor : 0;
-    const renewablePart = infrastructureRenewablePct ? 0 : 0; // zero by definition
-    let otherPart = 0;
-    if (infrastructureOtherPct && infrastructureOtherPct > 0 && infrastructureOtherRows.length > 0) {
-      const sumOtherEmissions = infrastructureOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
-      otherPart = (infrastructureOtherPct / 100) * infrastructureTotalKwh * sumOtherEmissions;
-    }
-    return Number((gridPart + renewablePart + otherPart).toFixed(6));
-  }, [infrastructureTotalKwh, infrastructureGridPct, infrastructureGridCountry, infrastructureGridFactor, infrastructureRenewablePct, infrastructureOtherPct, infrastructureOtherRows]);
+    const sumOther = infrastructureOtherRows.reduce((s, r) => s + (r.emissions || 0), 0);
+    return (
+      scope3GridElectricityKg({
+        totalKwh: infrastructureTotalKwh ?? 0,
+        gridPct: infrastructureGridPct,
+        gridFactor: infrastructureGridFactor,
+        otherPct: infrastructureOtherPct,
+        otherRowEmissionsSum: sumOther,
+      }) ?? 0
+    );
+  }, [
+    infrastructureTotalKwh,
+    infrastructureGridPct,
+    infrastructureGridFactor,
+    infrastructureOtherPct,
+    infrastructureOtherRows,
+  ]);
   
   const infrastructureTotalRefrigerantEmissions = useMemo(() => {
     return infrastructureRefrigerantRows.reduce((sum, r) => sum + (r.emissions || 0), 0);
@@ -1027,7 +1065,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
             </div>
             <div>
               <Label>Grid emission factor</Label>
-              <Input value={gridFactor ?? ''} readOnly placeholder="Auto" />
+              <Input value={gridFactor ?? ''} readOnly placeholder="Verified factor required" />
             </div>
             <div>
               <Label>Grid emissions</Label>
@@ -1585,7 +1623,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               </div>
               <div>
                 <Label>Grid emission factor</Label>
-                <Input value={equipmentGridFactor ?? ''} readOnly placeholder="Auto" />
+                <Input value={equipmentGridFactor ?? ''} readOnly placeholder="Verified factor required" />
               </div>
               <div>
                 <Label>Grid emissions</Label>
@@ -2150,7 +2188,7 @@ const LeasedAssetsSection: React.FC<LeasedAssetsSectionProps> = ({ type, onSave 
               </div>
               <div>
                 <Label>Grid emission factor</Label>
-                <Input value={infrastructureGridFactor ?? ''} readOnly placeholder="Auto" />
+                <Input value={infrastructureGridFactor ?? ''} readOnly placeholder="Verified factor required" />
               </div>
               <div>
                 <Label>Grid emissions</Label>

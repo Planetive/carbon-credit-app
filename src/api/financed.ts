@@ -5,6 +5,7 @@ export type FinancedEmission = {
   organization_id: string;
   user_id: string;
   counterparty_id?: string | null;
+  /** Portfolio exposures.id only. Calculator financing_instance_id is stored in inputs. */
   exposure_id?: string | null;
   questionnaire_id?: string | null;
   calc_kind: "finance" | "facilitated" | string;

@@ -108,27 +108,12 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
     // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
   }, [user, companyContext, counterpartyId]);
 
-  // Sync to emissionData
+  // Notes only — never sync typed or stored kg as a verified Category 3 calculation.
   useEmissionSync({
     category: "fuel_energy_activities",
     rows: fuelEnergyRows,
     isInitialLoad: isInitialLoadFuelEnergy,
-    mapRowToEntry: (r) =>
-      r.extraction &&
-      r.refining &&
-      typeof r.distance === "number" &&
-      r.distance >= 0 &&
-      typeof r.emissions === "number" &&
-      r.emissions >= 0
-        ? {
-            id: r.id,
-            category: "fuel_energy_activities",
-            activity: r.extraction,
-            unit: "km",
-            quantity: r.distance,
-            emissions: r.emissions,
-          }
-        : null,
+    mapRowToEntry: () => null,
     setEmissionData,
   });
 
@@ -175,9 +160,10 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           user_id: user.id,
           counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
           extraction: r.extraction,
-          distance: r.distance!,
+          distance: r.distance ?? 0,
           refining: r.refining,
-          emissions: r.emissions || 0,
+          // Notes workflow only — never store a manual figure as a verified result.
+          emissions: 0,
         }));
 
         await insertScope3CategoryEntries("scope3_fuel_energy_activities", payload);
@@ -188,9 +174,9 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           changedExisting.map((r) =>
             updateScope3CategoryEntry("scope3_fuel_energy_activities", r.dbId!, {
               extraction: r.extraction,
-              distance: r.distance!,
+              distance: r.distance ?? 0,
               refining: r.refining,
-              emissions: r.emissions || 0,
+              emissions: 0,
             })
           )
         );
@@ -276,10 +262,6 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
     (sum, r) => sum + (r.distance || 0),
     0,
   );
-  const totalEmissions = fuelEnergyRows.reduce(
-    (sum, r) => sum + (r.emissions || 0),
-    0,
-  );
 
   return (
     <div className="space-y-6">
@@ -289,7 +271,9 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
             Fuel &amp; Energy Related Activities
           </h4>
           <p className="text-sm text-gray-600">
-            Capture upstream fuel and energy details
+            Not calculated. Well-to-tank and T&amp;D loss methods stay unavailable
+            until verified upstream datasets are mounted. Notes are not verified
+            emissions. Scope 1 combustion and Scope 2 generation factors are not reused.
           </p>
         </div>
         <Button
@@ -297,29 +281,28 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
           className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add New Entry
+          Add Note
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center mb-4">
-        <Label className="text-gray-500 font-medium">Extraction</Label>
-        <Label className="text-gray-500 font-medium">Distance (km)</Label>
-        <Label className="text-gray-500 font-medium">Refining</Label>
-        <Label className="text-gray-500 font-medium">Emissions (kg CO2e)</Label>
-        <Label className="text-gray-500 font-medium">Actions</Label>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+        <Label className="text-gray-500 font-medium">Extraction (note)</Label>
+        <Label className="text-gray-500 font-medium">Distance note (km)</Label>
+        <Label className="text-gray-500 font-medium">Refining (note)</Label>
+        <Label className="text-gray-500 font-medium">Status</Label>
       </div>
 
       <div className="space-y-4">
         {fuelEnergyRows.map((r) => (
           <div
             key={r.id}
-            className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
+            className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center p-4 rounded-lg bg-gray-50 border border-gray-200"
           >
             <div className="w-full">
               <Input
                 value={r.extraction}
                 onChange={(e) =>
-                  updateFuelEnergyRow(r.id, { extraction: e.target.value })
+                  updateFuelEnergyRow(r.id, { extraction: e.target.value, emissions: undefined })
                 }
                 placeholder="e.g., drilling, mining"
                 className="w-full"
@@ -334,15 +317,15 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === "") {
-                    updateFuelEnergyRow(r.id, { distance: undefined });
+                    updateFuelEnergyRow(r.id, { distance: undefined, emissions: undefined });
                   } else {
                     const numValue = Number(value);
                     if (numValue >= 0) {
-                      updateFuelEnergyRow(r.id, { distance: numValue });
+                      updateFuelEnergyRow(r.id, { distance: numValue, emissions: undefined });
                     }
                   }
                 }}
-                placeholder="Enter distance"
+                placeholder="Optional note"
                 className="w-full"
               />
             </div>
@@ -350,33 +333,16 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
               <Input
                 value={r.refining}
                 onChange={(e) =>
-                  updateFuelEnergyRow(r.id, { refining: e.target.value })
+                  updateFuelEnergyRow(r.id, { refining: e.target.value, emissions: undefined })
                 }
                 placeholder="Refining processes"
                 className="w-full"
               />
             </div>
-            <div className="w-full">
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={r.emissions ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === "") {
-                    updateFuelEnergyRow(r.id, { emissions: undefined });
-                  } else {
-                    const numValue = Number(value);
-                    if (numValue >= 0) {
-                      updateFuelEnergyRow(r.id, { emissions: numValue });
-                    }
-                  }
-                }}
-                placeholder="Enter emissions"
-                className="w-full"
-              />
-            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-gray-700 font-medium flex-1">
+                Not calculated
+              </div>
             {r.isExisting ? (
               <Button
                 variant="outline"
@@ -397,21 +363,21 @@ export const FuelEnergyActivitiesSection: React.FC<FuelEnergyActivitiesSectionPr
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
+            </div>
           </div>
         ))}
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-gray-700 font-medium">
-          Total Distance:{" "}
+          Notes:{" "}
+          <span className="font-semibold">{fuelEnergyRows.length}</span>
+          {" "}· Distance notes:{" "}
           <span className="font-semibold">
             {totalDistance.toFixed(1)} km
           </span>
-          {" "}·{" "}
-          Total Emissions:{" "}
-          <span className="font-semibold">
-            {totalEmissions.toFixed(3)} kg CO2e
-          </span>
+          {" "}· Emissions:{" "}
+          <span className="font-semibold">Not calculated</span>
         </div>
         {(() => {
           const pendingNew = fuelEnergyRows.filter(

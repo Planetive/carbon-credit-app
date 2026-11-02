@@ -3,6 +3,17 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { readSelectedReportingYear } from './reportingYear';
+import { fetchUkAnnualScope2 } from './ukScope2Results';
+import { fetchScope3Verified, type Scope3VerifiedResults } from './scope3Results';
+import {
+  duplicatePcafFacilitatedKg,
+  NOT_CALCULATED_SCOPE3_CATEGORIES,
+  scope3CompletionPercent,
+  verifiedAnnualGrandKg,
+  verifiedScope3AnnualKg,
+} from './scope3Reporting';
 import {
   calculateLegacyScope2ElectricityTotal,
   loadLegacyCategoryDetailRows,
@@ -11,6 +22,8 @@ import {
   sumInvestmentAttributed,
   sumRowDataEmissions,
 } from '@/integrations/supabase/ghgEntryAggregates';
+import { loadFinancedReportingRowsSafe } from '@/utils/portfolioCalculationsForScope3';
+import { sumCategory15AttributedSafely } from '@/utils/scope3FinancedImportSafety';
 import {
   exportFullEmissionReportPdf,
   mapEmissionResultsPageToCalculatorShape,
@@ -32,6 +45,7 @@ interface EmissionResultsData {
 
 const UKResultsScreen = () => {
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -51,6 +65,12 @@ const UKResultsScreen = () => {
   const [epaScope1HeatSteamEmissions, setEpaScope1HeatSteamEmissions] = useState<number>(0);
   const [electricityEmissions, setElectricityEmissions] = useState<number>(0);
   const [heatSteamEmissions, setHeatSteamEmissions] = useState<number>(0);
+  const [verifiedElectricityKg, setVerifiedElectricityKg] = useState(0);
+  const [verifiedHeatKg, setVerifiedHeatKg] = useState(0);
+  const [scope3Verified, setScope3Verified] = useState<Scope3VerifiedResults | null>(null);
+  const [scope2Note, setScope2Note] = useState(
+    "Legacy undated Scope 2 records are excluded from the annual total."
+  );
   // Scope 2 Purchased Heat and Steam (EPA)
   const [epaHeatSteamEmissions, setEpaHeatSteamEmissions] = useState<number>(0);
   const [mounted, setMounted] = useState(false);
@@ -65,6 +85,7 @@ const UKResultsScreen = () => {
   const [scope3EmployeeCommuting, setScope3EmployeeCommuting] = useState<number>(0);
   const [scope3Investments, setScope3Investments] = useState<number>(0);
   const [scope3Facilitated, setScope3Facilitated] = useState<number>(0);
+  const [scope3DuplicatePcafKg, setScope3DuplicatePcafKg] = useState(0);
   const [scope3DownstreamTransport, setScope3DownstreamTransport] = useState<number>(0);
   const [scope3EndOfLife, setScope3EndOfLife] = useState<number>(0);
   const [scope3ProcessingSold, setScope3ProcessingSold] = useState<number>(0);
@@ -198,8 +219,8 @@ const UKResultsScreen = () => {
 
   // Scope 2 breakdown (EPA: Electricity + Purchased Heat & Steam from scope2_heatsteam_entries_epa)
   const scope2Total = useMemo(
-    () => (isEPA ? electricityEmissions + epaHeatSteamEmissions : electricityEmissions + heatSteamEmissions),
-    [isEPA, electricityEmissions, heatSteamEmissions, epaHeatSteamEmissions]
+    () => (isEPA ? electricityEmissions + epaHeatSteamEmissions : verifiedElectricityKg + verifiedHeatKg),
+    [isEPA, electricityEmissions, epaHeatSteamEmissions, verifiedElectricityKg, verifiedHeatKg]
   );
   const scope2Breakdown = useMemo(() => {
     if (isEPA) {
@@ -211,11 +232,11 @@ const UKResultsScreen = () => {
       return data.map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }));
     }
     const data = [
-      { key: 'scope2_electricity', label: 'Electricity', value: electricityEmissions, color: 'bg-orange-500' },
-      { key: 'scope2_heatsteam', label: 'Heat & Steam', value: heatSteamEmissions, color: 'bg-amber-600' },
+      { key: 'uk_purchased_electricity', label: 'Purchased electricity (location-based, verified)', value: verifiedElectricityKg, color: 'bg-orange-500' },
+      { key: 'uk_purchased_heat', label: 'Purchased heat and steam (verified)', value: verifiedHeatKg, color: 'bg-amber-600' },
     ];
     return data.map(d => ({ ...d, pct: scope2Total > 0 ? (d.value / scope2Total) * 100 : 0 }));
-  }, [isEPA, electricityEmissions, heatSteamEmissions, epaHeatSteamEmissions, scope2Total]);
+  }, [isEPA, electricityEmissions, epaHeatSteamEmissions, verifiedElectricityKg, verifiedHeatKg, scope2Total]);
   const topContributorS2 = useMemo(() => scope2Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), [scope2Breakdown]);
 
   // Scope 3 total and breakdown (excluding LCA entries as they are separate)
@@ -264,25 +285,47 @@ const UKResultsScreen = () => {
       { key: 'scope3_use_of_sold', label: 'Use of Sold Products', value: scope3UseOfSold, color: 'bg-red-500', category: 'downstream' },
       { key: 'scope3_end_of_life', label: 'End of Life Treatment', value: scope3EndOfLife, color: 'bg-yellow-500', category: 'downstream' },
       { key: 'scope3_investments', label: 'Category 15 — Investments & finance', value: scope3Investments, color: 'bg-emerald-500', category: 'downstream' },
-      { key: 'scope3_facilitated', label: 'Facilitated emissions', value: scope3Facilitated, color: 'bg-[#1D9E75]', category: 'downstream' },
+      { key: 'scope3_facilitated', label: scope3DuplicatePcafKg > 0 ? 'Facilitated emissions (same PCAF calculation as Category 15 is not added again)' : 'Facilitated emissions', value: scope3Facilitated, color: 'bg-[#1D9E75]', category: 'downstream' },
     ];
     return data.map(d => ({ ...d, pct: scope3DownstreamTotal > 0 ? (d.value / scope3DownstreamTotal) * 100 : 0 }));
   }, [scope3DownstreamTransport, scope3ProcessingSold, scope3UseOfSold, 
-      scope3EndOfLife, scope3Investments, scope3Facilitated, scope3DownstreamTotal]);
+      scope3EndOfLife, scope3Investments, scope3Facilitated, scope3DuplicatePcafKg, scope3DownstreamTotal]);
 
   // Combined breakdown for CSV export
   const scope3Breakdown = useMemo(() => {
     return [...scope3UpstreamBreakdown, ...scope3DownstreamBreakdown];
   }, [scope3UpstreamBreakdown, scope3DownstreamBreakdown]);
 
-  const topContributorS3 = useMemo(() => 
-    scope3Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }), 
+  const verifiedScope3Kg = useMemo(
+    () => verifiedScope3AnnualKg(
+      readSelectedReportingYear(),
+      scope3Verified && scope3Verified.status !== "unavailable"
+        ? scope3Verified.totalKgCo2e
+        : null,
+    ),
+    [scope3Verified],
+  );
+
+  const annualGrandKg = useMemo(
+    () => verifiedAnnualGrandKg({
+      reportingYear: readSelectedReportingYear(),
+      scope1Kg: scope1Total,
+      scope2Kg: scope2Total,
+      legacyScope3Kg: Math.max(0, scope3Total - scope3DuplicatePcafKg),
+      verifiedScope3Kg,
+    }),
+    [scope1Total, scope2Total, scope3Total, scope3DuplicatePcafKg, verifiedScope3Kg],
+  );
+
+  const topContributorS3 = useMemo(() =>
+    scope3Breakdown.reduce((a: any, b: any) => (b.value > a.value ? b : a), { label: '', value: 0, pct: 0, color: '' }),
     [scope3Breakdown]
   );
 
   const exportCsv = () => {
     const scope2TotalLocal = scope2Total;
-    const grandTotal = scope1Total + scope2TotalLocal + scope3Total;
+    const grandTotal = annualGrandKg ?? scope1Total + scope2TotalLocal;
+    const legacyScope3Kg = Math.max(0, scope3Total - scope3DuplicatePcafKg);
 
     // Build a comprehensive CSV across all scopes
     const rows: (string | number)[][] = [];
@@ -304,33 +347,63 @@ const UKResultsScreen = () => {
     scope2Breakdown.forEach(b => {
       rows.push(['Scope 2', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
     });
-    rows.push(['Scope 2', 'Total', scope2TotalLocal.toFixed(6), '100.00']);
+    rows.push(['Scope 2', 'Total', scope2TotalLocal.toFixed(6), isEPA ? '100.00' : 'partial']);
+    if (!isEPA) {
+      rows.push(['Scope 2', 'Legacy undated electricity and heat excluded', (electricityEmissions + heatSteamEmissions).toFixed(6), 'excluded']);
+    }
     rows.push([]);
 
     // Scope 3 breakdown - Upstream
     rows.push(['Scope 3', 'Upstream Emissions', '', '']);
     rows.push(['Scope', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
     scope3UpstreamBreakdown.forEach(b => {
-      rows.push(['Scope 3', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
+      rows.push(['Scope 3', b.label, b.value.toFixed(6), 'excluded']);
     });
-    rows.push(['Scope 3', 'Upstream Total', scope3UpstreamTotal.toFixed(6), scope3Total > 0 ? ((scope3UpstreamTotal / scope3Total) * 100).toFixed(2) : '0.00']);
+    rows.push(['Scope 3', 'Upstream Total', scope3UpstreamTotal.toFixed(6), 'excluded']);
     rows.push([]);
     
     // Scope 3 breakdown - Downstream
     rows.push(['Scope 3', 'Downstream Emissions', '', '']);
     rows.push(['Scope', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
     scope3DownstreamBreakdown.forEach(b => {
-      rows.push(['Scope 3', b.label, b.value.toFixed(6), b.pct.toFixed(2)]);
+      rows.push(['Scope 3', b.label, b.value.toFixed(6), 'excluded']);
     });
-    rows.push(['Scope 3', 'Downstream Total', scope3DownstreamTotal.toFixed(6), scope3Total > 0 ? ((scope3DownstreamTotal / scope3Total) * 100).toFixed(2) : '0.00']);
+    rows.push(['Scope 3', 'Downstream Total', scope3DownstreamTotal.toFixed(6), 'excluded']);
+    if (scope3DuplicatePcafKg > 0) {
+      rows.push(['Scope 3', 'PCAF calculation already in Category 15', scope3DuplicatePcafKg.toFixed(6), 'excluded duplicate']);
+    }
     rows.push([]);
     
-    // Scope 3 Grand Total
-    rows.push(['Scope 3', 'Total', scope3Total.toFixed(6), '100.00']);
+    // Verified Scope 3 annual subtotal (same aggregation as dashboard / EPA CSV)
+    if (verifiedScope3Kg == null) {
+      rows.push(['Scope 3', 'Verified annual total', 'Unavailable', 'unavailable']);
+    } else {
+      (scope3Verified?.byCategory || [])
+        .filter((row) => row.status === 'verified' && row.kgCo2e != null)
+        .forEach((row) => {
+          rows.push(['Scope 3', `${row.label} (verified)`, row.kgCo2e!.toFixed(6), 'verified partial']);
+        });
+      (scope3Verified?.byCategory || [])
+        .filter((row) => row.status === 'no_activity')
+        .forEach((row) => {
+          rows.push(['Scope 3', row.label, 'No activity', 'incomplete']);
+        });
+      (scope3Verified?.byCategory || [])
+        .filter((row) => row.status === 'unsupported' || row.status === 'awaiting_factors')
+        .forEach((row) => {
+          rows.push(['Scope 3', row.label, 'Not calculated', row.status]);
+        });
+      rows.push(['Scope 3', 'Verified partial total', verifiedScope3Kg.toFixed(6), 'partial']);
+      rows.push(['Scope 3', 'Inventory status', 'Partial', 'Not a complete Scope 3 inventory']);
+    }
+    rows.push(['Scope 3', 'Legacy undated records excluded', legacyScope3Kg.toFixed(6), 'excluded']);
+    NOT_CALCULATED_SCOPE3_CATEGORIES.forEach((category) => {
+      rows.push(['Scope 3', category.label, 'Not calculated', 'not calculated']);
+    });
     rows.push([]);
 
     // Grand total
-    rows.push(['All Scopes', 'Grand Total', grandTotal.toFixed(6)]);
+    rows.push(['All Scopes', 'Grand Total', grandTotal.toFixed(6), verifiedScope3Kg == null ? 'partial' : 'partial with verified Scope 3']);
 
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -348,7 +421,8 @@ const UKResultsScreen = () => {
     rows.push([]);
     rows.push(['Scope 2', 'Category', 'Emissions (kg CO2e)', 'Share (%)']);
     scope2Breakdown.forEach(b => rows.push(['Scope 2', b.label, b.value.toFixed(6), b.pct.toFixed(2)]));
-    rows.push(['Scope 2', 'Total', scope2Total.toFixed(6), '100.00']);
+    rows.push(['Scope 2', 'Total', scope2Total.toFixed(6), 'partial']);
+    rows.push(['Scope 2', 'Legacy undated electricity and heat excluded', (electricityEmissions + heatSteamEmissions).toFixed(6), 'excluded']);
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -469,8 +543,16 @@ const UKResultsScreen = () => {
         setScope3WasteGenerated(sumEmissionsField(wasteGeneratedRows));
         setScope3BusinessTravel(sumEmissionsField(businessTravelRows));
         setScope3EmployeeCommuting(sumEmissionsField(employeeCommutingRows));
-        setScope3Investments(sumInvestmentAttributed(investmentsRows));
-        setScope3Facilitated(sumEmissionsField(facilitatedRows));
+        const financedReportingRows = await loadFinancedReportingRowsSafe();
+        const investmentsTotal = financedReportingRows.length
+          ? sumCategory15AttributedSafely(investmentsRows, financedReportingRows, "finance")
+          : sumInvestmentAttributed(investmentsRows);
+        const facilitatedTotal = financedReportingRows.length
+          ? sumCategory15AttributedSafely(facilitatedRows, financedReportingRows, "facilitated")
+          : sumEmissionsField(facilitatedRows);
+        setScope3Investments(investmentsTotal);
+        setScope3Facilitated(facilitatedTotal);
+        setScope3DuplicatePcafKg(duplicatePcafFacilitatedKg(investmentsRows, facilitatedRows));
         setScope3DownstreamTransport(sumEmissionsField(downstreamTransportRows));
         setScope3EndOfLife(sumEmissionsField(endOfLifeRows));
         setScope3ProcessingSold(processingTotal);
@@ -486,8 +568,8 @@ const UKResultsScreen = () => {
           sumEmissionsField(wasteGeneratedRows) +
           sumEmissionsField(businessTravelRows) +
           sumEmissionsField(employeeCommutingRows) +
-          sumInvestmentAttributed(investmentsRows) +
-          sumEmissionsField(facilitatedRows) +
+          investmentsTotal +
+          facilitatedTotal +
           sumEmissionsField(downstreamTransportRows) +
           sumEmissionsField(endOfLifeRows) +
           processingTotal +
@@ -496,7 +578,11 @@ const UKResultsScreen = () => {
         setResults({
           scope1_completion: 100,
           scope2_completion: 100,
-          scope3_completion: scope3TotalCalc > 0 ? 100 : 0,
+          scope3_completion: scope3CompletionPercent(
+            scope3TotalCalc,
+            verifiedScope3AnnualKg(readSelectedReportingYear()),
+            0,
+          ),
           total_completion: 100,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
@@ -510,6 +596,37 @@ const UKResultsScreen = () => {
     loadScope1Totals();
   }, [user]);
 
+  useEffect(() => {
+    if (isEPA) return;
+    let cancelled = false;
+    void (async () => {
+      const year = readSelectedReportingYear();
+      const [annual, scope3] = await Promise.all([
+        fetchUkAnnualScope2({
+          organizationId: currentOrganization?.id,
+          reportingYear: year,
+        }),
+        fetchScope3Verified({
+          organizationId: currentOrganization?.id,
+          reportingYear: year,
+        }),
+      ]);
+      if (cancelled) return;
+      setVerifiedElectricityKg(annual.electricityKg);
+      setVerifiedHeatKg(annual.heatKg);
+      setScope3Verified(scope3);
+      const legacyKg = electricityEmissions + heatSteamEmissions;
+      setScope2Note(
+        annual.error
+          ? `${annual.error} Legacy undated electricity and heat records (${legacyKg.toFixed(3)} kg) are excluded.`
+          : `Verified purchased electricity and heat are shown for ${year}. Legacy undated records (${legacyKg.toFixed(3)} kg) are excluded and are not a complete annual inventory. Purchased cooling is not included.`
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEPA, currentOrganization?.id, electricityEmissions, heatSteamEmissions]);
+
 
   const mappedResults: EpaIpccResultsData = useMemo(() => {
     const scope1 = breakdown.map(({ key, label, value }) => ({ key, label, value }));
@@ -522,20 +639,20 @@ const UKResultsScreen = () => {
       scope1ByActivity: [],
       scope2,
       scope3,
+      scope3Verified: scope3Verified ?? undefined,
       totals: {
         scope1: scope1Total,
         scope2: scope2Total,
         scope3: scope3Total,
-        grand: scope1Total + scope2Total + scope3Total,
+        grand: annualGrandKg ?? scope1Total + scope2Total,
       },
     };
-  }, [breakdown, scope2Breakdown, scope3Breakdown, scope1Total, scope2Total, scope3Total]);
+  }, [breakdown, scope2Breakdown, scope3Breakdown, scope1Total, scope2Total, scope3Total, annualGrandKg, scope3Verified]);
 
   const categoriesWithScope = useMemo(
     () => [
       ...mappedResults.scope1.map((r) => ({ ...r, scope: "Scope 1" as const })),
       ...mappedResults.scope2.map((r) => ({ ...r, scope: "Scope 2" as const })),
-      ...mappedResults.scope3.map((r) => ({ ...r, scope: "Scope 3" as const })),
     ],
     [mappedResults]
   );
@@ -604,11 +721,19 @@ const UKResultsScreen = () => {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <div className="w-full px-3 sm:px-4 py-5 sm:py-6 space-y-6">
+        <p className="text-sm text-slate-600">{scope2Note}</p>
+        <p className="text-sm text-slate-600">
+          Legacy Scope 3 records have no reporting period and are excluded from the verified annual total.
+          {scope3DuplicatePcafKg > 0
+            ? ` ${scope3DuplicatePcafKg.toFixed(3)} kg from a facilitated row repeats a Category 15 PCAF calculation and is not added again.`
+            : ""}
+          {" "}Franchises and leased assets are not calculated.
+        </p>
         <ResultsSummaryCard
           grandTotalKg={mappedResults.totals.grand}
           categoriesCalculated={categoriesCalculated}
           submittedAt={submittedAt}
-          methodologyLabel="DEFRA / GHG Protocol"
+          methodologyLabel="DESNZ / GHG Protocol — partial Scope 2"
           onEditAssessment={() => navigate("/emission-calculator-uk")}
           onExportPdf={exportPdf}
           onExportExcel={exportCsv}
@@ -618,15 +743,15 @@ const UKResultsScreen = () => {
         <ScopeHighlightCards
           scope1Kg={mappedResults.totals.scope1}
           scope2Kg={mappedResults.totals.scope2}
-          scope3Kg={mappedResults.totals.scope3}
-          grandKg={mappedResults.totals.grand}
+          scope3Kg={verifiedScope3Kg}
+          grandKg={annualGrandKg ?? mappedResults.totals.scope1 + mappedResults.totals.scope2}
         />
 
         <EmissionsAnalyticsRow
           scope1Kg={mappedResults.totals.scope1}
           scope2Kg={mappedResults.totals.scope2}
-          scope3Kg={mappedResults.totals.scope3}
-          grandKg={mappedResults.totals.grand}
+          scope3Kg={verifiedScope3Kg}
+          grandKg={annualGrandKg ?? mappedResults.totals.scope1 + mappedResults.totals.scope2}
           categories={categoriesWithScope}
         />
 

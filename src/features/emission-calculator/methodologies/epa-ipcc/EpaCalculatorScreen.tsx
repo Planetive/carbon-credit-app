@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import { 
@@ -35,9 +35,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
-import { EmissionData, ScopeTotals } from "@/components/emissions/shared/types";
-import { loadEpaIpccResults } from "@/lib/epaIpccResults";
+import { EmissionData } from "@/components/emissions/shared/types";
+import { loadEpaIpccResults, type EpaIpccResultsData } from "@/lib/epaIpccResults";
+import { buildEpaSidebarDisplay } from "./epaSidebarTotals";
+import { EpaReportingYearControl } from "@/features/emission-calculator/results/EpaReportingYearControl";
+import {
+  readSelectedReportingYear,
+  writeSelectedReportingYear,
+} from "@/features/emission-calculator/results/reportingYear";
+import { buildEpaCalculatorPdf, formatPdfTonnes, type EpaCalculatorPdfFigures } from "./epaCalculatorPdf";
 import {
   blockEpaCompanySnapshot,
   blockEpaWizardHandoff,
@@ -46,7 +54,7 @@ import {
   loadCalculatorPreferences,
   saveCalculatorPreferences,
 } from "@/integrations/supabase/calculatorPreferencesClient";
-import HeatSteamEPAEmissions from "@/components/emissions/scope1/HeatSteamEPAEmissions";
+import { PurchasedHeatSteam } from "@/features/emission-calculator/scope2/components/PurchasedHeatSteam";
 import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
@@ -143,9 +151,7 @@ type EmissionPdfReportData = {
   description?: string;
   preparedBy?: string;
   date?: string;
-  s1: { stationary: number; mobile: number; fugitive: number; process: number };
-  s2: { electricity: number; heat: number };
-  s3: { upstream: number; downstream: number; travel: number; commute: number; waste: number };
+  figures: EpaCalculatorPdfFigures;
   targetYear?: string;
   targetPct?: string;
 };
@@ -212,11 +218,14 @@ const getReportCSS = (): string => `
 `;
 
 const getReportContent = (data: EmissionPdfReportData): string => {
-  const totalS1 = data.s1.stationary + data.s1.mobile + data.s1.fugitive + data.s1.process;
-  const totalS2 = data.s2.electricity + data.s2.heat;
-  const totalS3 = data.s3.upstream + data.s3.downstream + data.s3.travel + data.s3.commute + data.s3.waste;
-  const grandTotal = totalS1 + totalS2 + totalS3;
-  const fmt = (n: number) => n.toFixed(2);
+  const figures = data.figures;
+  const fmt = (n: number | null) => {
+    if (n == null) {
+      const word = figures.inventory === "partial" ? "Unassigned" : "Unavailable";
+      return `${word} ${figures.unit}`;
+    }
+    return `${formatPdfTonnes(n)} ${figures.unit}`;
+  };
 
   return `
   <div class="report">
@@ -239,37 +248,41 @@ const getReportContent = (data: EmissionPdfReportData): string => {
       <div class="page-content">
         <div class="page-title">Executive Summary</div><div class="page-divider"></div>
         <div class="summary-cards">
-          <div class="summary-card"><div class="summary-card-label">Scope 1 · Direct</div><div class="summary-card-value">${fmt(totalS1)}</div><div class="summary-card-unit">tCO2e</div></div>
-          <div class="summary-card"><div class="summary-card-label">Scope 2 · Indirect</div><div class="summary-card-value">${fmt(totalS2)}</div><div class="summary-card-unit">tCO2e</div></div>
-          <div class="summary-card"><div class="summary-card-label">Scope 3 · Value Chain</div><div class="summary-card-value">${fmt(totalS3)}</div><div class="summary-card-unit">tCO2e</div></div>
-          <div class="summary-card total"><div class="summary-card-label">Total Emissions</div><div class="summary-card-value">${fmt(grandTotal)}</div><div class="summary-card-unit">tCO2e</div></div>
+          <div class="summary-card"><div class="summary-card-label">Scope 1 · Direct</div><div class="summary-card-value">${escapeHtml(figures.scope1Label)}</div><div class="summary-card-unit">${figures.unit}</div></div>
+          <div class="summary-card"><div class="summary-card-label">Scope 2 · Indirect</div><div class="summary-card-value">${escapeHtml(figures.scope2Label)}</div><div class="summary-card-unit">${figures.unit}</div></div>
+          <div class="summary-card"><div class="summary-card-label">Scope 3 · Value Chain</div><div class="summary-card-value">${escapeHtml(figures.scope3Label)}</div><div class="summary-card-unit">${figures.unit}</div></div>
+          <div class="summary-card total"><div class="summary-card-label">Total Emissions</div><div class="summary-card-value">${escapeHtml(figures.grandLabel)}</div><div class="summary-card-unit">${figures.unit}</div></div>
         </div>
+        <p style="font-size: 12px; color: #5a7260; margin-bottom: 8px;">${escapeHtml(figures.statusLabel)}</p>
+        <p style="font-size: 12px; color: #5a7260; margin-bottom: 16px;">${escapeHtml(figures.biogenicLabel)}. GWP AR5. Biogenic CO2 is not included in Scope 1 or the total.</p>
+        ${figures.reconciliationNotice ? `<p style="font-size: 12px; color: #8a5a12; margin-bottom: 16px;">${escapeHtml(figures.reconciliationNotice)}</p>` : ""}
         <div class="scope-section">
           <div class="scope-header"><div class="scope-header-text">Scope 1 — Direct Emissions</div></div>
-          <div class="scope-row"><span>Stationary Combustion</span><span>${fmt(data.s1.stationary)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Mobile Combustion</span><span>${fmt(data.s1.mobile)} tCO2e</span></div>
-          <div class="scope-row"><span>Fugitive Emissions</span><span>${fmt(data.s1.fugitive)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Process Emissions</span><span>${fmt(data.s1.process)} tCO2e</span></div>
-          <div class="scope-subtotal"><span>Scope 1 Total</span><span>${fmt(totalS1)} tCO2e</span></div>
+          <div class="scope-row"><span>Stationary Combustion (verified)</span><span>${fmt(figures.stationary)}</span></div>
+          <div class="scope-row shaded"><span>Mobile Combustion (verified)</span><span>${fmt(figures.mobile)}</span></div>
+          <div class="scope-row"><span>Refrigerant leakage (verified)</span><span>${fmt(figures.refrigerant)}</span></div>
+          <div class="scope-row shaded"><span>Fugitive Emissions</span><span>${fmt(figures.fugitive)}</span></div>
+          <div class="scope-row shaded"><span>Process Emissions</span><span>${fmt(figures.process)}</span></div>
+          <div class="scope-subtotal"><span>Scope 1 Total</span><span>${fmt(figures.scope1)}</span></div>
         </div>
         <div class="scope-section">
           <div class="scope-header"><div class="scope-header-text">Scope 2 — Indirect Energy Emissions</div></div>
-          <div class="scope-row"><span>Purchased Electricity</span><span>${fmt(data.s2.electricity)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Purchased Heat / Steam</span><span>${fmt(data.s2.heat)} tCO2e</span></div>
-          <div class="scope-subtotal"><span>Scope 2 Total</span><span>${fmt(totalS2)} tCO2e</span></div>
+          <div class="scope-row"><span>Purchased Electricity</span><span>${fmt(figures.electricity)}</span></div>
+          <div class="scope-row shaded"><span>Purchased Heat / Steam</span><span>${fmt(figures.heat)}</span></div>
+          <div class="scope-subtotal"><span>Scope 2 Total</span><span>${fmt(figures.scope2)}</span></div>
         </div>
         <div class="scope-section">
           <div class="scope-header"><div class="scope-header-text">Scope 3 — Value Chain Emissions</div></div>
           <div class="scope-subheading">Upstream</div>
-          <div class="scope-row"><span>Upstream Activities</span><span>${fmt(data.s3.upstream)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Business Travel</span><span>${fmt(data.s3.travel)} tCO2e</span></div>
-          <div class="scope-row"><span>Employee Commuting</span><span>${fmt(data.s3.commute)} tCO2e</span></div>
-          <div class="scope-row shaded"><span>Waste</span><span>${fmt(data.s3.waste)} tCO2e</span></div>
+          <div class="scope-row"><span>Upstream Activities</span><span>${fmt(figures.upstream)}</span></div>
+          <div class="scope-row shaded"><span>Business Travel</span><span>${fmt(figures.travel)}</span></div>
+          <div class="scope-row"><span>Employee Commuting</span><span>${fmt(figures.commute)}</span></div>
+          <div class="scope-row shaded"><span>Waste</span><span>${fmt(figures.waste)}</span></div>
           <div class="scope-subheading">Downstream</div>
-          <div class="scope-row"><span>Downstream Activities</span><span>${fmt(data.s3.downstream)} tCO2e</span></div>
-          <div class="scope-subtotal"><span>Scope 3 Total</span><span>${fmt(totalS3)} tCO2e</span></div>
+          <div class="scope-row"><span>Downstream Activities</span><span>${fmt(figures.downstream)}</span></div>
+          <div class="scope-subtotal"><span>Scope 3 Total</span><span>${fmt(figures.scope3)}</span></div>
         </div>
-        <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${fmt(grandTotal)} tCO2e</div></div>
+        <div class="grand-total"><div class="grand-total-label">GRAND TOTAL EMISSIONS</div><div class="grand-total-value">${escapeHtml(figures.grandLabel)} ${figures.unit}</div></div>
         ${data.targetYear && data.targetPct ? `<div class="reduction-target"><div><div class="reduction-label">Reduction Target</div><div class="reduction-text">Achieve ${escapeHtml(data.targetPct)}% reduction in total emissions by ${escapeHtml(data.targetYear)}</div></div></div>` : ""}
         ${data.preparedBy || data.date ? `<div style="margin-top: 24px; font-size: 11px; color: #5a7260;">${data.preparedBy ? `Prepared by: ${escapeHtml(data.preparedBy)}` : ""}${data.preparedBy && data.date ? "&nbsp;&nbsp;·&nbsp;&nbsp;" : ""}${data.date ? `Date: ${escapeHtml(data.date)}` : ""}</div>` : ""}
         <div class="page-number">2</div>
@@ -283,6 +296,8 @@ const getReportContent = (data: EmissionPdfReportData): string => {
 const EmissionCalculatorEPA = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentOrganization, loading: organizationLoading } = useOrganization();
+  const [reportingYear, setReportingYear] = useState(readSelectedReportingYear);
   const { toast } = useToast();
   const defaultManualCategory = "scope1Screening";
 
@@ -314,7 +329,6 @@ const EmissionCalculatorEPA = () => {
   const [calculationMode, setCalculationMode] = useState<"lca" | "manual" | null>(null);
   const [showSwitchToLCADialog, setShowSwitchToLCADialog] = useState(false);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
-  const hasHydratedSummaryRef = useRef(false);
   const [emissionData, setEmissionData] = useState<EmissionData>({
     scope1: {
       fuel: [],
@@ -333,6 +347,8 @@ const EmissionCalculatorEPA = () => {
   const [ipccScope1Totals, setIpccScope1Totals] = useState<Record<string, number>>({});
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [companyInventoryNotice, setCompanyInventoryNotice] = useState<string | null>(null);
+  const [reportResults, setReportResults] = useState<EpaIpccResultsData | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -343,33 +359,7 @@ const EmissionCalculatorEPA = () => {
     );
   }, [user?.id, companyContext?.counterpartyId]);
 
-  // Totals – Scope 1 fuel + vehicle tables + Heat and Steam (Scope 1), Scope 2 = electricity + heat & steam, Scope 3 unchanged
-  const scopeTotals: ScopeTotals = {
-    scope1:
-      calculationMode === "lca"
-        ? emissionData.scope3.find((r) => r.category === "lca_scope1")?.emissions || 0
-        : emissionData.scope1.fuel.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          mobileFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          onRoadGasolineRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          onRoadDieselAltFuelRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          nonRoadVehicleRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          scope1HeatSteamRows.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          emissionData.scope1.refrigerant.reduce((sum, r) => sum + (r.emissions || 0), 0) +
-          Object.values(ipccScope1Totals).reduce((sum, v) => sum + (v || 0), 0),
-    scope2:
-      calculationMode === "lca"
-        ? emissionData.scope3.find((r) => r.category === "lca_scope2")?.emissions || 0
-        : emissionData.scope2.reduce((sum, r) => sum + (r.emissions || 0), 0),
-    scope3:
-      calculationMode === "lca"
-        ? (emissionData.scope3.find((r) => r.category === "lca_upstream")?.emissions || 0) +
-          (emissionData.scope3.find((r) => r.category === "lca_downstream")?.emissions || 0)
-        : emissionData.scope3
-            .filter((r) => !r.category?.startsWith("lca_"))
-            .reduce((sum, r) => sum + (r.emissions || 0), 0),
-    total: 0,
-  };
-  scopeTotals.total = scopeTotals.scope1 + scopeTotals.scope2 + scopeTotals.scope3;
+  const sidebarDisplay = buildEpaSidebarDisplay(reportResults, reportError);
 
   const markScope1ScreeningCalculated = (groupId: Scope1ActivityGroupId) => {
     setScope1Screening((prev) => {
@@ -474,15 +464,32 @@ const EmissionCalculatorEPA = () => {
    */
   const refreshSummaryFromDb = useCallback(
     async (opts?: { seedScope3IfEmpty?: boolean }) => {
-      if (!user?.id || companyContext) return;
+      if (!user?.id || organizationLoading) return;
+      if (!currentOrganization?.id) {
+        setReportResults(null);
+        setReportError("An organization is required before emissions can be shown.");
+        return;
+      }
 
       try {
-        const results = await loadEpaIpccResults(user.id);
+        const results = await loadEpaIpccResults(user.id, {
+          organizationId: currentOrganization.id,
+          counterpartyId: companyContext?.counterpartyId,
+          reportingYear,
+        });
+        setReportResults(results);
+        setReportError(null);
         const electricityTotal = Number(
           (results.scope2.find((r) => r.key === "electricity")?.value ?? 0).toFixed(6)
         );
+        const heatVerified = results.heatSteamVerified;
         const heatTotal = Number(
-          (results.scope2.find((r) => r.key === "heatsteam")?.value ?? 0).toFixed(6)
+          (heatVerified
+            ? heatVerified.status === "unavailable"
+              ? 0
+              : heatVerified.totalKgCo2e
+            : (results.scope2.find((r) => r.key === "heatsteam")?.value ?? 0)
+          ).toFixed(6)
         );
         const refrigerantTotal = Number(
           (results.scope1.find((r) => r.key === "uk_refrigerant")?.value ?? 0).toFixed(6)
@@ -580,17 +587,22 @@ const EmissionCalculatorEPA = () => {
         }));
       } catch (e) {
         console.warn("Failed to refresh EPA summary totals:", e);
+        setReportResults(null);
+        setReportError(
+          e instanceof Error && e.message
+            ? e.message
+            : "EPA totals could not be loaded. This is not a zero inventory."
+        );
       }
     },
-    [user?.id, companyContext]
+    [user?.id, companyContext, organizationLoading, currentOrganization?.id, reportingYear]
   );
 
   // Initial hydrate so Scope cards show saved totals immediately.
   useEffect(() => {
-    if (!user?.id || hasHydratedSummaryRef.current || companyContext) return;
-    hasHydratedSummaryRef.current = true;
+    if (!user?.id || organizationLoading) return;
     void refreshSummaryFromDb({ seedScope3IfEmpty: true });
-  }, [user?.id, companyContext, refreshSummaryFromDb]);
+  }, [user?.id, organizationLoading, refreshSummaryFromDb]);
 
   // Session totals are kilograms and are not a complete company inventory.
   // Do not write them to company_emissions. Stationary activity saves are separate.
@@ -999,61 +1011,15 @@ const EmissionCalculatorEPA = () => {
     saveLCAPreferences(true, "lca");
   };
 
-  const sumScope3ByCategories = (categories: string[]) =>
-    emissionData.scope3
-      .filter((row) => categories.includes(String(row.category || "")))
-      .reduce((sum, row) => sum + (Number(row.emissions) || 0), 0);
-
   const buildPdfReportData = (): EmissionPdfReportData => {
-    const stationary = emissionData.scope1.fuel.reduce((sum, row) => sum + (row.emissions || 0), 0);
-    const mobile =
-      mobileFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      onRoadGasolineRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      onRoadDieselAltFuelRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      nonRoadVehicleRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      (ipccScope1Totals.vehicularCarbonFootprints || 0);
-    const fugitive =
-      (ipccScope1Totals.flaring || 0) +
-      (ipccScope1Totals.venting || 0) +
-      emissionData.scope1.refrigerant.reduce((sum, row) => sum + (row.emissions || 0), 0);
-    const process =
-      scope1HeatSteamRows.reduce((sum, row) => sum + (row.emissions || 0), 0) +
-      (ipccScope1Totals.kitchenFootprints || 0) +
-      (ipccScope1Totals.powerFuelConsumption || 0) +
-      (ipccScope1Totals.heatingFootprints || 0);
-
-    const electricity = emissionData.scope2.find((item: any) => item.id === "electricity-total")?.emissions || 0;
-    const heat = emissionData.scope2.find((item: any) => item.id === "heat-total")?.emissions || 0;
-
-    const travel = sumScope3ByCategories(["business_travel", "businessTravel"]);
-    const commute = sumScope3ByCategories(["employee_commuting", "employeeCommuting"]);
-    const upstream = sumScope3ByCategories([
-      "purchased_goods_services",
-      "capital_goods",
-      "fuel_energy_activities",
-      "upstream_transportation",
-      "upstream_leased_assets",
-    ]);
-    const downstream = sumScope3ByCategories([
-      "investments",
-      "downstream_transportation",
-      "processing_use_of_sold_products",
-      "end_of_life_treatment",
-      "downstream_leased_assets",
-      "franchises",
-    ]);
-    const waste = sumScope3ByCategories(["waste_generated", "wasteGenerated"]);
-
     return {
-      company: companyContext?.counterpartyId || "Organization",
-      period: new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      company: currentOrganization?.name || "Organization",
+      period: String(reportResults?.annualReporting?.reportingYear ?? reportingYear),
       year: String(new Date().getFullYear()),
-      description: "EPA + IPCC greenhouse gas emissions summary report.",
+      description: "EPA greenhouse gas emissions summary. Figures are tCO2e from the reportable inventory.",
       preparedBy: user?.email || "Rethink Carbon User",
       date: new Date().toLocaleDateString(),
-      s1: { stationary, mobile, fugitive, process },
-      s2: { electricity, heat },
-      s3: { upstream, downstream, travel, commute, waste },
+      figures: buildEpaCalculatorPdf(reportResults, reportError),
     };
   };
 
@@ -1150,11 +1116,20 @@ const EmissionCalculatorEPA = () => {
               <div className="p-3 sm:p-3.5 bg-gradient-to-br from-[#1C7A53] to-[#1D9E75] rounded-2xl shadow-lg">
                 <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   EPA
                 </h1>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => void generatePDF()}
+                disabled={isGeneratingPdf}
+                className="rounded-lg border-gray-200 text-gray-700"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                <span className="text-sm font-medium">{isGeneratingPdf ? "Preparing" : "PDF"}</span>
+              </Button>
             </div>
           </div>
 
@@ -1165,13 +1140,11 @@ const EmissionCalculatorEPA = () => {
                 <CardContent className="p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="text-2xl font-extrabold text-red-600">
-                      {scopeTotals.scope1.toLocaleString(undefined, {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })}
+                      {sidebarDisplay.scope1Label}
                     </div>
                     <div className="text-xs font-semibold text-red-700/80 uppercase tracking-wide text-right">
                       Scope 1
+                      <div className="normal-case tracking-normal">{sidebarDisplay.unit}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -1180,13 +1153,11 @@ const EmissionCalculatorEPA = () => {
                 <CardContent className="p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="text-2xl font-extrabold text-yellow-600">
-                      {scopeTotals.scope2.toLocaleString(undefined, {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })}
+                      {sidebarDisplay.scope2Label}
                     </div>
                     <div className="text-xs font-semibold text-yellow-700/80 uppercase tracking-wide text-right">
                       Scope 2
+                      <div className="normal-case tracking-normal">{sidebarDisplay.unit}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -1195,13 +1166,11 @@ const EmissionCalculatorEPA = () => {
                 <CardContent className="p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="text-2xl font-extrabold text-blue-600">
-                      {scopeTotals.scope3.toLocaleString(undefined, {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })}
+                      {sidebarDisplay.scope3Label}
                     </div>
                     <div className="text-xs font-semibold text-blue-700/80 uppercase tracking-wide text-right">
                       Scope 3
+                      <div className="normal-case tracking-normal">{sidebarDisplay.unit}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -1210,18 +1179,31 @@ const EmissionCalculatorEPA = () => {
                 <CardContent className="p-4">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="text-2xl font-extrabold bg-gradient-to-r from-[#1D9E75] to-emerald-600 bg-clip-text text-transparent">
-                      {scopeTotals.total.toLocaleString(undefined, {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })}
+                      {sidebarDisplay.grandLabel}
                     </div>
                     <div className="text-xs font-semibold text-[#0F6E56]/80 uppercase tracking-wide text-right">
                       Total
+                      <div className="normal-case tracking-normal">{sidebarDisplay.unit}</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+            <div className="mb-3">
+              <EpaReportingYearControl
+                year={reportingYear}
+                onChange={(year) => {
+                  writeSelectedReportingYear(year);
+                  setReportingYear(year);
+                }}
+              />
+            </div>
+            <p className="text-xs leading-snug text-gray-500">
+              {sidebarDisplay.statusLabel}
+            </p>
+            <p className="mt-1 text-xs leading-snug text-gray-500">
+              {sidebarDisplay.biogenicLabel}. GWP AR5.
+            </p>
           </div>
 
           {/* Navigation */}
@@ -1639,8 +1621,10 @@ const EmissionCalculatorEPA = () => {
                         onDataChange={handleFuelDataChange}
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
+                        reportingYear={reportingYear}
                         onSaveAndNext={navigateToNextCategory}
                         onInventoryChanged={() => void refreshSummaryFromDb()}
+                        onSaved={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1658,6 +1642,8 @@ const EmissionCalculatorEPA = () => {
                         onDataChange={(kg) =>
                           handleMobileFuelDataChange([{ emissions: kg }])
                         }
+                        counterpartyId={companyContext?.counterpartyId}
+                        reportingYear={reportingYear}
                         onSaveAndNext={navigateToNextCategory}
                         onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
@@ -1677,6 +1663,8 @@ const EmissionCalculatorEPA = () => {
                         onDataChange={handleRefrigerantDataChange}
                         onSaveAndNext={navigateToNextCategory}
                         onInventoryChanged={() => void refreshSummaryFromDb()}
+                        counterpartyId={companyContext?.counterpartyId}
+                        reportingYear={reportingYear}
                       />
                     </CardContent>
                   </Card>
@@ -1704,11 +1692,12 @@ const EmissionCalculatorEPA = () => {
                 <div className="w-full" key={`heat-steam-${resetKey}`}>
                   <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl">
                     <CardContent className="p-4 sm:p-6">
-                      <HeatSteamEPAEmissions
+                      <PurchasedHeatSteam
                         onTotalChange={handleHeatSteamTotalChange}
                         onSaveAndNext={navigateToNextCategory}
-                        companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
+                        reportingYear={reportingYear}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1725,6 +1714,9 @@ const EmissionCalculatorEPA = () => {
                         onSaveAndNext={navigateToNextCategory}
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
+                        authoritativeInventory
+                        reportingYear={reportingYear}
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>
@@ -1743,6 +1735,7 @@ const EmissionCalculatorEPA = () => {
                         onSaveAndNext={navigateToNextCategory}
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
+                        framework="epa"
                       />
                     </CardContent>
                   </Card>

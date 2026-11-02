@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Save, Trash2, ChevronRight, Info } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,691 +13,487 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/api/client";
 import {
-  assignCreatedIdsToNewRows,
-  deleteLegacyTableEntry,
-  insertLegacyTableEntries,
-  listLegacyTableEntries,
-  shouldKeepLocalRowsAfterReload,
-  updateLegacyTableEntry,
-} from "@/integrations/supabase/ghgEntryClient";
-import { USE_JWT_AUTH } from "@/api/config";
-import { resolveEpaRefrigerantEmissionsKg } from "@/api/calcConnection";
+  calcEpaRefrigerantLeakage,
+  createEpaRefrigerantLeakageRecord,
+  updateEpaRefrigerantLeakageRecord,
+  type RefrigerantCalcResponse,
+} from "@/api/calc";
+import { getOrCreateDraftAssessment, listEmissionActivities, type EmissionActivity } from "@/api/ghg";
+import { listLegacyTableEntries } from "@/integrations/supabase/ghgEntryClient";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { activityMatchesReportingYear, matchesVerifiedCounterparty } from "@/features/emission-calculator/results/reportingYear";
+import { refrigerantGasGroups } from "@/features/emission-calculator/scope1/activity-based/refrigerant/refrigerantCatalog";
 import {
-  calculateEpaRefrigerantEmissions,
-  DEFAULT_AC_REFRIGERANT_TYPE,
-  EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS,
-  EPA_REFRIGERANT_GWP,
-  formatEpaRefrigerantLabel,
-  getDefaultEquipmentForUseCase,
-  getDefaultRefrigerantForUseCase,
-  getEquipmentGroupsForUseCase,
-  getGasGroupsForUseCase,
-  getSuggestedLeakageRate,
-  isEquipmentAllowedForUseCase,
-  isGasAllowedForUseCase,
-  resolveUseCaseFromEntry,
-  type EpaRefrigerantCalculationMethod,
-  type EpaRefrigerantEquipmentType,
-  type EpaRefrigerantUseCase,
-} from "@/features/emission-calculator/scope1/constants/epaRefrigerantGwp";
-import {
-  loadGovernedRefrigerantGwp,
-  snapshotGwp,
-} from "@/features/emission-calculator/scope1/activity-based/calc/refrigerantGwpLoader";
-
-export interface EpaRefrigerantRow {
-  id: string;
-  dbId?: string;
-  isExisting?: boolean;
-  useCase: EpaRefrigerantUseCase;
-  method: EpaRefrigerantCalculationMethod;
-  refrigerantType: string;
-  customGwp?: number;
-  leakageKg?: number;
-  chargeKg?: number;
-  leakageRatePercent?: number;
-  equipmentType?: EpaRefrigerantEquipmentType;
-  gwp?: number;
-  emissionsKg?: number;
-  emissionsTonnes?: number;
-}
+  applyCalcFailure,
+  applyCalcSuccess,
+  applySaveFailure,
+  applySaveSuccess,
+  blankRefrigerantEntry,
+  buildRefrigerantCalcBody,
+  buildRefrigerantSaveBody,
+  canCalculate,
+  canSave,
+  changeRefrigerantInputs,
+  claimSave,
+  isEditableRefrigerantActivity,
+  legacyRefrigerantKind,
+  legacyRefrigerantLabel,
+  matchesSelectedCounterparty,
+  refrigerantEntryBlocker,
+  refrigerantInputKey,
+  releaseSave,
+  saveUsesUpdate,
+  stateFromRefrigerantActivity,
+  verifiedTonnesText,
+  type RefrigerantEntryState,
+} from "@/features/emission-calculator/scope1/activity-based/refrigerant/refrigerantEntry";
 
 interface EpaRefrigerantEmissionsProps {
   onDataChange: (rows: Array<{ emissions?: number }>) => void;
   onSaveAndNext?: () => void;
+  onInventoryChanged?: () => void;
+  counterpartyId?: string;
+  reportingYear?: number;
 }
 
-const newRow = (): EpaRefrigerantRow => ({
-  id: crypto.randomUUID(),
-  useCase: "ac_hvac",
-  method: "leakage_record",
-  refrigerantType: DEFAULT_AC_REFRIGERANT_TYPE,
-});
-
-const mapDbRow = (entry: any): EpaRefrigerantRow => {
-  const refrigerantType = entry.refrigerant_type || "";
-  const equipmentType = entry.equipment_type || undefined;
-  return {
-    id: crypto.randomUUID(),
-    dbId: String(entry.id),
-    isExisting: true,
-    useCase: resolveUseCaseFromEntry(refrigerantType, equipmentType),
-    method: (entry.calculation_method as EpaRefrigerantCalculationMethod) || "leakage_record",
-    refrigerantType,
-    customGwp: undefined,
-    leakageKg:
-      entry.leakage_kg != null
-        ? Number(entry.leakage_kg)
-        : entry.calculation_method === "leakage_record"
-          ? Number(entry.quantity)
-          : undefined,
-    chargeKg: entry.charge_kg != null ? Number(entry.charge_kg) : undefined,
-    leakageRatePercent:
-      entry.leakage_rate_percent != null ? Number(entry.leakage_rate_percent) : undefined,
-    equipmentType,
-    gwp: entry.gwp != null ? Number(entry.gwp) : Number(entry.emission_factor),
-    emissionsKg: Number(entry.emissions),
-    emissionsTonnes: Number(entry.emissions) / 1000,
-  };
+type LegacyRow = {
+  id: string;
+  gas: string;
+  kindLabel: string;
+  stored: string;
 };
 
-const computeRow = (
-  row: EpaRefrigerantRow,
-  gwpMap: Record<string, number> = EPA_REFRIGERANT_GWP
-): EpaRefrigerantRow => {
-  const snap = snapshotGwp(gwpMap, row.refrigerantType, row.customGwp);
-  if (!snap) return { ...row, gwp: undefined, emissionsKg: undefined, emissionsTonnes: undefined };
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return err.message || fallback;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
 
-  const result = calculateEpaRefrigerantEmissions({
-    method: row.method,
-    gwp: snap.gwp,
-    leakageKg: row.leakageKg,
-    chargeKg: row.chargeKg,
-    leakageRatePercent: row.leakageRatePercent,
-  });
-
-  if (!result) {
-    return { ...row, gwp: snap.gwp, emissionsKg: undefined, emissionsTonnes: undefined };
-  }
-
-  return {
-    ...row,
-    gwp: snap.gwp,
-    leakageKg: result.leakageKg,
-    emissionsKg: result.emissionsKg,
-    emissionsTonnes: result.emissionsTonnes,
-  };
-};
+function methodLabel(method: string): string {
+  return method === "estimated_leakage" ? "Estimated leakage" : "Measured leakage";
+}
 
 const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
   onDataChange,
   onSaveAndNext,
+  onInventoryChanged,
+  counterpartyId,
+  reportingYear,
 }) => {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [rows, setRows] = useState<EpaRefrigerantRow[]>([]);
+  const { currentOrganization } = useOrganization();
+  const organizationId = currentOrganization?.id || null;
+  const onDataChangeRef = useRef(onDataChange);
+  onDataChangeRef.current = onDataChange;
+  const saveLock = useRef(false);
+  const [entry, setEntry] = useState<RefrigerantEntryState>(blankRefrigerantEntry);
+  const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
+  const [site, setSite] = useState("");
+  const [equipmentId, setEquipmentId] = useState("");
+  const [records, setRecords] = useState<EmissionActivity[]>([]);
+  const [legacyRows, setLegacyRows] = useState<LegacyRow[]>([]);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [calculating, setCalculating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-  const [gwpMap, setGwpMap] = useState<Record<string, number>>(EPA_REFRIGERANT_GWP);
+
+  const blocker = refrigerantEntryBlocker(entry, period);
+  const result = canSave(entry, period) ? entry.result : null;
+  const tonnes = verifiedTonnesText(result);
 
   useEffect(() => {
-    let cancelled = false;
-    loadGovernedRefrigerantGwp().then((src) => {
-      if (!cancelled) setGwpMap(src.map);
+    if (!reportingYear) return;
+    setPeriod((current) => {
+      const month = /^(0[1-9]|1[0-2])$/.test(current.slice(5, 7)) ? current.slice(5, 7) : "01";
+      return `${reportingYear}-${month}`;
     });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [reportingYear]);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const data = await listLegacyTableEntries("scope1_refrigerant_entries", {
-          user_id: user.id,
-          emission_framework: "epa",
-          order: { column: "created_at", ascending: false },
-        });
-
-        const mapped = (data || []).map(mapDbRow);
-        setRows(mapped);
-        onDataChange(mapped.map((r) => ({ emissions: r.emissionsKg })));
-      } catch (e: any) {
-        console.error(e);
-        toast({
-          title: "Error",
-          description: e?.message || "Failed to load refrigerant entries",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
-  }, [user?.id]);
-
-  const updateRow = (id: string, patch: Partial<EpaRefrigerantRow>) => {
-    let snapshot: EpaRefrigerantRow | null = null;
-    setRows((prev) => {
-      const next = prev.map((r) => {
-        if (r.id !== id) return r;
-        const computed = computeRow({ ...r, ...patch }, gwpMap);
-        snapshot = computed;
-        return computed;
-      });
-      onDataChange(next.map((r) => ({ emissions: r.emissionsKg })));
-      return next;
-    });
-
-    if (USE_JWT_AUTH && snapshot && snapshot.gwp != null && snapshot.emissionsKg != null) {
-      const snap = snapshot;
-      void (async () => {
-        const kg = await resolveEpaRefrigerantEmissionsKg({
-          method: snap.method,
-          gwp: snap.gwp!,
-          leakage_kg: snap.leakageKg,
-          charge_kg: snap.chargeKg,
-          leakage_rate_percent: snap.leakageRatePercent,
-        });
-        setRows((prev) => {
-          const next = prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.method !== snap.method || r.gwp !== snap.gwp) return r;
-            if (r.leakageKg !== snap.leakageKg || r.chargeKg !== snap.chargeKg) return r;
-            if (r.leakageRatePercent !== snap.leakageRatePercent) return r;
-            if (r.emissionsKg === kg) return r;
-            return {
-              ...r,
-              emissionsKg: kg,
-              emissionsTonnes: kg / 1000,
-            };
-          });
-          onDataChange(next.map((r) => ({ emissions: r.emissionsKg })));
-          return next;
-        });
-      })();
-    }
-  };
-
-  const addRow = () => setRows((prev) => [...prev, computeRow(newRow(), gwpMap)]);
-
-  const removeRow = (id: string) => {
-    setRows((prev) => {
-      const next = prev.filter((r) => r.id !== id);
-      onDataChange(next.map((r) => ({ emissions: r.emissionsKg })));
-      return next;
-    });
-  };
-
-  const deleteExistingRow = async (id: string) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row?.dbId) return;
-    if (!confirm("Delete this refrigerant entry?")) return;
-
-    setDeletingIds((prev) => new Set(prev).add(id));
-    try {
-      await deleteLegacyTableEntry("scope1_refrigerant_entries", row.dbId);
-
-      removeRow(id);
-      toast({ title: "Deleted", description: "Refrigerant entry removed." });
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Failed to delete entry", variant: "destructive" });
-    } finally {
-      setDeletingIds((prev) => {
-        const s = new Set(prev);
-        s.delete(id);
-        return s;
-      });
-    }
-  };
-
-  const pendingNew = rows.filter((r) => !r.isExisting && r.emissionsKg != null);
-
-  const saveEntries = async () => {
-    if (!user) {
-      toast({ title: "Sign in required", description: "Please log in to save.", variant: "destructive" });
-      return;
-    }
-
-    const toSave = rows.filter((r) => !r.isExisting && r.emissionsKg != null && r.gwp != null && r.refrigerantType);
-    if (toSave.length === 0) {
-      toast({ title: "Nothing to save", description: "Add a complete refrigerant entry first." });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = toSave.map((r) => ({
-        user_id: user.id,
-        emission_framework: "epa",
-        refrigerant_type: r.refrigerantType,
-        emission_factor: r.gwp!,
-        quantity: r.leakageKg!,
-        emissions: r.emissionsKg!,
-        calculation_method: r.method,
-        charge_kg: r.method === "estimated_leakage" ? r.chargeKg ?? null : null,
-        leakage_rate_percent: r.method === "estimated_leakage" ? r.leakageRatePercent ?? null : null,
-        leakage_kg: r.leakageKg ?? null,
-        gwp: r.gwp ?? null,
-        equipment_type: r.equipmentType ?? null,
-      }));
-
-      const created = await insertLegacyTableEntries("scope1_refrigerant_entries", payload);
-
-      const reloaded = await listLegacyTableEntries("scope1_refrigerant_entries", {
-        user_id: user.id,
-        emission_framework: "epa",
+  const loadRecords = () => {
+    setRecordsError(null);
+    Promise.all([
+      listEmissionActivities({
+        scope: 1,
+        category: "refrigerant_leakage",
+        legacy_source: "epa_refrigerant_v1",
+      }),
+      listLegacyTableEntries("scope1_refrigerant_entries", {
         order: { column: "created_at", ascending: false },
+      }),
+    ])
+      .then(([activities, legacy]) => {
+        setRecords(
+          (activities || []).filter((row) => {
+            const meta = (row.raw?.activity_meta || {}) as Record<string, unknown>;
+            return (
+              activityMatchesReportingYear(meta.period, reportingYear) &&
+              isEditableRefrigerantActivity(row, organizationId) &&
+              matchesVerifiedCounterparty(row.counterparty_id, counterpartyId)
+            );
+          })
+        );
+        setLegacyRows(
+          (legacy || []).flatMap((row) => {
+            const counterparty =
+              row.counterparty_id == null || row.counterparty_id === ""
+                ? null
+                : String(row.counterparty_id);
+            if (!matchesSelectedCounterparty({ counterparty_id: counterparty }, counterpartyId)) return [];
+            const kind = legacyRefrigerantKind(row);
+            if (!kind) return [];
+            const gas = String(row.refrigerant_type || "Unnamed refrigerant");
+            const stored = row.emissions == null ? "No stored total" : `${row.emissions} kg CO2e in the legacy table`;
+            return [{ id: String(row.id), gas, kindLabel: legacyRefrigerantLabel(kind), stored }];
+          })
+        );
+      })
+      .catch((err) => {
+        setRecords([]);
+        setLegacyRows([]);
+        setRecordsError(errorMessage(err, "Saved refrigerant entries could not be loaded."));
       });
+  };
 
-      if (shouldKeepLocalRowsAfterReload((reloaded || []).length, created.length > 0)) {
-        const kept = assignCreatedIdsToNewRows(rows, created, toSave);
-        setRows(kept);
-        onDataChange(kept.map((r) => ({ emissions: r.emissionsKg })));
-      } else {
-        const mapped = (reloaded || []).map(mapDbRow);
-        setRows(mapped);
-        onDataChange(mapped.map((r) => ({ emissions: r.emissionsKg })));
-      }
-      toast({ title: "Saved", description: `Saved ${toSave.length} refrigerant entr${toSave.length === 1 ? "y" : "ies"}.` });
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Failed to save", variant: "destructive" });
+  useEffect(() => {
+    loadRecords();
+  }, [organizationId, counterpartyId, reportingYear]);
+
+  useEffect(() => {
+    const kg = tonnes && result?.emissions_kg_co2e ? Number(result.emissions_kg_co2e) : null;
+    onDataChangeRef.current?.(kg != null && Number.isFinite(kg) ? [{ emissions: kg }] : []);
+  }, [tonnes, result]);
+
+  const update = (patch: Parameters<typeof changeRefrigerantInputs>[1]) => {
+    setEntry((current) => changeRefrigerantInputs(current, patch));
+  };
+
+  const calculate = async () => {
+    if (!canCalculate(entry, period)) return;
+    const snapshot = entry;
+    const snapshotKey = refrigerantInputKey(snapshot);
+    setCalculating(true);
+    setEntry((current) => ({ ...current, error: null, result: null, verifiedKey: null }));
+    try {
+      const calculated = await calcEpaRefrigerantLeakage(buildRefrigerantCalcBody(snapshot));
+      setEntry((current) => {
+        if (refrigerantInputKey(current) !== snapshotKey) return current;
+        return calculated.success
+          ? applyCalcSuccess(current, calculated)
+          : applyCalcFailure(current, calculated.error || "The calculation did not succeed.");
+      });
+    } catch (err) {
+      const message = errorMessage(err, "The calculation service is unavailable. Nothing was calculated in the browser.");
+      setEntry((current) => {
+        if (refrigerantInputKey(current) !== snapshotKey) return current;
+        return applyCalcFailure(current, message);
+      });
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const save = async () => {
+    if (!claimSave(saveLock)) return;
+    if (!canSave(entry, period)) {
+      releaseSave(saveLock);
+      return;
+    }
+    setSaving(true);
+    const updating = saveUsesUpdate(entry);
+    try {
+      const assessment = await getOrCreateDraftAssessment("epa", period);
+      const body = buildRefrigerantSaveBody({
+        state: entry,
+        assessmentId: assessment.id,
+        period,
+        equipmentId,
+        site,
+        counterpartyId,
+      });
+      const saved = updating && entry.activityId
+        ? await updateEpaRefrigerantLeakageRecord(entry.activityId, body)
+        : await createEpaRefrigerantLeakageRecord(body);
+      setEntry((current) => applySaveSuccess(current, saved));
+      toast({
+        title: updating ? "Updated" : "Saved",
+        description: `${saved.calculation.refrigerant}: ${saved.emissions_tco2e} tCO2e`,
+      });
+      loadRecords();
+      onInventoryChanged?.();
+    } catch (err) {
+      const message = errorMessage(err, "The refrigerant entry was not saved.");
+      setEntry((current) => applySaveFailure(current, message));
+      toast({ title: "Not saved", description: message, variant: "destructive" });
     } finally {
       setSaving(false);
+      releaseSave(saveLock);
     }
   };
 
-  const totalKg = useMemo(
-    () => rows.reduce((sum, r) => sum + (r.emissionsKg || 0), 0),
-    [rows]
-  );
+  const alignPeriod = (value: string) => {
+    if (!reportingYear) return value;
+    const month = /^(0[1-9]|1[0-2])$/.test(value.slice(5, 7)) ? value.slice(5, 7) : "01";
+    return `${reportingYear}-${month}`;
+  };
 
-  const showEstimateGuidance = useMemo(
-    () => rows.some((r) => r.method === "estimated_leakage"),
-    [rows]
-  );
-
-  const estimateGuidanceGroups = useMemo(() => {
-    const hasAcEstimate = rows.some((r) => r.method === "estimated_leakage" && r.useCase === "ac_hvac");
-    const hasOtherEstimate = rows.some((r) => r.method === "estimated_leakage" && r.useCase === "other");
-    if (hasAcEstimate && !hasOtherEstimate) return getEquipmentGroupsForUseCase("ac_hvac");
-    if (hasOtherEstimate && !hasAcEstimate) return getEquipmentGroupsForUseCase("other");
-    return [
-      ...getEquipmentGroupsForUseCase("ac_hvac"),
-      ...getEquipmentGroupsForUseCase("other"),
-    ];
-  }, [rows]);
-
-  if (loading) {
-    return <div className="text-sm text-gray-600">Loading refrigerant entries…</div>;
-  }
+  const editRecord = (row: EmissionActivity) => {
+    const loaded = stateFromRefrigerantActivity(row);
+    setEntry(loaded.entry);
+    setSite(loaded.context.site);
+    setEquipmentId(loaded.context.equipmentId);
+    if (loaded.context.period) setPeriod(alignPeriod(loaded.context.period));
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-gray-500">
-          Start with AC / HVAC for a short gas list, or Other systems for cold rooms and vehicles.
-        </p>
-        <Button
-          onClick={addRow}
-          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white rounded-xl shrink-0"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add entry
-        </Button>
-      </div>
+      <p className="text-sm text-gray-500">
+        Enter a measured leak or an estimate. The warming factor and tonnes are calculated by the server.
+      </p>
 
-      {showEstimateGuidance && (
-        <Card className="border-amber-100 bg-amber-50/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-900">
-              <Info className="h-4 w-4" />
-              Typical annual leakage rate assumptions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <p className="text-xs text-amber-800">
-              Use these rates only when you estimate leakage (no measured leak record). Selecting an
-              equipment type fills a suggested rate you can still edit.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="border-b border-amber-200/80">
-                    <th className="py-2 pr-4 font-medium text-amber-950">Category</th>
-                    <th className="py-2 pr-4 font-medium text-amber-950">Equipment type</th>
-                    <th className="py-2 font-medium text-amber-950">Typical annual leakage rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {estimateGuidanceGroups.map((group) =>
-                    group.options.map((row, idx) => (
-                      <tr key={row.id} className="border-b border-amber-100 last:border-0">
-                        <td className="py-2 pr-4 text-amber-900 align-top">
-                          {idx === 0 ? group.label : ""}
-                        </td>
-                        <td className="py-2 pr-4 text-amber-900">{row.label}</td>
-                        <td className="py-2 text-amber-800">{row.rateRange}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {rows.length === 0 ? (
-        <p className="text-sm text-gray-500">No refrigerant entries yet. Click Add entry to begin.</p>
-      ) : (
-        <div className="space-y-4">
-          {rows.map((row) => {
-            const gwp =
-              row.gwp ?? snapshotGwp(gwpMap, row.refrigerantType, row.customGwp)?.gwp;
-            const isDeleting = deletingIds.has(row.id);
-
-            return (
-              <Card key={row.id} className="border-gray-200">
-                <CardContent className="p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-3 flex-1 min-w-0">
-                      <div>
-                        <Label className="text-gray-600 mb-2 block">Leak source category</Label>
-                        <RadioGroup
-                          value={row.useCase}
-                          onValueChange={(v) => {
-                            const useCase = v as EpaRefrigerantUseCase;
-                            const nextGas = isGasAllowedForUseCase(row.refrigerantType, useCase)
-                              ? row.refrigerantType
-                              : getDefaultRefrigerantForUseCase(useCase);
-                            const keepEquipment = isEquipmentAllowedForUseCase(row.equipmentType, useCase);
-                            updateRow(row.id, {
-                              useCase,
-                              refrigerantType: nextGas,
-                              customGwp: undefined,
-                              equipmentType: keepEquipment ? row.equipmentType : undefined,
-                              leakageRatePercent: keepEquipment ? row.leakageRatePercent : undefined,
-                            });
-                          }}
-                          className="flex flex-col sm:flex-row gap-3"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="ac_hvac" id={`${row.id}-use-ac`} />
-                            <Label htmlFor={`${row.id}-use-ac`} className="font-normal cursor-pointer">
-                              AC / HVAC only
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="other" id={`${row.id}-use-other`} />
-                            <Label htmlFor={`${row.id}-use-other`} className="font-normal cursor-pointer">
-                              Other systems (cold rooms, vehicles, industrial, F-gases)
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-
-                      <RadioGroup
-                        value={row.method}
-                        onValueChange={(v) => {
-                          const method = v as EpaRefrigerantCalculationMethod;
-                          if (method === "estimated_leakage") {
-                            const equipmentType =
-                              row.equipmentType &&
-                              isEquipmentAllowedForUseCase(row.equipmentType, row.useCase)
-                                ? row.equipmentType
-                                : getDefaultEquipmentForUseCase(row.useCase);
-                            updateRow(row.id, {
-                              method,
-                              leakageKg: undefined,
-                              chargeKg: row.chargeKg,
-                              equipmentType,
-                              leakageRatePercent:
-                                row.leakageRatePercent ?? getSuggestedLeakageRate(equipmentType),
-                            });
-                            return;
-                          }
-                          updateRow(row.id, {
-                            method,
-                            leakageKg: undefined,
-                            chargeKg: undefined,
-                            leakageRatePercent: undefined,
-                          });
-                        }}
-                        className="flex flex-col sm:flex-row gap-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="leakage_record" id={`${row.id}-leakage-record`} />
-                          <Label htmlFor={`${row.id}-leakage-record`} className="font-normal cursor-pointer">
-                            I know how much gas leaked
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="estimated_leakage" id={`${row.id}-estimated`} />
-                          <Label htmlFor={`${row.id}-estimated`} className="font-normal cursor-pointer">
-                            I do not have leakage records (estimate leakage)
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    {row.isExisting ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 shrink-0"
-                        disabled={isDeleting}
-                        onClick={() => deleteExistingRow(row.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-600 shrink-0"
-                        onClick={() => removeRow(row.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label className="text-gray-600">
-                        {row.useCase === "ac_hvac" ? "What kind of AC gas?" : "What kind of gas leaked?"}
-                      </Label>
-                      <Select
-                        value={row.refrigerantType}
-                        onValueChange={(v) => updateRow(row.id, { refrigerantType: v, customGwp: undefined })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              row.useCase === "ac_hvac"
-                                ? "Choose common AC gas"
-                                : "Choose refrigeration or other gas"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getGasGroupsForUseCase(row.useCase).map((group) => (
-                            <SelectGroup key={group.id}>
-                              <SelectLabel>{group.label}</SelectLabel>
-                              {group.options.map((t) => (
-                                <SelectItem key={t} value={t}>
-                                  {formatEpaRefrigerantLabel(t)}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-gray-600">GWP value (optional)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        placeholder={gwp != null ? String(gwp) : "Auto-filled from refrigerant type"}
-                        value={row.customGwp ?? ""}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          updateRow(row.id, {
-                            customGwp: raw === "" ? undefined : Number(raw),
-                          });
-                        }}
-                      />
-                    </div>
-
-                    {row.method === "leakage_record" ? (
-                      <div>
-                        <Label className="text-gray-600">Leaked gas amount (kg)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.leakageKg ?? ""}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            updateRow(row.id, { leakageKg: raw === "" ? undefined : Number(raw) });
-                          }}
-                          placeholder="e.g. 5"
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <div>
-                          <Label className="text-gray-600">Equipment type (optional guidance)</Label>
-                          <Select
-                            value={row.equipmentType ?? ""}
-                            onValueChange={(v) => {
-                              const equipment = EPA_EQUIPMENT_LEAKAGE_ASSUMPTIONS.find((e) => e.id === v);
-                              updateRow(row.id, {
-                                equipmentType: v as EpaRefrigerantEquipmentType,
-                                leakageRatePercent: equipment?.suggestedRatePercent,
-                              });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={
-                                  row.useCase === "ac_hvac"
-                                    ? "Split AC, packaged AC, or chiller"
-                                    : "Cold room, vehicle, industrial, or other"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getEquipmentGroupsForUseCase(row.useCase).map((group) => (
-                                <SelectGroup key={group.group}>
-                                  <SelectLabel>{group.label}</SelectLabel>
-                                  {group.options.map((e) => (
-                                    <SelectItem key={e.id} value={e.id}>
-                                      {e.label} ({e.rateRange})
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-gray-600">Total refrigerant charge in equipment (kg)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={row.chargeKg ?? ""}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              updateRow(row.id, { chargeKg: raw === "" ? undefined : Number(raw) });
-                            }}
-                            placeholder="e.g. 20"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-gray-600">Expected annual leakage rate (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={row.leakageRatePercent ?? ""}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              updateRow(row.id, {
-                                leakageRatePercent: raw === "" ? undefined : Number(raw),
-                              });
-                            }}
-                            placeholder="e.g. 10"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {gwp != null && row.leakageKg != null && row.emissionsKg != null && (
-                    <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1]/60 px-4 py-3 text-sm text-[#0A4D3E] space-y-1">
-                      <p className="font-medium">How this was calculated</p>
-                      {row.method === "estimated_leakage" && row.chargeKg != null && row.leakageRatePercent != null && (
-                        <p>
-                          Estimated leakage: {row.chargeKg} × {row.leakageRatePercent}% = {row.leakageKg} kg
-                        </p>
-                      )}
-                      <p>
-                        {row.leakageKg} × {gwp.toLocaleString()} = {row.emissionsKg.toLocaleString()} kg CO₂e
-                      </p>
-                      <p>
-                        {row.emissionsKg.toLocaleString()} / 1000 = {row.emissionsTonnes?.toFixed(3)} tCO₂e
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t">
-        <div className="text-gray-700 font-medium">
-          Total refrigerant emissions:{" "}
-          <span className="font-semibold">
-            {totalKg.toLocaleString(undefined, { maximumFractionDigits: 3 })} kg CO₂e
-            {totalKg > 0 && ` (${(totalKg / 1000).toFixed(3)} tCO₂e)`}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={saveEntries}
-            disabled={saving || pendingNew.length === 0}
-            className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
+      <Card className="border-gray-200">
+        <CardContent className="p-5 space-y-4">
+          <RadioGroup
+            value={entry.method}
+            onValueChange={(value) => update({ method: value === "estimated_leakage" ? "estimated_leakage" : "leakage_record" })}
+            className="flex flex-col sm:flex-row gap-4"
           >
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Saving…" : `Save (${pendingNew.length})`}
-          </Button>
-          {onSaveAndNext && (
-            <Button variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75]">
-              Next <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="leakage_record" id="refrigerant-measured" />
+              <Label htmlFor="refrigerant-measured" className="font-normal cursor-pointer">
+                I know how much gas leaked
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="estimated_leakage" id="refrigerant-estimated" />
+              <Label htmlFor="refrigerant-estimated" className="font-normal cursor-pointer">
+                I do not have a measured leak
+              </Label>
+            </div>
+          </RadioGroup>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <Label className="text-gray-600">Refrigerant</Label>
+              <Select value={entry.gas || undefined} onValueChange={(gas) => update({ gas })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a supported refrigerant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {refrigerantGasGroups().map((group) => (
+                    <SelectGroup key={group.id}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.options.map((gas) => (
+                        <SelectItem key={gas} value={gas}>
+                          {gas}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {entry.method === "leakage_record" ? (
+              <div>
+                <Label className="text-gray-600">Measured leaked gas (kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={entry.leakageKg}
+                  onChange={(event) => update({ leakageKg: event.target.value })}
+                  placeholder="e.g. 2"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-gray-600">Equipment charge (kg)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={entry.chargeKg}
+                    onChange={(event) => update({ chargeKg: event.target.value })}
+                    placeholder="e.g. 10"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-600">Your assumed annual leakage rate (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="any"
+                    value={entry.leakageRatePercent}
+                    onChange={(event) => update({ leakageRatePercent: event.target.value })}
+                    placeholder="Enter a rate. A blank is not zero."
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    This rate is your assumption. It is not an EPA-published default, and equipment type does not fill it in.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <div>
+              <Label className="text-gray-600">Equipment type (optional)</Label>
+              <Input
+                value={entry.equipmentType}
+                onChange={(event) => update({ equipmentType: event.target.value })}
+                placeholder="Description only"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-600">Reporting month</Label>
+              <Input type="month" required value={period} onChange={(event) => setPeriod(alignPeriod(event.target.value))} />
+            </div>
+            <div>
+              <Label className="text-gray-600">Equipment ID (optional)</Label>
+              <Input value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)} />
+            </div>
+            <div>
+              <Label className="text-gray-600">Site (optional)</Label>
+              <Input value={site} onChange={(event) => setSite(event.target.value)} />
+            </div>
+          </div>
+
+          {blocker && !entry.error && <p className="text-sm text-gray-600">{blocker}</p>}
+          {entry.error && (
+            <p className="text-sm text-red-700" role="alert">
+              {entry.error}
+            </p>
           )}
-        </div>
+
+          {result && tonnes && <ResultPanel result={result} period={period} site={site} equipmentId={equipmentId} tonnes={tonnes} />}
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void calculate()}
+          disabled={!canCalculate(entry, period) || calculating || saving}
+          className="border-[#1D9E75] text-[#1D9E75]"
+        >
+          {calculating ? "Calculating…" : "Calculate"}
+        </Button>
+        <Button
+          type="button"
+          onClick={() => void save()}
+          disabled={!canSave(entry, period) || saving || calculating}
+          className="bg-[#1D9E75] hover:bg-[#22B87E] text-white"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          {saving ? "Saving…" : saveUsesUpdate(entry) ? "Update" : "Save"}
+        </Button>
+        {onSaveAndNext && (
+          <Button type="button" variant="outline" onClick={onSaveAndNext} className="border-[#1D9E75] text-[#1D9E75]">
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        )}
       </div>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-800">Verified refrigerant leakage</h3>
+        {recordsError && <p className="text-sm text-red-700">{recordsError}</p>}
+        {records.length === 0 ? (
+          <p className="text-sm text-gray-500">No verified entries for this organization and company yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {records.map((row) => {
+              const inputs = (row.raw?.inputs || {}) as Record<string, unknown>;
+              const meta = (row.raw?.activity_meta || {}) as Record<string, unknown>;
+              return (
+                <li key={row.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2">
+                  <div className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">{String(inputs.refrigerant || "Refrigerant")}</span>
+                    {" · "}
+                    {methodLabel(String(inputs.method || ""))}
+                    {" · "}
+                    {String(meta.period || "No month")}
+                    {" · "}
+                    {row.emissions_tco2e ?? "—"} tCO2e
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => editRecord(row)}>
+                    Edit
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-800">Legacy refrigerant records</h3>
+        <p className="text-xs text-gray-500">
+          These older rows stay as they were. They are not edited here and are not verified tonnes.
+        </p>
+        {legacyRows.length === 0 ? (
+          <p className="text-sm text-gray-500">No legacy EPA or UK-EPA refrigerant rows.</p>
+        ) : (
+          <ul className="space-y-2">
+            {legacyRows.map((row) => (
+              <li key={row.id} className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2 text-sm text-amber-950">
+                <p className="font-medium">{row.kindLabel}</p>
+                <p>
+                  {row.gas} · {row.stored}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 };
+
+function ResultPanel({
+  result,
+  period,
+  site,
+  equipmentId,
+  tonnes,
+}: {
+  result: RefrigerantCalcResponse;
+  period: string;
+  site: string;
+  equipmentId: string;
+  tonnes: string;
+}) {
+  return (
+    <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1]/60 px-4 py-3 text-sm text-[#0A4D3E] space-y-1">
+      <p className="font-medium">Server calculation</p>
+      <p>
+        {result.refrigerant} · {methodLabel(result.method)}
+      </p>
+      <p>Leaked refrigerant: {result.leakage_kg} kg</p>
+      {result.method === "estimated_leakage" && (
+        <p>
+          Charge {result.charge_kg} kg × {result.leakage_rate_percent}% user assumption. This rate is not an EPA factor.
+        </p>
+      )}
+      <p>GWP {result.gwp}</p>
+      {result.gwp_publication && <p>{result.gwp_publication}</p>}
+      {result.gwp_edition && <p>{result.gwp_edition}</p>}
+      {result.factor_provenance && <p>{result.factor_provenance}</p>}
+      {result.table11_reference && <p>{result.table11_reference}</p>}
+      <p>
+        {result.emissions_kg_co2e} kg CO2e = {tonnes} tCO2e
+      </p>
+      <p>Reporting month: {period}</p>
+      {(result.equipment_type || equipmentId || site) && (
+        <p>
+          {[result.equipment_type, equipmentId, site].filter(Boolean).join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default EpaRefrigerantEmissions;

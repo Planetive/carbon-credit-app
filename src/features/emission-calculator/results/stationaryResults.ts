@@ -5,6 +5,7 @@
 
 import type { EmissionActivity, EmissionAssessment } from "@/api/ghg";
 import { listEmissionActivities, listEmissionAssessments } from "@/api/ghg";
+import { reportingYearFromPeriod } from "./reportingYear";
 
 export const KG_PER_TONNE = 1000;
 const TONNE_SCALE = 100_000_000;
@@ -33,6 +34,11 @@ export type StationaryResultActivity = {
   n2o: StationaryGasView;
   totalKgCo2e: string;
   totalTco2e: string;
+  /** Tonnes of CO2 reported outside Scope 1. Absent when the saved record has no accounting block. */
+  biogenicCo2Tonnes?: string | null;
+  accountingTreatment?: string;
+  accountingVersion?: string;
+  methodology?: string;
   gwpVersion: string;
   factorSource: string;
   factorVersion: string;
@@ -43,16 +49,36 @@ export type StationaryVerifiedResults = {
   error: string | null;
   totalTco2e: number;
   totalKgCo2e: number;
+  /** Sum of recorded biogenic CO2. Null when the loaded records do not state it. Not part of totalTco2e. */
+  biogenicCo2Tonnes?: number | null;
+  biogenicStatus?: "recorded" | "partial" | "not_recorded";
   activities: StationaryResultActivity[];
+  /** Stored records with no YYYY or YYYY-MM period. They are not in the annual total. */
+  unassignedCount?: number;
+  unassignedTco2e?: number;
+  /** Stored records whose period year is not the selected reporting year. */
+  otherYearCount?: number;
+  /** Rows that failed the accounting, gas, or factor checks. They are not in the total. */
+  rejectedCount?: number;
 };
 
 export type StationaryReadContext = {
   organizationId?: string | null;
   counterpartyId?: string | null;
+  reportingYear?: number | null;
 };
 
 export function emptyStationaryVerified(): StationaryVerifiedResults {
-  return { status: "empty", error: null, totalTco2e: 0, totalKgCo2e: 0, activities: [] };
+  return {
+    status: "empty",
+    error: null,
+    totalTco2e: 0,
+    totalKgCo2e: 0,
+    biogenicCo2Tonnes: 0,
+    biogenicStatus: "recorded",
+    activities: [],
+    rejectedCount: 0,
+  };
 }
 
 export function tonnesToKg(tonnes: number): number {
@@ -133,15 +159,55 @@ export function isEpaStationaryActivity(activity: Pick<EmissionActivity, "legacy
   );
 }
 
+export const STATIONARY_ACCOUNTING_VERSION = "epa_stationary_biogenic_v1";
+/**
+ * Complete stationary records saved before the biogenic accounting label.
+ * Kept only when the gas, AR5, factor, and tonne checks also pass.
+ * A stored tonne total with no gas breakdown is not this record.
+ */
+export const STATIONARY_PRIOR_ACCOUNTING_VERSION = "epa_stationary_v1";
+
+function finiteText(value: string): boolean {
+  if (!value) return false;
+  return Number.isFinite(Number(value));
+}
+
+function gwpIs(value: string, expected: number): boolean {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed === expected;
+}
+
+function stationaryProvenanceOk(raw: Record<string, unknown>, columnScaled: number): boolean {
+  const accounting = asRecord(raw.accounting);
+  const meta = asRecord(raw.activity_meta);
+  const version = text(accounting.version) || text(meta.method_version);
+  if (version !== STATIONARY_ACCOUNTING_VERSION && version !== STATIONARY_PRIOR_ACCOUNTING_VERSION) return false;
+  const gases = [
+    [gasView(raw, "co2"), 1],
+    [gasView(raw, "ch4"), 28],
+    [gasView(raw, "n2o"), 265],
+  ] as const;
+  if (!gases.every(([gas, gwp]) => finiteText(gas.massKg) && finiteText(gas.co2eKg) && gwpIs(gas.gwp, gwp))) {
+    return false;
+  }
+  const source = asRecord(raw.factor_source);
+  if (!text(source.publisher) || !(text(source.dataset_title) || text(source.dataset_code))) return false;
+  if (text(source.gwp_version).toUpperCase() !== "AR5") return false;
+  return tonnesToScaled(raw.total_t_co2e) === columnScaled;
+}
+
 export function toStationaryResultActivity(activity: EmissionActivity): StationaryResultActivity | null {
   const scaled = tonnesToScaled(activity.emissions_tco2e);
   if (scaled == null) return null;
   const raw = asRecord(activity.raw);
+  if (!stationaryProvenanceOk(raw, scaled)) return null;
   const inputs = asRecord(raw.inputs);
   const meta = asRecord(raw.activity_meta);
   const source = factorSourceLabel(raw);
   const tonnes = scaledTonnesToNumber(scaled);
   const storedKg = text(raw.total_kg_co2e);
+  const accounting = asRecord(raw.accounting);
+  const biogenicText = text(accounting.biogenic_co2_t);
   return {
     id: activity.id,
     assessmentId: activity.assessment_id,
@@ -160,6 +226,10 @@ export function toStationaryResultActivity(activity: EmissionActivity): Stationa
     n2o: gasView(raw, "n2o"),
     totalKgCo2e: storedKg || String(scaledTonnesToKg(scaled)),
     totalTco2e: typeof activity.emissions_tco2e === "string" ? activity.emissions_tco2e.trim() : String(tonnes),
+    biogenicCo2Tonnes: biogenicText || null,
+    accountingTreatment: text(accounting.treatment),
+    accountingVersion: text(accounting.version),
+    methodology: text(accounting.methodology),
     gwpVersion: source.gwpVersion,
     factorSource: source.label,
     factorVersion: source.factorVersion,
@@ -176,35 +246,78 @@ export function selectEpaAssessmentIds(
     .map((assessment) => assessment.id);
 }
 
-export function selectStationaryActivities(
+export type StationaryYearPartition = {
+  included: StationaryResultActivity[];
+  unassigned: StationaryResultActivity[];
+  otherYear: StationaryResultActivity[];
+  rejectedCount: number;
+};
+
+export function partitionStationaryActivities(
   activities: EmissionActivity[],
   context: StationaryReadContext & { epaAssessmentIds: string[] }
-): StationaryResultActivity[] {
+): StationaryYearPartition {
   const allowedAssessments = new Set(context.epaAssessmentIds);
   const seen = new Set<string>();
-  const selected: StationaryResultActivity[] = [];
+  const included: StationaryResultActivity[] = [];
+  const unassigned: StationaryResultActivity[] = [];
+  const otherYear: StationaryResultActivity[] = [];
+  let rejectedCount = 0;
   for (const activity of activities) {
     if (!isEpaStationaryActivity(activity)) continue;
-    if (context.organizationId && activity.organization_id !== context.organizationId) continue;
+    if (!context.organizationId || activity.organization_id !== context.organizationId) continue;
     if (!allowedAssessments.has(activity.assessment_id)) continue;
     if (context.counterpartyId && activity.counterparty_id !== context.counterpartyId) continue;
     if (seen.has(activity.id)) continue;
     const view = toStationaryResultActivity(activity);
-    if (!view) continue;
+    if (!view) {
+      rejectedCount += 1;
+      continue;
+    }
     seen.add(activity.id);
-    selected.push(view);
+    const year = reportingYearFromPeriod(view.period);
+    if (context.reportingYear == null || year == null) {
+      if (year == null) unassigned.push(view);
+      else otherYear.push(view);
+      continue;
+    }
+    if (year !== context.reportingYear) otherYear.push(view);
+    else included.push(view);
   }
-  return selected;
+  return { included, unassigned, otherYear, rejectedCount };
+}
+
+export function selectStationaryActivities(
+  activities: EmissionActivity[],
+  context: StationaryReadContext & { epaAssessmentIds: string[] }
+): StationaryResultActivity[] {
+  return partitionStationaryActivities(activities, context).included;
+}
+
+export function summarizeBiogenicCo2(activities: Array<{ biogenicCo2Tonnes?: string | null }>): {
+  tonnes: number | null;
+  status: "recorded" | "partial" | "not_recorded";
+} {
+  const recorded = activities.filter((activity) => activity.biogenicCo2Tonnes != null && activity.biogenicCo2Tonnes !== "");
+  if (recorded.length === 0) return { tonnes: null, status: "not_recorded" };
+  const scaled = recorded.reduce((sum, activity) => sum + (tonnesToScaled(activity.biogenicCo2Tonnes) || 0), 0);
+  return {
+    tonnes: scaledTonnesToNumber(scaled),
+    status: recorded.length === activities.length ? "recorded" : "partial",
+  };
 }
 
 export function summarizeStationaryActivities(activities: StationaryResultActivity[]): StationaryVerifiedResults {
   if (activities.length === 0) return emptyStationaryVerified();
   const scaled = activities.reduce((sum, activity) => sum + (tonnesToScaled(activity.totalTco2e) || 0), 0);
+  const biogenic = summarizeBiogenicCo2(activities);
   return {
     status: "ready",
     error: null,
     totalTco2e: scaledTonnesToNumber(scaled),
     totalKgCo2e: scaledTonnesToKg(scaled),
+    biogenicCo2Tonnes: biogenic.tonnes,
+    biogenicStatus: biogenic.status,
     activities,
   };
 }
@@ -229,6 +342,22 @@ function errorText(err: unknown): string {
   return "Verified stationary records could not be loaded.";
 }
 
+function unavailableStationary(error: string): StationaryVerifiedResults {
+  return {
+    status: "unavailable",
+    error,
+    totalTco2e: 0,
+    totalKgCo2e: 0,
+    biogenicCo2Tonnes: null,
+    biogenicStatus: "not_recorded",
+    activities: [],
+    unassignedCount: 0,
+    unassignedTco2e: 0,
+    otherYearCount: 0,
+    rejectedCount: 0,
+  };
+}
+
 export async function fetchStationaryVerified(
   context: StationaryReadContext,
   deps: {
@@ -236,6 +365,12 @@ export async function fetchStationaryVerified(
     listActivities?: typeof listEmissionActivities;
   } = {}
 ): Promise<StationaryVerifiedResults> {
+  if (!context.organizationId) {
+    return unavailableStationary("An organization is required before emissions can be shown.");
+  }
+  if (context.reportingYear == null) {
+    return unavailableStationary("A reporting year is required. This is not a zero inventory.");
+  }
   const listAssessments = deps.listAssessments || listEmissionAssessments;
   const listActivities = deps.listActivities || listEmissionActivities;
   try {
@@ -248,18 +383,23 @@ export async function fetchStationaryVerified(
       }),
     ]);
     const epaAssessmentIds = selectEpaAssessmentIds(assessments || [], context.organizationId);
-    const selected = selectStationaryActivities(activities || [], {
+    const partitioned = partitionStationaryActivities(activities || [], {
       ...context,
       epaAssessmentIds,
     });
-    return summarizeStationaryActivities(selected);
-  } catch (err) {
+    const summary = summarizeStationaryActivities(partitioned.included);
+    const unassignedScaled = partitioned.unassigned.reduce(
+      (sum, activity) => sum + (tonnesToScaled(activity.totalTco2e) || 0),
+      0
+    );
     return {
-      status: "unavailable",
-      error: errorText(err),
-      totalTco2e: 0,
-      totalKgCo2e: 0,
-      activities: [],
+      ...summary,
+      unassignedCount: partitioned.unassigned.length,
+      unassignedTco2e: scaledTonnesToNumber(unassignedScaled),
+      otherYearCount: partitioned.otherYear.length,
+      rejectedCount: partitioned.rejectedCount,
     };
+  } catch (err) {
+    return unavailableStationary(errorText(err));
   }
 }

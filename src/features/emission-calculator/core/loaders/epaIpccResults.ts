@@ -7,6 +7,8 @@ import {
   sumResultKgField,
   sumRowDataEmissions,
 } from "@/integrations/supabase/ghgEntryAggregates";
+import { loadFinancedReportingRowsSafe } from "@/utils/portfolioCalculationsForScope3";
+import { sumCategory15AttributedSafely } from "@/utils/scope3FinancedImportSafety";
 import {
   groupScope1LegacyTotals,
   type GroupedScope1Total,
@@ -17,6 +19,30 @@ import {
   type StationaryReadContext,
   type StationaryVerifiedResults,
 } from "@/features/emission-calculator/results/stationaryResults";
+import {
+  fetchMobileVerified,
+  type MobileVerifiedResults,
+} from "@/features/emission-calculator/results/mobileResults";
+import {
+  fetchRefrigerantVerified,
+  type RefrigerantVerifiedResults,
+} from "@/features/emission-calculator/results/refrigerantResults";
+import {
+  fetchElectricityVerified,
+  type ElectricityVerifiedResults,
+} from "@/features/emission-calculator/results/electricityResults";
+import {
+  fetchHeatSteamVerified,
+  type HeatSteamVerifiedResults,
+} from "@/features/emission-calculator/results/heatSteamResults";
+import {
+  fetchScope3Verified,
+  type Scope3VerifiedResults,
+} from "@/features/emission-calculator/results/scope3Results";
+import {
+  productionAnnualAssignment,
+  type AnnualReportingAssignment,
+} from "@/features/emission-calculator/results/reportingYear";
 
 export interface EmissionCategoryTotal {
   key: string;
@@ -32,10 +58,43 @@ export interface EpaIpccResultsData {
   scope3: EmissionCategoryTotal[];
   /**
    * Backend epa_stationary records. Tonnes live here.
-   * totals.scope1 stays in kilograms and does not include this block, so existing
-   * CSV and PDF export loops keep their previous inputs.
+   * totals.scope1 stays in kilograms and does not include this block.
    */
   stationaryVerified?: StationaryVerifiedResults;
+  /**
+   * Backend epa_mobile_v1 records. Scope 1 tonnes live here.
+   * Legacy mobile tables are not copied into this block.
+   */
+  mobileVerified?: MobileVerifiedResults;
+  /**
+   * Backend epa_refrigerant_v1 records. Scope 1 tonnes live here.
+   * Legacy refrigerant tables are not copied into this block.
+   */
+  refrigerantVerified?: RefrigerantVerifiedResults;
+  /**
+   * Location-based purchased electricity in tonnes.
+   * Legacy scope2_electricity tables stay in scope2 and are not copied here.
+   * Purchased heat, steam, and cooling are not part of this block.
+   */
+  electricityVerified?: ElectricityVerifiedResults;
+  /**
+   * Purchased heat and steam in tonnes.
+   * Legacy scope2_heatsteam tables stay in scope2 and are not copied here.
+   * Purchased cooling is not part of this block.
+   */
+  heatSteamVerified?: HeatSteamVerifiedResults;
+  /**
+   * Verified Scope 3 from app.emission_activities (scope3_verified_activity_v1).
+   * Legacy scope3_* tables stay in scope3 and are not copied here.
+   * inventoryComplete is always false while unsupported categories remain.
+   */
+  scope3Verified?: Scope3VerifiedResults;
+  /**
+   * Which stored values belong to the selected reporting year.
+   * Shared Scope 2 stays withheld until those tables store a period.
+   * Verified Scope 3 uses scope3Verified, not this assignment flag.
+   */
+  annualReporting?: AnnualReportingAssignment;
   totals: {
     scope1: number;
     scope2: number;
@@ -79,6 +138,11 @@ export const loadEpaIpccResults = async (
     scope3UseOfSoldRows,
     scope2Electricity,
     stationaryVerified,
+    mobileVerified,
+    refrigerantVerified,
+    electricityVerified,
+    heatSteamVerified,
+    scope3Verified,
   ] = await Promise.all([
     // EPA-only fuel rows (exclude UK framework — shared table).
     safeListLegacyTable("scope1_fuel_entries", userId, {}, (row) => {
@@ -114,6 +178,11 @@ export const loadEpaIpccResults = async (
     safeListLegacyTable("scope3_use_of_sold_products", userId),
     calculateLegacyScope2ElectricityTotal(userId),
     fetchStationaryVerified(context),
+    fetchMobileVerified(context),
+    fetchRefrigerantVerified(context),
+    fetchElectricityVerified(context),
+    fetchHeatSteamVerified(context),
+    fetchScope3Verified(context),
   ]);
 
   const legacyFuelRows = legacyFuelRowsExcludingVerified(
@@ -121,20 +190,27 @@ export const loadEpaIpccResults = async (
     (stationaryVerified.activities || []).map((activity) => activity.id)
   );
 
+  const keptLegacy = (rows: Record<string, unknown>[]) =>
+    rows.filter((row) => row.method !== "epa_mobile_v1" && row.legacy_source !== "epa_mobile_v1");
+  const keptRefrigerantLegacy = (rows: Record<string, unknown>[]) =>
+    rows.filter(
+      (row) => row.method !== "epa_refrigerant_v1" && row.legacy_source !== "epa_refrigerant_v1"
+    );
+
   const scope1: EmissionCategoryTotal[] = [
     {
       key: "fuel",
       label: "Fuel (legacy / stationary)",
       value: sumEmissionsField(legacyFuelRows),
     },
-    { key: "mobile", label: "Mobile Fuel (legacy)", value: sumEmissionsField(scope1MobileRows) },
-    { key: "onroad_gas", label: "On-road Gasoline (legacy)", value: sumEmissionsField(scope1OnRoadGasRows) },
+    { key: "mobile", label: "Mobile Fuel (legacy)", value: sumEmissionsField(keptLegacy(scope1MobileRows)) },
+    { key: "onroad_gas", label: "On-road Gasoline (legacy)", value: sumEmissionsField(keptLegacy(scope1OnRoadGasRows)) },
     {
       key: "onroad_diesel",
       label: "On-road Diesel & Alt Fuel (legacy)",
-      value: sumEmissionsField(scope1OnRoadDieselRows),
+      value: sumEmissionsField(keptLegacy(scope1OnRoadDieselRows)),
     },
-    { key: "nonroad", label: "Non-road Vehicle (legacy)", value: sumEmissionsField(scope1NonRoadRows) },
+    { key: "nonroad", label: "Non-road Vehicle (legacy)", value: sumEmissionsField(keptLegacy(scope1NonRoadRows)) },
     {
       key: "heatsteam",
       label: "Heat & Steam Scope 1 (legacy)",
@@ -143,14 +219,14 @@ export const loadEpaIpccResults = async (
     {
       key: "uk_refrigerant",
       label: "Refrigerant / leaks",
-      value: sumEmissionsField(scope1UkRefrigerantRows),
+      value: sumEmissionsField(keptRefrigerantLegacy(scope1UkRefrigerantRows)),
     },
     { key: "flaring", label: "Flaring", value: sumResultKgField(scope1FlaringRows) },
     { key: "venting", label: "Venting", value: sumResultKgField(scope1VentingRows) },
     {
       key: "vehicular",
       label: "Vehicular Footprints (historical)",
-      value: sumResultKgField(scope1VehicularRows),
+      value: sumResultKgField(keptLegacy(scope1VehicularRows)),
     },
     {
       key: "kitchen",
@@ -176,6 +252,14 @@ export const loadEpaIpccResults = async (
     { key: "heatsteam", label: "Heat & Steam (Scope 2)", value: sumEmissionsField(scope2HeatSteamRows) },
   ];
 
+  const financedReportingRows = await loadFinancedReportingRowsSafe();
+  const investmentsValue = financedReportingRows.length
+    ? sumCategory15AttributedSafely(scope3InvestmentsRows, financedReportingRows, "finance")
+    : sumInvestmentAttributed(scope3InvestmentsRows);
+  const facilitatedValue = financedReportingRows.length
+    ? sumCategory15AttributedSafely(scope3FacilitatedRows, financedReportingRows, "facilitated")
+    : sumEmissionsField(scope3FacilitatedRows);
+
   const scope3: EmissionCategoryTotal[] = [
     { key: "purchased_goods", label: "Purchased Goods & Services", value: sumEmissionsField(scope3PurchasedGoodsRows) },
     { key: "capital_goods", label: "Capital Goods", value: sumEmissionsField(scope3CapitalGoodsRows) },
@@ -184,8 +268,8 @@ export const loadEpaIpccResults = async (
     { key: "waste", label: "Waste Generated", value: sumEmissionsField(scope3WasteGeneratedRows) },
     { key: "business_travel", label: "Business Travel", value: sumEmissionsField(scope3BusinessTravelRows) },
     { key: "employee_commuting", label: "Employee Commuting", value: sumEmissionsField(scope3EmployeeCommutingRows) },
-    { key: "investments", label: "Investments", value: sumInvestmentAttributed(scope3InvestmentsRows) },
-    { key: "facilitated", label: "Facilitated Emissions", value: sumEmissionsField(scope3FacilitatedRows) },
+    { key: "investments", label: "Investments", value: investmentsValue },
+    { key: "facilitated", label: "Facilitated Emissions", value: facilitatedValue },
     { key: "downstream_transport", label: "Downstream Transportation", value: sumEmissionsField(scope3DownstreamTransportRows) },
     { key: "end_of_life", label: "End of Life Treatment", value: sumEmissionsField(scope3EndOfLifeRows) },
     { key: "processing_sold", label: "Processing of Sold Products", value: sumRowDataEmissions(scope3ProcessingSoldRows) },
@@ -202,6 +286,12 @@ export const loadEpaIpccResults = async (
     scope2,
     scope3,
     stationaryVerified,
+    mobileVerified,
+    refrigerantVerified,
+    electricityVerified,
+    heatSteamVerified,
+    scope3Verified,
+    annualReporting: productionAnnualAssignment(context.reportingYear ?? null),
     totals: {
       scope1: scope1Total,
       scope2: scope2Total,

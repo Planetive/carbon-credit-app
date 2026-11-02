@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { executePcafCalculation } from "../utils/executePcafCalculation";
+import { PcafAuthorityError } from "../utils/pcafAuthority";
+import { FinancedScopeBreakdownPanel } from "../components/FinancedScopeBreakdownPanel";
+import {
+  questionnaireScopePayload,
+  sumReportedScopes,
+  type FinancedScopeBreakdown,
+} from "../utils/financedScopeBreakdown";
 import { ALL_FORMULAS, getFormulasByCategory } from '../config/corporateBondAndBusinessLoanFormulaConfigs';
 import { PROJECT_FINANCE_FORMULAS } from '../config/projectFinanceFormulaConfigs';
 import { MORTGAGE_FORMULAS } from '../config/mortgageFormulaConfigs';
@@ -39,6 +46,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { CalculationStepDto, EmissionResultRow, FinanceFormValue, FinanceMode } from "../types/contracts";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  clonePropertyList,
+  ensureFinancingInstanceId,
+  identityFieldsForSave,
+} from "@/utils/financedExposureIdentity";
 
 
 
@@ -50,6 +62,9 @@ interface CalculationResult {
   dataQualityScore?: number;
   methodology?: string;
   calculationSteps?: CalculationStepDto[];
+  authority?: "backend" | "preview";
+  inputFingerprint?: string;
+  scopeBreakdown?: FinancedScopeBreakdown;
 }
 
 interface FinanceEmissionCalculatorProps {
@@ -60,9 +75,9 @@ interface FinanceEmissionCalculatorProps {
   calculationMethod?: string;
   calculationMethods?: Record<string, string>;
   counterpartyId?: string; // Prefer this when provided
-  scope1Emissions?: number;
-  scope2Emissions?: number;
-  scope3Emissions?: number;
+  scope1Emissions?: number | null;
+  scope2Emissions?: number | null;
+  scope3Emissions?: number | null;
   verifiedEmissions?: number;
   unverifiedEmissions?: number;
   activeTab: FinanceMode;
@@ -82,6 +97,37 @@ type ProductionFactorRow = {
 };
 
 const MATERIAL_FACTOR_DATASET = "ice_embodied_carbon_v5";
+
+function defaultMortgageProperties(): Property[] {
+  return [
+    {
+      id: "1",
+      name: "Property 1",
+      propertyValueAtOrigination: 0,
+      actualEnergyConsumption: 0,
+      actualEnergyConsumptionUnit: "MWh",
+      supplierSpecificEmissionFactor: 0,
+      supplierSpecificEmissionFactorUnit: "tCO2e/MWh",
+      averageEmissionFactor: 0,
+      averageEmissionFactorUnit: "tCO2e/MWh",
+      estimatedEnergyConsumptionFromLabels: 0,
+      estimatedEnergyConsumptionFromLabelsUnit: "MWh",
+      estimatedEnergyConsumptionFromStatistics: 0,
+      estimatedEnergyConsumptionFromStatisticsUnit: "MWh",
+      floorArea: 0,
+    },
+  ];
+}
+
+function defaultCreProperties(): CREProperty[] {
+  return [
+    {
+      id: "1",
+      name: "Property 1",
+      propertyValueAtOrigination: 0,
+    },
+  ];
+}
 
 const normalizeDeclaredUnit = (value: unknown): string => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -187,6 +233,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
   // Per-loan-instance form data store so duplicate types don't overwrite each other
   const [perLoanFormData, setPerLoanFormData] = useState<Record<string, Record<string, unknown>>>({});
+  const mortgagePropertiesRef = useRef<Record<string, Property[]>>({});
+  const crePropertiesRef = useRef<Record<string, CREProperty[]>>({});
+  const financingInstanceIdsRef = useRef<Record<string, string>>({});
 
   const persistCurrentLoanForm = (loanInstanceKey: string, data: Record<string, unknown>) => {
     if (!loanInstanceKey) return;
@@ -200,33 +249,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
   }, [expandedLoanTypes.length]);
 
-  const [properties, setProperties] = useState<Property[]>([
-    { 
-      id: '1', 
-      name: 'Property 1', 
-      propertyValueAtOrigination: 0,
-      actualEnergyConsumption: 0,
-      actualEnergyConsumptionUnit: 'MWh',
-      supplierSpecificEmissionFactor: 0,
-      supplierSpecificEmissionFactorUnit: 'tCO2e/MWh',
-      averageEmissionFactor: 0,
-      averageEmissionFactorUnit: 'tCO2e/MWh',
-      estimatedEnergyConsumptionFromLabels: 0,
-      estimatedEnergyConsumptionFromLabelsUnit: 'MWh',
-      estimatedEnergyConsumptionFromStatistics: 0,
-      estimatedEnergyConsumptionFromStatisticsUnit: 'MWh',
-      floorArea: 0
-    }
-  ]);
+  const [properties, setProperties] = useState<Property[]>(defaultMortgageProperties());
 
   // Commercial Real Estate Properties (simpler - only needs property value)
-  const [commercialProperties, setCommercialProperties] = useState<CREProperty[]>([
-    {
-      id: '1',
-      name: 'Property 1',
-      propertyValueAtOrigination: 0
-    }
-  ]);
+  const [commercialProperties, setCommercialProperties] = useState<CREProperty[]>(defaultCreProperties());
   console.log('🔄 FinanceEmissionCalculator - Initial props:', {
     propVerifiedEmissions,
     propUnverifiedEmissions,
@@ -500,12 +526,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       denominatorLabel: string;
       denominatorValue: number;
       dataQualityScore?: number;
+      scopeBreakdown?: FinancedScopeBreakdown;
     }>
   >([]);
   const [selectedFormula, setSelectedFormula] = useState<string>('');
   const [companyType, setCompanyType] = useState<'listed' | 'private'>('listed');
   const [isCalculating, setIsCalculating] = useState(false);
-  // Remove local tab state - use prop from parent instead
+  const calcGenerationRef = useRef(0);
+  const inputsVersionRef = useRef(0);
   
   // Use props from ESGWizard questionnaire
   const hasEmissions = propHasEmissions || '';
@@ -533,6 +561,68 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     );
   })();
 
+  const persistInstanceIds = (map: Record<string, string>) => {
+    financingInstanceIdsRef.current = map;
+    try {
+      if (resolvedCounterpartyId) {
+        sessionStorage.setItem(
+          `financingInstanceIds:${resolvedCounterpartyId}:finance`,
+          JSON.stringify(map),
+        );
+      }
+    } catch {
+      /* ignore quota */
+    }
+  };
+
+  const idForLoanKey = (key: string): string => {
+    const ensured = ensureFinancingInstanceId(financingInstanceIdsRef.current, key);
+    persistInstanceIds(ensured.map);
+    return ensured.id;
+  };
+
+  const mortgagePropertiesFor = (key: string): Property[] => {
+    if (!key) return defaultMortgageProperties();
+    if (!mortgagePropertiesRef.current[key]) {
+      mortgagePropertiesRef.current[key] = defaultMortgageProperties();
+    }
+    return mortgagePropertiesRef.current[key];
+  };
+
+  const crePropertiesFor = (key: string): CREProperty[] => {
+    if (!key) return defaultCreProperties();
+    if (!crePropertiesRef.current[key]) {
+      crePropertiesRef.current[key] = defaultCreProperties();
+    }
+    return crePropertiesRef.current[key];
+  };
+
+  const writeMortgageProperties = (key: string, next: Property[]) => {
+    const cloned = clonePropertyList(next, defaultMortgageProperties());
+    mortgagePropertiesRef.current = { ...mortgagePropertiesRef.current, [key]: cloned };
+    if (key === loanInstanceKey) setProperties(cloned);
+  };
+
+  const writeCreProperties = (key: string, next: CREProperty[]) => {
+    const cloned = clonePropertyList(next, defaultCreProperties());
+    crePropertiesRef.current = { ...crePropertiesRef.current, [key]: cloned };
+    if (key === loanInstanceKey) setCommercialProperties(cloned);
+  };
+
+  useEffect(() => {
+    if (!resolvedCounterpartyId) return;
+    try {
+      const raw = sessionStorage.getItem(`financingInstanceIds:${resolvedCounterpartyId}:finance`);
+      financingInstanceIdsRef.current = raw ? JSON.parse(raw) : {};
+    } catch {
+      financingInstanceIdsRef.current = {};
+    }
+  }, [resolvedCounterpartyId]);
+
+  useEffect(() => {
+    inputsVersionRef.current += 1;
+  }, [formData, selectedFormula, perLoanFormData, properties, commercialProperties, sharedCompanyData, currentLoanIndex]);
+
   // Debug props
   console.log('FinanceEmissionCalculator props:', {
     propHasEmissions,
@@ -558,13 +648,16 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     } else if (initialFormDataRef.current) {
       setFormData(initialFormDataRef.current);
     }
+    setProperties(clonePropertyList(mortgagePropertiesFor(loanInstanceKey), defaultMortgageProperties()));
+    setCommercialProperties(clonePropertyList(crePropertiesFor(loanInstanceKey), defaultCreProperties()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loanInstanceKey, currentLoanIndex]);
 
   // Always start fresh - no database pre-filling
   useEffect(() => {
     // Only reset when we have valid props to avoid overriding with undefined values
     if (propVerifiedEmissions !== undefined || propUnverifiedEmissions !== undefined) {
-      const returnedTotalEmissions = (propScope1 || 0) + (propScope2 || 0) + (propScope3 || 0);
+      const returnedTotalEmissions = sumReportedScopes(propScope1, propScope2, propScope3) ?? 0;
       // Clear all data when switching companies - always start fresh
       setSharedCompanyData({
         sharePrice: 0,
@@ -765,19 +858,22 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       floorArea: 0,
       totalEmission: 0 // For Option 2a: Total emission = Estimated Energy Consumption from Energy Labels × Floor Area × Average Emission Factor
     };
-    setProperties([...properties, newProperty]);
+    writeMortgageProperties(loanInstanceKey, [...properties, newProperty]);
   };
 
   const removeProperty = (id: string) => {
     if (properties.length > 1) {
-      setProperties(properties.filter(property => property.id !== id));
+      writeMortgageProperties(loanInstanceKey, properties.filter(property => property.id !== id));
     }
   };
 
   const updateProperty = (id: string, field: keyof Property, value: string | number) => {
-    setProperties(properties.map(property => 
-      property.id === id ? { ...property, [field]: value } : property
-    ));
+    writeMortgageProperties(
+      loanInstanceKey,
+      properties.map(property =>
+        property.id === id ? { ...property, [field]: value } : property
+      ),
+    );
   };
 
   // Commercial Real Estate property management functions
@@ -787,19 +883,25 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       name: `Property ${commercialProperties.length + 1}`,
       propertyValueAtOrigination: 0
     };
-    setCommercialProperties([...commercialProperties, newProperty]);
+    writeCreProperties(loanInstanceKey, [...commercialProperties, newProperty]);
   };
 
   const removeCommercialProperty = (id: string) => {
     if (commercialProperties.length > 1) {
-      setCommercialProperties(commercialProperties.filter(property => property.id !== id));
+      writeCreProperties(
+        loanInstanceKey,
+        commercialProperties.filter(property => property.id !== id),
+      );
     }
   };
 
   const updateCommercialProperty = (id: string, field: keyof CREProperty, value: string | number) => {
-    setCommercialProperties(commercialProperties.map(property => 
-      property.id === id ? { ...property, [field]: value } : property
-    ));
+    writeCreProperties(
+      loanInstanceKey,
+      commercialProperties.map(property =>
+        property.id === id ? { ...property, [field]: value } : property
+      ),
+    );
   };
 
 
@@ -1016,8 +1118,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             error: `Outstanding loan amount is required for ${loanLabel}`
           });
         }
-        // Properties validation for mortgage (uses current properties state)
-        const totalPropertyValue = properties.reduce((sum, p) => sum + p.propertyValueAtOrigination, 0);
+        const totalPropertyValue = mortgagePropertiesFor(inst.key).reduce(
+          (sum, p) => sum + p.propertyValueAtOrigination,
+          0,
+        );
         if (totalPropertyValue === 0) {
           errors.push({
             loanKey: inst.key,
@@ -1049,8 +1153,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             error: `Outstanding loan amount is required for ${loanLabel}`
           });
         }
-        // Properties validation for commercial real estate (uses current commercialProperties state)
-        const totalPropertyValue = commercialProperties.reduce((sum, p) => sum + p.propertyValueAtOrigination, 0);
+        const totalPropertyValue = crePropertiesFor(inst.key).reduce(
+          (sum, p) => sum + p.propertyValueAtOrigination,
+          0,
+        );
         if (totalPropertyValue === 0) {
           errors.push({
             loanKey: inst.key,
@@ -1289,26 +1395,38 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     };
   };
 
-  const calculateSingleLoan = async (loanTypeKey: string, loanFormData: typeof formData) => {
+  const calculateSingleLoan = async (
+    loanTypeKey: string,
+    loanFormData: typeof formData,
+    options?: {
+      mortgageProperties?: Property[];
+      commercialProperties?: CREProperty[];
+    },
+  ) => {
     const useShared = expandedLoanTypes.length > 1;
     const formulas = getAvailableFormulasForLoan(loanTypeKey);
-    const selectedId = formulas.length === 1 ? formulas[0].id : selectedFormula; // fallback to current selection if multiple
+    const selectedId = formulas.length === 1
+      ? formulas[0].id
+      : (formulas.find((formula) => formula.id === selectedFormula)?.id || formulas[0]?.id || selectedFormula);
     if (!selectedId) {
       throw new Error('No formula selected for ' + (typeLabels[loanTypeKey] || loanTypeKey));
     }
 
-    // Calculate totals for mortgages and commercial real estate if applicable (uses current properties state)
+    const mortgageProps = options?.mortgageProperties || properties;
+    const creProps = options?.commercialProperties || commercialProperties;
+
+    // Calculate totals for mortgages and commercial real estate if applicable
     const totalPropertyValueAtOrigination = loanTypeKey === 'mortgage'
-      ? properties.reduce((sum, property) => sum + property.propertyValueAtOrigination, 0)
+      ? mortgageProps.reduce((sum, property) => sum + property.propertyValueAtOrigination, 0)
       : loanTypeKey === 'commercial-real-estate'
-      ? commercialProperties.reduce((sum, property) => sum + property.propertyValueAtOrigination, 0)
+      ? creProps.reduce((sum, property) => sum + property.propertyValueAtOrigination, 0)
       : 0;
     const totalActualEnergyConsumption = loanTypeKey === 'mortgage'
-      ? properties.reduce((sum, property) => sum + smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit), 0)
+      ? mortgageProps.reduce((sum, property) => sum + smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit), 0)
       : 0;
 
     const weightedAverageSupplierEmissionFactor = loanTypeKey === 'mortgage' && totalActualEnergyConsumption > 0 ? 
-      properties.reduce((sum, property) => {
+      mortgageProps.reduce((sum, property) => {
         const convertedEnergy = smartConvertUnit(property.actualEnergyConsumption, property.actualEnergyConsumptionUnit);
         const convertedEmissionFactor = smartConvertUnit(property.supplierSpecificEmissionFactor, property.supplierSpecificEmissionFactorUnit);
         return sum + (convertedEnergy * convertedEmissionFactor);
@@ -1398,6 +1516,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       vehicle_emission_factor: smartConvertUnit(loanFormData.vehicle_emission_factor || 0, loanFormData.vehicle_emission_factor_unit),
       verified_emissions: smartConvertUnit(loanFormData.verified_emissions || 0, loanFormData.verified_emissionsUnit),
       unverified_emissions: smartConvertUnit(loanFormData.unverified_emissions || 0, loanFormData.unverified_emissionsUnit),
+      ...questionnaireScopePayload(propScope1, propScope2, propScope3),
       ...buildEnergyPcafFields(loanFormData, loanTypeKey, selectedId),
       production: loanFormData.production || 0,
       process_emissions: loanFormData.process_emissions || 0,
@@ -1477,6 +1596,13 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       denominatorLabel = 'Total Equity + Debt';
     }
 
+    if (pcafResult.authority !== "backend") {
+      throw new PcafAuthorityError(
+        "INVALID_RESPONSE",
+        "Local preview cannot be saved as a reportable result."
+      );
+    }
+
     return {
       attributionFactor: pcafResult.attributionFactor,
       financeEmission: pcafResult.financedEmissions,
@@ -1488,6 +1614,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       pcafFormulaId: selectedId,
       pcafInputs,
       companyType,
+      authority: pcafResult.authority,
+      inputFingerprint: pcafResult.inputFingerprint,
+      scopeBreakdown: pcafResult.scopeBreakdown,
     };
   };
 
@@ -1514,7 +1643,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       }
     }
 
+    if (loanInstanceKey) {
+      writeMortgageProperties(loanInstanceKey, properties);
+      writeCreProperties(loanInstanceKey, commercialProperties);
+    }
+
     setIsCalculating(true);
+    const generation = ++calcGenerationRef.current;
+    const inputsVersion = inputsVersionRef.current;
     
     // Use setTimeout to allow UI to update before heavy calculation
     setTimeout(() => {
@@ -1779,6 +1915,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         vehicle_emission_factor: smartConvertUnit(formData.vehicle_emission_factor || 0, formData.vehicle_emission_factor_unit),
         verified_emissions: smartConvertUnit(formData.verified_emissions || 0, formData.verified_emissionsUnit),
         unverified_emissions: smartConvertUnit(formData.unverified_emissions || 0, formData.unverified_emissionsUnit),
+        ...questionnaireScopePayload(propScope1, propScope2, propScope3),
         ...buildEnergyPcafFields(formData, loanType, selectedFormula),
         production: formData.production || 0,
         process_emissions: formData.process_emissions || 0,
@@ -1822,18 +1959,22 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         counterparty_id: propCounterpartyId ?? null,
         persist: false,
       });
+      if (generation !== calcGenerationRef.current) {
+        return;
+      }
+      if (inputsVersion !== inputsVersionRef.current) {
+        throw new PcafAuthorityError(
+          "STALE",
+          "Inputs changed before the calculation finished. Recalculate to save a reportable result."
+        );
+      }
+      if (pcafConfirmed.authority !== "backend") {
+        throw new PcafAuthorityError(
+          "INVALID_RESPONSE",
+          "Local preview cannot be saved as a reportable result."
+        );
+      }
       console.log('🔍 PCAF CALCULATION DEBUG - Calculation Result:', pcafConfirmed);
-
-      const localPreview: CalculationResult = {
-        attributionFactor: pcafConfirmed.attributionFactor,
-        financeEmission: pcafConfirmed.financedEmissions,
-        totalProductOutput: 0,
-        evic: 0,
-        dataQualityScore: pcafConfirmed.dataQualityScore,
-        methodology: pcafConfirmed.methodology,
-        calculationSteps: pcafConfirmed.calculationSteps,
-      };
-      setResult(localPreview);
 
       const pcafResult = {
         attributionFactor: pcafConfirmed.attributionFactor,
@@ -1912,7 +2053,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         evic: denominatorValue, // Store the appropriate denominator value
         dataQualityScore: pcafResult.dataQualityScore,
         methodology: pcafResult.methodology,
-        calculationSteps: pcafResult.calculationSteps
+        calculationSteps: pcafResult.calculationSteps,
+        authority: pcafConfirmed.authority,
+        inputFingerprint: pcafConfirmed.inputFingerprint,
+        scopeBreakdown: pcafResult.scopeBreakdown,
     };
 
       setResult(calculationResult);
@@ -1930,27 +2074,55 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           pcafFormulaId?: string;
           pcafInputs?: Record<string, unknown>;
           companyType?: string;
+          financingInstanceId?: string;
+          instanceKey?: string;
+          authority?: "backend" | "preview";
+          inputFingerprint?: string;
+          scopeBreakdown?: FinancedScopeBreakdown;
         }> = [];
         for (const inst of expandedLoanTypes) {
           const ltKey = inst.type;
           const saved = perLoanFormData[inst.key] || formData; // fall back to current formData
-          try {
-            const r = await calculateSingleLoan(ltKey, saved);
-            results.push({
-              type: ltKey,
-              label: `${typeLabels[ltKey] || ltKey} #${inst.instance}`,
-              attributionFactor: r.attributionFactor,
-              financeEmission: r.financeEmission,
-              denominatorLabel: r.denominatorLabel,
-              denominatorValue: r.denominatorValue,
-              dataQualityScore: r.dataQualityScore,
-              pcafFormulaId: r.pcafFormulaId,
-              pcafInputs: r.pcafInputs as Record<string, unknown>,
-              companyType: r.companyType,
-            });
-          } catch (e) {
-            console.warn('Failed to calculate for loan type', ltKey, e);
+          const instanceId = idForLoanKey(inst.key);
+          const r = await calculateSingleLoan(ltKey, saved, {
+            mortgageProperties: mortgagePropertiesFor(inst.key),
+            commercialProperties: crePropertiesFor(inst.key),
+          });
+          if (generation !== calcGenerationRef.current) {
+            return;
           }
+          if (inputsVersion !== inputsVersionRef.current) {
+            throw new PcafAuthorityError(
+              "STALE",
+              "Inputs changed before the calculation finished. Recalculate to save a reportable result."
+            );
+          }
+          results.push({
+            type: ltKey,
+            label: `${typeLabels[ltKey] || ltKey} #${inst.instance}`,
+            attributionFactor: r.attributionFactor,
+            financeEmission: r.financeEmission,
+            denominatorLabel: r.denominatorLabel,
+            denominatorValue: r.denominatorValue,
+            dataQualityScore: r.dataQualityScore,
+            pcafFormulaId: r.pcafFormulaId,
+            pcafInputs: {
+              ...(r.pcafInputs as Record<string, unknown>),
+              ...identityFieldsForSave(instanceId, inst.key, ltKey),
+              ...(ltKey === 'mortgage'
+                ? { properties: clonePropertyList(mortgagePropertiesFor(inst.key), defaultMortgageProperties()) }
+                : {}),
+              ...(ltKey === 'commercial-real-estate'
+                ? { commercialProperties: clonePropertyList(crePropertiesFor(inst.key), defaultCreProperties()) }
+                : {}),
+            },
+            companyType: r.companyType,
+            financingInstanceId: instanceId,
+            instanceKey: inst.key,
+            authority: r.authority,
+            inputFingerprint: r.inputFingerprint,
+            scopeBreakdown: r.scopeBreakdown,
+          });
         }
         setMultiResults(results);
         // Persist state so navigating back restores values
@@ -1959,6 +2131,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             perLoanFormData,
             sharedCompanyData,
             properties,
+            commercialProperties,
+            mortgageProperties: mortgagePropertiesRef.current,
+            creProperties: crePropertiesRef.current,
+            financingInstanceIds: financingInstanceIdsRef.current,
             formData,
             selectedFormula,
             currentLoanIndex,
@@ -1977,6 +2153,11 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             pcafFormulaId: r.pcafFormulaId,
             pcafInputs: r.pcafInputs,
             companyType: r.companyType,
+            financingInstanceId: r.financingInstanceId,
+            instanceKey: r.instanceKey,
+            authority: r.authority,
+            inputFingerprint: r.inputFingerprint,
+            scopeBreakdown: r.scopeBreakdown,
           })), {
             outstandingLoan: formData.outstandingLoan,
             totalAssetsValue: formData.totalAssetsValue,
@@ -1997,6 +2178,10 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             perLoanFormData,
             sharedCompanyData,
             properties,
+            commercialProperties,
+            mortgageProperties: mortgagePropertiesRef.current,
+            creProperties: crePropertiesRef.current,
+            financingInstanceIds: financingInstanceIdsRef.current,
             formData,
             selectedFormula,
             currentLoanIndex,
@@ -2012,6 +2197,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
         
         if (onResults) {
           console.log('🔍 CALLING onResults callback');
+          const instanceId = idForLoanKey(loanInstanceKey || `${loanType}#1`);
           onResults([
             {
               type: loanType,
@@ -2022,8 +2208,22 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
               denominatorValue: calculationResult.evic,
               dataQualityScore: calculationResult.dataQualityScore,
               pcafFormulaId: selectedFormula,
-              pcafInputs: pcafInputs as Record<string, unknown>,
+              pcafInputs: {
+                ...(pcafInputs as Record<string, unknown>),
+                ...identityFieldsForSave(instanceId, loanInstanceKey || `${loanType}#1`, loanType),
+                ...(loanType === 'mortgage'
+                  ? { properties: clonePropertyList(properties, defaultMortgageProperties()) }
+                  : {}),
+                ...(loanType === 'commercial-real-estate'
+                  ? { commercialProperties: clonePropertyList(commercialProperties, defaultCreProperties()) }
+                  : {}),
+              },
               companyType,
+              financingInstanceId: instanceId,
+              instanceKey: loanInstanceKey || `${loanType}#1`,
+              authority: calculationResult.authority,
+              inputFingerprint: calculationResult.inputFingerprint,
+              scopeBreakdown: calculationResult.scopeBreakdown,
             }
           ], {
             outstandingLoan: formData.outstandingLoan,
@@ -2048,13 +2248,19 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
           variant: "default"
         });
       } catch (error) {
-        toast({
-          title: "Calculation Error",
-          description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: "destructive"
-        });
+        if (generation === calcGenerationRef.current) {
+          setResult(null);
+          setMultiResults([]);
+          toast({
+            title: "Calculation Error",
+            description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            variant: "destructive"
+          });
+        }
       } finally {
-        setIsCalculating(false);
+        if (generation === calcGenerationRef.current) {
+          setIsCalculating(false);
+        }
       }
       })();
     }, 100);
@@ -2946,6 +3152,26 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                 </CardContent>
               </Card>
 
+              {multiResults.length === 0 && (
+                <FinancedScopeBreakdownPanel
+                  breakdown={result.scopeBreakdown}
+                  totalTco2e={result.financeEmission}
+                />
+              )}
+              {multiResults.length > 0 && (
+                <div className="space-y-3">
+                  {multiResults.map((r, idx) => (
+                    <div key={idx}>
+                      <p className="text-xs font-semibold text-[#64748B] mb-1">{r.label}</p>
+                      <FinancedScopeBreakdownPanel
+                        breakdown={r.scopeBreakdown}
+                        totalTco2e={r.financeEmission}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
             {multiResults.length > 0 && (
               <div className="space-y-3">
                 <div className="text-sm font-medium text-muted-foreground">Per-Loan Results</div>
@@ -3000,6 +3226,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
             calculationMethod={propCalculationMethod}
             verifiedEmissions={propVerifiedEmissions}
             unverifiedEmissions={propUnverifiedEmissions}
+            scope1Emissions={propScope1}
+            scope2Emissions={propScope2}
+            scope3Emissions={propScope3}
           onCalculationComplete={(result) => {
             // Handle facilitated emission calculation result
             console.log('Facilitated emission result:', result);
@@ -3019,6 +3248,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                 pcafFormulaId: result.pcafFormulaId,
                 pcafInputs: result.pcafInputs,
                 companyType: result.companyType,
+                authority: result.authority,
+                inputFingerprint: result.inputFingerprint,
+                scopeBreakdown: result.scopeBreakdown,
               };
               onResults([formattedResult]);
             }

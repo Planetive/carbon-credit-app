@@ -68,7 +68,7 @@ export const WasteGeneratedSection: React.FC<WasteGeneratedSectionProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Material</Label>
-        <Label className="text-gray-500 font-medium">Volume (kg)</Label>
+        <Label className="text-gray-500 font-medium">Mass (kg)</Label>
         <Label className="text-gray-500 font-medium">Disposal Method</Label>
         <Label className="text-gray-500 font-medium">Emissions</Label>
       </div>

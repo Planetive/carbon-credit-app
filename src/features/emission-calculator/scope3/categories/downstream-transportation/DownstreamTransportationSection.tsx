@@ -73,7 +73,7 @@ export const DownstreamTransportationSection: React.FC<DownstreamTransportationS
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Vehicle Type</Label>
         <Label className="text-gray-500 font-medium">Distance (km)</Label>
-        <Label className="text-gray-500 font-medium">Weight (kg)</Label>
+        <Label className="text-gray-500 font-medium">Mass (kg)</Label>
         <Label className="text-gray-500 font-medium">Emissions</Label>
       </div>
 

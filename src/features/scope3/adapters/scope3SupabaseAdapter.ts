@@ -18,6 +18,7 @@ type Scope3InvestmentRecord = {
   line_type: string | null;
   linked_emission_calculation_id: string | null;
   linked_finance_emission_calculation_id: string | null;
+  linked_financed_emissions_id?: string | null;
 };
 
 type Scope3FacilitatedRecord = {
@@ -26,6 +27,7 @@ type Scope3FacilitatedRecord = {
   emissions: number | null;
   linked_emission_calculation_id: string | null;
   linked_finance_emission_calculation_id: string | null;
+  linked_financed_emissions_id?: string | null;
 };
 
 type CounterpartyIdRecord = { id: string };
@@ -44,13 +46,15 @@ export async function fetchScope3Investments(
 
 export async function findScope3InvestmentDuplicate(
   userId: string,
-  source: "emission_calculations" | "finance_emission_calculations",
+  source: "emission_calculations" | "finance_emission_calculations" | "jwt",
   linkedId: string,
 ): Promise<{ id: string } | null> {
   const linkedField =
-    source === "emission_calculations"
-      ? "linked_emission_calculation_id"
-      : "linked_finance_emission_calculation_id";
+    source === "jwt"
+      ? "linked_financed_emissions_id"
+      : source === "emission_calculations"
+        ? "linked_emission_calculation_id"
+        : "linked_finance_emission_calculation_id";
 
   const rows = await listLegacyTableEntries("scope3_investments", { user_id: userId });
   const hit = rows.find((r) => String(r[linkedField] ?? "") === linkedId);

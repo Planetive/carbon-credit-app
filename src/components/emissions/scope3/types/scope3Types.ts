@@ -67,12 +67,17 @@ export interface BusinessTravelRow {
   emissions: number | undefined;
 }
 
+export type CommuteDistanceBasis = "annual_total" | "one_way" | "round_trip";
+
 export interface EmployeeCommutingRow {
   id: string;
   dbId?: string | number;
   isExisting?: boolean;
   travelTypeId: string;
   distance: number | undefined;
+  /** annual_total = distance already annual; one_way doubles per day; round_trip does not. */
+  distanceBasis?: CommuteDistanceBasis;
+  workingDaysPerYear?: number | undefined;
   employees: number | undefined;
   emissions: number | undefined;
 }
@@ -90,6 +95,7 @@ export interface InvestmentRow {
   lineType?: InvestmentLineType;
   linkedEmissionCalculationId?: string | null;
   linkedFinanceEmissionCalculationId?: string | null;
+  linkedFinancedEmissionsId?: string | null;
 }
 
 export interface EndOfLifeRow {

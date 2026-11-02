@@ -45,7 +45,8 @@ function mapWasteData(data: any[]): WasteMaterial[] {
       "Anaerobically Digested (Dry Digestate with Curing)":
         item["Anaerobically Digested (Dry Digestate with Curing)"],
       "Anaerobically Digested (Wet Digestate with Curing)":
-        item["Anaerobically Digested (Wet Digestate with Curing)"],
+        item["Anaerobically Digested (Wet Digestate with Curing)"] ??
+        item["Anaerobically Digested (Wet  Digestate with Curing)"],
       created_at: item.created_at,
       updated_at: item.updated_at,
     };
@@ -152,7 +153,15 @@ export function getEmissionFactor(
 ): number | null {
   if (!material) return null;
 
-  const value = material[disposalMethod as keyof WasteMaterial];
+  let value = material[disposalMethod as keyof WasteMaterial];
+  if (
+    (value === null || value === undefined) &&
+    disposalMethod === "Anaerobically Digested (Wet Digestate with Curing)"
+  ) {
+    value = (material as Record<string, unknown>)[
+      "Anaerobically Digested (Wet  Digestate with Curing)"
+    ] as WasteMaterial[keyof WasteMaterial];
+  }
 
   if (
     value === null ||

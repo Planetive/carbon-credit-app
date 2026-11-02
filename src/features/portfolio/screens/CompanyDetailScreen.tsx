@@ -8,7 +8,18 @@ import { Tooltip, TooltipContent, TooltipPortal, TooltipProvider, TooltipTrigger
 import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles, Plus, Minus } from 'lucide-react';
 import { PortfolioClient, EmissionCalculation } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
+import { USE_JWT_AUTH } from '@/api/config';
+import {
+  emissionCalculationToReportingRow,
+  selectCompanyDisplayRow,
+  type FinancedCalculationRow,
+} from '@/utils/financedEmissionsReporting';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FinancedScopeBreakdownPanel } from '@/features/finance-emissions/components/FinancedScopeBreakdownPanel';
+import {
+  parseFinancedScopeBreakdown,
+  type FinancedScopeBreakdown,
+} from '@/features/finance-emissions/utils/financedScopeBreakdown';
 
 const currencyFormat = (value: number) => (Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -227,23 +238,49 @@ const CompanyDetail: React.FC = () => {
     }
   }, [location.pathname, counterpartyId]);
 
-  // Helper functions to get emission results
+  const toReportingRows = () => {
+    const source = USE_JWT_AUTH ? 'jwt' : 'emission_calculations';
+    return emissionCalculations
+      .map((calc) => emissionCalculationToReportingRow(calc, source))
+      .filter((row): row is FinancedCalculationRow => row != null);
+  };
+
+  const displayRowToCalculation = (display: FinancedCalculationRow): EmissionCalculation => {
+    const original = emissionCalculations.find((calc) => calc.id === display.id);
+    if (original) {
+      return {
+        ...original,
+        financed_emissions: display.financedEmissions,
+        results: (display.results as EmissionCalculation['results']) || original.results,
+      };
+    }
+    return {
+      id: display.id,
+      user_id: '',
+      counterparty_id: display.counterpartyId,
+      exposure_id: display.exposureId ?? null,
+      questionnaire_id: null,
+      calculation_type: display.calcKind,
+      company_type: '',
+      formula_id: display.formulaId || 'aggregate',
+      inputs: (display.inputs || {}) as Record<string, unknown>,
+      results: (display.results || {}) as Record<string, unknown>,
+      financed_emissions: display.financedEmissions,
+      attribution_factor: display.attributionFactor ?? null,
+      data_quality_score: display.dataQualityScore ?? null,
+      evic: null,
+      total_equity_plus_debt: null,
+      status: (display.status as EmissionCalculation['status']) || 'completed',
+      created_at: display.createdAt || '',
+      updated_at: display.updatedAt || '',
+    };
+  };
+
   const getFinanceEmissionResult = () => {
-    // Filter finance calculations and exclude null/zero emissions
-    const financeCalculations = emissionCalculations
-      .filter(calc => 
-        calc.calculation_type === 'finance' && 
-        calc.financed_emissions !== null && 
-        calc.financed_emissions !== undefined &&
-        calc.financed_emissions > 0 &&
-        isFinite(calc.financed_emissions)
-      )
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    
-    console.log('🔍 CompanyDetail - getFinanceEmissionResult - Filtered calculations:', financeCalculations);
-    console.log('🔍 CompanyDetail - getFinanceEmissionResult - Selected result:', financeCalculations[0]);
-    
-    if (financeCalculations[0]) return financeCalculations[0];
+    const display = selectCompanyDisplayRow(toReportingRows(), 'finance');
+    if (display) {
+      return displayRowToCalculation(display);
+    }
 
     // Fallback to cached summary if DB returned nothing (immediate return from wizard)
     try {
@@ -290,21 +327,10 @@ const CompanyDetail: React.FC = () => {
   };
 
   const getFacilitatedEmissionResult = () => {
-    // Filter facilitated calculations and exclude null/zero emissions
-    const facilitatedCalculations = emissionCalculations
-      .filter(calc => 
-        calc.calculation_type === 'facilitated' && 
-        calc.financed_emissions !== null && 
-        calc.financed_emissions !== undefined &&
-        calc.financed_emissions > 0 &&
-        isFinite(calc.financed_emissions)
-      )
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    
-    console.log('🔍 CompanyDetail - getFacilitatedEmissionResult - Filtered calculations:', facilitatedCalculations);
-    console.log('🔍 CompanyDetail - getFacilitatedEmissionResult - Selected result:', facilitatedCalculations[0]);
-
-    if (facilitatedCalculations[0]) return facilitatedCalculations[0];
+    const display = selectCompanyDisplayRow(toReportingRows(), 'facilitated');
+    if (display) {
+      return displayRowToCalculation(display);
+    }
 
     // Fallback to cached summary
     try {
@@ -393,17 +419,44 @@ const CompanyDetail: React.FC = () => {
     return [];
   };
 
+  const parseScopeBreakdown = (
+    source: Record<string, unknown> | null | undefined,
+    total: number,
+  ): FinancedScopeBreakdown | undefined => {
+    try {
+      return parseFinancedScopeBreakdown(source, total);
+    } catch {
+      return undefined;
+    }
+  };
+
   const getBreakdownRows = (calc?: EmissionCalculation) => {
     const rows = Array.isArray(calc?.results?.allResults) ? calc!.results.allResults : [];
-    return rows
+    const mapped = rows
       .filter((r: any) => r && (r.label || r.type))
-      .map((r: any) => ({
-        label: String(r.label || r.type || 'Loan'),
-        attributionFactor: Number(r.attributionFactor || 0),
-        financedEmissions: Number(r.financedEmissions || 0),
-        dataQualityScore:
-          typeof r.dataQualityScore === 'number' && isFinite(r.dataQualityScore) ? r.dataQualityScore : null,
-      }));
+      .map((r: any) => {
+        const financedEmissions = Number(r.financedEmissions || 0);
+        return {
+          label: String(r.label || r.type || 'Loan'),
+          attributionFactor: Number(r.attributionFactor || 0),
+          financedEmissions,
+          dataQualityScore:
+            typeof r.dataQualityScore === 'number' && isFinite(r.dataQualityScore) ? r.dataQualityScore : null,
+          scopeBreakdown: parseScopeBreakdown(r as Record<string, unknown>, financedEmissions),
+        };
+      });
+    if (mapped.length > 0) return mapped;
+    if (!calc) return [];
+    const total = Number(calc.financed_emissions || 0);
+    return [
+      {
+        label: String(calc.formula_id || 'Financed emissions'),
+        attributionFactor: Number(calc.attribution_factor || 0),
+        financedEmissions: total,
+        dataQualityScore: calc.data_quality_score ?? null,
+        scopeBreakdown: parseScopeBreakdown(calc.results as Record<string, unknown>, total),
+      },
+    ];
   };
 
   const prettifyKey = (key: string) =>
@@ -1114,6 +1167,19 @@ const CompanyDetail: React.FC = () => {
                                 )}
                               </tbody>
                             </table>
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            {(expandedBreakdown === 'finance' ? financeBreakdown : facilitatedBreakdown).map((row, idx) => (
+                              <div key={`scope-${idx}`}>
+                                {(expandedBreakdown === 'finance' ? financeBreakdown : facilitatedBreakdown).length > 1 && (
+                                  <p className="text-xs font-semibold text-gray-500 mb-1">{row.label}</p>
+                                )}
+                                <FinancedScopeBreakdownPanel
+                                  breakdown={row.scopeBreakdown}
+                                  totalTco2e={row.financedEmissions}
+                                />
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}

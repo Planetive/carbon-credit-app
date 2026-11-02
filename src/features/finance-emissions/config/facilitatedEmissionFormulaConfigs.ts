@@ -472,11 +472,11 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
       const weightingFactor = inputs.weighting_factor || 0;
       const energyConsumption = inputs.energy_consumption || 0;
       const emissionFactor = inputs.emission_factor || 0;
-      const processEmissions = inputs.process_emissions || 0;
+      const processEmissions = Number(inputs.process_emissions || 0);
       const evic = calculateEVIC(inputs);
       const attributionFactor = calculateAttributionFactorListed(facilitatedAmount, evic);
-      const energyEmissions = energyConsumption * emissionFactor;
-      const facilitatedEmissions = (facilitatedAmount / evic) * weightingFactor * energyEmissions + processEmissions;
+      const energyEmissions = energyConsumption * emissionFactor + processEmissions;
+      const facilitatedEmissions = attributionFactor * weightingFactor * energyEmissions;
       
       return {
         attributionFactor,
@@ -498,12 +498,12 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
           {
             step: 'Energy Emissions',
             value: energyEmissions,
-            formula: `${energyConsumption} × ${emissionFactor} = ${energyEmissions.toFixed(2)} tCO2e`
+            formula: `${energyConsumption} × ${emissionFactor}${processEmissions ? ` + ${processEmissions}` : ''} = ${energyEmissions.toFixed(2)} tCO2e`
           },
           {
             step: 'Facilitated Emissions',
             value: facilitatedEmissions,
-            formula: `(${facilitatedAmount} / ${evic}) × ${weightingFactor} × ${energyEmissions} + ${processEmissions} = ${facilitatedEmissions.toFixed(2)} tCO2e`
+            formula: `${attributionFactor.toFixed(6)} × ${weightingFactor} × ${energyEmissions} = ${facilitatedEmissions.toFixed(2)} tCO2e`
           }
         ],
         metadata: {
@@ -586,11 +586,11 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
       const weightingFactor = inputs.weighting_factor || 0;
       const energyConsumption = inputs.energy_consumption || 0;
       const emissionFactor = inputs.emission_factor || 0;
-      const processEmissions = inputs.process_emissions || 0;
+      const processEmissions = Number(inputs.process_emissions || 0);
       const totalEquityPlusDebt = calculateTotalEquityPlusDebt(inputs);
       const attributionFactor = calculateAttributionFactorUnlisted(facilitatedAmount, totalEquityPlusDebt);
-      const energyEmissions = energyConsumption * emissionFactor;
-      const facilitatedEmissions = (facilitatedAmount / totalEquityPlusDebt) * weightingFactor * energyEmissions + processEmissions;
+      const energyEmissions = energyConsumption * emissionFactor + processEmissions;
+      const facilitatedEmissions = attributionFactor * weightingFactor * energyEmissions;
       
       return {
         attributionFactor,
@@ -612,12 +612,12 @@ export const FACILITATED_EMISSION_FORMULAS: FormulaConfig[] = [
           {
             step: 'Energy Emissions',
             value: energyEmissions,
-            formula: `${energyConsumption} × ${emissionFactor} = ${energyEmissions.toFixed(2)} tCO2e`
+            formula: `${energyConsumption} × ${emissionFactor}${processEmissions ? ` + ${processEmissions}` : ''} = ${energyEmissions.toFixed(2)} tCO2e`
           },
           {
             step: 'Facilitated Emissions',
             value: facilitatedEmissions,
-            formula: `(${facilitatedAmount} / ${totalEquityPlusDebt}) × ${weightingFactor} × ${energyEmissions} + ${processEmissions} = ${facilitatedEmissions.toFixed(2)} tCO2e`
+            formula: `${attributionFactor.toFixed(6)} × ${weightingFactor} × ${energyEmissions} = ${facilitatedEmissions.toFixed(2)} tCO2e`
           }
         ],
         metadata: {

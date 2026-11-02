@@ -19,6 +19,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { EpaReportingYearControl } from "@/features/emission-calculator/results/EpaReportingYearControl";
 import OverviewEmissionsCard, {
   OVERVIEW_EMISSIONS_SCOPE_COLORS,
 } from "@/features/dashboard/components/OverviewEmissionsCard";
@@ -48,6 +49,8 @@ export interface CompanyOverviewScreenProps {
   /** True while scope totals are still loading for Emissions Overview. */
   emissionsLoading?: boolean;
   onRetryEmissions?: () => void;
+  reportingYear?: number;
+  onReportingYearChange?: (year: number) => void;
   monitoringModulesActive?: number;
 }
 
@@ -229,6 +232,8 @@ const CompanyOverviewScreen = ({
   emissionsSummary = null,
   emissionsLoading = false,
   onRetryEmissions,
+  reportingYear,
+  onReportingYearChange,
   monitoringModulesActive = 0,
 }: CompanyOverviewScreenProps) => {
   const navigate = useNavigate();
@@ -242,12 +247,15 @@ const CompanyOverviewScreen = ({
   const s2 = kgToTco2eOrNull(emissionsSummary?.scope2Kg ?? null);
   const s3 = kgToTco2eOrNull(emissionsSummary?.scope3Kg ?? null);
   const totalEmissions = kgToTco2eOrNull(emissionsSummary?.grandKg ?? null);
-  const emissionsIncomplete =
+  const emissionsUnavailable =
     !emissionsLoading &&
     (emissionsSummary == null ||
+      emissionsSummary.inventory === "unavailable" ||
+      emissionsSummary.inventory === "missing_organization" ||
       emissionsSummary.status === "incomplete" ||
-      emissionsSummary.status === "missing_organization" ||
-      emissionsSummary.grandKg == null);
+      emissionsSummary.status === "missing_organization");
+  const emissionsPartial = !emissionsLoading && emissionsSummary?.inventory === "partial";
+  const emissionsIncomplete = emissionsUnavailable;
   const tracked = emissionsSummary
     ? dashboardTrackedLabel(emissionsSummary)
     : { value: "Incomplete", sub: "Totals were not shown" };
@@ -288,14 +296,16 @@ const CompanyOverviewScreen = ({
         label: "Scope 2",
         sub: "Energy indirect",
         value: s2,
+        missingLabel: emissionsPartial ? "Unassigned" : "Unavailable",
       },
       {
         label: "Scope 3",
-        sub: "Other indirect",
+        sub: "Legacy undated records are excluded",
         value: s3,
+        missingLabel: emissionsUnavailable ? "Unavailable" : "Legacy excluded",
       },
     ],
-    [s1, s2, s3]
+    [s1, s2, s3, emissionsPartial]
   );
 
   const esgImpactAreas = useMemo(
@@ -473,6 +483,12 @@ const CompanyOverviewScreen = ({
 
       {/* Emissions + ESG — 60% / 40% on xl+ */}
       <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 items-stretch">
+        <div className="space-y-3">
+        {reportingYear != null && onReportingYearChange ? (
+          <div className="max-w-xs">
+            <EpaReportingYearControl year={reportingYear} onChange={onReportingYearChange} />
+          </div>
+        ) : null}
         <OverviewEmissionsCard
           scopeRows={emissionScopeRows}
           donutData={donutData}
@@ -495,6 +511,7 @@ const CompanyOverviewScreen = ({
           onRetry={onRetryEmissions}
           onViewFullResults={() => navigate("/emission-results-calculator")}
         />
+        </div>
         <OverviewEsgProgressCard
           esgScore={esgScore}
           readinessLabel={readinessLabel}

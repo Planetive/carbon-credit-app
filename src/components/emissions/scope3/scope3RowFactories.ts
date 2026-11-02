@@ -48,6 +48,8 @@ export const createEmployeeCommutingRow = (): EmployeeCommutingRow => ({
   id: rowId("ec"),
   travelTypeId: "",
   distance: undefined,
+  distanceBasis: "annual_total",
+  workingDaysPerYear: undefined,
   employees: undefined,
   emissions: undefined,
 });

@@ -49,8 +49,8 @@ import FuelEmissions from "@/components/emissions/scope1/FuelEmissions";
 import RefrigerantEmissions from "@/components/emissions/scope1/RefrigerantEmissions";
 import PassengerVehicleEmissions from "@/components/emissions/scope1/PassengerVehicleEmissions";
 import DeliveryVehicleEmissions from "@/components/emissions/scope1/DeliveryVehicleEmissions";
-import ElectricityEmissions from "@/components/emissions/scope2/ElectricityEmissions";
-import HeatSteamEmissions from "@/components/emissions/scope2/HeatSteamEmissions";
+import { UkPurchasedElectricity } from "@/features/emission-calculator/scope2/components/UkPurchasedElectricity";
+import { UkPurchasedHeatSteam } from "@/features/emission-calculator/scope2/components/UkPurchasedHeatSteam";
 import Scope3Section from "@/features/emission-calculator/scope3/Scope3Section";
 import LCAQuestionnaire from "@/components/emissions/LCAQuestionnaire";
 
@@ -1191,7 +1191,11 @@ const UKCalculatorScreen = () => {
             <div className="w-full" key={`electricity-${resetKey}`}>
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300">
                 <CardContent className="p-8">
-                  <ElectricityEmissions onTotalChange={handleElectricityDataChange} onSaveAndNext={navigateToNextCategory} />
+                  <UkPurchasedElectricity
+                    counterpartyId={companyContext?.counterpartyId}
+                    onTotalChange={handleElectricityDataChange}
+                    onSaveAndNext={navigateToNextCategory}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -1201,7 +1205,11 @@ const UKCalculatorScreen = () => {
             <div className="w-full" key={`heat-${resetKey}`}>
               <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-300">
                 <CardContent className="p-8">
-                  <HeatSteamEmissions onTotalChange={handleHeatSteamDataChange} onSaveAndNext={navigateToNextCategory} />
+                  <UkPurchasedHeatSteam
+                    counterpartyId={companyContext?.counterpartyId}
+                    onTotalChange={handleHeatSteamDataChange}
+                    onSaveAndNext={navigateToNextCategory}
+                  />
                 </CardContent>
               </Card>
             </div>

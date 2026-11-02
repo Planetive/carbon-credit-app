@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Flame } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +18,10 @@ import { LegacySavedInventory } from "./LegacySavedInventory";
 type Props = {
   companyContext?: boolean;
   counterpartyId?: string;
+  reportingYear?: number;
   onDataChange: (rows: Array<{ emissions?: number }>) => void;
   onSaveAndNext?: () => void;
+  onSaved?: () => void;
   /** After inventory delete — parent should re-read sidebar totals from DB. */
   onInventoryChanged?: () => void;
 };
@@ -30,8 +32,10 @@ type Props = {
  */
 export function StationaryCombustionSection({
   counterpartyId,
+  reportingYear,
   onDataChange,
   onInventoryChanged,
+  onSaved,
 }: Props) {
   const [equipmentType, setEquipmentType] = useState<StationaryEquipmentType>("boiler");
   const [site, setSite] = useState("");
@@ -47,6 +51,13 @@ export function StationaryCombustionSection({
     },
     [onDataChange]
   );
+  useEffect(() => {
+    if (!reportingYear) return;
+    setPeriod((current) => {
+      const month = /^(0[1-9]|1[0-2])$/.test(current.slice(5, 7)) ? current.slice(5, 7) : "01";
+      return `${reportingYear}-${month}`;
+    });
+  }, [reportingYear]);
   const restoreActivity = useCallback((context: StationaryActivityContext) => {
     const match = STATIONARY_EQUIPMENT_OPTIONS.find(
       (option) => option.id === context.equipmentType || option.label === context.equipmentType
@@ -149,8 +160,10 @@ export function StationaryCombustionSection({
           site={site}
           equipmentId={sourceId}
           period={period}
+          reportingYear={reportingYear}
           counterpartyId={counterpartyId}
           onVerifiedKgChange={reportVerified}
+          onSaved={onSaved}
           onEditActivity={restoreActivity}
         />
       </FormStep>

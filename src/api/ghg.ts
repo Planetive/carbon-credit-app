@@ -1,4 +1,8 @@
 import { apiFetch } from "./client";
+import {
+  reportingYearFromPeriod,
+  selectDraftAssessment,
+} from "@/features/emission-calculator/results/reportingYear";
 
 export type EmissionAssessment = {
   id: string;
@@ -152,12 +156,12 @@ export async function getOrCreateDraftAssessment(
     framework,
     status: "draft",
   });
-  // Defense: some API builds ignore framework query filtering.
-  const matched = (existing || []).filter((a) => a.framework === framework);
-  if (matched.length > 0) return matched[0];
+  const selected = selectDraftAssessment(existing || [], framework, reportingPeriod);
+  if (selected) return selected;
+  const year = reportingPeriod ? reportingYearFromPeriod(reportingPeriod) : null;
   return createEmissionAssessment({
     framework,
-    reporting_period: reportingPeriod ?? null,
+    reporting_period: year != null ? String(year) : reportingPeriod ?? null,
     status: "draft",
   });
 }

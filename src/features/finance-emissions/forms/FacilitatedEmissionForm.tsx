@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Calculator, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CalculationEngine } from '../engines/CalculationEngine';
 import { ALL_FACILITATED_FORMULAS, getFacilitatedFormulaById } from '../config/facilitatedEmissionFormulaConfigs';
 import { smartConvertUnit } from '../utils/unitConversions';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import type { FacilitatedCalculationResult } from "../types/contracts";
 import { resolveFinancedCalculation } from "@/api/financedConnection";
+import { PcafAuthorityError } from "../utils/pcafAuthority";
+import { questionnaireScopePayload, sumReportedScopes } from "../utils/financedScopeBreakdown";
+import { FinancedScopeBreakdownPanel } from "../components/FinancedScopeBreakdownPanel";
 import { tryLoadFactorSheetViaApi } from "@/api/factorDualRead";
 import SectorProxyInputs from "./SectorProxyInputs";
 import EnergyEmissionInputs from "./EnergyEmissionInputs";
@@ -27,6 +29,9 @@ interface FacilitatedEmissionFormProps {
   calculationMethod?: string; // '2a' | '2b' | '3a' | '3c' when no company GHG
   verifiedEmissions?: number; // Auto-calculated verified emissions from parent
   unverifiedEmissions?: number; // Auto-calculated unverified emissions from parent
+  scope1Emissions?: number | null;
+  scope2Emissions?: number | null;
+  scope3Emissions?: number | null;
   onCalculationComplete?: (result: FacilitatedCalculationResult) => void;
 }
 
@@ -118,10 +123,15 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   calculationMethod = '',
   verifiedEmissions = 0,
   unverifiedEmissions = 0,
+  scope1Emissions: propScope1,
+  scope2Emissions: propScope2,
+  scope3Emissions: propScope3,
   onCalculationComplete
 }) => {
   const { toast } = useToast();
-  const calculationEngine = new CalculationEngine();
+  const calcGenerationRef = useRef(0);
+  const inputsVersionRef = useRef(0);
+  const [isCalculating, setIsCalculating] = useState(false);
   
   const [formData, setFormData] = useState({
     // Financial Information
@@ -174,6 +184,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState("");
 
+  useEffect(() => {
+    inputsVersionRef.current += 1;
+  }, [formData, companyType]);
+
   // Load questionnaire data from database and restore saved form state
   useEffect(() => {
     const initializeForm = async () => {
@@ -201,10 +215,12 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
             const dbCompanyType = questionnaire.corporate_structure === 'listed' ? 'listed' : 'unlisted';
             setCompanyType(dbCompanyType);
             
-            // Calculate total emissions from scope 1, 2, 3
-            const totalEmissions = (questionnaire.scope1_emissions || 0) + 
-                                 (questionnaire.scope2_emissions || 0) + 
-                                 (questionnaire.scope3_emissions || 0);
+            const totalEmissions =
+              sumReportedScopes(
+                questionnaire.scope1_emissions,
+                questionnaire.scope2_emissions,
+                questionnaire.scope3_emissions
+              ) ?? 0;
             
             console.log('Auto-fill debug:', {
               scope1: questionnaire.scope1_emissions,
@@ -512,6 +528,10 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
   };
 
   const calculateFacilitatedEmission = () => {
+    void runFacilitatedCalculation();
+  };
+
+  const runFacilitatedCalculation = async () => {
     if (!selectedFormula) {
       toast({
         title: "No Formula Selected",
@@ -596,6 +616,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
          verified_emissions: smartConvertUnit(formData.verifiedEmissions, formData.verifiedEmissionsUnit),
          // Option 1b - Unverified GHG Emissions (convert to tonnes CO2e)
          unverified_emissions: smartConvertUnit(formData.unverifiedEmissions, formData.unverifiedEmissionsUnit),
+         ...questionnaireScopePayload(propScope1, propScope2, propScope3),
          // Option 2a - EPA/DEFRA electricity (energy_consumption already in tCO2e, EF = 1)
          energy_consumption: formData.energy_consumption || 0,
          emission_factor: selectedOptionCode === '2b' ? productionEmissionFactor : (formData.emission_factor || 0),
@@ -619,36 +640,32 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
          sector_intensity_unit: formData.sector_intensity_unit,
        };
 
-      const calculationResult = calculationEngine.calculate(selectedFormula, calculationInputs, companyType === 'unlisted' ? 'private' : companyType);
-      
-      const localResult: FacilitatedCalculationResult = {
-        attributionFactor: calculationResult.attributionFactor,
-        facilitatedEmission: calculationResult.financedEmissions,
-        evic: companyType === 'listed' ? totalAssetsValue : undefined,
-        totalEquityPlusDebt: companyType === 'unlisted' ? totalAssetsValue : undefined,
-        dataQualityScore: calculationResult.dataQualityScore,
-        methodology: calculationResult.methodology, 
-        calculationSteps: calculationResult.calculationSteps
-      };
-
-      // Instant local preview; parent callback after API confirm (or local if JWT off)
-      setResult(localResult);
-
-      void (async () => {
+      const generation = ++calcGenerationRef.current;
+      const inputsVersion = inputsVersionRef.current;
+      setIsCalculating(true);
+      try {
         const confirmed = await resolveFinancedCalculation({
           calc_kind: "facilitated",
           formula_id: selectedFormula,
           company_type: companyType === "unlisted" ? "unlisted" : companyType,
           inputs: calculationInputs as Record<string, unknown>,
           persist: false,
-          local: {
-            attributionFactor: calculationResult.attributionFactor,
-            financedEmissions: calculationResult.financedEmissions,
-            dataQualityScore: calculationResult.dataQualityScore,
-            methodology: calculationResult.methodology,
-            calculationSteps: calculationResult.calculationSteps,
-          },
         });
+        if (generation !== calcGenerationRef.current) {
+          return;
+        }
+        if (inputsVersion !== inputsVersionRef.current) {
+          throw new PcafAuthorityError(
+            "STALE",
+            "Inputs changed before the calculation finished. Recalculate to save a reportable result."
+          );
+        }
+        if (confirmed.authority !== "backend") {
+          throw new PcafAuthorityError(
+            "INVALID_RESPONSE",
+            "Local preview cannot be saved as a reportable result."
+          );
+        }
 
         const result: FacilitatedCalculationResult = {
           attributionFactor: confirmed.attributionFactor,
@@ -656,12 +673,14 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
           evic: companyType === 'listed' ? totalAssetsValue : undefined,
           totalEquityPlusDebt: companyType === 'unlisted' ? totalAssetsValue : undefined,
           dataQualityScore: confirmed.dataQualityScore,
-          methodology: confirmed.methodology ?? calculationResult.methodology,
-          calculationSteps:
-            confirmed.calculationSteps ?? calculationResult.calculationSteps,
+          methodology: confirmed.methodology,
+          calculationSteps: confirmed.calculationSteps,
           pcafFormulaId: selectedFormula,
           pcafInputs: calculationInputs as Record<string, unknown>,
           companyType,
+          authority: confirmed.authority,
+          inputFingerprint: confirmed.inputFingerprint,
+          scopeBreakdown: confirmed.scopeBreakdown,
         };
 
         setResult(result);
@@ -678,14 +697,28 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
         if (onCalculationComplete) {
           onCalculationComplete(result);
         }
-      })();
-      
-      toast({
-        title: "Facilitated Emission Calculation Complete",
-        description: `Facilitated emission calculated successfully.`,
-        variant: "default"
-      });
+
+        toast({
+          title: "Facilitated Emission Calculation Complete",
+          description: `Facilitated emission calculated successfully.`,
+          variant: "default"
+        });
+      } catch (error) {
+        if (generation === calcGenerationRef.current) {
+          setResult(null);
+          toast({
+            title: "Calculation Error",
+            description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            variant: "destructive"
+          });
+        }
+      } finally {
+        if (generation === calcGenerationRef.current) {
+          setIsCalculating(false);
+        }
+      }
     } catch (error) {
+      setResult(null);
       toast({
         title: "Calculation Error",
         description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -1269,7 +1302,7 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
         <Button
           type="button"
           onClick={calculateFacilitatedEmission}
-          disabled={!selectedFormula}
+          disabled={!selectedFormula || isCalculating}
           className="h-11 rounded-xl bg-[#0F6E56] px-6 text-white hover:bg-[#0D5E49]"
         >
           <Calculator className="mr-2 h-4 w-4" />
@@ -1299,6 +1332,12 @@ export const FacilitatedEmissionForm: React.FC<FacilitatedEmissionFormProps> = (
               unit="tCO₂e"
             />
           </FieldGrid>
+          <div className="pt-3">
+            <FinancedScopeBreakdownPanel
+              breakdown={result.scopeBreakdown}
+              totalTco2e={result.facilitatedEmission}
+            />
+          </div>
         </InputSection>
       )}
     </div>

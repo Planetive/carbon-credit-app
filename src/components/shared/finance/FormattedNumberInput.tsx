@@ -5,8 +5,9 @@ import { formatNumberWithCommas, handleFormattedNumberChange } from "./numberFor
 interface FormattedNumberInputProps {
   id?: string;
   placeholder?: string;
-  value: number;
+  value: number | null;
   onChange: (value: number) => void;
+  onClear?: () => void;
   className?: string;
   min?: number;
   max?: number;
@@ -19,21 +20,28 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   placeholder = "0",
   value,
   onChange,
+  onClear,
   className,
   min,
   max,
   step,
   disabled,
 }) => {
-  const [displayValue, setDisplayValue] = React.useState(value ? formatNumberWithCommas(value) : "");
+  const [displayValue, setDisplayValue] = React.useState(
+    value == null ? "" : formatNumberWithCommas(value)
+  );
 
   React.useEffect(() => {
-    setDisplayValue(value ? formatNumberWithCommas(value) : "");
+    setDisplayValue(value == null ? "" : formatNumberWithCommas(value));
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setDisplayValue(inputValue);
+    if (inputValue === "" && onClear) {
+      onClear();
+      return;
+    }
     handleFormattedNumberChange(inputValue, onChange);
   };
 

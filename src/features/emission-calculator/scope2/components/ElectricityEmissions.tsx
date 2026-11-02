@@ -21,6 +21,7 @@ import {
   resolveElectricityEmissionsKg,
 } from "@/api/calcConnection";
 import { FACTORS, SCOPE2_FACTORS } from "@/components/emissions/shared/EmissionFactors";
+import { LocationBasedElectricity } from "./LocationBasedElectricity";
 import { formatDynamicEmission } from "@/features/emission-calculator/scope1/components/emissionFormatting";
 import {
   loadEpaFuelFactors,
@@ -72,9 +73,13 @@ interface ElectricityEmissionsProps {
       emissions?: number;
     }>;
   }) => void;
+  /** EPA inventory path. Finance and UK embeds leave this unset. */
+  authoritativeInventory?: boolean;
+  reportingYear?: number;
+  onInventoryChanged?: () => void;
 }
 
-const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
+const LegacyElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
   onTotalChange,
   onSaveAndNext,
   companyContext = false,
@@ -875,6 +880,21 @@ const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = ({
       </div>
     </div>
   );
+};
+
+const ElectricityEmissions: React.FC<ElectricityEmissionsProps> = (props) => {
+  if (props.authoritativeInventory) {
+    return (
+      <LocationBasedElectricity
+        reportingYear={props.reportingYear}
+        counterpartyId={props.counterpartyId}
+        onTotalChange={props.onTotalChange}
+        onSaveAndNext={props.onSaveAndNext}
+        onInventoryChanged={props.onInventoryChanged}
+      />
+    );
+  }
+  return <LegacyElectricityEmissions {...props} />;
 };
 
 export default ElectricityEmissions;

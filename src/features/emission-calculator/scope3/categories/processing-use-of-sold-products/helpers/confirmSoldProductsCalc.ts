@@ -2,6 +2,7 @@ import {
   resolveSoldProductsElectricityKg,
   resolveSoldProductsQtyFactorKg,
 } from "@/api/calcConnection";
+import { isRejectedScope3GridPlaceholder } from "@/lib/emissions/scope3FactorUnits";
 import { SCOPE2_FACTORS } from "@/components/emissions/shared/EmissionFactors";
 import type {
   GridCountry,
@@ -10,8 +11,15 @@ import type {
   UseOfSoldProductsRow,
 } from "../types";
 
-const gridFactor = (country?: GridCountry) =>
+/** Legacy UAE/Pakistan placeholders — never treat as verified for Scope 3. */
+const legacyGridFactor = (country?: GridCountry) =>
   country ? SCOPE2_FACTORS.GridCountries?.[country] : undefined;
+
+function verifiedGridFactor(country?: GridCountry): number | undefined {
+  const factor = legacyGridFactor(country);
+  if (factor == null || isRejectedScope3GridPlaceholder(factor)) return undefined;
+  return factor;
+}
 
 async function qtyFactorKg(
   quantity?: number,
@@ -29,17 +37,22 @@ async function electricityKg(opts: {
   other_sources?: OtherSourceRow[];
 }): Promise<number | undefined> {
   if (!opts.total_kwh) return undefined;
-  const sumOther = (opts.other_sources || []).reduce(
-    (s, r) => s + (r.emissions || 0),
-    0
-  );
-  return resolveSoldProductsElectricityKg({
+  // Refuse legacy other×kWh mixing and placeholder/missing grid factors.
+  if (opts.other_pct != null && opts.other_pct > 0) return undefined;
+  if ((opts.other_sources || []).some((r) => (r.emissions || 0) !== 0)) {
+    return undefined;
+  }
+  if (opts.grid_factor == null || isRejectedScope3GridPlaceholder(opts.grid_factor)) {
+    return undefined;
+  }
+  const kg = await resolveSoldProductsElectricityKg({
     total_kwh: opts.total_kwh,
     grid_pct: opts.grid_pct,
     grid_factor: opts.grid_factor,
-    other_pct: opts.other_pct,
-    other_row_emissions_sum: sumOther,
+    other_pct: undefined,
+    other_row_emissions_sum: undefined,
   });
+  return kg ?? undefined;
 }
 
 /** Confirm processing-of-sold-products row via qty-factor + electricity calc APIs. */
@@ -62,12 +75,18 @@ export async function confirmProcessingRowKg(
   const elecKg = await electricityKg({
     total_kwh: row.totalKwh,
     grid_pct: row.gridPct,
-    grid_factor: gridFactor(row.gridCountry),
+    grid_factor: verifiedGridFactor(row.gridCountry),
     other_pct: row.otherPct,
     other_sources: row.otherSources,
   });
 
   if (fuelKg === undefined && elecKg === undefined) return undefined;
+  // If electricity was requested but blocked, do not mix a partial misleading total.
+  if (row.totalKwh && row.totalKwh > 0 && elecKg === undefined) {
+    if (fuelKg === undefined) return undefined;
+    // Fuel-only path still valid when electricity cannot be verified.
+    return Number(fuelKg.toFixed(6));
+  }
   return Number(((fuelKg ?? 0) + (elecKg ?? 0)).toFixed(6));
 }
 
@@ -107,10 +126,13 @@ export async function confirmUseRowKg(
     const elecKg = await electricityKg({
       total_kwh: row.hybridTotalKwh,
       grid_pct: row.hybridGridPct,
-      grid_factor: gridFactor(row.hybridGridCountry),
+      grid_factor: verifiedGridFactor(row.hybridGridCountry),
       other_pct: row.hybridOtherPct,
       other_sources: row.hybridOtherSources,
     });
+    if (row.hybridTotalKwh && row.hybridTotalKwh > 0 && elecKg === undefined) {
+      return undefined;
+    }
     if (fuelKg === undefined && elecKg === undefined) return undefined;
     return Number(((fuelKg ?? 0) + (elecKg ?? 0)).toFixed(6));
   }
@@ -126,7 +148,7 @@ export async function confirmUseRowKg(
     return electricityKg({
       total_kwh: row.electricityTotalKwh,
       grid_pct: row.electricityGridPct,
-      grid_factor: gridFactor(row.electricityGridCountry),
+      grid_factor: verifiedGridFactor(row.electricityGridCountry),
       other_pct: row.electricityOtherPct,
       other_sources: row.electricityOtherSources,
     });
@@ -140,7 +162,7 @@ export async function confirmUseRowKg(
     const elecKg = await electricityKg({
       total_kwh: row.electricityTotalKwh,
       grid_pct: row.electricityGridPct,
-      grid_factor: gridFactor(row.electricityGridCountry),
+      grid_factor: verifiedGridFactor(row.electricityGridCountry),
       other_pct: row.electricityOtherPct,
       other_sources: row.electricityOtherSources,
     });
@@ -148,6 +170,10 @@ export async function confirmUseRowKg(
       row.coolingRefrigerantQuantity,
       row.refrigerantFactor
     );
+    if (row.electricityTotalKwh && row.electricityTotalKwh > 0 && elecKg === undefined) {
+      // Electricity blocked — refrigerant-only only if no kWh requested path needed
+      return refrigKg;
+    }
     if (elecKg === undefined && refrigKg === undefined) return undefined;
     return Number(((elecKg ?? 0) + (refrigKg ?? 0)).toFixed(6));
   }

@@ -16,12 +16,21 @@ import { SupplierAutocomplete } from "@/components/emissions/scope3/SupplierAuto
 import type { Supplier } from "@/components/emissions/scope3/types";
 import { useEmissionSync } from "@/components/emissions/scope3/hooks/useEmissionSync";
 import { USE_JWT_AUTH } from "@/api/config";
-import { resolveSpendBasedEmissionsKg } from "@/api/calcConnection";
+import { ApiError } from "@/api/client";
+import { getOrCreateDraftAssessment } from "@/api/ghg";
+import { calcScope3Spend, saveScope3Spend, verifiedActivityId } from "@/api/scope3Verified";
+import { spendEmissionsKg } from "@/lib/emissions/scope3FactorUnits";
+import {
+  Scope3PeriodFields,
+  scope3Period,
+} from "@/features/emission-calculator/scope3/verified/Scope3PeriodFields";
+import { readSelectedReportingYear } from "@/features/emission-calculator/results/reportingYear";
 
 interface CapitalGoodsSectionProps {
   user: { id: string } | null;
   companyContext?: boolean;
   counterpartyId?: string;
+  framework?: "uk" | "epa";
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
 }
@@ -30,6 +39,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
   user,
   companyContext,
   counterpartyId,
+  framework = "uk",
   setEmissionData,
   onSaveAndNext,
 }) => {
@@ -40,6 +50,10 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
   const [savingCapitalGoods, setSavingCapitalGoods] = useState(false);
   const [deletingCapitalGoods, setDeletingCapitalGoods] = useState<Set<string>>(new Set());
   const [isInitialLoadCapitalGoods, setIsInitialLoadCapitalGoods] = useState(true);
+  const [year, setYear] = useState(readSelectedReportingYear);
+  const [month, setMonth] = useState("01");
+  const [factorError, setFactorError] = useState<string | null>(null);
+  const period = scope3Period(year, month);
 
   const newCapitalGoodsRow = (): CapitalGoodsRow => ({
     id: `capg-${Date.now()}-${Math.random()}`,
@@ -56,15 +70,21 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
 
   const updateCapitalGoodsRow = (id: string, patch: Partial<CapitalGoodsRow>) => {
     let snapshot: CapitalGoodsRow | null = null;
-    let factor = 0;
     setCapitalGoodsRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
         const updated: CapitalGoodsRow = { ...r, ...patch };
         const supplier: Supplier | null | undefined = updated.supplier;
         if (supplier && typeof updated.amount === "number" && updated.amount > 0) {
-          factor = supplier.emission_factor;
-          updated.emissions = updated.amount * supplier.emission_factor;
+          updated.emissions = USE_JWT_AUTH
+            ? undefined
+            : spendEmissionsKg({
+                amount: updated.amount,
+                emissionFactor: supplier.emission_factor,
+                factorUnit: supplier.unit,
+                activityCurrency: "USD",
+                activityPriceYear: 2022,
+              }) ?? undefined;
         } else {
           updated.emissions = undefined;
         }
@@ -76,24 +96,43 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
     if (
       USE_JWT_AUTH &&
       snapshot &&
+      snapshot.supplier &&
       typeof snapshot.amount === "number" &&
-      snapshot.emissions != null
+      snapshot.amount > 0
     ) {
       const snap = snapshot;
       void (async () => {
-        const kg = await resolveSpendBasedEmissionsKg({
-          amount: snap.amount!,
-          emission_factor: factor,
-          category: "capital_goods",
-        });
-        setCapitalGoodsRows((prev) =>
-          prev.map((r) => {
-            if (r.id !== id) return r;
-            if (r.amount !== snap.amount) return r;
-            if (r.emissions === kg) return r;
-            return { ...r, emissions: kg };
-          }),
-        );
+        setFactorError(null);
+        try {
+          const calculated = await calcScope3Spend({
+            amount: snap.amount!,
+            period,
+            supplier_id: snap.supplier!.id,
+            supplier_code: snap.supplier!.code,
+            activity_currency: "USD",
+            activity_price_year: 2022,
+            category: "capital_goods",
+          });
+          const kg = Number(calculated.emissions_kg);
+          setCapitalGoodsRows((prev) =>
+            prev.map((r) => {
+              if (r.id !== id) return r;
+              if (r.amount !== snap.amount) return r;
+              return { ...r, emissions: Number.isFinite(kg) ? kg : undefined };
+            }),
+          );
+        } catch (err) {
+          const message =
+            err instanceof ApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Verified capital goods factor unavailable";
+          setFactorError(message);
+          setCapitalGoodsRows((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, emissions: undefined } : r)),
+          );
+        }
       })();
     }
   };
@@ -125,7 +164,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
                   id: raw.supplier_id,
                   supplier_name: raw.supplier_name || "",
                   code: raw.supplier_code || "",
-                  unit: "PKR",
+                  unit: "USD",
                   emission_factor: raw.emission_factor,
                 }
               : null;
@@ -170,7 +209,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
             id: r.id,
             category: "capital_goods",
             activity: `${r.supplier.supplier_name} (${r.supplier.code})`,
-            unit: "PKR",
+            unit: "USD",
             quantity: r.amount,
             emissions: r.emissions || 0,
           }
@@ -193,7 +232,8 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         r.supplier &&
         typeof r.amount === "number" &&
         r.amount > 0 &&
-        !r.isExisting,
+        !r.isExisting &&
+        (USE_JWT_AUTH || r.emissions != null),
     );
 
     const changedExisting = capitalGoodsRows.filter((r) => {
@@ -216,7 +256,47 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
     }
 
     setSavingCapitalGoods(true);
+    setFactorError(null);
     try {
+      if (USE_JWT_AUTH) {
+        const assessment = await getOrCreateDraftAssessment(framework, period);
+        const toSave = [...newEntries, ...changedExisting];
+        for (const r of toSave) {
+          if (!r.supplier || typeof r.amount !== "number") continue;
+          const saved = await saveScope3Spend({
+            amount: r.amount,
+            period,
+            assessment_id: assessment.id,
+            counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
+            activity_id: verifiedActivityId(r.dbId),
+            client_entry_id: r.id,
+            supplier_id: r.supplier.id,
+            supplier_code: r.supplier.code,
+            activity_currency: "USD",
+            activity_price_year: 2022,
+            category: "capital_goods",
+          });
+          const kg = Number(saved.calculation.emissions_kg);
+          setCapitalGoodsRows((prev) =>
+            prev.map((row) =>
+              row.id === r.id
+                ? {
+                    ...row,
+                    dbId: saved.activity_id,
+                    isExisting: true,
+                    emissions: Number.isFinite(kg) ? kg : undefined,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast({
+          title: "Verified capital goods saved",
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+        });
+        return;
+      }
+
       if (newEntries.length > 0) {
         const payload = newEntries.map((r) => ({
           user_id: user.id,
@@ -269,7 +349,7 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
                 id: raw.supplier_id,
                 supplier_name: raw.supplier_name || "",
                 code: raw.supplier_code || "",
-                unit: "PKR",
+                unit: "USD",
                 emission_factor: raw.emission_factor,
               }
             : null,
@@ -281,9 +361,14 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
+      const message =
+        e instanceof ApiError
+          ? e.message
+          : err.message || "Failed to save";
+      setFactorError(message);
       toast({
         title: "Error",
-        description: err.message || "Failed to save",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -345,7 +430,8 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         <div>
           <h4 className="text-lg font-semibold text-gray-900">Capital Goods</h4>
           <p className="text-sm text-gray-600">
-            Record details for purchased capital goods
+            Verified saves use 2022 USD purchaser-price factors for the selected reporting month.
+            Client emission totals are not trusted.
           </p>
         </div>
         <Button
@@ -357,9 +443,21 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         </Button>
       </div>
 
+      <Scope3PeriodFields
+        year={year}
+        month={month}
+        onYearChange={setYear}
+        onMonthChange={setMonth}
+      />
+      {factorError && (
+        <p className="text-sm text-red-600" role="alert">
+          {factorError}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mb-4">
         <Label className="text-gray-500 font-medium">Equipment</Label>
-        <Label className="text-gray-500 font-medium">Amount (PKR)</Label>
+        <Label className="text-gray-500 font-medium">Amount (2022 USD)</Label>
         <Label className="text-gray-500 font-medium">Emissions</Label>
       </div>
 
@@ -434,11 +532,11 @@ export const CapitalGoodsSection: React.FC<CapitalGoodsSectionProps> = ({
         <div className="text-gray-700 font-medium">
           Total Amount:{" "}
           <span className="font-semibold">
-            PKR{" "}
             {totalAmount.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
-            })}
+            })}{" "}
+            USD (2022)
           </span>{" "}
           | Total Emissions:{" "}
           <span className="font-semibold">

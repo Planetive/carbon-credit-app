@@ -24,6 +24,25 @@ import {
   type FinancedEmission,
 } from '@/api/financed';
 import { resolveFinancedCalculation } from '@/api/financedConnection';
+import { serializeFinancedScopeBreakdown } from '@/features/finance-emissions/utils/financedScopeBreakdown';
+import {
+  FASTAPI_CONFIG_MESSAGE,
+  PcafAuthorityError,
+  isBackendCalculationAvailable,
+} from '@/features/finance-emissions/utils/pcafAuthority';
+import {
+  emissionCalculationToReportingRow,
+  normalizeFinancedCalcKind,
+  type FinancedCalculationRow,
+} from '@/utils/financedEmissionsReporting';
+import {
+  extractFinancingInstanceId,
+  matchFinancedRecordForSave,
+  withFinancingIdentitySteps,
+  engineInputsWithoutIdentity,
+  FINANCING_INSTANCE_FIELD,
+  type ExistingFinancedRecord,
+} from '@/utils/financedExposureIdentity';
 
 function financedToEmissionCalculation(row: FinancedEmission): EmissionCalculation {
   const calcType =
@@ -596,6 +615,7 @@ export class PortfolioClient {
           company_type: string;
           formula_id: string;
           formula_name: string | null;
+          calculation_steps?: unknown;
           financed_emissions: number;
           attribution_factor: number | null;
           evic: number | null;
@@ -612,7 +632,9 @@ export class PortfolioClient {
           calculation_type: r.calculation_type === 'finance_emission' ? 'finance' : 'facilitated',
           company_type: r.company_type,
           formula_id: r.formula_id,
-          inputs: {},
+          inputs: extractFinancingInstanceId(r)
+            ? { [FINANCING_INSTANCE_FIELD]: extractFinancingInstanceId(r) }
+            : {},
           results: {
             attributionFactor: r.attribution_factor,
             financedEmissions: r.financed_emissions,
@@ -983,7 +1005,120 @@ export class PortfolioClient {
     if (error) throw error;
   }
 
-  // Portfolio totals
+  /**
+   * All financed/facilitated calculation rows for reporting.
+   * JWT: app.financed_emissions. Legacy: emission_calculations plus
+   * finance_emission_calculations. Does not choose totals — callers must use
+   * summarizeFinancedPortfolio / selectFinancedGroup.
+   */
+  static async listFinancedReportingRows(): Promise<FinancedCalculationRow[]> {
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions();
+      return rows.flatMap((row) => {
+        const calcKind = normalizeFinancedCalcKind(row.calc_kind);
+        if (!calcKind) return [];
+        const mapped: FinancedCalculationRow = {
+          id: row.id,
+          counterpartyId: row.counterparty_id ?? null,
+          calcKind,
+          formulaId: row.formula_id ?? null,
+          formulaName: row.formula_name ?? null,
+          financedEmissions: Number(row.financed_emissions ?? 0) || 0,
+          status: row.status ?? 'completed',
+          updatedAt: row.updated_at ?? null,
+          createdAt: row.created_at ?? null,
+          source: 'jwt',
+          results: row.results,
+          dataQualityScore:
+            row.data_quality_score == null ? null : Number(row.data_quality_score),
+          inputs: (row.inputs || null) as Record<string, unknown> | null,
+          exposureId: row.exposure_id ?? null,
+          attributionFactor:
+            row.attribution_factor == null ? null : Number(row.attribution_factor),
+          legacySource: row.legacy_source ?? null,
+          legacyId: row.legacy_id ?? null,
+          financingInstanceId: extractFinancingInstanceId(row.inputs) || extractFinancingInstanceId(row),
+        };
+        return [mapped];
+      });
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: ecData, error: ecError } = await supabase
+      .from('emission_calculations')
+      .select(
+        'id, counterparty_id, exposure_id, calculation_type, formula_id, financed_emissions, status, created_at, updated_at, results, data_quality_score, inputs, attribution_factor'
+      )
+      .eq('user_id', user.id);
+
+    if (ecError) throw ecError;
+
+    const { data: fecData, error: fecError } = await supabase
+      .from('finance_emission_calculations')
+      .select(
+        'id, counterparty_id, calculation_type, formula_id, formula_name, financed_emissions, status, created_at, updated_at, attribution_factor, data_quality_score, calculation_steps'
+      )
+      .eq('user_id', user.id);
+
+    if (fecError) {
+      console.warn('listFinancedReportingRows: finance_emission_calculations unavailable', fecError);
+    }
+
+    const fromEc = ((ecData || []) as Array<Record<string, unknown>>).flatMap((raw) => {
+      const mapped = emissionCalculationToReportingRow(
+        {
+          id: String(raw.id),
+          counterparty_id: (raw.counterparty_id as string | null) ?? null,
+          exposure_id: (raw.exposure_id as string | null) ?? null,
+          calculation_type: String(raw.calculation_type ?? ''),
+          formula_id: (raw.formula_id as string | null) ?? null,
+          financed_emissions: raw.financed_emissions,
+          status: (raw.status as string | null) ?? null,
+          created_at: (raw.created_at as string | null) ?? null,
+          updated_at: (raw.updated_at as string | null) ?? null,
+          results: raw.results,
+          data_quality_score:
+            raw.data_quality_score == null ? null : Number(raw.data_quality_score),
+          inputs: (raw.inputs as Record<string, unknown> | null) ?? null,
+          attribution_factor:
+            raw.attribution_factor == null ? null : Number(raw.attribution_factor),
+        },
+        'emission_calculations',
+      );
+      return mapped ? [mapped] : [];
+    });
+
+    const fromFec = ((fecData || []) as Array<Record<string, unknown>>).flatMap((raw) => {
+      const mapped = emissionCalculationToReportingRow(
+        {
+          id: String(raw.id),
+          counterparty_id: (raw.counterparty_id as string | null) ?? null,
+          calculation_type: String(raw.calculation_type ?? ''),
+          formula_id: (raw.formula_id as string | null) ?? null,
+          formula_name: (raw.formula_name as string | null) ?? null,
+          financed_emissions: raw.financed_emissions,
+          status: (raw.status as string | null) ?? null,
+          created_at: (raw.created_at as string | null) ?? null,
+          updated_at: (raw.updated_at as string | null) ?? null,
+          data_quality_score:
+            raw.data_quality_score == null ? null : Number(raw.data_quality_score),
+          attribution_factor:
+            raw.attribution_factor == null ? null : Number(raw.attribution_factor),
+          calculation_steps: raw.calculation_steps,
+        },
+        'finance_emission_calculations',
+      );
+      return mapped ? [mapped] : [];
+    });
+
+    return [...fromEc, ...fromFec];
+  }
+
+  // Portfolio totals from the legacy RPC. That SQL sums every emission_calculations
+  // row, including aggregate plus components. Do not use this for reportable
+  // finance totals — use listFinancedReportingRows + summarizeFinancedPortfolio.
   static async getPortfolioTotals(): Promise<PortfolioTotals> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -1075,57 +1210,62 @@ export class PortfolioClient {
   }): Promise<void> {
     const calcKind =
       data.calculation_type === 'facilitated_emission' ? 'facilitated' : 'finance';
-    const financedEmissions = Number(data.financed_emissions ?? 0) || 0;
-    const attributionFactor =
-      data.attribution_factor == null ? null : Number(data.attribution_factor);
-    const dataQualityScore =
-      data.data_quality_score == null ? null : Number(data.data_quality_score);
+    const pcafFormulaId =
+      typeof data.pcaf_formula_id === 'string' ? data.pcaf_formula_id : null;
+    const pcafInputs =
+      data.pcaf_inputs && typeof data.pcaf_inputs === 'object'
+        ? (data.pcaf_inputs as Record<string, unknown>)
+        : null;
+    const companyTypeForCalc =
+      typeof data.company_type === 'string' ? data.company_type : 'unlisted';
+
+    if (!isBackendCalculationAvailable()) {
+      throw new PcafAuthorityError('CONFIG', FASTAPI_CONFIG_MESSAGE);
+    }
+    if (!pcafFormulaId || !pcafInputs) {
+      throw new PcafAuthorityError(
+        'INVALID_RESPONSE',
+        'Cannot save a reportable financed-emissions result without a backend PCAF calculation.',
+      );
+    }
 
     if (USE_JWT_AUTH) {
-      let financedEmissionsFinal = financedEmissions;
-      let attributionFactorFinal = attributionFactor;
-      let dataQualityScoreFinal = dataQualityScore;
-
-      const pcafFormulaId =
-        typeof data.pcaf_formula_id === 'string' ? data.pcaf_formula_id : null;
-      const pcafInputs =
-        data.pcaf_inputs && typeof data.pcaf_inputs === 'object'
-          ? (data.pcaf_inputs as Record<string, unknown>)
-          : null;
-      const companyTypeForCalc =
-        typeof data.company_type === 'string' ? data.company_type : 'unlisted';
-
-      if (pcafFormulaId && pcafInputs) {
-        const confirmed = await resolveFinancedCalculation({
-          calc_kind: calcKind,
-          formula_id: pcafFormulaId,
-          company_type: companyTypeForCalc,
-          inputs: pcafInputs,
-          counterparty_id: data.counterparty_id,
-          persist: false,
-          local: {
-            attributionFactor: attributionFactor ?? 0,
-            financedEmissions,
-            dataQualityScore: dataQualityScore ?? undefined,
-          },
-        });
-        financedEmissionsFinal = confirmed.financedEmissions;
-        attributionFactorFinal = confirmed.attributionFactor;
-        dataQualityScoreFinal =
-          confirmed.dataQualityScore == null
-            ? null
-            : confirmed.dataQualityScore;
-      }
+      const confirmed = await resolveFinancedCalculation({
+        calc_kind: calcKind,
+        formula_id: pcafFormulaId,
+        company_type: companyTypeForCalc,
+        inputs: engineInputsWithoutIdentity(pcafInputs),
+        counterparty_id: data.counterparty_id,
+        persist: false,
+      });
+      const financedEmissionsFinal = confirmed.financedEmissions;
+      const attributionFactorFinal = confirmed.attributionFactor;
+      const dataQualityScoreFinal =
+        confirmed.dataQualityScore == null ? null : confirmed.dataQualityScore;
 
       const existing = await listFinancedEmissions({
         counterparty_id: data.counterparty_id,
         calc_kind: calcKind,
       });
-      const match = existing.find(
-        (r) =>
-          r.formula_id === data.formula_id &&
-          (r.counterparty_id || null) === data.counterparty_id
-      );
+      const instanceId =
+        typeof data.financing_instance_id === 'string' && data.financing_instance_id
+          ? data.financing_instance_id
+          : extractFinancingInstanceId(pcafInputs) || extractFinancingInstanceId(data);
+      const currentCountForFormula =
+        typeof data.current_count_for_formula === 'number' && data.current_count_for_formula > 0
+          ? data.current_count_for_formula
+          : 1;
+      const existingRecords: ExistingFinancedRecord[] = existing.map((r) => ({
+        id: r.id,
+        formulaId: r.formula_id ?? null,
+        financingInstanceId: extractFinancingInstanceId(r.inputs) || extractFinancingInstanceId(r),
+      }));
+      const match = matchFinancedRecordForSave({
+        existing: existingRecords,
+        formulaId: data.formula_id,
+        financingInstanceId: instanceId,
+        currentCountForFormula,
+      });
       const payload = {
         calc_kind: calcKind,
         company_type: data.company_type,
@@ -1144,11 +1284,20 @@ export class PortfolioClient {
           total_equity_plus_debt: data.total_equity_plus_debt,
           ...(pcafInputs || {}),
           pcaf_formula_id: pcafFormulaId,
+          ...(instanceId
+            ? {
+                [FINANCING_INSTANCE_FIELD]: instanceId,
+                instance_key: typeof data.instance_key === 'string' ? data.instance_key : null,
+              }
+            : {}),
         },
         results: {
           financed_emissions: financedEmissionsFinal,
           attribution_factor: attributionFactorFinal,
           data_quality_score: dataQualityScoreFinal,
+          emissions_unit: confirmed.emissionsUnit,
+          methodology: confirmed.methodology,
+          ...serializeFinancedScopeBreakdown(confirmed.scopeBreakdown),
         },
         financed_emissions: financedEmissionsFinal,
         attribution_factor: attributionFactorFinal,
@@ -1164,69 +1313,8 @@ export class PortfolioClient {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    throw new PcafAuthorityError('CONFIG', FASTAPI_CONFIG_MESSAGE);
 
-    console.log('💾 PortfolioClient - saveFinanceEmissionCalculation called:', {
-      user_id: user.id,
-      counterparty_id: data.counterparty_id,
-      calculation_type: data.calculation_type,
-      financed_emissions: data.financed_emissions
-    });
-
-    // First, try to find existing calculation with same counterparty_id, calculation_type, and formula_id
-    const { data: existing, error: findError } = await supabase
-      .from('finance_emission_calculations')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('counterparty_id', data.counterparty_id)
-      .eq('calculation_type', data.calculation_type)
-      .eq('formula_id', data.formula_id)
-      .single();
-
-    if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('❌ PortfolioClient - Error finding existing record:', findError);
-      throw findError;
-    }
-
-    if (existing) {
-      console.log('📝 PortfolioClient - Updating existing record:', existing.id);
-      // Update existing record
-      const { data: updated, error: updateError } = await supabase
-        .from('finance_emission_calculations')
-        .update({
-          ...data,
-          user_id: user.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('❌ PortfolioClient - Error updating record:', updateError);
-        throw updateError;
-      }
-      console.log('✅ PortfolioClient - Record updated successfully:', updated);
-    } else {
-      console.log('➕ PortfolioClient - Creating new record');
-      // Create new record
-      const { data: created, error: createError } = await supabase
-        .from('finance_emission_calculations')
-        .insert({
-          ...data,
-          user_id: user.id
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('❌ PortfolioClient - Error creating record:', createError);
-        console.error('   Data being inserted:', { ...data, user_id: user.id });
-        throw createError;
-      }
-      console.log('✅ PortfolioClient - Record created successfully:', created);
-    }
   }
 
   /** Delete all finance/facilitated calcs for a counterparty+mode (fresh start). */
@@ -1271,23 +1359,37 @@ export class PortfolioClient {
   }
 
   /**
-   * Remove stale per-formula rows that are no longer in the current results.
+   * Remove stale instanced rows that are no longer in the current results.
    * Never deletes formula_id === 'aggregate'.
+   * Never deletes unlinked legacy rows (no financing_instance_id).
    */
   static async cleanupStaleEmissionCalculations(
     counterpartyId: string,
     calculationMode: 'finance' | 'facilitated',
-    keepFormulaIds: string[]
+    keepFormulaIds: string[],
+    keepInstanceIds: string[] = [],
   ): Promise<void> {
-    const keep = new Set(keepFormulaIds.filter(Boolean));
-    keep.add('aggregate');
+    void keepFormulaIds;
+    const keepInstances = new Set(keepInstanceIds.filter(Boolean));
+
+    const isStaleInstanced = (row: {
+      formula_id?: string | null;
+      inputs?: unknown;
+      calculation_steps?: unknown;
+    }) => {
+      const formulaId = row.formula_id || '';
+      if (formulaId === 'aggregate') return false;
+      const instanceId = extractFinancingInstanceId(row.inputs) || extractFinancingInstanceId(row);
+      if (!instanceId) return false;
+      return keepInstances.size > 0 && !keepInstances.has(instanceId);
+    };
 
     if (USE_JWT_AUTH) {
       const rows = await listFinancedEmissions({
         counterparty_id: counterpartyId,
         calc_kind: calculationMode,
       });
-      const stale = rows.filter((r) => r.formula_id && !keep.has(r.formula_id));
+      const stale = rows.filter((r) => isStaleInstanced(r));
       await Promise.all(stale.map((r) => deleteFinancedEmission(r.id)));
       return;
     }
@@ -1300,13 +1402,13 @@ export class PortfolioClient {
 
     const { data: financeRows } = await supabase
       .from('finance_emission_calculations')
-      .select('id, formula_id')
+      .select('id, formula_id, calculation_steps')
       .eq('user_id', user.id)
       .eq('counterparty_id', counterpartyId)
       .eq('calculation_type', financeType);
 
     const financeStaleIds = (financeRows || [])
-      .filter((r: { formula_id?: string }) => r.formula_id && !keep.has(r.formula_id))
+      .filter((r: { formula_id?: string; calculation_steps?: unknown }) => isStaleInstanced(r))
       .map((r: { id: string }) => r.id);
     if (financeStaleIds.length > 0) {
       const { error } = await supabase
@@ -1318,13 +1420,13 @@ export class PortfolioClient {
 
     const { data: emissionRows } = await supabase
       .from('emission_calculations')
-      .select('id, formula_id')
+      .select('id, formula_id, inputs')
       .eq('user_id', user.id)
       .eq('counterparty_id', counterpartyId)
       .eq('calculation_type', calculationMode);
 
     const emissionStaleIds = (emissionRows || [])
-      .filter((r: { formula_id?: string }) => r.formula_id && !keep.has(r.formula_id))
+      .filter((r: { formula_id?: string; inputs?: unknown }) => isStaleInstanced(r))
       .map((r: { id: string }) => r.id);
     if (emissionStaleIds.length > 0) {
       const { error } = await supabase

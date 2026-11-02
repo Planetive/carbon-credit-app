@@ -1,3 +1,5 @@
+import type { FinancedScopeBreakdown } from "../utils/financedScopeBreakdown";
+
 export type FinanceMode = "finance" | "facilitated";
 
 export type EmissionResultRow = {
@@ -12,6 +14,13 @@ export type EmissionResultRow = {
   pcafFormulaId?: string;
   pcafInputs?: Record<string, unknown>;
   companyType?: string;
+  /** Only backend-authoritative results may be saved as reportable. */
+  authority?: "backend" | "preview";
+  inputFingerprint?: string;
+  /** Stable calculator loan/investment instance. Not formula_id and not exposures.id. */
+  financingInstanceId?: string;
+  instanceKey?: string;
+  scopeBreakdown?: FinancedScopeBreakdown;
 };
 
 export type CalculationStepDto = {
@@ -31,6 +40,9 @@ export type FacilitatedCalculationResult = {
   pcafFormulaId?: string;
   pcafInputs?: Record<string, unknown>;
   companyType?: string;
+  authority?: "backend" | "preview";
+  inputFingerprint?: string;
+  scopeBreakdown?: FinancedScopeBreakdown;
 };
 
 export type WizardLocationState = {

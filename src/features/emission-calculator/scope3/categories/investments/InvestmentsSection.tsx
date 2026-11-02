@@ -18,7 +18,19 @@ import { fetchMyProfileDual } from "@/api/profileDualRead";
 import { useEmissionSync } from "@/components/emissions/scope3/hooks/useEmissionSync";
 import type { InvestmentRow, InvestmentLineType } from "@/components/emissions/scope3/types/scope3Types";
 import type { EmissionData } from "@/components/emissions/shared/types";
-import { fetchPortfolioCalculationsForScope3 } from "@/utils/portfolioCalculationsForScope3";
+import {
+  loadScope3FinancedImportContext,
+  scope3ImportLinkPayload,
+  type PortfolioCalculationForScope3,
+} from "@/utils/portfolioCalculationsForScope3";
+import {
+  assessScope3FinancedImport,
+  assessScope3FinancedImportBatch,
+  importedActivityFromRecord,
+  selectCategory15ReportableActivities,
+  type Scope3ImportedActivity,
+} from "@/utils/scope3FinancedImportSafety";
+import type { FinancedCalculationRow } from "@/utils/financedEmissionsReporting";
 import { confirmAction } from "@/utils/confirmAction";
 import {
   deleteScope3Investment,
@@ -76,6 +88,18 @@ const humanizeToken = (value: string): string => {
   return trimmed;
 };
 
+function investmentToImportedActivity(row: InvestmentRow): Scope3ImportedActivity {
+  return {
+    id: row.dbId || row.id,
+    label: row.companyName || "Imported financed line",
+    lineType: row.lineType || "equity",
+    attributedEmissions: row.calculatedEmissions ?? null,
+    linkedEmissionCalculationId: row.linkedEmissionCalculationId ?? null,
+    linkedFinanceEmissionCalculationId: row.linkedFinanceEmissionCalculationId ?? null,
+    linkedFinancedEmissionsId: row.linkedFinancedEmissionsId ?? null,
+  };
+}
+
 const displayValue = (value: unknown): string => {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "number") {
@@ -128,9 +152,8 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
   const [creatingCorporateJourney, setCreatingCorporateJourney] = useState(false);
   const [expandedFinancedRows, setExpandedFinancedRows] = useState<Set<string>>(new Set());
   const [financedDetailsByRowId, setFinancedDetailsByRowId] = useState<Record<string, DetailEntryDto[]>>({});
-  const [portfolioRows, setPortfolioRows] = useState<Awaited<ReturnType<typeof fetchPortfolioCalculationsForScope3>>>(
-    [],
-  );
+  const [portfolioRows, setPortfolioRows] = useState<PortfolioCalculationForScope3[]>([]);
+  const [reportingRows, setReportingRows] = useState<FinancedCalculationRow[]>([]);
 
   const isCorporateUser = userTypeResolved ? userType === "corporate" : true;
 
@@ -177,6 +200,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     if (companyContext && !counterpartyId) {
       setInvestmentRows([]);
       setExistingInvestments([]);
+      setReportingRows([]);
       setIsInitialLoadInvestments(false);
       return;
     }
@@ -187,6 +211,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         const inv = investeeTotalFromDb(entry);
         const pct = Number(entry.ownership_percentage) || 0;
         const calc = Number(entry.calculated_emissions) || 0;
+        const imported = importedActivityFromRecord(entry);
         return {
           id: crypto.randomUUID(),
           dbId: entry.id as string,
@@ -196,10 +221,22 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           percentage: pct,
           calculatedEmissions: calc,
           lineType: lt,
-          linkedEmissionCalculationId: (entry.linked_emission_calculation_id as string) || null,
-          linkedFinanceEmissionCalculationId: (entry.linked_finance_emission_calculation_id as string) || null,
+          linkedEmissionCalculationId: imported.linkedEmissionCalculationId,
+          linkedFinanceEmissionCalculationId: imported.linkedFinanceEmissionCalculationId,
+          linkedFinancedEmissionsId: imported.linkedFinancedEmissionsId,
         };
       });
+      try {
+        const context = await loadScope3FinancedImportContext(
+          supabase,
+          user.id,
+          "finance",
+          companyContext && counterpartyId ? counterpartyId : null,
+        );
+        setReportingRows(context.reportingRows);
+      } catch {
+        setReportingRows([]);
+      }
       setExistingInvestments(loadedRows);
       setInvestmentRows(loadedRows.length > 0 ? loadedRows : []);
     } catch (error: unknown) {
@@ -247,6 +284,15 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       if (!r.companyName?.trim()) return null;
       if (r.lineType === "financed") {
         if (typeof r.calculatedEmissions !== "number" || r.calculatedEmissions < 0) return null;
+        const reportable = selectCategory15ReportableActivities(
+          investmentRows.map(investmentToImportedActivity),
+          reportingRows,
+          "finance",
+        );
+        const activityId = r.dbId || r.id;
+        if (reportable.overlapping.some((item) => item.id === activityId) && !reportable.reportableIds.has(activityId)) {
+          return null;
+        }
         return {
           id: r.id,
           category: "investments",
@@ -283,13 +329,14 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     setImportOpen(true);
     setImportLoading(true);
     try {
-      const list = await fetchPortfolioCalculationsForScope3(
+      const context = await loadScope3FinancedImportContext(
         supabase,
         user.id,
         "finance",
         companyContext && counterpartyId ? counterpartyId : null,
       );
-      setPortfolioRows(list);
+      setPortfolioRows(context.candidates);
+      setReportingRows(context.reportingRows);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to load";
       toast({ title: "Could not load portfolio", description: msg, variant: "destructive" });
@@ -298,9 +345,27 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     }
   };
 
-  const importFinanceRow = async (p: (typeof portfolioRows)[0]) => {
+  const importFinanceRow = async (p: PortfolioCalculationForScope3) => {
     const name = p.counterpartyName || "Financed counterparty";
     const fe = p.financedEmissions;
+    const safety = assessScope3FinancedImport({
+      candidate: p,
+      existing: investmentRows.map(investmentToImportedActivity),
+      reportingRows,
+      calcKind: "finance",
+    });
+    if (safety.status === "already-imported") {
+      toast({ title: "Already added", description: "This finance result is already in Investments." });
+      return;
+    }
+    if (safety.blocked) {
+      toast({
+        title: safety.status === "unresolved" ? "Import needs reconciliation" : "Import blocked",
+        description: safety.message,
+        variant: "destructive",
+      });
+      return;
+    }
     const dup = await findScope3InvestmentDuplicate(user.id, p.source, p.id);
     if (dup?.id) {
       toast({ title: "Already added", description: "This finance result is already in Investments." });
@@ -315,11 +380,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
       calculated_emissions: fe,
       line_type: "financed",
     };
-    if (p.source === "emission_calculations") {
-      basePayload.linked_emission_calculation_id = p.id;
-    } else {
-      basePayload.linked_finance_emission_calculation_id = p.id;
-    }
+    Object.assign(basePayload, scope3ImportLinkPayload(p));
 
     try {
       await insertScope3Investment(basePayload);
@@ -340,16 +401,31 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
 
   const syncCorporateFinanceResults = useCallback(async () => {
     if (!isCorporateUser) return;
-    const list = await fetchPortfolioCalculationsForScope3(
+    const context = await loadScope3FinancedImportContext(
       supabase,
       user.id,
       "finance",
       companyContext && counterpartyId ? counterpartyId : null,
     );
-    if (!list.length) return;
+    setReportingRows(context.reportingRows);
+    if (!context.candidates.length) return;
+
+    const batch = assessScope3FinancedImportBatch({
+      candidates: context.candidates,
+      existing: investmentRows.map(investmentToImportedActivity),
+      reportingRows: context.reportingRows,
+      calcKind: "finance",
+    });
+    if (batch.blocked.length > 0) {
+      toastRef.current({
+        title: "Financed import needs reconciliation",
+        description: batch.blocked.map((item) => item.decision.message).join(" "),
+        variant: "destructive",
+      });
+    }
 
     let added = 0;
-    for (const p of list) {
+    for (const p of batch.allowed) {
       const basePayload: Record<string, unknown> = {
         user_id: user.id,
         counterparty_id: companyContext && counterpartyId ? counterpartyId : null,
@@ -359,11 +435,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         calculated_emissions: p.financedEmissions,
         line_type: "financed",
       };
-      if (p.source === "emission_calculations") {
-        basePayload.linked_emission_calculation_id = p.id;
-      } else {
-        basePayload.linked_finance_emission_calculation_id = p.id;
-      }
+      Object.assign(basePayload, scope3ImportLinkPayload(p));
       try {
         await insertScope3Investment(basePayload);
         added += 1;
@@ -381,10 +453,10 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         description: `${added} financed line${added > 1 ? "s" : ""} added to Investments.`,
       });
     }
-  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadInvestments]);
+  }, [isCorporateUser, user.id, companyContext, counterpartyId, loadInvestments, investmentRows, toast]);
 
   useEffect(() => {
-    if (!userTypeResolved || tab !== "financed" || !isCorporateUser) return;
+    if (!userTypeResolved || tab !== "financed" || !isCorporateUser || isInitialLoadInvestments) return;
     syncCorporateFinanceResults().catch((e: unknown) => {
       const err = e as { message?: string };
       toastRef.current({
@@ -393,7 +465,7 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         variant: "destructive",
       });
     });
-  }, [userTypeResolved, tab, isCorporateUser, syncCorporateFinanceResults]);
+  }, [userTypeResolved, tab, isCorporateUser, isInitialLoadInvestments, syncCorporateFinanceResults]);
 
   const saveInvestments = async () => {
     if (!user) {
@@ -535,7 +607,29 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
     () => financedRows.filter((r) => r.linkedEmissionCalculationId || r.linkedFinanceEmissionCalculationId),
     [financedDetailsKey],
   );
-  const totalEmissions = investmentRows.reduce((sum, r) => sum + (r.calculatedEmissions || 0), 0);
+  const financedImportSafety = useMemo(
+    () =>
+      selectCategory15ReportableActivities(
+        investmentRows.map(investmentToImportedActivity),
+        reportingRows,
+        "finance",
+      ),
+    [investmentRows, reportingRows],
+  );
+  const overlappingFinancedIds = useMemo(
+    () =>
+      new Set(
+        financedImportSafety.overlapping
+          .filter((item) => !financedImportSafety.reportableIds.has(item.id))
+          .map((item) => item.id),
+      ),
+    [financedImportSafety],
+  );
+  const totalEmissions = investmentRows.reduce((sum, r) => {
+    const activityId = r.dbId || r.id;
+    if (overlappingFinancedIds.has(activityId)) return sum;
+    return sum + (r.calculatedEmissions || 0);
+  }, 0);
   const toggleFinancedDetails = (id: string) => {
     setExpandedFinancedRows((prev) => {
       const next = new Set(prev);
@@ -752,6 +846,30 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
         </TabsContent>
 
         <TabsContent value="financed" className="mt-6 space-y-4">
+          <p className="text-xs text-gray-500">
+            Category 15 records the institution's attributed financed-emissions total once. Financed Scope 1, 2 and 3
+            of the counterparty are already inside that total and are not imported as extra Category 15 activity.
+          </p>
+          {financedImportSafety.overlapping.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">Financed lines need reconciliation</p>
+              <p className="mt-1">
+                These Category 15 records overlap an aggregate and component calculations for the same
+                counterparty. They are kept in the list and were not deleted. The category total counts the
+                financed total once:{" "}
+                {financedImportSafety.overlapping.map((item) => item.label).join("; ")}.
+              </p>
+            </div>
+          )}
+          {financedImportSafety.unresolved.length > 0 && financedImportSafety.overlapping.length === 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">Some financed lines could not be matched</p>
+              <p className="mt-1">
+                {financedImportSafety.unresolved.map((item) => item.label).join("; ")}. Further portfolio
+                imports for these counterparties are blocked until the lines are reconciled.
+              </p>
+            </div>
+          )}
           {isCorporateUser ? (
             <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
@@ -875,7 +993,9 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
           <DialogHeader>
             <DialogTitle>Import financed emissions</DialogTitle>
             <DialogDescription>
-              Completed finance calculations from your portfolio. Each can only be added once.
+              Imports the institution's attributed financed-emissions total once as Category 15.
+              The investee's own financed Scope 3 breakdown is not an additional Category 15 activity.
+              An aggregate is not added when detailed calculations for the same counterparty are already in Category 15.
             </DialogDescription>
           </DialogHeader>
           {importLoading ? (
@@ -887,7 +1007,14 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
             </p>
           ) : (
             <ul className="space-y-2">
-              {portfolioRows.map((p) => (
+              {portfolioRows.map((p) => {
+                const safety = assessScope3FinancedImport({
+                  candidate: p,
+                  existing: investmentRows.map(investmentToImportedActivity),
+                  reportingRows,
+                  calcKind: "finance",
+                });
+                return (
                 <li
                   key={`${p.source}-${p.id}`}
                   className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
@@ -898,12 +1025,22 @@ export const InvestmentsSection: React.FC<InvestmentsSectionProps> = ({
                       {p.financedEmissions.toFixed(2)} tCO₂e · {new Date(p.createdAt).toLocaleDateString()}
                       {p.formulaName ? ` · ${p.formulaName}` : ""}
                     </div>
+                    {safety.blocked && (
+                      <div className="mt-1 text-xs text-amber-800">{safety.message}</div>
+                    )}
                   </div>
-                  <Button type="button" size="sm" className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]" onClick={() => importFinanceRow(p)}>
-                    Add
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0 bg-[#1D9E75] hover:bg-[#22B87E]"
+                    disabled={safety.blocked || safety.status === "already-imported"}
+                    onClick={() => importFinanceRow(p)}
+                  >
+                    {safety.status === "already-imported" ? "Added" : safety.blocked ? "Blocked" : "Add"}
                   </Button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </DialogContent>

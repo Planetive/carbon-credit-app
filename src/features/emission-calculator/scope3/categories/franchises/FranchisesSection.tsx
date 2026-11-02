@@ -80,7 +80,7 @@ export const FranchisesSection: React.FC<FranchisesSectionProps> = ({
         <div>
           <h3 className="text-base font-semibold text-gray-900">Franchises</h3>
           <p className="text-sm text-gray-600">
-            Franchise details, operations, and energy use
+            Not calculated. An entry is a note only and is not a verified zero.
           </p>
         </div>
         <Button
