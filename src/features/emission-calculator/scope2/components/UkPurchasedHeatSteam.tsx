@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getOrCreateDraftAssessment } from "@/api/ghg";
+import { getCounterpartyApi } from "@/api/portfolio";
 import {
   calcUkScope2HeatSteam,
   createUkScope2HeatSteamRecord,
@@ -18,6 +19,14 @@ import {
   reportingYearChoices,
   writeSelectedReportingYear,
 } from "@/features/emission-calculator/results/reportingYear";
+import { UkHeatSteamCountrySelect } from "./UkHeatSteamCountrySelect";
+import {
+  heatSteamLocationLabel,
+  missingHeatSteamCountryMessage,
+  resolveHeatSteamLocation,
+  type HeatSteamLocationHints,
+  type ResolvedHeatSteamLocation,
+} from "../ukHeatSteamLocation";
 
 const MONTHS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
 
@@ -29,17 +38,22 @@ function messageOf(err: unknown): string {
 
 export function UkPurchasedHeatSteam({
   counterpartyId,
+  locationHints,
   onTotalChange,
   onSaveAndNext,
 }: {
   counterpartyId?: string;
+  locationHints?: HeatSteamLocationHints;
   onTotalChange?: (totalKg: number) => void;
   onSaveAndNext?: () => void;
 }) {
   const { toast } = useToast();
   const [year, setYear] = useState(readSelectedReportingYear);
   const [month, setMonth] = useState("01");
-  const [country, setCountry] = useState("");
+  const [resolvedLocation, setResolvedLocation] = useState<ResolvedHeatSteamLocation>({
+    status: "unavailable",
+  });
+  const [selectedCountry, setSelectedCountry] = useState("");
   const [energyForm, setEnergyForm] = useState("purchased_heat");
   const [supplierName, setSupplierName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -49,24 +63,56 @@ export function UkPurchasedHeatSteam({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const period = `${year}-${month}`;
+  const country =
+    resolvedLocation.status === "resolved" ? resolvedLocation.country : selectedCountry.trim();
+
+  useEffect(() => {
+    let cancelled = false;
+    const applyHints = (hints: HeatSteamLocationHints) => {
+      if (cancelled) return;
+      setResolvedLocation(resolveHeatSteamLocation(hints));
+    };
+
+    applyHints(locationHints || {});
+    if (!counterpartyId) return () => {
+      cancelled = true;
+    };
+
+    void getCounterpartyApi(counterpartyId)
+      .then((row) => {
+        applyHints({
+          ...locationHints,
+          counterpartyGeography: row.geography ?? locationHints?.counterpartyGeography,
+        });
+      })
+      .catch(() => applyHints(locationHints || {}));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [counterpartyId, locationHints?.counterpartyGeography, locationHints?.facilityCountry, locationHints?.organizationCountry]);
 
   const calculate = async () => {
     setError(null);
     setResult(null);
-    if (!country.trim()) {
-      setError("Enter the country of the heat supplier. A UK factor is not applied to another country.");
+    if (!country) {
+      setError(missingHeatSteamCountryMessage());
       return;
     }
     setBusy(true);
     try {
       const calculated = await calcUkScope2HeatSteam({
-        country: country.trim(),
+        country,
         energy_form: energyForm,
         quantity,
         unit,
         period,
         supplier_name: supplierName.trim(),
       });
+      if (!calculated.ok || calculated.save_allowed === false) {
+        setError(calculated.error || "No verified purchased heat or steam factor is stored for this country.");
+        return;
+      }
       setResult(calculated);
       const kg = Number(calculated.total_kg_co2e);
       if (Number.isFinite(kg)) onTotalChange?.(kg);
@@ -78,13 +124,13 @@ export function UkPurchasedHeatSteam({
   };
 
   const save = async () => {
-    if (!result?.save_allowed) return;
+    if (!result?.save_allowed || !country) return;
     setBusy(true);
     setError(null);
     try {
       const assessment = await getOrCreateDraftAssessment("uk", period);
       const body = {
-        country: country.trim(),
+        country,
         energy_form: energyForm,
         quantity,
         unit,
@@ -112,7 +158,8 @@ export function UkPurchasedHeatSteam({
         <h4 className="text-lg font-semibold text-gray-900">Purchased heat and steam</h4>
         <p className="text-sm text-gray-600">
           The factor is a complete kg CO2e value for purchased heat or steam. It is not split into separate gases.
-          On-site fuel combustion stays in Scope 1.
+          On-site fuel combustion stays in Scope 1. The DESNZ UK district heat factor is used only when this
+          activity is in the United Kingdom.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -154,8 +201,15 @@ export function UkPurchasedHeatSteam({
           </Select>
         </div>
         <div>
-          <Label>Supplier country</Label>
-          <Input value={country} onChange={(event) => setCountry(event.target.value)} placeholder="Country where the heat was supplied" />
+          <Label>District energy location</Label>
+          {resolvedLocation.status === "resolved" ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-sm font-medium text-slate-900">{resolvedLocation.country}</p>
+              <p className="text-xs text-slate-500">{heatSteamLocationLabel(resolvedLocation.source)}</p>
+            </div>
+          ) : (
+            <UkHeatSteamCountrySelect value={selectedCountry} onChange={setSelectedCountry} />
+          )}
         </div>
         <div>
           <Label>Supplier name</Label>
@@ -179,7 +233,11 @@ export function UkPurchasedHeatSteam({
       {error && <p className="text-sm text-red-700">{error}</p>}
       {result?.total_t_co2e && (
         <p className="text-sm text-gray-700">
-          {result.total_kg_co2e} kg CO2e ({result.total_t_co2e} tCO2e). The factor was applied as a complete CO2e value.
+          {result.total_kg_co2e} kg CO2e ({result.total_t_co2e} tCO2e). The factor was applied as a complete CO2e value
+          {result.factor?.publisher
+            ? `. ${result.factor.publisher}${result.factor.source_document ? `, ${result.factor.source_document}` : ""}`
+            : ""}
+          {result.factor?.country ? ` · ${result.factor.country}` : ""}.
         </p>
       )}
       <div className="flex gap-2">

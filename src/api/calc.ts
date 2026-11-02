@@ -634,6 +634,12 @@ export type Scope2HeatSteamCalculation = {
     production_fuel?: string;
     gas_coverage?: string;
     supplier_specific?: boolean;
+    country?: string;
+    publication_year?: number | null;
+    reporting_year?: number | null;
+    unit?: string;
+    value?: string;
+    boundary?: string;
   };
   methodology?: string;
 };
