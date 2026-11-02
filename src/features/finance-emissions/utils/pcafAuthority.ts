@@ -83,6 +83,17 @@ export function assertReportableResults(
   }
 }
 
+export function pcafCompanyTypeFromStructure(
+  corporateStructure: string | null | undefined
+): "listed" | "private" {
+  return corporateStructure === "listed" ? "listed" : "private";
+}
+
+/** Value snapshot so cloned objects with the same fields do not look like input edits. */
+export function financeWizardInputSignature(state: unknown): string {
+  return JSON.stringify(state);
+}
+
 export function fingerprintPcafInputs(
   formulaId: string,
   inputs: Record<string, unknown>

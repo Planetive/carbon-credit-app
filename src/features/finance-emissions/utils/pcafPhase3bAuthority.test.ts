@@ -42,9 +42,11 @@ import {
   PcafAuthorityError,
   assertCurrentFingerprint,
   assertReportableResults,
+  financeWizardInputSignature,
   fingerprintPcafInputs,
   isBackendCalculationAvailable,
   isReportablePcafResult,
+  pcafCompanyTypeFromStructure,
   requestAuthoritativePcafCalculation,
   validateAuthoritativePcafResult,
 } from "./pcafAuthority";
@@ -324,6 +326,49 @@ describe("Phase 3B authoritative request workflows", () => {
       inputs: { outstanding_amount: 1 },
     });
     expect(recovered.financedEmissions).toBe(44);
+  });
+
+  it("maps questionnaire corporate structure onto PCAF company_type", () => {
+    expect(pcafCompanyTypeFromStructure("listed")).toBe("listed");
+    expect(pcafCompanyTypeFromStructure("unlisted")).toBe("private");
+    expect(pcafCompanyTypeFromStructure("private")).toBe("private");
+    expect(pcafCompanyTypeFromStructure("")).toBe("private");
+    expect(pcafCompanyTypeFromStructure(undefined)).toBe("private");
+  });
+
+  it("treats cloned calculator state as the same input snapshot", () => {
+    const formData = {
+      outstandingLoan: 100_000_000,
+      totalEquity: 200_000_000,
+      totalDebt: 300_000_000,
+    };
+    const properties = [{ id: "1", propertyValueAtOrigination: 0 }];
+    const snapshot = {
+      formData,
+      selectedFormula: "1a-unlisted-equity",
+      currentLoanIndex: 0,
+      properties,
+      commercialProperties: [],
+      sharedCompanyData: { totalDebt: 0 },
+      perLoanFormData: {},
+      companyType: "private",
+    };
+    expect(financeWizardInputSignature(snapshot)).toBe(
+      financeWizardInputSignature({
+        ...snapshot,
+        formData: { ...formData },
+        properties: properties.map((row) => ({ ...row })),
+        commercialProperties: [],
+        sharedCompanyData: { totalDebt: 0 },
+        perLoanFormData: {},
+      })
+    );
+    expect(financeWizardInputSignature(snapshot)).not.toBe(
+      financeWizardInputSignature({
+        ...snapshot,
+        formData: { ...formData, outstandingLoan: 1 },
+      })
+    );
   });
 
   it("12. rejects a stale calculation fingerprint after inputs change", async () => {

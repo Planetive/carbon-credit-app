@@ -10,7 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { executePcafCalculation } from "../utils/executePcafCalculation";
-import { PcafAuthorityError } from "../utils/pcafAuthority";
+import {
+  PcafAuthorityError,
+  financeWizardInputSignature,
+  pcafCompanyTypeFromStructure,
+} from "../utils/pcafAuthority";
 import { FinancedScopeBreakdownPanel } from "../components/FinancedScopeBreakdownPanel";
 import {
   questionnaireScopePayload,
@@ -530,15 +534,16 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }>
   >([]);
   const [selectedFormula, setSelectedFormula] = useState<string>('');
-  const [companyType, setCompanyType] = useState<'listed' | 'private'>('listed');
   const [isCalculating, setIsCalculating] = useState(false);
   const calcGenerationRef = useRef(0);
   const inputsVersionRef = useRef(0);
+  const lastCounterpartyRef = useRef<string | null>(null);
   
   // Use props from ESGWizard questionnaire
   const hasEmissions = propHasEmissions || '';
   const verificationStatus = propVerificationStatus || '';
   const corporateStructure = propCorporateStructure || '';
+  const companyType = pcafCompanyTypeFromStructure(corporateStructure);
   const currentLoan = expandedLoanTypes.length > 0 ? expandedLoanTypes[currentLoanIndex] : undefined;
   const loanType = currentLoan?.type || '';
   const loanInstanceKey = currentLoan?.key || '';
@@ -597,16 +602,34 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     return crePropertiesRef.current[key];
   };
 
-  const writeMortgageProperties = (key: string, next: Property[]) => {
+  const persistMortgageProperties = (key: string, next: Property[]) => {
     const cloned = clonePropertyList(next, defaultMortgageProperties());
     mortgagePropertiesRef.current = { ...mortgagePropertiesRef.current, [key]: cloned };
-    if (key === loanInstanceKey) setProperties(cloned);
+    return cloned;
+  };
+
+  const persistCreProperties = (key: string, next: CREProperty[]) => {
+    const cloned = clonePropertyList(next, defaultCreProperties());
+    crePropertiesRef.current = { ...crePropertiesRef.current, [key]: cloned };
+    return cloned;
+  };
+
+  const writeMortgageProperties = (key: string, next: Property[]) => {
+    const cloned = persistMortgageProperties(key, next);
+    if (key === loanInstanceKey) {
+      setProperties((prev) =>
+        financeWizardInputSignature(prev) === financeWizardInputSignature(cloned) ? prev : cloned
+      );
+    }
   };
 
   const writeCreProperties = (key: string, next: CREProperty[]) => {
-    const cloned = clonePropertyList(next, defaultCreProperties());
-    crePropertiesRef.current = { ...crePropertiesRef.current, [key]: cloned };
-    if (key === loanInstanceKey) setCommercialProperties(cloned);
+    const cloned = persistCreProperties(key, next);
+    if (key === loanInstanceKey) {
+      setCommercialProperties((prev) =>
+        financeWizardInputSignature(prev) === financeWizardInputSignature(cloned) ? prev : cloned
+      );
+    }
   };
 
   useEffect(() => {
@@ -619,9 +642,20 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
   }, [resolvedCounterpartyId]);
 
+  const calcInputsSignature = financeWizardInputSignature({
+    formData,
+    selectedFormula,
+    currentLoanIndex,
+    properties,
+    commercialProperties,
+    sharedCompanyData,
+    perLoanFormData,
+    companyType,
+  });
+
   useEffect(() => {
     inputsVersionRef.current += 1;
-  }, [formData, selectedFormula, perLoanFormData, properties, commercialProperties, sharedCompanyData, currentLoanIndex]);
+  }, [calcInputsSignature]);
 
   // Debug props
   console.log('FinanceEmissionCalculator props:', {
@@ -653,51 +687,58 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loanInstanceKey, currentLoanIndex]);
 
-  // Always start fresh - no database pre-filling
+  // Reset loan amounts only when the counterparty changes. Emission-prop updates
+  // must not wipe outstanding/equity/debt mid-calculation (that raced the PCAF request).
   useEffect(() => {
-    // Only reset when we have valid props to avoid overriding with undefined values
-    if (propVerifiedEmissions !== undefined || propUnverifiedEmissions !== undefined) {
-      const returnedTotalEmissions = sumReportedScopes(propScope1, propScope2, propScope3) ?? 0;
-      // Clear all data when switching companies - always start fresh
-      setSharedCompanyData({
-        sharePrice: 0,
-        outstandingShares: 0,
-        totalDebt: 0,
-        minorityInterest: 0,
-        preferredStock: 0,
-        totalEquity: 0
+    const verified = propVerifiedEmissions || 0;
+    const unverified = propUnverifiedEmissions || 0;
+    const returnedTotalEmissions = sumReportedScopes(propScope1, propScope2, propScope3) ?? 0;
+    const counterpartyChanged = lastCounterpartyRef.current !== (resolvedCounterpartyId || null);
+    lastCounterpartyRef.current = resolvedCounterpartyId || null;
+
+    if (!counterpartyChanged) {
+      setFormData((prev) => {
+        if (
+          prev.verified_emissions === verified &&
+          prev.unverified_emissions === unverified &&
+          prev.emissions === returnedTotalEmissions
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          verified_emissions: verified,
+          unverified_emissions: unverified,
+          emissions: returnedTotalEmissions,
+        };
       });
-      
-      // Clear form data
-      console.log('🔄 FinanceEmissionCalculator - Resetting form data with props:', {
-        propVerifiedEmissions,
-        propUnverifiedEmissions,
-        resolvedCounterpartyId,
-        activeTab,
-        expandedLoanTypes: expandedLoanTypes.length
-      });
-      // Reset form data to initial state, preserving existing structure and only updating specific fields
-      setFormData(prev => ({
-        ...prev, // Preserve all existing fields
-        outstandingLoan: 0,
-        verified_emissions: propVerifiedEmissions || 0,
-        unverified_emissions: propUnverifiedEmissions || 0,
-        emissions: returnedTotalEmissions,
-        energyConsumption: 0,
-        emissionFactor: 0,
-        totalDebt: 0,
-        totalEquity: 0,
-        minorityInterest: 0,
-        preferredStock: 0,
-        sharePrice: 0,
-        outstandingShares: 0
-      }));
-      
-      // Clear per-loan form data
-      setPerLoanFormData({});
-      
-      console.log('🔄 FinanceEmissionCalculator - Starting fresh for counterparty:', resolvedCounterpartyId);
+      return;
     }
+
+    setSharedCompanyData({
+      sharePrice: 0,
+      outstandingShares: 0,
+      totalDebt: 0,
+      minorityInterest: 0,
+      preferredStock: 0,
+      totalEquity: 0
+    });
+    setFormData((prev) => ({
+      ...prev,
+      outstandingLoan: 0,
+      verified_emissions: verified,
+      unverified_emissions: unverified,
+      emissions: returnedTotalEmissions,
+      energyConsumption: 0,
+      emissionFactor: 0,
+      totalDebt: 0,
+      totalEquity: 0,
+      minorityInterest: 0,
+      preferredStock: 0,
+      sharePrice: 0,
+      outstandingShares: 0
+    }));
+    setPerLoanFormData({});
   }, [resolvedCounterpartyId, propVerifiedEmissions, propUnverifiedEmissions, propScope1, propScope2, propScope3]);
 
   // No auto-filling - always start fresh
@@ -1644,17 +1685,17 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     }
 
     if (loanInstanceKey) {
-      writeMortgageProperties(loanInstanceKey, properties);
-      writeCreProperties(loanInstanceKey, commercialProperties);
+      persistMortgageProperties(loanInstanceKey, properties);
+      persistCreProperties(loanInstanceKey, commercialProperties);
     }
 
     setIsCalculating(true);
     const generation = ++calcGenerationRef.current;
-    const inputsVersion = inputsVersionRef.current;
     
     // Use setTimeout to allow UI to update before heavy calculation
     setTimeout(() => {
       void (async () => {
+      const inputsVersion = inputsVersionRef.current;
       try {
       // Single-loan detailed calculation (kept for current view and validations)
       // Calculate total property value for mortgages and commercial real estate
