@@ -130,5 +130,16 @@ describe("EPA sidebar totals", () => {
     expect(display.scope3).toBeNull();
     expect(display.grand).toBeNull();
     expect(display.statusLabel).toMatch(/could not be loaded/i);
+    expect(display.compactNote).toMatch(/could not be loaded/i);
+    expect(display.compactNote!.length).toBeLessThan(120);
+  });
+
+  it("does not dump methodology paragraphs into the calculator sidebar", () => {
+    const display = buildEpaSidebarDisplay(
+      results({ stationaryVerified: verified(5.31145, 5311.45) })
+    );
+    expect(display.statusLabel).toMatch(/not an independently verified|Reporting year|partial/i);
+    expect(display.compactNote).toBeNull();
+    expect(display.compactNote).not.toBe(display.statusLabel);
   });
 });

@@ -3,12 +3,19 @@ import { reportingYearChoices } from "./reportingYear";
 type Props = {
   year: number;
   onChange: (year: number) => void;
+  compact?: boolean;
 };
 
-export function EpaReportingYearControl({ year, onChange }: Props) {
+export function EpaReportingYearControl({ year, onChange, compact = false }: Props) {
   return (
-    <label className="flex items-center justify-between gap-3 text-xs text-slate-600">
-      <span>Reporting year</span>
+    <label
+      className={
+        compact
+          ? "inline-flex items-center gap-2 text-xs text-slate-500"
+          : "flex items-center justify-between gap-3 text-xs text-slate-600"
+      }
+    >
+      {compact ? null : <span>Reporting year</span>}
       <select
         aria-label="Reporting year"
         className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800"

@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Save } from "lucide-react";
+import { ChevronDown, ChevronRight, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError } from "@/api/client";
 import {
@@ -26,7 +18,7 @@ import { getOrCreateDraftAssessment, listEmissionActivities, type EmissionActivi
 import { listLegacyTableEntries } from "@/integrations/supabase/ghgEntryClient";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { activityMatchesReportingYear, matchesVerifiedCounterparty } from "@/features/emission-calculator/results/reportingYear";
-import { refrigerantGasGroups } from "@/features/emission-calculator/scope1/activity-based/refrigerant/refrigerantCatalog";
+import { RefrigerantGasSelect } from "@/features/emission-calculator/scope1/activity-based/refrigerant/RefrigerantGasSelect";
 import {
   applyCalcFailure,
   applyCalcSuccess,
@@ -74,7 +66,49 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 function methodLabel(method: string): string {
-  return method === "estimated_leakage" ? "Estimated leakage" : "Measured leakage";
+  return method === "estimated_leakage" ? "Estimated leak" : "Measured leak";
+}
+
+function formatNumber(value: string | null | undefined): string {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
+function formatQty(value: string | null | undefined, unit: string): string {
+  const formatted = formatNumber(value);
+  return formatted === "—" ? "—" : `${formatted} ${unit}`;
+}
+
+function formatReportingMonth(period: string): string {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period);
+  if (!match) return period;
+  return new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function gwpBasisLabel(result: RefrigerantCalcResponse): string | null {
+  const haystack = `${result.gwp_edition || ""} ${result.gwp_publication || ""} ${result.gwp_basis || ""}`;
+  if (/AR6/i.test(haystack)) return "IPCC AR6";
+  if (/AR5/i.test(haystack)) return "IPCC AR5";
+  if (/AR4/i.test(haystack)) return "IPCC AR4";
+  const basis = result.gwp_basis?.trim();
+  return basis || null;
+}
+
+function uniqueFactorNotes(result: RefrigerantCalcResponse): string[] {
+  const seen = new Set<string>();
+  const notes: string[] = [];
+  for (const raw of [result.gwp_publication, result.gwp_edition, result.factor_provenance, result.table11_reference]) {
+    const text = (raw || "").trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    notes.push(text);
+  }
+  return notes;
 }
 
 const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
@@ -277,23 +311,7 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label className="text-gray-600">Refrigerant</Label>
-              <Select value={entry.gas || undefined} onValueChange={(gas) => update({ gas })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a supported refrigerant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {refrigerantGasGroups().map((group) => (
-                    <SelectGroup key={group.id}>
-                      <SelectLabel>{group.label}</SelectLabel>
-                      {group.options.map((gas) => (
-                        <SelectItem key={gas} value={gas}>
-                          {gas}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <RefrigerantGasSelect value={entry.gas} onChange={(gas) => update({ gas })} />
             </div>
 
             {entry.method === "leakage_record" ? (
@@ -408,20 +426,23 @@ const EpaRefrigerantEmissions: React.FC<EpaRefrigerantEmissionsProps> = ({
             {records.map((row) => {
               const inputs = (row.raw?.inputs || {}) as Record<string, unknown>;
               const meta = (row.raw?.activity_meta || {}) as Record<string, unknown>;
+              const periodLabel = meta.period ? formatReportingMonth(String(meta.period)) : "No month";
               return (
-                <li key={row.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2">
-                  <div className="text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">{String(inputs.refrigerant || "Refrigerant")}</span>
-                    {" · "}
-                    {methodLabel(String(inputs.method || ""))}
-                    {" · "}
-                    {String(meta.period || "No month")}
-                    {" · "}
-                    {row.emissions_tco2e ?? "—"} tCO2e
+                <li key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{String(inputs.refrigerant || "Refrigerant")}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {methodLabel(String(inputs.method || ""))} · {periodLabel}
+                    </p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={() => editRecord(row)}>
-                    Edit
-                  </Button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <p className="text-sm font-semibold tabular-nums text-gray-900">
+                      {row.emissions_tco2e ?? "—"} <span className="text-xs font-medium text-gray-500">tCO₂e</span>
+                    </p>
+                    <Button type="button" size="sm" variant="outline" onClick={() => editRecord(row)}>
+                      Edit
+                    </Button>
+                  </div>
                 </li>
               );
             })}
@@ -466,32 +487,68 @@ function ResultPanel({
   equipmentId: string;
   tonnes: string;
 }) {
+  const basis = gwpBasisLabel(result);
+  const notes = uniqueFactorNotes(result);
+  const sourceLine = result.gwp_publication?.trim() || notes[0] || null;
+  const extraNotes = notes.filter((note) => note !== sourceLine);
+  const location = [result.equipment_type, equipmentId, site].filter(Boolean).join(" · ");
+
+  const facts = [
+    { label: "Refrigerant", value: result.refrigerant },
+    { label: "Method", value: methodLabel(result.method) },
+    { label: "Gas leaked", value: formatQty(result.leakage_kg, "kg") },
+    ...(result.method === "estimated_leakage"
+      ? [
+          { label: "Charge", value: formatQty(result.charge_kg ?? null, "kg") },
+          {
+            label: "Leakage rate",
+            value: result.leakage_rate_percent ? `${result.leakage_rate_percent}% (your assumption)` : "—",
+          },
+        ]
+      : []),
+    { label: "GWP", value: basis ? `${formatNumber(result.gwp)} · ${basis}` : formatNumber(result.gwp) },
+    { label: "Period", value: formatReportingMonth(period) },
+    ...(location ? [{ label: "Location", value: location }] : []),
+  ];
+
   return (
-    <div className="rounded-lg border border-[#BFE3D3] bg-[#EAF7F1]/60 px-4 py-3 text-sm text-[#0A4D3E] space-y-1">
-      <p className="font-medium">Server calculation</p>
-      <p>
-        {result.refrigerant} · {methodLabel(result.method)}
-      </p>
-      <p>Leaked refrigerant: {result.leakage_kg} kg</p>
-      {result.method === "estimated_leakage" && (
-        <p>
-          Charge {result.charge_kg} kg × {result.leakage_rate_percent}% user assumption. This rate is not an EPA factor.
-        </p>
-      )}
-      <p>GWP {result.gwp}</p>
-      {result.gwp_publication && <p>{result.gwp_publication}</p>}
-      {result.gwp_edition && <p>{result.gwp_edition}</p>}
-      {result.factor_provenance && <p>{result.factor_provenance}</p>}
-      {result.table11_reference && <p>{result.table11_reference}</p>}
-      <p>
-        {result.emissions_kg_co2e} kg CO2e = {tonnes} tCO2e
-      </p>
-      <p>Reporting month: {period}</p>
-      {(result.equipment_type || equipmentId || site) && (
-        <p>
-          {[result.equipment_type, equipmentId, site].filter(Boolean).join(" · ")}
-        </p>
-      )}
+    <div className="rounded-xl border border-[#BFE3D3] bg-[#EAF7F1]/70 overflow-hidden">
+      <div className="px-4 py-4 sm:px-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#0F6E56]">Calculated emissions</p>
+          <p className="mt-1 text-[28px] leading-none font-semibold tracking-[-0.03em] tabular-nums text-[#0A4D3E]">
+            {tonnes}
+            <span className="ml-1.5 text-sm font-medium text-[#0F6E56]">tCO₂e</span>
+          </p>
+          <p className="mt-1.5 text-xs text-[#3F6F5E]">{formatQty(result.emissions_kg_co2e, "kg CO₂e")}</p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-[#BFE3D3]/70 border-t border-[#BFE3D3]">
+        {facts.map((fact) => (
+          <div key={fact.label} className="bg-[#F6FBF8] px-4 py-3">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-[#5B7C6E]">{fact.label}</dt>
+            <dd className="mt-0.5 text-sm font-medium text-[#0A4D3E]">{fact.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {sourceLine ? (
+        <p className="px-4 py-3 text-xs text-[#3F6F5E] border-t border-[#BFE3D3]">{sourceLine}</p>
+      ) : null}
+      {extraNotes.length > 0 ? (
+        <Collapsible>
+          <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-2.5 text-xs font-medium text-[#0F6E56] border-t border-[#BFE3D3] hover:bg-[#EAF7F1]">
+            Factor details
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-2 px-4 pb-3 text-xs leading-relaxed text-[#3F6F5E]">
+              {extraNotes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
     </div>
   );
 }

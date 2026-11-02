@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { activityMatchesReportingYear, matchesVerifiedCounterparty } from "@/features/emission-calculator/results/reportingYear";
 import type { EmissionActivity } from "@/api/ghg";
 import type { RefrigerantCalcResponse, RefrigerantSaveResponse } from "@/api/calc";
-import { canonicalRefrigerant, isSupportedRefrigerant, offeredRefrigerants } from "./refrigerantCatalog";
+import {
+  canonicalRefrigerant,
+  filterRefrigerantGroups,
+  isSupportedRefrigerant,
+  offeredRefrigerants,
+} from "./refrigerantCatalog";
 import {
   applyCalcFailure,
   applyCalcSuccess,
@@ -81,6 +86,18 @@ describe("supported refrigerant choices", () => {
     expect(canonicalRefrigerant("HFC-43-I0mee")).toBe("HFC-43-10mee");
     expect(isSupportedRefrigerant("R-502")).toBe(false);
     expect(refrigerantEntryBlocker(entry({ gas: "SF6" }), "2026-10")).toMatch(/not available/i);
+  });
+
+  it("narrows the list as the user types R, 134, or an ASHRAE alias", () => {
+    const names = (query: string) => filterRefrigerantGroups(query).flatMap((group) => [...group.options]);
+    expect(names("R")).toContain("R-404A");
+    expect(names("R")).toContain("R-410A");
+    expect(names("R")).toContain("HFC-134a");
+    expect(names("134")).toContain("HFC-134a");
+    expect(names("r-134a")).toEqual(["HFC-134a"]);
+    expect(names("hfc-32")).toEqual(["HFC-32"]);
+    expect(names("R-22")).not.toContain("R-22");
+    expect(names("SF6")).toEqual([]);
   });
 });
 

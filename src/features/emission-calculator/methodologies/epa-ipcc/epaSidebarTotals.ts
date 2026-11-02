@@ -29,6 +29,8 @@ export type EpaSidebarDisplay = {
   grandLabel: string;
   biogenicLabel: string;
   statusLabel: string;
+  /** Short calculator-sidebar copy. Methodology paragraphs stay on the results screen. */
+  compactNote: string | null;
   incomplete: boolean;
 };
 
@@ -59,6 +61,7 @@ export function buildEpaSidebarDisplay(
       statusLabel:
         loadError ||
         "EPA totals have not loaded. This is not a zero inventory.",
+      compactNote: loadError || "Emissions could not be loaded for this reporting year.",
       incomplete: true,
     };
   }
@@ -84,6 +87,11 @@ export function buildEpaSidebarDisplay(
     grandLabel: grand != null ? tonnesLabel(summary.grandKg) : inventory === "partial" ? "Partial" : "Unavailable",
     biogenicLabel: summary.biogenicLabel,
     statusLabel: loadError || summary.statusLabel,
+    compactNote: unavailable
+      ? loadError || "Emissions could not be loaded for this reporting year."
+      : summary.reconciliationPending
+        ? "Historical stationary combustion is excluded until reconciliation."
+        : null,
     incomplete: unavailable,
   };
 }

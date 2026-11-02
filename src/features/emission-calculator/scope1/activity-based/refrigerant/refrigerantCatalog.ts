@@ -106,3 +106,29 @@ export function refrigerantGasGroups(): RefrigerantGasGroup[] {
 export function offeredRefrigerants(): string[] {
   return refrigerantGasGroups().flatMap((group) => [...group.options]);
 }
+
+function compactRefrigerantToken(value: string): string {
+  return normalizeRefrigerantName(value).replace(/-/g, "").replace(/\s+/g, "");
+}
+
+function searchTokensFor(name: string): string[] {
+  const aliases = Object.entries(ALIASES)
+    .filter(([, canonical]) => canonical === name)
+    .map(([alias]) => alias);
+  return [name, ...aliases].map(compactRefrigerantToken);
+}
+
+export function matchesRefrigerantQuery(name: string, query: string): boolean {
+  const needle = compactRefrigerantToken(query);
+  if (!needle) return true;
+  return searchTokensFor(name).some((token) => token.includes(needle));
+}
+
+export function filterRefrigerantGroups(query: string): RefrigerantGasGroup[] {
+  return refrigerantGasGroups()
+    .map((group) => ({
+      ...group,
+      options: group.options.filter((name) => matchesRefrigerantQuery(name, query)),
+    }))
+    .filter((group) => group.options.length > 0);
+}
