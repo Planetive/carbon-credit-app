@@ -9,11 +9,13 @@ export const FIELD_INPUT =
 export function InputSection({
   title,
   description,
+  tooltip,
   action,
   children,
 }: {
   title: string;
   description?: string;
+  tooltip?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
@@ -21,7 +23,10 @@ export function InputSection({
     <section className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-[#0F172A]">{title}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold text-[#0F172A]">{title}</h3>
+            {tooltip && <FieldTooltip content={tooltip} />}
+          </div>
           {description && <p className="mt-0.5 text-sm text-[#64748B]">{description}</p>}
         </div>
         {action}
@@ -40,6 +45,7 @@ export function FormField({
   unit,
   required,
   tooltip,
+  hint,
   span,
   children,
 }: {
@@ -47,6 +53,7 @@ export function FormField({
   unit?: string;
   required?: boolean;
   tooltip?: string;
+  hint?: ReactNode;
   span?: boolean;
   children: ReactNode;
 }) {
@@ -60,6 +67,7 @@ export function FormField({
         {unit && <span className="text-xs text-[#94A3B8]">{unit}</span>}
         {tooltip && <FieldTooltip content={tooltip} />}
       </div>
+      {hint}
       {children}
     </div>
   );

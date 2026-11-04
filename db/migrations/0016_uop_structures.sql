@@ -1,0 +1,7 @@
+-- POINTER ONLY.
+-- Canonical Phase 5B migration lives in carbon-credit-backend:
+--   db/migrations/0016_uop_structures.sql
+--
+-- DO NOT apply this SPA file.
+-- DO NOT apply the backend file to production from Phase 5B.
+-- DO NOT reuse 0014 or 0015.

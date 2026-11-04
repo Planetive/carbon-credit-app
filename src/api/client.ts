@@ -24,6 +24,9 @@ function detailToMessage(detail: unknown, fallback: string): string {
   if (detail && typeof detail === "object" && "detail" in detail) {
     const inner = (detail as { detail: unknown }).detail;
     if (typeof inner === "string") return inner;
+    if (inner && typeof inner === "object" && "message" in inner && typeof (inner as { message: unknown }).message === "string") {
+      return (inner as { message: string }).message;
+    }
     if (Array.isArray(inner)) {
       return inner
         .map((item) =>

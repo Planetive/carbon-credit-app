@@ -4,8 +4,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Plus, Building2, CheckCircle, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save, Car, Landmark, Minus, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Building2, CheckCircle, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save, Car, Landmark, Minus, Home, Layers } from 'lucide-react';
 import { FinanceEmissionCalculator } from './FinanceEmissionCalculator';
+import {
+  FINANCE_LOAN_TYPE_DEFS,
+  UOP_LOAN_TYPE,
+  filterNonUopLoanTypes,
+  financeLoanTypeLabel,
+  isUopLoanType,
+} from '../config/loanTypeOptions';
+import {
+  UopBackendUnavailableBanner,
+  UopQuestionnaire,
+  UopResultsPanel,
+  ensureUopInstances,
+  rejectUopReportableResults,
+  uopInstanceKey,
+  uopWizardSteps,
+  useUopDraftPersistence,
+  validateUopStep,
+  type UopByInstance,
+} from '../uop';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
@@ -43,23 +62,28 @@ interface WizardStep {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
+const LOAN_TYPE_ICONS: Record<string, LucideIcon> = {
+  'corporate-bond': Landmark,
+  'business-loan': Building2,
+  'project-finance': BarChart3,
+  mortgage: Home,
+  'sovereign-debt': FileText,
+  'motor-vehicle-loan': Car,
+  'commercial-real-estate': Building,
+  [UOP_LOAN_TYPE]: Layers,
+};
+
 const LOAN_TYPE_OPTIONS: Array<{
   value: string;
   label: string;
   description: string;
   icon: LucideIcon;
-}> = [
-  { value: 'corporate-bond', label: 'Corporate Bond', description: 'Debt securities issued by corporations', icon: Landmark },
-  { value: 'business-loan', label: 'Business Loan', description: 'Loans to businesses for operations', icon: Building2 },
-  { value: 'project-finance', label: 'Project Finance', description: 'Financing for a specific project', icon: BarChart3 },
-  { value: 'mortgage', label: 'Mortgage', description: 'Loans secured by residential property', icon: Home },
-  { value: 'sovereign-debt', label: 'Sovereign Debt', description: 'Bonds or loans issued by governments', icon: FileText },
-  { value: 'motor-vehicle-loan', label: 'Motor Vehicle Loan', description: 'Loans for cars, trucks, and other vehicles', icon: Car },
-  { value: 'commercial-real-estate', label: 'Commercial Real Estate', description: 'Loans for offices, retail, and industrial buildings', icon: Building },
-];
+}> = FINANCE_LOAN_TYPE_DEFS.map((item) => ({
+  ...item,
+  icon: LOAN_TYPE_ICONS[item.value] || FileText,
+}));
 
-const loanTypeLabel = (type: string) =>
-  LOAN_TYPE_OPTIONS.find((o) => o.value === type)?.label || type;
+const loanTypeLabel = (type: string) => financeLoanTypeLabel(type);
 
 const BOND_FAMILY = ['corporate-bond', 'business-loan', 'project-finance'];
 const PROPERTY_FAMILY = ['commercial-real-estate', 'mortgage'];
@@ -670,7 +694,9 @@ export const ESGWizard: React.FC = () => {
         scope3Emissions: null as number | null,
         verifierName: '',
         verified_emissions: 0,
-        unverified_emissions: 0
+        unverified_emissions: 0,
+        uopByInstance: {} as UopByInstance,
+        uopActiveKey: '',
       });
       setResults([]);
       setCurrentStep(0);
@@ -786,7 +812,9 @@ export const ESGWizard: React.FC = () => {
             scope3Emissions,
             verifierName: questionnaire.verifier_name || '',
             verified_emissions,
-            unverified_emissions
+            unverified_emissions,
+            uopByInstance: {} as UopByInstance,
+            uopActiveKey: '',
           });
 
           console.log('Loaded questionnaire data into form:', {
@@ -1004,7 +1032,9 @@ export const ESGWizard: React.FC = () => {
     verifierName: '',
     // Auto-calculated emissions
     verified_emissions: 0,
-    unverified_emissions: 0
+    unverified_emissions: 0,
+    uopByInstance: {} as UopByInstance,
+    uopActiveKey: '',
   });
 
   const PROPERTY_DIRECT_TYPES = ['commercial-real-estate', 'mortgage'];
@@ -1030,9 +1060,24 @@ export const ESGWizard: React.FC = () => {
   const hasVehicleFamily = selectedTypeIds.includes('motor-vehicle-loan');
   const hasPropertyFamily = selectedTypeIds.some((t) => PROPERTY_FAMILY.includes(t));
   const hasSovereignFamily = selectedTypeIds.includes('sovereign-debt');
+  const hasUopFamily = selectedTypeIds.includes(UOP_LOAN_TYPE);
+  const uopQuantity = formData.loanTypes.find((item) => item.type === UOP_LOAN_TYPE)?.quantity || 0;
+  const isUopOnly = hasUopFamily && formData.loanTypes.every((item) => item.type === UOP_LOAN_TYPE);
+  const nonUopLoanTypes = filterNonUopLoanTypes(formData.loanTypes);
+  const activeUopKey = formData.uopActiveKey || uopInstanceKey(1);
+  const activeUopDraft = formData.uopByInstance?.[activeUopKey];
+  const uopPersistence = useUopDraftPersistence({
+    enabled: isUopOnly,
+    drafts: formData.uopByInstance || {},
+    activeKey: activeUopKey,
+    counterpartyId,
+    onReplace: (next) => {
+      setFormData((prev) => ({ ...prev, uopByInstance: next }));
+    },
+  });
   const isMixedFamilies =
-    [hasBondFamily, hasVehicleFamily, hasPropertyFamily, hasSovereignFamily].filter(Boolean).length > 1;
-  const skipCompanyGhg = isDirectMethod || (isMixedFamilies && !hasBondFamily);
+    [hasBondFamily, hasVehicleFamily, hasPropertyFamily, hasSovereignFamily, hasUopFamily].filter(Boolean).length > 1;
+  const skipCompanyGhg = isDirectMethod || isUopOnly || (isMixedFamilies && !hasBondFamily);
   const methodFor = (type: string) => formData.calculationMethods?.[type] || '';
   const methodForFamily = (types: string[]) => types.map(methodFor).find(Boolean) || '';
   const activityMixLabels = [
@@ -1053,15 +1098,18 @@ export const ESGWizard: React.FC = () => {
       next = next.filter((s) => s.id !== 'corporate-structure');
     }
     if (skipCompanyGhg) {
-      next = next
-        .filter((s) => s.id !== 'emission-status')
-        .map((s) =>
+      next = next.filter((s) => s.id !== 'emission-status');
+      if (isUopOnly) {
+        next = next.filter((s) => s.id !== 'verification');
+      } else {
+        next = next.map((s) =>
           s.id === 'verification'
             ? isMixedFamilies
               ? { ...s, title: 'Methods by loan', description: 'Choose how you will estimate emissions for each loan type' }
               : { ...s, title: 'How will you estimate emissions?', description: 'Pick the option that best matches the data you have' }
             : s
         );
+      }
     } else if (isMixedFamilies) {
       next = next.map((s) => {
         if (s.id === 'emission-status') {
@@ -1081,6 +1129,21 @@ export const ESGWizard: React.FC = () => {
         return s;
       });
     }
+    if (mode === 'finance' && hasUopFamily) {
+      const activeDraft = formData.uopByInstance?.[formData.uopActiveKey || uopInstanceKey(1)];
+      const uopSteps = uopWizardSteps(activeDraft).map((step) => ({
+        id: step.id,
+        title: step.title,
+        description: step.description,
+        icon: Layers,
+      }));
+      if (isUopOnly) {
+        next = next.filter((s) => s.id !== 'emission-calculation');
+      }
+      const insertAt = next.findIndex((s) => s.id === 'emission-calculation' || s.id === 'results');
+      const at = insertAt >= 0 ? insertAt : next.length;
+      next = [...next.slice(0, at), ...uopSteps, ...next.slice(at)];
+    }
     return next;
   })();
 
@@ -1090,6 +1153,22 @@ export const ESGWizard: React.FC = () => {
       setFormData((prev) => ({ ...prev, corporateStructure: 'unlisted' }));
     }
   }, [mode, needsListing, formData.loanTypes.length, formData.corporateStructure]);
+
+  useEffect(() => {
+    if (mode !== 'finance') return;
+    setFormData((prev) => {
+      const qty = prev.loanTypes.find((item) => item.type === UOP_LOAN_TYPE)?.quantity || 0;
+      const nextMap = ensureUopInstances(prev.uopByInstance, qty);
+      const keys = Object.keys(nextMap);
+      const prevKeys = Object.keys(prev.uopByInstance || {});
+      const sameShape =
+        keys.length === prevKeys.length &&
+        keys.every((key) => prev.uopByInstance?.[key]?.financingInstanceId === nextMap[key]?.financingInstanceId);
+      const active = keys.includes(prev.uopActiveKey) ? prev.uopActiveKey : keys[0] || '';
+      if (sameShape && prev.uopActiveKey === active) return prev;
+      return { ...prev, uopByInstance: nextMap, uopActiveKey: active };
+    });
+  }, [mode, uopQuantity]);
 
   useEffect(() => {
     const currentId = steps[currentStep]?.id;
@@ -1325,6 +1404,7 @@ export const ESGWizard: React.FC = () => {
     }
 
     console.log('✅ ESGWizard - Counterparty ID is valid UUID:', counterpartyId);
+    rejectUopReportableResults(calculationResults);
     assertReportableResults(calculationResults);
 
     try {
@@ -1761,6 +1841,20 @@ export const ESGWizard: React.FC = () => {
           }
         }
         break;
+      case 'uop-eligibility':
+      case 'uop-guidance':
+      case 'uop-structure':
+      case 'uop-emissions-path':
+      case 'uop-holdings':
+      case 'uop-assets': {
+        const draft = dataToValidate.uopByInstance?.[dataToValidate.uopActiveKey || uopInstanceKey(1)];
+        if (!draft) {
+          errors.uop = 'Complete the Use of Proceeds questions for this structure.';
+          break;
+        }
+        Object.assign(errors, validateUopStep(stepId, draft));
+        break;
+      }
     }
 
     return errors;
@@ -1796,6 +1890,18 @@ export const ESGWizard: React.FC = () => {
       // Update validation errors immediately - replace all errors for current step
       setValidationErrors(errors);
       
+      return updated;
+    });
+  };
+
+  const updateActiveUop = (nextDraft: NonNullable<typeof activeUopDraft>) => {
+    setFormData((prev) => {
+      const key = prev.uopActiveKey || uopInstanceKey(1);
+      const updated = {
+        ...prev,
+        uopByInstance: { ...prev.uopByInstance, [key]: nextDraft },
+      };
+      setValidationErrors(validateUopStep(steps[currentStep]?.id, nextDraft));
       return updated;
     });
   };
@@ -2333,11 +2439,26 @@ export const ESGWizard: React.FC = () => {
           loanTypes: formData.loanTypes,
           counterpartyId
         });
+        if (nonUopLoanTypes.length === 0) {
+          return (
+            <div className="space-y-4">
+              {activeUopDraft ? (
+                <UopResultsPanel
+                  draft={activeUopDraft}
+                  counterpartyId={counterpartyId}
+                  onResult={(result) => updateActiveUop({ ...activeUopDraft, lastCalculation: result })}
+                />
+              ) : (
+                <UopBackendUnavailableBanner />
+              )}
+            </div>
+          );
+        }
         return <FinanceEmissionCalculator 
           hasEmissions={formData.hasEmissions}
           verificationStatus={formData.verificationStatus}
           corporateStructure={formData.corporateStructure}
-          loanTypes={formData.loanTypes}
+          loanTypes={nonUopLoanTypes}
           calculationMethod={formData.calculationMethod}
           calculationMethods={formData.calculationMethods}
           counterpartyId={counterpartyId}
@@ -2415,13 +2536,24 @@ export const ESGWizard: React.FC = () => {
 
         return (
           <div className="space-y-6">
+            {hasUopFamily && activeUopDraft && (
+              <UopResultsPanel
+                draft={activeUopDraft}
+                counterpartyId={counterpartyId}
+                onResult={(result) => updateActiveUop({ ...activeUopDraft, lastCalculation: result })}
+              />
+            )}
             {!results || results.length === 0 ? (
-              <div className="py-14 text-center">
-                <div className="w-12 h-12 bg-[#F1F5F9] rounded-xl flex items-center justify-center mx-auto mb-3">
-                  <Calculator className="h-6 w-6 text-[#94A3B8]" />
-                </div>
-                <p className="text-[#0F172A] font-medium">No results yet</p>
-                <p className="text-sm text-[#64748B] mt-1">Run a calculation to see financed emissions.</p>
+              <div className="space-y-4">
+                {hasUopFamily ? null : (
+                  <div className="py-14 text-center">
+                    <div className="w-12 h-12 bg-[#F1F5F9] rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <Calculator className="h-6 w-6 text-[#94A3B8]" />
+                    </div>
+                    <p className="text-[#0F172A] font-medium">No results yet</p>
+                    <p className="text-sm text-[#64748B] mt-1">Run a calculation to see financed emissions.</p>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -2505,6 +2637,7 @@ export const ESGWizard: React.FC = () => {
                 )}
 
                 <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                  {steps.some((s) => s.id === 'emission-calculation') && (
                   <Button 
                     onClick={() => setCurrentStep(steps.findIndex(s => s.id === 'emission-calculation'))}
                     variant="outline" 
@@ -2513,6 +2646,7 @@ export const ESGWizard: React.FC = () => {
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Recalculate
                   </Button>
+                  )}
                   {mode === 'finance' ? (
                     <Button 
                       onClick={() => navigate('/finance-emission', { 
@@ -2563,6 +2697,66 @@ export const ESGWizard: React.FC = () => {
         );
       }
 
+      case 'uop-eligibility':
+      case 'uop-guidance':
+      case 'uop-structure':
+      case 'uop-emissions-path':
+      case 'uop-holdings':
+      case 'uop-assets': {
+        const uopKeys = Object.keys(formData.uopByInstance || {});
+        if (!activeUopDraft) {
+          return <p className="text-sm text-[#64748B]">Select Use of Proceeds Structures to continue.</p>;
+        }
+        return (
+          <div className="space-y-4">
+            {uopKeys.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {uopKeys.map((key, index) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => updateFormData('uopActiveKey', key)}
+                    className={cn(
+                      'h-9 rounded-lg border px-3 text-sm font-medium',
+                      key === activeUopKey
+                        ? 'border-[#0F6E56] bg-[#EAF7F1] text-[#0F6E56]'
+                        : 'border-[#E2E8F0] bg-white text-[#64748B]'
+                    )}
+                  >
+                    Structure {index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+            <UopQuestionnaire
+              draft={activeUopDraft}
+              onChange={updateActiveUop}
+              stepId={steps[currentStep].id}
+              errors={validationErrors}
+              counterpartyId={counterpartyId}
+              siblingHoldings={uopKeys
+                .map((key, index) => {
+                  const other = formData.uopByInstance?.[key];
+                  if (!other?.structureId) return null;
+                  return {
+                    key,
+                    label: `Structure ${index + 1}`,
+                    structureId: other.structureId,
+                    structureName: other.structureName,
+                    draft: other,
+                  };
+                })
+                .filter((item): item is NonNullable<typeof item> => Boolean(item))}
+              saveStatus={uopPersistence.enabled ? uopPersistence.status : undefined}
+              saveError={uopPersistence.errorMessage}
+              onRetrySave={uopPersistence.retry}
+              onRefreshDraft={uopPersistence.refresh}
+              onApplyShared={uopPersistence.applyShared}
+            />
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -2597,6 +2791,14 @@ export const ESGWizard: React.FC = () => {
           return formData.calculationMethod !== '';
         }
         return false;
+      case 'uop-eligibility':
+      case 'uop-guidance':
+      case 'uop-structure':
+      case 'uop-emissions-path':
+      case 'uop-holdings':
+      case 'uop-assets':
+        if (!activeUopDraft) return false;
+        return Object.keys(validateUopStep(steps[currentStep].id, activeUopDraft)).length === 0;
       default:
         return true;
     }

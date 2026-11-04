@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
@@ -82,6 +83,25 @@ const MainHeader = () => {
       window.removeEventListener("resize", updateHeroState);
     };
   }, [isHome]);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setMobileSolutionsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnDesktop = () => {
+      if (window.innerWidth >= 768) setIsMobileMenuOpen(false);
+    };
+    window.addEventListener("resize", closeOnDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("resize", closeOnDesktop);
+    };
+  }, [isMobileMenuOpen]);
 
   // Home: glass in hero; light white bar with dark text after scroll
   const headerClass = isHome
@@ -325,116 +345,117 @@ const MainHeader = () => {
         </button>
       </div>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsMobileMenuOpen(false)} />
-      )}
-
-      {/* Mobile Menu */}
-      <div className={`md:hidden fixed top-0 right-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
-        isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-        <div className="flex flex-col h-full">
-          {/* Mobile Menu Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <span className="font-semibold text-gray-900">Menu</span>
+      {isMobileMenuOpen &&
+        createPortal(
+          <div className="md:hidden fixed inset-0 z-[200]" role="dialog" aria-modal="true" aria-label="Menu">
             <button
+              type="button"
+              className="absolute inset-0 bg-[#041512]/70"
+              aria-label="Close menu"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 text-gray-600 hover:text-[#1D9E75] transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Mobile Navigation Links */}
-          <nav className="flex-1 p-4">
-            <div className="space-y-2">
-              <a
-                href="/"
-                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Home
-              </a>
-              <Link
-                to="/about"
-                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                About
-              </Link>
-              {/* Mobile Solutions accordion */}
-              <div className="border rounded-lg">
+            />
+            <div className="absolute inset-y-0 right-0 flex h-dvh w-full max-w-sm flex-col bg-white text-gray-900 shadow-[-16px_0_40px_rgba(0,0,0,0.28)]">
+              <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+                <span className="font-semibold text-gray-900">Menu</span>
                 <button
-                  className="w-full flex items-center justify-between p-3 text-left text-base font-normal text-gray-700 hover:bg-gray-100"
-                  onClick={() => setMobileSolutionsOpen(v => !v)}
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 text-gray-700 hover:text-[#1D9E75] transition-colors"
+                  aria-label="Close menu"
                 >
-                  <span>Solutions</span>
-                  <svg className={`h-4 w-4 transition-transform ${mobileSolutionsOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.855a.75.75 0 111.08 1.04l-4.24 4.404a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
-                  </svg>
+                  <X className="h-5 w-5" />
                 </button>
-                {mobileSolutionsOpen && (
-                  <div className="px-2 pb-2">
-                    <Link
-                      to="/solutions/corporate"
-                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Carbon Intelligence for corporates
-                    </Link>
-                    <Link
-                      to="/solutions/financial-institutions"
-                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Carbon Intelligence for financial institutions
-                    </Link>
-                    <Link
-                      to="/solutions/modules/ai"
-                      className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Sustainability solution modules
-                    </Link>
-                    <div className="my-1 border-t border-gray-200/80" />
-                    {moduleSolutionLinks.map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        className="block p-2 rounded text-[15px] text-gray-700 hover:bg-gray-100"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </div>
-              <Link
-                to="/pricing"
-                className="flex items-center p-3 rounded-lg text-base font-normal text-gray-700 hover:bg-gray-100 transition-colors"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-            </div>
-          </nav>
 
-          {/* Mobile Auth Buttons */}
-          <div className="p-4 border-t border-gray-200 space-y-3">
-            <Button variant="outline" className="w-full" asChild>
-              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Login</Link>
-            </Button>
-            <Button
-              className="w-full bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold"
-              asChild
-            >
-              <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+              <nav className="flex-1 overflow-y-auto bg-white p-4">
+                <div className="space-y-2">
+                  <a
+                    href="/"
+                    className="flex items-center p-3 rounded-lg text-base font-medium text-gray-900 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Home
+                  </a>
+                  <Link
+                    to="/about"
+                    className="flex items-center p-3 rounded-lg text-base font-medium text-gray-900 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    About
+                  </Link>
+                  <div className="border border-gray-200 rounded-lg bg-white">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between p-3 text-left text-base font-medium text-gray-900 hover:bg-gray-100"
+                      onClick={() => setMobileSolutionsOpen((v) => !v)}
+                    >
+                      <span>Solutions</span>
+                      <svg className={`h-4 w-4 transition-transform ${mobileSolutionsOpen ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.085l3.71-3.855a.75.75 0 111.08 1.04l-4.24 4.404a.75.75 0 01-1.08 0L5.25 8.27a.75.75 0 01-.02-1.06z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {mobileSolutionsOpen && (
+                      <div className="px-2 pb-2">
+                        <Link
+                          to="/solutions/corporate"
+                          className="block p-2 rounded text-[15px] text-gray-800 hover:bg-gray-100"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Carbon Intelligence for corporates
+                        </Link>
+                        <Link
+                          to="/solutions/financial-institutions"
+                          className="block p-2 rounded text-[15px] text-gray-800 hover:bg-gray-100"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Carbon Intelligence for financial institutions
+                        </Link>
+                        <Link
+                          to="/solutions/modules/ai"
+                          className="block p-2 rounded text-[15px] text-gray-800 hover:bg-gray-100"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Sustainability solution modules
+                        </Link>
+                        <div className="my-1 border-t border-gray-200" />
+                        {moduleSolutionLinks.map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className="block p-2 rounded text-[15px] text-gray-800 hover:bg-gray-100"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    to="/pricing"
+                    className="flex items-center p-3 rounded-lg text-base font-medium text-gray-900 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Pricing
+                  </Link>
+                </div>
+              </nav>
+
+              <div className="border-t border-gray-200 bg-white p-4 space-y-3">
+                <Button variant="outline" className="w-full bg-white text-gray-900" asChild>
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Login</Link>
+                </Button>
+                <Button
+                  className="w-full bg-[#124740] hover:bg-[#0F3B35] text-white font-semibold"
+                  asChild
+                >
+                  <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)}>Contact Us</Link>
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </header>
   );
 };

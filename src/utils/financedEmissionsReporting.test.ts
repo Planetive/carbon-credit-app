@@ -321,4 +321,153 @@ describe("financed emissions reporting contract", () => {
     ]);
     expect(group.total).toBe(9);
   });
+
+  it("includes a UoP parent once and never its underlying look-through", () => {
+    const group = selectFinancedGroup([
+      row({
+        id: "uop-parent",
+        formulaId: "uop-separate-lookthrough",
+        formulaName: "PCAF §5.7 separate look-through",
+        financedEmissions: 46,
+        dataQualityScore: 1.4,
+        financingInstanceId: "uop-a",
+        source: "jwt",
+        results: { reporting_role: "uop_parent", include_underlying_independently: false },
+      }),
+      row({
+        id: "uop-underlying",
+        formulaId: "mortgage",
+        financedEmissions: 36,
+        source: "jwt",
+        results: { reporting_role: "uop_underlying" },
+      }),
+    ]);
+    expect(group.total).toBe(46);
+    expect(ids(group.selectedRows)).toEqual(["uop-parent"]);
+  });
+
+  it("keeps two holdings in the same fund independent", () => {
+    const group = selectFinancedGroup([
+      row({
+        id: "hold-a",
+        formulaId: "uop-separate-lookthrough",
+        financedEmissions: 46,
+        financingInstanceId: "uop-a",
+        source: "jwt",
+      }),
+      row({
+        id: "hold-b",
+        formulaId: "uop-separate-lookthrough",
+        financedEmissions: 18.4,
+        financingInstanceId: "uop-b",
+        source: "jwt",
+      }),
+    ]);
+    expect(group.total).toBeCloseTo(64.4);
+    expect(ids(group.selectedRows)).toEqual(["hold-a", "hold-b"]);
+  });
+
+  it("adds a UoP parent beside a general-purpose aggregate without double-counting components", () => {
+    const jwt: FinancedRowSource = "jwt";
+    const group = selectFinancedGroup([
+      row({ id: "c1", formulaId: "mortgage", financedEmissions: 60, source: jwt }),
+      row({
+        id: "agg",
+        formulaId: "aggregate",
+        financedEmissions: 100,
+        source: jwt,
+        updatedAt: "2026-02-01T00:00:00.000Z",
+      }),
+      row({
+        id: "uop-parent",
+        formulaId: "uop-issuer-reported",
+        financedEmissions: 20,
+        financingInstanceId: "uop-a",
+        source: jwt,
+        results: { reporting_role: "uop_parent" },
+      }),
+    ]);
+    expect(group.total).toBe(120);
+    expect(ids(group.selectedRows)).toEqual(["agg", "uop-parent"]);
+    const importable = selectImportableFinancedRows(
+      [
+        row({ id: "c1", formulaId: "mortgage", financedEmissions: 60, source: jwt }),
+        row({
+          id: "agg",
+          formulaId: "aggregate",
+          financedEmissions: 100,
+          source: jwt,
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        }),
+        row({
+          id: "uop-parent",
+          formulaId: "uop-issuer-reported",
+          financedEmissions: 20,
+          financingInstanceId: "uop-a",
+          source: jwt,
+        }),
+      ],
+      "finance",
+    );
+    expect(ids(importable)).toEqual(["agg", "uop-parent"]);
+  });
+
+  it("counts the same financing instance once across reporting years unless a year is selected", () => {
+    const jwt: FinancedRowSource = "jwt";
+    const rows = [
+      row({
+        id: "uop-2025",
+        formulaId: "uop-separate-lookthrough",
+        financedEmissions: 40,
+        financingInstanceId: "uop-a",
+        source: jwt,
+        updatedAt: "2025-12-31T00:00:00.000Z",
+        inputs: { reporting_year: "2025" },
+        results: { reporting_role: "uop_parent", reporting_year: "2025" },
+      }),
+      row({
+        id: "uop-2026",
+        formulaId: "uop-separate-lookthrough",
+        financedEmissions: 46,
+        financingInstanceId: "uop-a",
+        source: jwt,
+        updatedAt: "2026-12-31T00:00:00.000Z",
+        inputs: { reporting_year: "2026" },
+        results: { reporting_role: "uop_parent", reporting_year: "2026" },
+      }),
+    ];
+    const latest = selectFinancedGroup(rows);
+    expect(latest.total).toBe(46);
+    expect(ids(latest.selectedRows)).toEqual(["uop-2026"]);
+    const year2025 = selectFinancedGroup(rows, { reportingYear: "2025" });
+    expect(year2025.total).toBe(40);
+    expect(ids(year2025.selectedRows)).toEqual(["uop-2025"]);
+    const importable = selectImportableFinancedRows(rows, "finance");
+    expect(ids(importable)).toEqual(["uop-2026"]);
+  });
+
+  it("excludes unresolved UoP / general-purpose overlap from Category 15", () => {
+    const importable = selectImportableFinancedRows(
+      [
+        row({
+          id: "gp",
+          formulaId: "mortgage",
+          financedEmissions: 12,
+          financingInstanceId: "gp-1",
+          source: "jwt",
+        }),
+        row({
+          id: "uop-overlap",
+          formulaId: "uop-separate-lookthrough",
+          financedEmissions: 46,
+          status: "review_required",
+          financingInstanceId: "uop-a",
+          source: "jwt",
+          results: { overlap: { status: "review_required" } },
+        }),
+      ],
+      "finance",
+    );
+    expect(ids(importable)).toEqual(["gp"]);
+  });
 });

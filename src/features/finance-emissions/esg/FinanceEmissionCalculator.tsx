@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { isUopLoanType } from "../config/loanTypeOptions";
+import { UOP_REPORTABLE_BLOCKED_MESSAGE } from "../uop/reportableGuard";
 import { executePcafCalculation } from "../utils/executePcafCalculation";
 import {
   PcafAuthorityError,
@@ -215,6 +217,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const expandedLoanTypes = React.useMemo(() => {
     const list: Array<{ type: string; instance: number; key: string }> = [];
     (propLoanTypes || []).forEach(({ type, quantity }) => {
+      if (isUopLoanType(type)) return;
       const qty = Math.max(1, Number(quantity) || 1);
       for (let i = 0; i < qty; i++) {
         list.push({ type, instance: i + 1, key: `${type}#${i + 1}` });
@@ -232,7 +235,8 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     'mortgage': 'Mortgage',
     'sovereign-debt': 'Sovereign Debt',
     'motor-vehicle-loan': 'Motor Vehicle Loan',
-    'commercial-real-estate': 'Commercial Real Estate'
+    'commercial-real-estate': 'Commercial Real Estate',
+    'use-of-proceeds': 'Use of Proceeds Structures',
   };
 
   // Per-loan-instance form data store so duplicate types don't overwrite each other
@@ -752,6 +756,9 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
   // Get available formulas based on questionnaire answers for a given loan type
   const getAvailableFormulasForLoan = (loanTypeParam: string) => {
+    if (isUopLoanType(loanTypeParam)) {
+      return [];
+    }
     const isListed = corporateStructure === 'listed';
     const isProjectFinance = loanTypeParam === 'project-finance';
     const isMortgage = loanTypeParam === 'mortgage';
@@ -1662,6 +1669,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   };
 
   const calculateFinanceEmission = () => {
+    if (isUopLoanType(loanType)) {
+      toast({
+        title: "Calculation unavailable",
+        description: UOP_REPORTABLE_BLOCKED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     if (!selectedFormula) {
       toast({
         title: "No Formula Selected",

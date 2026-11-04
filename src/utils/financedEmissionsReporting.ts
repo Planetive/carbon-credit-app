@@ -120,11 +120,36 @@ function pickStoredScopeFields(
 
 function isReportableStatus(status: string | null | undefined): boolean {
   const s = String(status ?? "completed").trim().toLowerCase();
-  return s !== "failed" && s !== "draft";
+  return s !== "failed" && s !== "draft" && s !== "review_required" && s !== "void" && s !== "superseded" && s !== "incomplete";
+}
+
+export function isUopParentFormulaId(formulaId: string | null | undefined): boolean {
+  const key = String(formulaId ?? "").trim().toLowerCase();
+  return key.startsWith("uop") || key.includes("use-of-proceeds");
+}
+
+function resultsRecord(results: unknown): Record<string, unknown> | null {
+  return results && typeof results === "object" ? (results as Record<string, unknown>) : null;
+}
+
+export function isUopUnderlyingReportingRow(row: FinancedCalculationRow): boolean {
+  const results = resultsRecord(row.results);
+  return results?.reporting_role === "uop_underlying" || results?.include_underlying_independently === true;
+}
+
+export function hasUnresolvedUopOverlap(row: FinancedCalculationRow): boolean {
+  const results = resultsRecord(row.results);
+  const overlap = results?.overlap;
+  if (overlap && typeof overlap === "object" && (overlap as Record<string, unknown>).status === "review_required") {
+    return true;
+  }
+  return String(row.status ?? "").trim().toLowerCase() === "review_required";
 }
 
 export function isEligibleFinancedRow(row: FinancedCalculationRow): boolean {
   if (!isReportableStatus(row.status)) return false;
+  if (isUopUnderlyingReportingRow(row)) return false;
+  if (hasUnresolvedUopOverlap(row)) return false;
   return Number.isFinite(row.financedEmissions) && row.financedEmissions >= 0;
 }
 
@@ -159,10 +184,53 @@ function sumEmissions(rows: FinancedCalculationRow[]): number {
  * Choose the canonical rows for one counterparty + calc kind.
  * Never returns both an aggregate and its component rows.
  */
+export type FinancedSelectionOptions = {
+  reportingYear?: string | null;
+};
+
+export function rowReportingYear(row: FinancedCalculationRow): string | null {
+  const inputs = row.inputs && typeof row.inputs === "object" ? row.inputs : null;
+  const fromInputs = String(inputs?.reporting_year || inputs?.reportingYear || "").trim();
+  const results = resultsRecord(row.results);
+  const fromResults = String(results?.reporting_year || results?.reportingYear || "").trim();
+  return fromInputs || fromResults || null;
+}
+
+function yearRank(row: FinancedCalculationRow): number {
+  const year = Number(rowReportingYear(row) || 0);
+  return Number.isFinite(year) ? year : 0;
+}
+
+function collapseSameFinancingInstance(rows: FinancedCalculationRow[]): FinancedCalculationRow[] {
+  const uninstanced = rows.filter((row) => !row.financingInstanceId);
+  const instanced = rows.filter((row) => Boolean(row.financingInstanceId));
+  const best = new Map<string, FinancedCalculationRow>();
+  for (const row of instanced) {
+    const key = `${row.source}:${row.financingInstanceId}`;
+    const previous = best.get(key);
+    if (!previous) {
+      best.set(key, row);
+      continue;
+    }
+    const byYear = yearRank(row) - yearRank(previous);
+    if (byYear > 0 || (byYear === 0 && recency(row) >= recency(previous))) {
+      best.set(key, row);
+    }
+  }
+  return [...uninstanced, ...best.values()];
+}
+
 export function selectFinancedGroup(
   rows: FinancedCalculationRow[],
+  options?: FinancedSelectionOptions,
 ): FinancedGroupSelection {
-  const eligible = rows.filter(isEligibleFinancedRow);
+  const wantedYear = String(options?.reportingYear || "").trim();
+  const eligible = rows.filter((row) => {
+    if (!isEligibleFinancedRow(row)) return false;
+    if (!wantedYear) return true;
+    const year = rowReportingYear(row);
+    return !year || year === wantedYear;
+  });
   const calcKind = eligible[0]?.calcKind ?? rows[0]?.calcKind ?? "finance";
   const counterpartyId = eligible[0]?.counterpartyId ?? rows[0]?.counterpartyId ?? null;
   const empty = (): FinancedGroupSelection => ({
@@ -188,42 +256,47 @@ export function selectFinancedGroup(
     }
   }
 
-  const aggregates = working.filter((row) => isAggregateFormulaId(row.formulaId));
-  const components = working.filter((row) => !isAggregateFormulaId(row.formulaId));
+  const uopParents = collapseSameFinancingInstance(
+    working.filter((row) => isUopParentFormulaId(row.formulaId)),
+  );
+  const general = working.filter((row) => !isUopParentFormulaId(row.formulaId));
+  const aggregates = general.filter((row) => isAggregateFormulaId(row.formulaId));
+  const components = general.filter((row) => !isAggregateFormulaId(row.formulaId));
   const selectedIds = new Set<string>();
+
+  const withUopParents = (base: FinancedCalculationRow[], reason: FinancedSelectionReason, total: number): FinancedGroupSelection => {
+    const selected = [...base, ...uopParents];
+    selected.forEach((row) => selectedIds.add(`${row.source}:${row.id}`));
+    return {
+      counterpartyId: selected[0]?.counterpartyId ?? counterpartyId,
+      calcKind: selected[0]?.calcKind ?? calcKind,
+      total: total + sumEmissions(uopParents),
+      reason: base.length === 0 && uopParents.length > 0 ? "components-sum" : reason,
+      selectedRows: selected,
+      discardedRows: rows.filter((row) => !selectedIds.has(`${row.source}:${row.id}`)),
+    };
+  };
 
   if (aggregates.length > 0) {
     const aggregate = latestRow(aggregates);
     if (!aggregate) return empty();
-    selectedIds.add(`${aggregate.source}:${aggregate.id}`);
-    return {
-      counterpartyId: aggregate.counterpartyId,
-      calcKind: aggregate.calcKind,
-      total: financedEmissionsNumber(aggregate.financedEmissions),
-      reason: "aggregate",
-      selectedRows: [aggregate],
-      discardedRows: rows.filter((row) => `${row.source}:${row.id}` !== `${aggregate.source}:${aggregate.id}`),
-    };
+    return withUopParents([aggregate], "aggregate", financedEmissionsNumber(aggregate.financedEmissions));
   }
 
-  if (components.length > 0) {
+  if (components.length > 0 || uopParents.length > 0) {
     const instanced = components.filter((row) => Boolean(row.financingInstanceId));
     const activeComponents =
-      instanced.length === 0
-        ? components
-        : components.filter((row) => {
-            if (row.financingInstanceId) return true;
-            return !instanced.some((item) => item.formulaId === row.formulaId);
-          });
-    activeComponents.forEach((row) => selectedIds.add(`${row.source}:${row.id}`));
-    return {
-      counterpartyId: activeComponents[0].counterpartyId,
-      calcKind: activeComponents[0].calcKind,
-      total: sumEmissions(activeComponents),
-      reason: "components-sum",
-      selectedRows: activeComponents,
-      discardedRows: rows.filter((row) => !selectedIds.has(`${row.source}:${row.id}`)),
-    };
+      components.length === 0
+        ? []
+        : instanced.length === 0
+          ? components
+          : components.filter((row) => {
+              if (row.financingInstanceId) return true;
+              return !instanced.some((item) => item.formulaId === row.formulaId);
+            });
+    if (activeComponents.length === 0 && uopParents.length === 0) return empty();
+    const collapsedComponents = collapseSameFinancingInstance(activeComponents);
+    return withUopParents(collapsedComponents, "components-sum", sumEmissions(collapsedComponents));
   }
 
   return empty();
@@ -232,6 +305,7 @@ export function selectFinancedGroup(
 export function selectFinancedGroups(
   rows: FinancedCalculationRow[],
   calcKind?: FinancedCalcKind,
+  options?: FinancedSelectionOptions,
 ): FinancedGroupSelection[] {
   const filtered = calcKind ? rows.filter((row) => row.calcKind === calcKind) : rows;
   const buckets = new Map<string, FinancedCalculationRow[]>();
@@ -241,13 +315,14 @@ export function selectFinancedGroups(
     list.push(row);
     buckets.set(key, list);
   }
-  return Array.from(buckets.values()).map(selectFinancedGroup);
+  return Array.from(buckets.values()).map((groupRows) => selectFinancedGroup(groupRows, options));
 }
 
 export function summarizeFinancedPortfolio(
   rows: FinancedCalculationRow[],
+  options?: FinancedSelectionOptions,
 ): FinancedPortfolioSummary {
-  const groups = selectFinancedGroups(rows);
+  const groups = selectFinancedGroups(rows, undefined, options);
   const financeGroups = groups.filter((g) => g.calcKind === "finance" && g.reason !== "empty");
   const facilitatedGroups = groups.filter((g) => g.calcKind === "facilitated" && g.reason !== "empty");
   const unique = (items: FinancedGroupSelection[]) =>
@@ -270,8 +345,9 @@ export function summarizeFinancedPortfolio(
 export function selectImportableFinancedRows(
   rows: FinancedCalculationRow[],
   calcKind: FinancedCalcKind,
+  options?: FinancedSelectionOptions,
 ): FinancedCalculationRow[] {
-  return selectFinancedGroups(rows, calcKind)
+  return selectFinancedGroups(rows, calcKind, options)
     .filter((group) => group.reason !== "empty" && group.total > 0)
     .flatMap((group) => group.selectedRows);
 }
@@ -284,7 +360,7 @@ export function selectCompanyDisplayRow(
     (item) => item.calcKind === calcKind && item.reason !== "empty",
   );
   if (!group) return null;
-  if (group.reason === "aggregate") return group.selectedRows[0] ?? null;
+  if (group.reason === "aggregate" && group.selectedRows.length === 1) return group.selectedRows[0] ?? null;
   if (group.selectedRows.length === 1) return group.selectedRows[0] ?? null;
 
   const first = group.selectedRows[0];
