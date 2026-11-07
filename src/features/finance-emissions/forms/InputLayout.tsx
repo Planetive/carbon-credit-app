@@ -20,8 +20,8 @@ export function InputSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[14px] border border-[#E8EEF0] bg-[#F8FAFC] p-4 sm:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className="rounded-xl border border-[#E8EEF0] bg-[#F8FAFC] p-5 sm:p-6">
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <h3 className="text-sm font-semibold text-[#0F172A]">{title}</h3>
@@ -37,7 +37,7 @@ export function InputSection({
 }
 
 export function FieldGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">{children}</div>;
+  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">{children}</div>;
 }
 
 export function FormField({
@@ -58,7 +58,7 @@ export function FormField({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("space-y-1.5", span && "sm:col-span-2")}>
+    <div className={cn("space-y-2", span && "sm:col-span-2")}>
       <div className="flex min-h-[20px] items-center gap-1.5">
         <Label className="text-sm font-medium text-[#334155]">
           {label}

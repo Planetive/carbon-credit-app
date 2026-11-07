@@ -7,13 +7,14 @@ import { FinancedScopeBreakdownPanel } from "../components/FinancedScopeBreakdow
 import type { FinancedScopeBreakdown } from "../utils/financedScopeBreakdown";
 import { questionnairePayload } from "./draftPersistence";
 import {
-  UOP_REPORTABLE_BLOCKED_MESSAGE,
   canCalculateUop,
   canSaveReportableUop,
   canSubmitReportableUopSave,
   uopReportableSaveBlockers,
 } from "./reportableGuard";
 import { uopQuestionnaireComplete } from "./validation";
+import { UopPreviewNotice } from "./UopPreviewNotice";
+import { OverlapReviewPanel } from "./OverlapReviewPanel";
 import type { UopCalculationResult, UopDraft } from "./types";
 
 function asNumber(value: unknown): number | null {
@@ -125,14 +126,16 @@ export function UopResultsPanel({
     }
   };
 
+  const outstanding = asNumber(attribution.outstanding_amount) ?? draft.outstandingInvestment;
+  const denominator = asNumber(attribution.denominator);
+  const attributionPct =
+    asNumber(attribution.attribution_factor) != null ? Number(attribution.attribution_factor) * 100 : null;
+
   return (
     <div className="space-y-4">
-      <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-        <p className="font-semibold">Preview calculation only</p>
-        <p className="mt-1 leading-relaxed">{UOP_REPORTABLE_BLOCKED_MESSAGE}</p>
-        {canSaveReportableUop() ? null : (
-          <p className="mt-2 text-amber-900/80">Final reportable Save and portfolio inclusion stay disabled.</p>
-        )}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+        <UopPreviewNotice />
+        <p className="text-xs text-slate-500">Calculated by the server — not typed in this form</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -143,7 +146,7 @@ export function UopResultsPanel({
           onClick={() => void run(false)}
         >
           <Calculator className="h-4 w-4 mr-2" />
-          {busy ? "Calculating…" : result ? "Recalculate" : "Calculate"}
+          {busy ? "Calculating…" : result ? "Recalculate" : "Calculate preview"}
         </Button>
         {canSaveReportableUop() && (
           <Button
@@ -158,7 +161,7 @@ export function UopResultsPanel({
           </Button>
         )}
         {!ready && (
-          <p className="text-sm text-[#64748B]">Finish the Use of Proceeds questions before calculating. Totals are not computed in the browser.</p>
+          <p className="text-sm text-[#64748B]">Finish the earlier steps before calculating. Totals are not computed in the browser.</p>
         )}
         {canSaveReportableUop() && result && !saveReady && (
           <p className="text-sm text-[#64748B]">
@@ -182,14 +185,12 @@ export function UopResultsPanel({
               <p className="mt-1 leading-relaxed">{result.message || "This path cannot be completed with the information provided."}</p>
             </div>
           )}
-          {overlap?.detected && (
-            <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">General-purpose overlap needs review</p>
-              <p className="mt-1 leading-relaxed">
-                PCAF §5.7 pages 107–108: this holding is not added to portfolio totals while general-purpose
-                financing to the same issuer remains unresolved. Emissions are not silently subtracted.
-              </p>
-            </div>
+          {(overlap?.detected || (Array.isArray((overlap as { reviews?: unknown[] } | null)?.reviews) && ((overlap as { reviews?: unknown[] }).reviews?.length || 0) > 0)) && (
+            <OverlapReviewPanel
+              draft={draft}
+              overlap={overlap as Record<string, unknown>}
+              counterpartyId={counterpartyId}
+            />
           )}
           {result.persisted_reportable && (
             <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
@@ -201,30 +202,83 @@ export function UopResultsPanel({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Metric label="Total financed emissions" value={`${formatNumber(result.financed_emissions)} tCO₂e`} hint={result.formula_name || result.formula_id || ""} />
             <Metric
-              label="Investor attribution"
-              value={formatNumber(asNumber(attribution.attribution_factor) != null ? Number(attribution.attribution_factor) * 100 : null, 4) + "%"}
-              hint={String(attribution.equation || "Outstanding / (equity + debt)")}
+              label="Bank’s financed emissions"
+              value={`${formatNumber(result.financed_emissions)} tCO₂e`}
+              hint={formulaHint(result.formula_id, result.formula_name)}
+              calculated
+            />
+            <Metric
+              label="Your share of the vehicle"
+              value={formatNumber(attributionPct, 4) + "%"}
+              hint="Outstanding ÷ (loans and bonds + shares)"
+              calculated
             />
             <Metric
               label="Data-quality score"
               value={result.data_quality_score == null ? "Undefined" : formatNumber(result.data_quality_score, 4)}
-              hint="Weighted by underlying asset outstanding. Not a separate UoP 1a/1b score."
+              hint="Taken from each asset’s method, weighted by amount assigned."
+              calculated
             />
           </div>
 
-          <div className="rounded-[14px] border border-[#E8EEF0] bg-white p-4 text-sm space-y-1">
-            <p className="font-semibold text-[#0F172A]">Investor attribution</p>
-            <p className="text-[#64748B]">Outstanding {formatNumber(attribution.outstanding_amount, 2)} / denominator {formatNumber(attribution.denominator, 2)} ({String(attribution.denominator_kind || "total equity + debt")})</p>
-            <p className="text-[#64748B]">Allocated {formatNumber(result.allocated_financed_emissions)} tCO₂e · Unallocated {formatNumber(result.unallocated_financed_emissions)} tCO₂e</p>
-            {result.allocation ? (
-              <p className="text-[#64748B]">
-                Allocation {formatNumber(asNumber((result.allocation as Record<string, unknown>).allocation_percent) != null ? Number((result.allocation as Record<string, unknown>).allocation_percent) * 100 : null, 2)}%
-                {" · "}
-                {String((result.allocation as Record<string, unknown>).equation || "")}
-              </p>
-            ) : null}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-[14px] border border-[#E8EEF0] bg-white p-4 text-sm space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">You entered</p>
+              <BreakdownLine label="Outstanding" value={`${formatNumber(outstanding, 2)} ${draft.currency || ""}`.trim()} />
+              <BreakdownLine
+                label="Vehicle loans and bonds"
+                value={formatNumber(draft.totalStructureDebt, 2)}
+              />
+              <BreakdownLine
+                label="Vehicle shares"
+                value={formatNumber(draft.totalStructureEquity, 2)}
+              />
+              {draft.emissionsPath === "issuer_reported" && (
+                <BreakdownLine
+                  label="Issuer published emissions"
+                  value={`${formatNumber(draft.issuerReportedFinancedEmissions)} tCO₂e`}
+                />
+              )}
+              <BreakdownLine label="Assigned proceeds" value={formatNumber(draft.allocatedProceeds, 2)} />
+              {draft.unallocatedProceeds != null && (
+                <BreakdownLine label="Leftover proceeds" value={formatNumber(draft.unallocatedProceeds, 2)} />
+              )}
+            </div>
+            <div className="rounded-[14px] border border-[#DCEAE2] bg-[#F8FAFC] p-4 text-sm space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#0F6E56]">Calculated</p>
+              <BreakdownLine
+                label="Denominator"
+                value={`${formatNumber(denominator, 2)} (${String(attribution.denominator_kind || "loans/bonds + shares")})`}
+              />
+              <BreakdownLine
+                label="Your share"
+                value={`${formatNumber(outstanding, 2)} ÷ ${formatNumber(denominator, 2)} = ${formatNumber(attributionPct, 4)}%`}
+              />
+              <BreakdownLine
+                label="From assigned assets"
+                value={`${formatNumber(result.allocated_financed_emissions)} tCO₂e`}
+              />
+              <BreakdownLine
+                label="From leftover funds"
+                value={`${formatNumber(result.unallocated_financed_emissions)} tCO₂e`}
+              />
+              <BreakdownLine
+                label="Bank total"
+                value={`${formatNumber(result.financed_emissions)} tCO₂e`}
+              />
+              {result.allocation ? (
+                <BreakdownLine
+                  label="Allocation used"
+                  value={`${formatNumber(
+                    asNumber((result.allocation as Record<string, unknown>).allocation_percent) != null
+                      ? Number((result.allocation as Record<string, unknown>).allocation_percent) * 100
+                      : null,
+                    2
+                  )}%`}
+                />
+              ) : null}
+            </div>
           </div>
 
           {breakdown && (
@@ -237,8 +291,8 @@ export function UopResultsPanel({
           {assets.length > 0 && (
             <div className="rounded-[14px] border border-[#E8EEF0] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#E8EEF0]">
-                <p className="text-sm font-semibold text-[#0F172A]">Underlying assets</p>
-                <p className="text-xs text-[#64748B] mt-0.5">Each asset uses its PCAF asset-class denominator. Rows stay non-reportable.</p>
+                <p className="text-sm font-semibold text-[#0F172A]">Calculated by asset</p>
+                <p className="text-xs text-[#64748B] mt-0.5">These rows are not added to the portfolio on their own.</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -246,9 +300,9 @@ export function UopResultsPanel({
                     <tr className="bg-[#F8FAFC] text-xs uppercase tracking-wide text-[#64748B]">
                       <th className="text-left px-4 py-2">Asset</th>
                       <th className="text-left px-4 py-2">Class</th>
-                      <th className="text-right px-4 py-2">Asset AF</th>
-                      <th className="text-right px-4 py-2">Investor FE</th>
-                      <th className="text-right px-4 py-2">DQ</th>
+                      <th className="text-right px-4 py-2">Asset share</th>
+                      <th className="text-right px-4 py-2">Bank emissions</th>
+                      <th className="text-right px-4 py-2">Score</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -291,12 +345,48 @@ export function UopResultsPanel({
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function formulaHint(formulaId?: string | null, formulaName?: string | null): string {
+  switch (String(formulaId || "")) {
+    case "uop-separate-lookthrough":
+      return "Your share of the funded assets in this vehicle";
+    case "uop-integrated-lookthrough":
+      return "Your share of assigned assets plus leftover funds";
+    case "uop-issuer-reported":
+      return "Your share of the issuer’s published financed emissions";
+    default:
+      break;
+  }
+  const name = String(formulaName || "");
+  if (/PCAF|Figure\s*\d|Table\s*\d|§/i.test(name)) return "";
+  return name;
+}
+
+function Metric({
+  label,
+  value,
+  hint,
+  calculated,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  calculated?: boolean;
+}) {
   return (
     <div className="rounded-[14px] border border-[#E8EEF0] bg-white px-4 py-3">
       <p className="text-xs font-medium text-[#64748B]">{label}</p>
       <p className="mt-1 text-lg font-semibold text-[#0F172A]">{value}</p>
+      {calculated ? <p className="text-[11px] font-medium text-[#0F6E56] mt-1">Calculated</p> : null}
       {hint ? <p className="text-[11px] text-[#94A3B8] mt-1 leading-relaxed">{hint}</p> : null}
+    </div>
+  );
+}
+
+function BreakdownLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <p className="text-[#64748B]">{label}</p>
+      <p className="font-medium text-[#0F172A] text-right">{value}</p>
     </div>
   );
 }

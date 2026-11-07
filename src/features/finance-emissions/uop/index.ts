@@ -7,7 +7,7 @@ export {
   currentEligibilityQuestion,
   visibleEligibilityQuestions,
 } from "./eligibility";
-export { uopOutcomeDisplay } from "./copy";
+export { uopOutcomeDisplay, uopRedirectLoanType } from "./copy";
 export {
   createUopDraft,
   createUnderlyingAsset,
@@ -22,7 +22,13 @@ export {
   draftOutcome,
   copySharedStructure,
 } from "./state";
-export { validateUopStep, assetsRequired, uopStepIsComplete, uopQuestionnaireComplete } from "./validation";
+export {
+  validateUopStep,
+  assetsRequired,
+  uopStepIsComplete,
+  uopQuestionnaireComplete,
+  structureKindFitsClassification,
+} from "./validation";
 export { optionsForAssetClass, optionDef, isUnsupportedUopAssetClass } from "./underlyingOptions";
 export {
   UOP_BACKEND_AVAILABLE,
@@ -38,8 +44,9 @@ export {
   rejectUopReportableResults,
   uopReportableSaveBlockers,
 } from "./reportableGuard";
-export { uopWizardSteps } from "./wizardSteps";
+export { uopWizardSteps, isUopWizardStepId } from "./wizardSteps";
 export { UopQuestionnaire, UopBackendUnavailableBanner, UopDraftStatusBar } from "./UopQuestionnaire";
+export { UopPreviewNotice } from "./UopPreviewNotice";
 export { UopResultsPanel } from "./UopResultsPanel";
 export type { UopSiblingOption } from "./UopQuestionnaire";
 export { useUopDraftPersistence } from "./useUopDraftPersistence";

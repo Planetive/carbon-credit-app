@@ -1,65 +1,74 @@
 import { resolveUopAccounting, uopQualifiesForMethod } from "./eligibility";
-import { assetsRequired } from "./validation";
 import type { UopDraft } from "./types";
 
 export type UopWizardStepId =
   | "uop-eligibility"
-  | "uop-guidance"
   | "uop-structure"
+  | "uop-allocation"
+  | "uop-emissions"
+  | "uop-review"
   | "uop-emissions-path"
   | "uop-holdings"
   | "uop-assets";
 
 export type UopWizardStep = {
-  id: UopWizardStepId;
+  id: Exclude<UopWizardStepId, "uop-emissions-path" | "uop-holdings" | "uop-assets">;
   title: string;
+  shortTitle: string;
   description: string;
 };
+
+export const UOP_STAGE_IDS = [
+  "uop-eligibility",
+  "uop-structure",
+  "uop-allocation",
+  "uop-emissions",
+  "uop-review",
+] as const;
+
+export function isUopWizardStepId(id: string | null | undefined): boolean {
+  return String(id || "").startsWith("uop-");
+}
 
 export function uopWizardSteps(draft: UopDraft | null | undefined): UopWizardStep[] {
   const resolved = draft ? resolveUopAccounting(draft.eligibility) : null;
   const steps: UopWizardStep[] = [
     {
       id: "uop-eligibility",
-      title: "Check this financing",
-      description: "A few yes/no questions",
+      title: "Financing type",
+      shortTitle: "Type",
+      description: "Check whether this deal is Use of Proceeds",
     },
   ];
-  if (!resolved) return steps;
-  if (!uopQualifiesForMethod(resolved)) {
-    steps.push({
-      id: "uop-guidance",
-      title: "Use a different method",
-      description: "This is not calculated as Use of Proceeds",
-    });
-    return steps;
-  }
+  if (!resolved || !uopQualifiesForMethod(resolved)) return steps;
   steps.push(
     {
       id: "uop-structure",
-      title: "Describe the financing",
+      title: "Investment details",
+      shortTitle: "Details",
       description: "Name, amounts, and documents",
     },
     {
-      id: "uop-emissions-path",
-      title: "Where emissions come from",
-      description: "Issuer report, assets, or estimate",
-    },
-    {
-      id: "uop-holdings",
-      title: resolved.classification === "separate" ? "How much has been assigned" : "Assigned and leftover proceeds",
+      id: "uop-allocation",
+      title: "Funded assets",
+      shortTitle: "Assets",
       description:
         resolved.classification === "separate"
-          ? "Leftover cash in a separate vehicle is not treated as emissions"
-          : "Assigned and leftover amounts are both in scope",
+          ? "How much has been assigned, and to which assets"
+          : "Assigned amounts, leftover funds, and funded assets",
+    },
+    {
+      id: "uop-emissions",
+      title: "Emissions data",
+      shortTitle: "Emissions",
+      description: "Issuer report, asset figures, or an approved factor",
+    },
+    {
+      id: "uop-review",
+      title: "Review and results",
+      shortTitle: "Review",
+      description: "Check the figures and calculate a preview",
     }
   );
-  if (draft && assetsRequired(draft)) {
-    steps.push({
-      id: "uop-assets",
-      title: "Assets that received the money",
-      description: "Each asset is listed separately",
-    });
-  }
   return steps;
 }

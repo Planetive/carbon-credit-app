@@ -8,6 +8,7 @@ import {
   canSaveReportableUop,
   rejectUopReportableResults,
 } from "./reportableGuard";
+import { bindApprovedFactorForTest } from "./factorLibrary";
 import { createUopDraft, createUnderlyingAsset } from "./state";
 import { uopQuestionnaireComplete, validateUopAssets, validateUopStructure } from "./validation";
 import type { UopDraft } from "./types";
@@ -84,9 +85,11 @@ describe("Phase 5C UoP calculate guards", () => {
     draft.assets[0].estimation.factorGeography = "PK";
     draft.assets[0].estimation.factorYear = "2024";
     draft.assets[0].estimation.factorUnit = "tCO2e/currency";
-    expect(validateUopAssets(draft)["assets.asset-a.estimation.emissionFactor"]).toBeTruthy();
+    expect(validateUopAssets(draft)["assets.asset-a.estimation.libraryEntryId"]).toBeTruthy();
     draft.assets[0].estimation.emissionFactor = 0.0002;
-    expect(validateUopAssets(draft)["assets.asset-a.estimation.emissionFactor"]).toBeUndefined();
+    expect(validateUopAssets(draft)["assets.asset-a.estimation.libraryEntryId"]).toBeTruthy();
+    draft.assets[0].estimation = bindApprovedFactorForTest(draft.assets[0].estimation);
+    expect(validateUopAssets(draft)["assets.asset-a.estimation.libraryEntryId"]).toBeUndefined();
     draft.totalStructureEquity = -12;
     expect(validateUopStructure(draft).totalStructureEquity).toBeUndefined();
   });

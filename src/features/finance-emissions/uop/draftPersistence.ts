@@ -5,7 +5,13 @@ import type {
   UopDraftSnapshot,
   UopDraftUpsertBody,
 } from "@/api/uopDrafts";
-import { createUnderlyingAsset, createUopDraft, emptyEligibility, emptyEstimation } from "./state";
+import {
+  createUnderlyingAsset,
+  createUnderlyingAssetId,
+  createUopDraft,
+  emptyEligibility,
+  emptyEstimation,
+} from "./state";
 import type { UopDraft, UopEligibilityAnswers, UopUnderlyingAsset } from "./types";
 
 export type UopDraftSaveStatus =
@@ -166,6 +172,83 @@ function asEstimation(value: unknown): UopUnderlyingAsset["estimation"] {
     factorYear: asString(raw.factorYear || raw.factor_year),
     factorUnit: asString(raw.factorUnit || raw.factor_unit),
     emissionFactor: asNumber(raw.emissionFactor ?? raw.emission_factor),
+    libraryEntryId: asString(raw.libraryEntryId || raw.library_entry_id),
+    libraryPublicationId: asString(raw.libraryPublicationId || raw.library_publication_id),
+    libraryFactorValue: asNumber(raw.libraryFactorValue ?? raw.library_factor_value),
+    libraryFactorUnit: asString(raw.libraryFactorUnit || raw.library_factor_unit),
+    libraryGeography: asString(raw.libraryGeography || raw.library_geography),
+    libraryApplicableYear: asString(raw.libraryApplicableYear || raw.library_applicable_year),
+    libraryDatasetVersion: asString(raw.libraryDatasetVersion || raw.library_dataset_version),
+    libraryCurrencyCode: asString(raw.libraryCurrencyCode || raw.library_currency_code),
+    libraryPriceYear: asString(raw.libraryPriceYear || raw.library_price_year),
+    factorConfirmed: Boolean(raw.factorConfirmed ?? raw.factor_confirmed),
+    activityCurrency: asString(raw.activityCurrency || raw.activity_currency),
+    priceYear: asString(raw.priceYear || raw.price_year),
+    manualFactorRationale: asString(raw.manualFactorRationale || raw.manual_factor_rationale),
+    sovereignCountryName: asString(raw.sovereignCountryName || raw.sovereign_country_name),
+    ppAdjustedGdp: asNumber(raw.ppAdjustedGdp ?? raw.pp_adjusted_gdp),
+    pppGdpYear: asString(raw.pppGdpYear || raw.ppp_gdp_year),
+    pppGdpSource: asString(raw.pppGdpSource || raw.ppp_gdp_source),
+    preferredPppGdpYear: asString(raw.preferredPppGdpYear || raw.preferred_ppp_gdp_year, "2025"),
+    allowPppGdpFallback: Boolean(raw.allowPppGdpFallback ?? raw.allow_ppp_gdp_fallback),
+    verifiedCountryEmissions: asNumber(raw.verifiedCountryEmissions ?? raw.verified_country_emissions),
+    unverifiedCountryEmissions: asNumber(raw.unverifiedCountryEmissions ?? raw.unverified_country_emissions),
+    regionName: asString(raw.regionName || raw.region_name),
+    regionalPppAdjustedGdp: asNumber(raw.regionalPppAdjustedGdp ?? raw.regional_ppp_adjusted_gdp),
+    regionalNominalGdp: asNumber(raw.regionalNominalGdp ?? raw.regional_nominal_gdp),
+    countryPppAdjustmentFactor: asNumber(
+      raw.countryPppAdjustmentFactor ?? raw.country_ppp_adjustment_factor
+    ),
+    regionalGdpCurrency: asString(raw.regionalGdpCurrency || raw.regional_gdp_currency),
+    regionalGdpYear: asString(raw.regionalGdpYear || raw.regional_gdp_year),
+    regionalGdpSource: asString(raw.regionalGdpSource || raw.regional_gdp_source),
+    verifiedRegionalEmissions: asNumber(raw.verifiedRegionalEmissions ?? raw.verified_regional_emissions),
+    unverifiedRegionalEmissions: asNumber(
+      raw.unverifiedRegionalEmissions ?? raw.unverified_regional_emissions
+    ),
+    proxyRegionalEmissions: asNumber(raw.proxyRegionalEmissions ?? raw.proxy_regional_emissions),
+    regionalEmissionsSource: asString(raw.regionalEmissionsSource || raw.regional_emissions_source),
+    regionalEmissionsYear: asString(raw.regionalEmissionsYear || raw.regional_emissions_year),
+    regionalEmissionsUnit: asString(raw.regionalEmissionsUnit || raw.regional_emissions_unit, "tCO2e"),
+    subSovereignIssuerKind: asString(
+      raw.subSovereignIssuerKind || raw.sub_sovereign_issuer_kind
+    ) as UopUnderlyingAsset["estimation"]["subSovereignIssuerKind"],
+    childStructureId: asString(raw.childStructureId || raw.child_structure_id),
+    childTotalCapital: asNumber(raw.childTotalCapital ?? raw.child_total_capital),
+    childAssets: Array.isArray(raw.childAssets || raw.child_assets)
+      ? (raw.childAssets || raw.child_assets).map((row: unknown) => {
+          const child = asRecord(row);
+          return {
+            underlyingAssetId: asString(child.underlyingAssetId || child.underlying_asset_id, createUnderlyingAssetId()),
+            name: asString(child.name),
+            assetClass: asString(child.assetClass || child.asset_class) as UopUnderlyingAsset["assetClass"],
+            allocatedOutstanding: asNumber(child.allocatedOutstanding ?? child.allocated_outstanding),
+            totalAssetValue: asNumber(child.totalAssetValue ?? child.total_asset_value),
+            hasReportedEmissions: asString(child.hasReportedEmissions || child.has_reported_emissions) as UopUnderlyingAsset["hasReportedEmissions"],
+            verificationStatus: asString(child.verificationStatus || child.verification_status) as UopUnderlyingAsset["verificationStatus"],
+            scope1Emissions: asNumber(child.scope1Emissions ?? child.scope1_emissions),
+            scope2Emissions: asNumber(child.scope2Emissions ?? child.scope2_emissions),
+            scope3Emissions: asNumber(child.scope3Emissions ?? child.scope3_emissions),
+            dataSource: asString(child.dataSource || child.data_source),
+          };
+        })
+      : [],
+    vehicles: Array.isArray(raw.vehicles || raw.vehicleRows || raw.vehicle_rows)
+      ? (raw.vehicles || raw.vehicleRows || raw.vehicle_rows).map((row: unknown) => {
+          const vehicle = asRecord(row);
+          return {
+            id: asString(vehicle.id || vehicle.vehicleId || vehicle.vehicle_id, createUnderlyingAssetId()),
+            name: asString(vehicle.name),
+            valueAtOrigination: asNumber(vehicle.valueAtOrigination ?? vehicle.value_at_origination),
+            outstandingAmount: asNumber(vehicle.outstandingAmount ?? vehicle.outstanding_amount),
+            fuelConsumption: asNumber(vehicle.fuelConsumption ?? vehicle.fuel_consumption),
+            distanceTraveled: asNumber(vehicle.distanceTraveled ?? vehicle.distance_traveled),
+            efficiency: asNumber(vehicle.efficiency),
+            fuelUnit: asString(vehicle.fuelUnit || vehicle.fuel_unit, "litre"),
+            distanceUnit: asString(vehicle.distanceUnit || vehicle.distance_unit, "km"),
+          };
+        })
+      : [],
   };
 }
 

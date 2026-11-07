@@ -14,7 +14,7 @@ export const UOP_DRAFT_API_AVAILABLE = true;
 export const UOP_BACKEND_AVAILABLE = UOP_REPORTABLE_SAVE_AVAILABLE;
 
 export const UOP_REPORTABLE_BLOCKED_MESSAGE =
-  "Use of Proceeds can be calculated for preview, but reportable Save and portfolio inclusion stay disabled until the Phase 5D release flag is enabled.";
+  "You can calculate a preview. Saving this result into your portfolio is not available yet.";
 
 export function canCalculateUop(): boolean {
   return UOP_CALCULATE_AVAILABLE;

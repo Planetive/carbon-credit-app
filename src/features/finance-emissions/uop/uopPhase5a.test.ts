@@ -8,7 +8,7 @@ import {
   isUopLoanType,
 } from "../config/loanTypeOptions";
 import { currentEligibilityQuestion, resolveUopAccounting, visibleEligibilityQuestions } from "./eligibility";
-import { uopOutcomeDisplay } from "./copy";
+import { ELIGIBILITY_COPY, uopOutcomeDisplay, uopRedirectLoanType } from "./copy";
 import {
   addUnderlyingAsset,
   createUopDraft,
@@ -178,16 +178,24 @@ describe("Phase 5A Use of Proceeds questionnaire", () => {
     expect(uopWizardSteps(separate).map((step) => step.id)).toEqual([
       "uop-eligibility",
       "uop-structure",
-      "uop-emissions-path",
-      "uop-holdings",
+      "uop-allocation",
+      "uop-emissions",
+      "uop-review",
     ]);
     const issuer = { ...separate, emissionsPath: "issuer_reported" as const };
     expect(assetsRequired(issuer)).toBe(false);
     expect(validateUopStep("uop-emissions-path", issuer).issuerReportedFinancedEmissions).toBeTruthy();
+    expect(validateUopStep("uop-emissions", issuer).issuerReportedFinancedEmissions).toBeTruthy();
 
     const assetsPath = { ...separate, emissionsPath: "underlying_assets" as const };
     expect(assetsRequired(assetsPath)).toBe(true);
-    expect(uopWizardSteps(assetsPath).map((step) => step.id)).toContain("uop-assets");
+    expect(uopWizardSteps(assetsPath).map((step) => step.id)).toEqual([
+      "uop-eligibility",
+      "uop-structure",
+      "uop-allocation",
+      "uop-emissions",
+      "uop-review",
+    ]);
 
     const estimateIntegrated = {
       ...qualifyingIntegrated(),
@@ -273,7 +281,6 @@ describe("Phase 5A Use of Proceeds questionnaire", () => {
     const notUop = resolveUopAccounting(answers({ proceedsAllocatedToSpecificAssets: "no" }));
     expect(uopWizardSteps({ ...createUopDraft("use-of-proceeds#1"), eligibility: notUop ? answers({ proceedsAllocatedToSpecificAssets: "no" }) : answers({ proceedsAllocatedToSpecificAssets: "no" }) }).map((s) => s.id)).toEqual([
       "uop-eligibility",
-      "uop-guidance",
     ]);
   });
 
@@ -311,10 +318,10 @@ describe("Phase 5A Use of Proceeds questionnaire", () => {
     const integrated = resolveUopAccounting(qualifyingIntegrated().eligibility);
     expect(separate).toMatchObject({ kind: "uop", classification: "separate" });
     expect(integrated).toMatchObject({ kind: "uop", classification: "integrated" });
-    expect(uopOutcomeDisplay(separate!).official).toMatch(/Separate use-of-proceeds structure/i);
-    expect(uopOutcomeDisplay(integrated!).official).toMatch(/Integrated use-of-proceeds structure/i);
     expect(uopOutcomeDisplay(separate!).heading).toMatch(/separate Use of Proceeds/i);
     expect(uopOutcomeDisplay(integrated!).heading).toMatch(/integrated Use of Proceeds/i);
+    expect(uopOutcomeDisplay(separate!).official).toBe("");
+    expect(uopOutcomeDisplay(integrated!).official).toBe("");
 
     expect(
       resolveUopAccounting(answers({ proceedsAllocatedToSpecificAssets: "no" }))
@@ -344,5 +351,35 @@ describe("Phase 5A Use of Proceeds questionnaire", () => {
         })
       )
     ).toMatchObject({ method: "mortgages" });
+  });
+
+  it("13. keeps eligibility help in everyday language, without methodology citations", () => {
+    const forbidden = /PCAF|Figure\s*5|Table\s*5|footnote\s*\d|§5/i;
+    for (const copy of Object.values(ELIGIBILITY_COPY)) {
+      expect(copy.title).not.toMatch(forbidden);
+      expect(copy.example).not.toMatch(forbidden);
+      expect(copy.pcaf).not.toMatch(forbidden);
+    }
+    const separate = resolveUopAccounting(qualifyingSeparate().eligibility);
+    const integrated = resolveUopAccounting(qualifyingIntegrated().eligibility);
+    expect(uopOutcomeDisplay(separate!).heading).not.toMatch(forbidden);
+    expect(uopOutcomeDisplay(separate!).body).not.toMatch(forbidden);
+    expect(uopOutcomeDisplay(integrated!).heading).not.toMatch(forbidden);
+    expect(uopOutcomeDisplay(integrated!).body).not.toMatch(forbidden);
+    expect(uopRedirectLoanType(separate!)).toBeNull();
+    expect(uopRedirectLoanType(resolveUopAccounting(answers({ proceedsAllocatedToSpecificAssets: "no" })))).toBeNull();
+    expect(
+      uopRedirectLoanType(
+        resolveUopAccounting(
+          answers({
+            proceedsAllocatedToSpecificAssets: "yes",
+            isSecuritized: "no",
+            structureHasControl: "no",
+            debtBasedWithOneFullyAllocatedAsset: "yes",
+            singleAssetClass: "mortgage",
+          })
+        )
+      )
+    ).toBe("mortgage");
   });
 });

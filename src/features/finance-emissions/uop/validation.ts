@@ -5,7 +5,7 @@ import {
   optionNeedsDenominator,
   optionsForAssetClass,
 } from "./underlyingOptions";
-import type { UopDraft, UopUnderlyingAsset } from "./types";
+import type { UopClassification, UopDraft, UopStructureKind, UopUnderlyingAsset } from "./types";
 
 export type UopFieldErrors = Record<string, string>;
 
@@ -26,6 +26,37 @@ export function validateUopEligibility(draft: UopDraft): UopFieldErrors {
   return errors;
 }
 
+const SEPARATE_STRUCTURE_KINDS = new Set<UopStructureKind>([
+  "equity-fund",
+  "debt-fund",
+  "holding-spv-without-control",
+]);
+const INTEGRATED_STRUCTURE_KINDS = new Set<UopStructureKind>([
+  "labeled-bond",
+  "labeled-loan",
+  "multi-asset-loan",
+]);
+
+export function structureKindsForClassification(classification: UopClassification | null | undefined): UopStructureKind[] {
+  if (classification === "integrated") {
+    return ["labeled-bond", "labeled-loan", "multi-asset-loan", "other"];
+  }
+  if (classification === "separate") {
+    return ["equity-fund", "debt-fund", "holding-spv-without-control", "other"];
+  }
+  return ["equity-fund", "debt-fund", "holding-spv-without-control", "labeled-bond", "labeled-loan", "multi-asset-loan", "other"];
+}
+
+export function structureKindFitsClassification(
+  kind: UopStructureKind | "",
+  classification: UopClassification | null | undefined
+): boolean {
+  if (!kind || kind === "other" || !classification) return true;
+  if (classification === "integrated") return !SEPARATE_STRUCTURE_KINDS.has(kind);
+  if (classification === "separate") return !INTEGRATED_STRUCTURE_KINDS.has(kind);
+  return true;
+}
+
 export function validateUopStructure(draft: UopDraft): UopFieldErrors {
   const errors: UopFieldErrors = {};
   const outcome = resolveUopAccounting(draft.eligibility);
@@ -33,10 +64,24 @@ export function validateUopStructure(draft: UopDraft): UopFieldErrors {
   if (requireText(draft.structureName)) errors.structureName = "Please enter the name of this bond, loan, or fund.";
   if (requireText(draft.issuerName)) errors.issuerName = "Please enter who issued or manages this financing.";
   if (!draft.structureKind) errors.structureKind = "Please choose the type of financing.";
+  if (draft.structureKind && !structureKindFitsClassification(draft.structureKind, outcome.classification)) {
+    errors.structureKind =
+      outcome.classification === "integrated"
+        ? "A separate fund or SPV does not match assets sitting on the borrower’s books. Choose a labeled bond, labeled loan, or earmarked loan — or go back if the assets sit in a fund."
+        : "A labeled bond or earmarked loan usually sits on the borrower’s books. That does not match a separate fund. Choose a fund or SPV — or go back if the assets sit on the borrower’s books.";
+  }
   if (!draft.investmentType) errors.investmentType = "Please say whether your bank holds a loan/bond or shares.";
   if (outcome.classification === "integrated" && draft.investmentType === "equity") {
     errors.investmentType =
       "Please choose loan or bond (debt). Shares are not allowed for this type of Use of Proceeds financing.";
+  }
+  if (draft.structureKind === "equity-fund" && draft.investmentType === "debt") {
+    errors.investmentType =
+      "An equity fund holds shares. Choose shares, or change the financing type if this is a debt fund.";
+  }
+  if (draft.structureKind === "debt-fund" && draft.investmentType === "equity") {
+    errors.investmentType =
+      "A debt fund holds loans or bonds. Choose loan or bond, or change the financing type if this is an equity fund.";
   }
   if (missingNumber(draft.outstandingInvestment) || (draft.outstandingInvestment || 0) <= 0) {
     errors.outstandingInvestment = "Please enter your bank’s outstanding amount. It must be greater than zero.";
@@ -45,14 +90,14 @@ export function validateUopStructure(draft: UopDraft): UopFieldErrors {
     errors.totalStructureDebt = "Please enter total loans and bonds in the vehicle. Zero is allowed.";
   }
   if (missingNumber(draft.totalStructureEquity)) {
-    errors.totalStructureEquity = "Please enter total shares in the vehicle. Zero is allowed if it is debt-only. Negative equity is allowed (PCAF footnote 164).";
+    errors.totalStructureEquity = "Please enter total shares in the vehicle. Zero is allowed if it is debt-only. A negative figure is allowed.";
   }
   const equityUsed = Math.max(0, draft.totalStructureEquity || 0);
   const denom = (draft.totalStructureDebt || 0) + equityUsed;
   if (denom <= 0) {
     if (missingNumber(draft.totalStructureAssets) || (draft.totalStructureAssets || 0) <= 0) {
       errors.totalStructureDebt =
-        "After setting negative equity to 0, total loans/bonds plus shares must be greater than zero, or enter total assets as the PCAF footnote 166 fallback.";
+        "After setting negative equity to 0, total loans/bonds plus shares must be greater than zero, or enter total assets as a fallback.";
     }
   }
   if (requireText(draft.reportingYear)) errors.reportingYear = "Please enter the reporting year (YYYY).";
@@ -136,7 +181,7 @@ export function validateUopHoldings(draft: UopDraft): UopFieldErrors {
     }
     if ((draft.unallocatedProceeds || 0) > 0 && draft.unallocatedUsesAssetLevelEstimate !== "yes") {
       if (!draft.issuerCompanyType) {
-        errors.issuerCompanyType = "Please say whether the issuer is listed or private, so leftover funds can use Figure 5-1 Step 3a.";
+        errors.issuerCompanyType = "Please say whether the issuer is listed or private, so leftover funds can use the issuer’s company figures.";
       }
       if (draft.issuerCompanyType === "listed" && (missingNumber(draft.issuerEvic) || (draft.issuerEvic || 0) <= 0)) {
         errors.issuerEvic = "Issuer EVIC is required for leftover issuer-level attribution.";
@@ -179,17 +224,104 @@ function validateOneAsset(asset: UopUnderlyingAsset, index: number): UopFieldErr
       errors[`${prefix}.verificationStatus`] = `Please say whether ${label} was verified.`;
     }
   } else if (asset.hasReportedEmissions === "no") {
-    if (isUnsupportedUopAssetClass(asset.assetClass)) {
-      errors[`${prefix}.assetClass`] =
-        `${label} cannot be estimated here. Nested Use of Proceeds and sovereign assets stay unavailable.`;
+    if (asset.assetClass === "sub-sovereign-debt") {
+      if (asset.estimation.subSovereignIssuerKind === "corporate-like") {
+        errors[`${prefix}.estimation.subSovereignIssuerKind`] =
+          `${label}: corporate-like sub-sovereign issuers use business-loan methods (PCAF §5.10 Table 5.10-2).`;
+      }
+      if (requireText(asset.estimation.regionName)) {
+        errors[`${prefix}.estimation.regionName`] = `Please enter the region for ${label}.`;
+      }
+      if (requireText(asset.estimation.sovereignCountryName)) {
+        errors[`${prefix}.estimation.sovereignCountryName`] = `Please enter the country for ${label}.`;
+      }
+      const hasDirect = !missingNumber(asset.estimation.regionalPppAdjustedGdp) && (asset.estimation.regionalPppAdjustedGdp || 0) > 0;
+      const hasAnnex =
+        !missingNumber(asset.estimation.regionalNominalGdp) &&
+        (asset.estimation.regionalNominalGdp || 0) > 0 &&
+        !missingNumber(asset.estimation.countryPppAdjustmentFactor) &&
+        (asset.estimation.countryPppAdjustmentFactor || 0) > 0;
+      if (!hasDirect && !hasAnnex) {
+        errors[`${prefix}.estimation.regionalPppAdjustedGdp`] =
+          `Please enter regional PPP-adjusted GDP (or regional nominal GDP × country PPP factor) for ${label}. National catalog GDP is not accepted.`;
+      }
+      if (requireText(asset.estimation.regionalGdpCurrency)) {
+        errors[`${prefix}.estimation.regionalGdpCurrency`] = `Please enter the regional GDP currency for ${label}.`;
+      }
+      if (requireText(asset.estimation.regionalGdpSource)) {
+        errors[`${prefix}.estimation.regionalGdpSource`] = `Please enter the regional GDP source for ${label}.`;
+      } else if (/national\s+catalog/i.test(asset.estimation.regionalGdpSource)) {
+        errors[`${prefix}.estimation.regionalGdpSource`] =
+          `National catalog GDP cannot be used as regional GDP for ${label}.`;
+      }
+      if (requireText(asset.estimation.regionalEmissionsSource)) {
+        errors[`${prefix}.estimation.regionalEmissionsSource`] = `Please enter the regional emissions source for ${label}.`;
+      }
     }
+    if (asset.assetClass === "use-of-proceeds") {
+      if (!asset.estimation.childAssets?.length) {
+        errors[`${prefix}.estimation.childAssets`] =
+          `Please add the child fund’s underlying assets for ${label}. Nested Use of Proceeds needs look-through, not a single collapsed total.`;
+      }
+      if (missingNumber(asset.estimation.childTotalCapital) || (asset.estimation.childTotalCapital || 0) <= 0) {
+        errors[`${prefix}.estimation.childTotalCapital`] =
+          `Please enter the child fund’s total capital for ${label}.`;
+      }
+      for (const child of asset.estimation.childAssets || []) {
+        const cPrefix = `${prefix}.estimation.childAssets.${child.underlyingAssetId}`;
+        if (requireText(child.name)) errors[`${cPrefix}.name`] = `Please name each child asset under ${label}.`;
+        if (!child.assetClass) errors[`${cPrefix}.assetClass`] = `Please choose a type for each child asset under ${label}.`;
+        if (missingNumber(child.allocatedOutstanding) || (child.allocatedOutstanding || 0) < 0) {
+          errors[`${cPrefix}.allocatedOutstanding`] = `Please enter the amount on each child asset under ${label}.`;
+        }
+        if (child.assetClass === "sub-sovereign-debt") {
+          errors[`${cPrefix}.assetClass`] = `Child asset under ${label} cannot use unsupported sub-sovereign methods.`;
+        }
+      }
+    } else {
     const options = optionsForAssetClass(asset.assetClass);
     const selected = optionDef(asset.assetClass, asset.estimation.pcafOption);
     if (options.length > 0 && !selected) {
       errors[`${prefix}.estimation.pcafOption`] =
-        `Please choose the PCAF option for ${label}. The data-quality score comes from that option.`;
+        `Please choose the data option for ${label}. The data-quality score comes from that option.`;
     }
-    if (selected && optionNeedsDenominator(selected.id) && (missingNumber(asset.totalAssetValue) || (asset.totalAssetValue || 0) <= 0)) {
+    const sovereignInventoryOption =
+      (asset.assetClass === "sovereign-debt" && selected && ["1a", "1b", "3b"].includes(selected.id)) ||
+      (asset.assetClass === "sub-sovereign-debt" && selected && ["1a", "1b", "4a", "4b"].includes(selected.id));
+    if (
+      asset.assetClass === "sovereign-debt" &&
+      String(asset.estimation.pppGdpYear) === "2024" &&
+      String(asset.estimation.preferredPppGdpYear || "2025") === "2025" &&
+      !asset.estimation.allowPppGdpFallback
+    ) {
+      errors[`${prefix}.estimation.allowPppGdpFallback`] =
+        `Confirm the 2024 PPP-GDP fallback for ${label}. 2024 data is never used silently for 2025.`;
+    }
+    if (asset.assetClass === "sovereign-debt") {
+      if (requireText(asset.estimation.sovereignCountryName)) {
+        errors[`${prefix}.estimation.sovereignCountryName`] =
+          `Please select the country for ${label} so PPP-adjusted GDP can load from the catalog.`;
+      }
+      if (missingNumber(asset.estimation.ppAdjustedGdp) || (asset.estimation.ppAdjustedGdp || 0) <= 0) {
+        errors[`${prefix}.estimation.ppAdjustedGdp`] =
+          `No PPP-adjusted GDP is available for ${label}. A sovereign calculator without a catalog row is not enough.`;
+      }
+      if (selected?.id === "1a" && missingNumber(asset.estimation.verifiedCountryEmissions)) {
+        errors[`${prefix}.estimation.verifiedCountryEmissions`] =
+          `Please enter verified country emissions for ${label}.`;
+      }
+      if (selected?.id === "1b" && missingNumber(asset.estimation.unverifiedCountryEmissions)) {
+        errors[`${prefix}.estimation.unverifiedCountryEmissions`] =
+          `Please enter unverified country emissions for ${label}.`;
+      }
+    }
+    if (
+      selected &&
+      optionNeedsDenominator(selected.id) &&
+      asset.assetClass !== "sovereign-debt" &&
+      asset.assetClass !== "sub-sovereign-debt" &&
+      (missingNumber(asset.totalAssetValue) || (asset.totalAssetValue || 0) <= 0)
+    ) {
       errors[`${prefix}.totalAssetValue`] = `Please enter the attribution value for ${label} (EVIC, equity+debt, property value, or vehicle value).`;
     }
     if (selected?.fields.includes("energy") && missingNumber(asset.estimation.energyConsumption ?? asset.estimation.physicalActivityAmount)) {
@@ -224,14 +356,34 @@ function validateOneAsset(asset: UopUnderlyingAsset, index: number): UopFieldErr
     if (selected?.fields.includes("buildingCount") && missingNumber(asset.estimation.numberOfBuildings)) {
       errors[`${prefix}.estimation.numberOfBuildings`] = `Please enter the number of buildings for ${label}.`;
     }
-    if (selected?.fields.includes("fuel") && missingNumber(asset.estimation.fuelConsumption ?? asset.estimation.physicalActivityAmount)) {
-      errors[`${prefix}.estimation.fuelConsumption`] = `Please enter fuel consumption for ${label}.`;
-    }
-    if (selected?.fields.includes("distance") && missingNumber(asset.estimation.distanceTraveled ?? asset.estimation.physicalActivityAmount)) {
-      errors[`${prefix}.estimation.distanceTraveled`] = `Please enter distance for ${label}.`;
-    }
-    if (selected?.fields.includes("efficiency") && missingNumber(asset.estimation.efficiency)) {
-      errors[`${prefix}.estimation.efficiency`] = `Please enter fuel efficiency for ${label}.`;
+    const multiVehicle =
+      asset.assetClass === "motor-vehicle-loan" && (asset.estimation.vehicles?.length || 0) > 0;
+    if (multiVehicle) {
+      for (const vehicle of asset.estimation.vehicles) {
+        const vPrefix = `${prefix}.estimation.vehicles.${vehicle.id}`;
+        if (String(vehicle.fuelUnit || "").toLowerCase().includes("gallon")) {
+          errors[vPrefix] = `Gallons are not supported for ${label}. Use litres.`;
+        }
+        if (selected?.fields.includes("fuel") && missingNumber(vehicle.fuelConsumption)) {
+          errors[vPrefix] = `Please enter fuel for each vehicle under ${label}.`;
+        }
+        if (selected?.fields.includes("distance") && missingNumber(vehicle.distanceTraveled)) {
+          errors[vPrefix] = `Please enter distance for each vehicle under ${label}.`;
+        }
+        if (selected?.fields.includes("efficiency") && missingNumber(vehicle.efficiency)) {
+          errors[vPrefix] = `Please enter efficiency for each vehicle under ${label}.`;
+        }
+      }
+    } else {
+      if (selected?.fields.includes("fuel") && missingNumber(asset.estimation.fuelConsumption ?? asset.estimation.physicalActivityAmount)) {
+        errors[`${prefix}.estimation.fuelConsumption`] = `Please enter fuel consumption for ${label}.`;
+      }
+      if (selected?.fields.includes("distance") && missingNumber(asset.estimation.distanceTraveled ?? asset.estimation.physicalActivityAmount)) {
+        errors[`${prefix}.estimation.distanceTraveled`] = `Please enter distance for ${label}.`;
+      }
+      if (selected?.fields.includes("efficiency") && missingNumber(asset.estimation.efficiency)) {
+        errors[`${prefix}.estimation.efficiency`] = `Please enter fuel efficiency for ${label}.`;
+      }
     }
     if (!selected) {
       if (!asset.estimation.method) {
@@ -249,22 +401,53 @@ function validateOneAsset(asset: UopUnderlyingAsset, index: number): UopFieldErr
         }
       }
     }
-    if (requireText(asset.estimation.factorSource) && requireText(asset.estimation.factorDatasetCode)) {
-      errors[`${prefix}.estimation.factorSource`] = `Please record the published factor source for ${label}. Do not invent a factor.`;
+    if (selected?.method === "economic") {
+      if (requireText(asset.estimation.activityCurrency)) {
+        errors[`${prefix}.estimation.activityCurrency`] =
+          `Please enter the activity currency for ${label}. Economic intensities are currency-specific.`;
+      }
+      if (requireText(asset.estimation.priceYear)) {
+        errors[`${prefix}.estimation.priceYear`] =
+          `Please enter the price year for ${label}.`;
+      }
+      const unit = String(asset.estimation.factorUnit || asset.estimation.libraryFactorUnit || "").toLowerCase();
+      if (unit.includes("kwh") || unit.includes("litre") || unit.includes("gallon") || unit.includes("/mwh")) {
+        errors[`${prefix}.estimation.factorUnit`] =
+          `Economic estimation for ${label} needs a sector intensity (tCO₂e per currency), not an electricity or fuel factor.`;
+      }
     }
-    if (missingNumber(asset.estimation.emissionFactor)) {
-      errors[`${prefix}.estimation.emissionFactor`] =
-        `Please enter the published numeric factor for ${label}. This calculator will not invent a factor or substitute EPA/DESNZ values.`;
+    if (!sovereignInventoryOption) {
+      if (requireText(asset.estimation.factorSource) && requireText(asset.estimation.factorDatasetCode)) {
+        errors[`${prefix}.estimation.factorSource`] = `Please record the published factor source for ${label}. Do not invent a factor.`;
+      }
+      if (requireText(asset.estimation.libraryEntryId)) {
+        errors[`${prefix}.estimation.libraryEntryId`] =
+          `No verified factor available for ${label}. Confirm an approved library factor. A typed number is not used.`;
+      } else if (!asset.estimation.factorConfirmed) {
+        errors[`${prefix}.estimation.factorConfirmed`] = `Please confirm the approved factor for ${label} before calculating.`;
+      }
+      if (missingNumber(asset.estimation.emissionFactor)) {
+        errors[`${prefix}.estimation.emissionFactor`] =
+          `Please confirm the approved numeric factor for ${label}. This calculator will not invent a factor or substitute EPA/DESNZ values.`;
+      }
+      if (requireText(asset.estimation.factorGeography)) {
+        errors[`${prefix}.estimation.factorGeography`] = `Please enter the geography of the published factor for ${label}.`;
+      }
+      if (requireText(asset.estimation.factorYear)) {
+        errors[`${prefix}.estimation.factorYear`] = `Please enter the year of the published factor for ${label}.`;
+      }
+      if (requireText(asset.estimation.factorUnit)) {
+        errors[`${prefix}.estimation.factorUnit`] = `Please enter the units of the published factor for ${label}.`;
+      }
+    } else {
+      if (requireText(asset.estimation.factorSource)) {
+        errors[`${prefix}.estimation.factorSource`] = `Please record the emissions source for ${label}.`;
+      }
+      if (missingNumber(asset.estimation.emissionFactor)) {
+        errors[`${prefix}.estimation.emissionFactor`] = `Please confirm country emissions for ${label}.`;
+      }
     }
-    if (requireText(asset.estimation.factorGeography)) {
-      errors[`${prefix}.estimation.factorGeography`] = `Please enter the geography of the published factor for ${label}.`;
-    }
-    if (requireText(asset.estimation.factorYear)) {
-      errors[`${prefix}.estimation.factorYear`] = `Please enter the year of the published factor for ${label}.`;
-    }
-    if (requireText(asset.estimation.factorUnit)) {
-      errors[`${prefix}.estimation.factorUnit`] = `Please enter the units of the published factor for ${label}.`;
-    }
+    } // end non-nested estimation branch
   } else {
     errors[`${prefix}.hasReportedEmissions`] = `Please say whether ${label} already has reported emissions.`;
   }
@@ -288,6 +471,37 @@ export function assetsRequired(draft: UopDraft): boolean {
   return false;
 }
 
+function validateOneAssetIdentity(asset: UopUnderlyingAsset, index: number): UopFieldErrors {
+  const prefix = `assets.${asset.underlyingAssetId}`;
+  const errors: UopFieldErrors = {};
+  const label = asset.name.trim() || `Underlying asset ${index + 1}`;
+  if (requireText(asset.name)) errors[`${prefix}.name`] = `Please name ${label}.`;
+  if (!asset.assetClass) errors[`${prefix}.assetClass`] = `Please choose the asset type for ${label}.`;
+  if (missingNumber(asset.allocatedOutstanding) || (asset.allocatedOutstanding || 0) < 0) {
+    errors[`${prefix}.allocatedOutstanding`] = `Please enter how much money sits on ${label}.`;
+  }
+  return errors;
+}
+
+export function validateUopAssetIdentity(draft: UopDraft): UopFieldErrors {
+  if (draft.assets.length === 0) return {};
+  return draft.assets.reduce(
+    (errors, asset, index) => ({ ...errors, ...validateOneAssetIdentity(asset, index) }),
+    {} as UopFieldErrors
+  );
+}
+
+export function validateUopAllocation(draft: UopDraft): UopFieldErrors {
+  const errors: UopFieldErrors = { ...validateUopHoldings(draft) };
+  const needAssets =
+    assetsRequired(draft) &&
+    (draft.emissionsPath !== "issuer_reported" || draft.allocationStatus === "unknown");
+  if (needAssets && draft.assets.length === 0) {
+    errors.assets = "Please add at least one asset that received this money.";
+  }
+  return { ...errors, ...validateUopAssetIdentity(draft) };
+}
+
 export function validateUopAssets(draft: UopDraft): UopFieldErrors {
   if (!assetsRequired(draft)) return {};
   if (draft.assets.length === 0) {
@@ -296,12 +510,27 @@ export function validateUopAssets(draft: UopDraft): UopFieldErrors {
   return draft.assets.reduce((errors, asset, index) => ({ ...errors, ...validateOneAsset(asset, index) }), {} as UopFieldErrors);
 }
 
+export function validateUopEmissions(draft: UopDraft): UopFieldErrors {
+  return { ...validateUopEmissionsPath(draft), ...validateUopAssets(draft) };
+}
+
+export function validateUopReview(draft: UopDraft): UopFieldErrors {
+  if (uopQuestionnaireComplete(draft)) return {};
+  return { review: "Please finish the earlier steps before calculating." };
+}
+
 export function validateUopStep(stepId: string, draft: UopDraft): UopFieldErrors {
   switch (stepId) {
     case "uop-eligibility":
       return validateUopEligibility(draft);
     case "uop-structure":
       return validateUopStructure(draft);
+    case "uop-allocation":
+      return validateUopAllocation(draft);
+    case "uop-emissions":
+      return validateUopEmissions(draft);
+    case "uop-review":
+      return validateUopReview(draft);
     case "uop-emissions-path":
       return validateUopEmissionsPath(draft);
     case "uop-holdings":
@@ -320,7 +549,6 @@ export function uopStepIsComplete(stepId: string, draft: UopDraft): boolean {
 export function uopQuestionnaireComplete(draft: UopDraft): boolean {
   const outcome = resolveUopAccounting(draft.eligibility);
   if (!uopQualifiesForMethod(outcome)) return false;
-  const steps = ["uop-eligibility", "uop-structure", "uop-emissions-path", "uop-holdings"];
-  if (assetsRequired(draft)) steps.push("uop-assets");
-  return steps.every((stepId) => uopStepIsComplete(stepId, draft));
+  const steps = ["uop-eligibility", "uop-structure", "uop-allocation", "uop-emissions"];
+  return steps.every((stepId) => Object.keys(validateUopStep(stepId, draft)).length === 0);
 }

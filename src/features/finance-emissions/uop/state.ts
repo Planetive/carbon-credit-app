@@ -6,7 +6,9 @@ import type {
   UopDraft,
   UopEligibilityAnswers,
   UopEstimationInputs,
+  UopNestedChildAsset,
   UopUnderlyingAsset,
+  UopVehicleRow,
 } from "./types";
 
 export const UOP_CURRENCIES = ["PKR", "USD", "EUR", "GBP"] as const;
@@ -50,6 +52,45 @@ export const emptyEstimation = (): UopEstimationInputs => ({
   factorYear: "",
   factorUnit: "",
   emissionFactor: null,
+  libraryEntryId: "",
+  libraryPublicationId: "",
+  libraryFactorValue: null,
+  libraryFactorUnit: "",
+  libraryGeography: "",
+  libraryApplicableYear: "",
+  libraryDatasetVersion: "",
+  libraryCurrencyCode: "",
+  libraryPriceYear: "",
+  factorConfirmed: false,
+  activityCurrency: "",
+  priceYear: "",
+  manualFactorRationale: "",
+  sovereignCountryName: "",
+  ppAdjustedGdp: null,
+  pppGdpYear: "",
+  pppGdpSource: "",
+  preferredPppGdpYear: "2025",
+  allowPppGdpFallback: false,
+  verifiedCountryEmissions: null,
+  unverifiedCountryEmissions: null,
+  regionName: "",
+  regionalPppAdjustedGdp: null,
+  regionalNominalGdp: null,
+  countryPppAdjustmentFactor: null,
+  regionalGdpCurrency: "",
+  regionalGdpYear: "",
+  regionalGdpSource: "",
+  verifiedRegionalEmissions: null,
+  unverifiedRegionalEmissions: null,
+  proxyRegionalEmissions: null,
+  regionalEmissionsSource: "",
+  regionalEmissionsYear: "",
+  regionalEmissionsUnit: "tCO2e",
+  subSovereignIssuerKind: "",
+  childStructureId: "",
+  childTotalCapital: null,
+  childAssets: [],
+  vehicles: [],
 });
 
 export function createUnderlyingAssetId(): string {
@@ -57,6 +98,36 @@ export function createUnderlyingAssetId(): string {
     return crypto.randomUUID();
   }
   return `uop-asset-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function createVehicleRow(partial?: Partial<UopVehicleRow>): UopVehicleRow {
+  return {
+    id: partial?.id || createUnderlyingAssetId(),
+    name: partial?.name || "",
+    valueAtOrigination: partial?.valueAtOrigination ?? null,
+    outstandingAmount: partial?.outstandingAmount ?? null,
+    fuelConsumption: partial?.fuelConsumption ?? null,
+    distanceTraveled: partial?.distanceTraveled ?? null,
+    efficiency: partial?.efficiency ?? null,
+    fuelUnit: partial?.fuelUnit || "litre",
+    distanceUnit: partial?.distanceUnit || "km",
+  };
+}
+
+export function createNestedChildAsset(partial?: Partial<UopNestedChildAsset>): UopNestedChildAsset {
+  return {
+    underlyingAssetId: partial?.underlyingAssetId || createUnderlyingAssetId(),
+    name: partial?.name || "",
+    assetClass: partial?.assetClass || "",
+    allocatedOutstanding: partial?.allocatedOutstanding ?? null,
+    totalAssetValue: partial?.totalAssetValue ?? null,
+    hasReportedEmissions: partial?.hasReportedEmissions || "yes",
+    verificationStatus: partial?.verificationStatus || "",
+    scope1Emissions: partial?.scope1Emissions ?? null,
+    scope2Emissions: partial?.scope2Emissions ?? null,
+    scope3Emissions: partial?.scope3Emissions ?? null,
+    dataSource: partial?.dataSource || "",
+  };
 }
 
 export function createUnderlyingAsset(partial?: Partial<UopUnderlyingAsset>): UopUnderlyingAsset {

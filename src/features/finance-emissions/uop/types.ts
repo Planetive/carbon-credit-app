@@ -30,7 +30,38 @@ export type UopStructureKind =
   | "other"
   | "";
 
-export type UopUnderlyingAssetClass = ExistingFinanceLoanType | "listed-equity" | "unlisted-equity" | "use-of-proceeds";
+export type UopUnderlyingAssetClass =
+  | ExistingFinanceLoanType
+  | "listed-equity"
+  | "unlisted-equity"
+  | "use-of-proceeds"
+  | "sub-sovereign-debt";
+
+export type UopVehicleRow = {
+  id: string;
+  name: string;
+  valueAtOrigination: number | null;
+  outstandingAmount: number | null;
+  fuelConsumption: number | null;
+  distanceTraveled: number | null;
+  efficiency: number | null;
+  fuelUnit: string;
+  distanceUnit: string;
+};
+
+export type UopNestedChildAsset = {
+  underlyingAssetId: string;
+  name: string;
+  assetClass: UopUnderlyingAssetClass | "";
+  allocatedOutstanding: number | null;
+  totalAssetValue: number | null;
+  hasReportedEmissions: UopYesNo;
+  verificationStatus: "verified" | "unverified" | "";
+  scope1Emissions: number | null;
+  scope2Emissions: number | null;
+  scope3Emissions: number | null;
+  dataSource: string;
+};
 
 export type UopOtherMethod =
   | "customer-segment"
@@ -109,6 +140,49 @@ export type UopEstimationInputs = {
   factorUnit: string;
   /** Published numeric factor. Never invented or silently substituted. */
   emissionFactor: number | null;
+  libraryEntryId: string;
+  libraryPublicationId: string;
+  libraryFactorValue: number | null;
+  libraryFactorUnit: string;
+  libraryGeography: string;
+  libraryApplicableYear: string;
+  libraryDatasetVersion: string;
+  libraryCurrencyCode: string;
+  libraryPriceYear: string;
+  factorConfirmed: boolean;
+  activityCurrency: string;
+  priceYear: string;
+  manualFactorRationale: string;
+  /** Sovereign reuse (§5.9) — country name drives PPP GDP catalog lookup. */
+  sovereignCountryName: string;
+  ppAdjustedGdp: number | null;
+  pppGdpYear: string;
+  pppGdpSource: string;
+  preferredPppGdpYear: string;
+  allowPppGdpFallback: boolean;
+  verifiedCountryEmissions: number | null;
+  unverifiedCountryEmissions: number | null;
+  /** Sub-sovereign §5.10 — employee-provided regional inputs only. */
+  regionName: string;
+  regionalPppAdjustedGdp: number | null;
+  regionalNominalGdp: number | null;
+  countryPppAdjustmentFactor: number | null;
+  regionalGdpCurrency: string;
+  regionalGdpYear: string;
+  regionalGdpSource: string;
+  verifiedRegionalEmissions: number | null;
+  unverifiedRegionalEmissions: number | null;
+  proxyRegionalEmissions: number | null;
+  regionalEmissionsSource: string;
+  regionalEmissionsYear: string;
+  regionalEmissionsUnit: string;
+  subSovereignIssuerKind: "sovereign-like" | "corporate-like" | "";
+  /** Nested UoP look-through (§5.7). */
+  childStructureId: string;
+  childTotalCapital: number | null;
+  childAssets: UopNestedChildAsset[];
+  /** Multi-vehicle rows for motor-vehicle loans (§5.6). */
+  vehicles: UopVehicleRow[];
 };
 
 export type UopIssuerCompanyType = "listed" | "unlisted" | "";

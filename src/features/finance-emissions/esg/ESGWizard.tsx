@@ -16,10 +16,11 @@ import {
 import {
   UopBackendUnavailableBanner,
   UopQuestionnaire,
-  UopResultsPanel,
   ensureUopInstances,
   rejectUopReportableResults,
+  resolveUopAccounting,
   uopInstanceKey,
+  uopQualifiesForMethod,
   uopWizardSteps,
   useUopDraftPersistence,
   validateUopStep,
@@ -58,6 +59,7 @@ type RefreshPortfolioWindow = Window & {
 interface WizardStep {
   id: string;
   title: string;
+  shortTitle?: string;
   description: string;
   icon?: React.ComponentType<{ className?: string }>;
 }
@@ -1134,11 +1136,12 @@ export const ESGWizard: React.FC = () => {
       const uopSteps = uopWizardSteps(activeDraft).map((step) => ({
         id: step.id,
         title: step.title,
+        shortTitle: step.shortTitle,
         description: step.description,
         icon: Layers,
       }));
       if (isUopOnly) {
-        next = next.filter((s) => s.id !== 'emission-calculation');
+        next = next.filter((s) => s.id !== 'emission-calculation' && s.id !== 'results');
       }
       const insertAt = next.findIndex((s) => s.id === 'emission-calculation' || s.id === 'results');
       const at = insertAt >= 0 ? insertAt : next.length;
@@ -1744,6 +1747,23 @@ export const ESGWizard: React.FC = () => {
     }
   };
 
+  const handleLeaveUop = (suggestedLoanType?: string | null) => {
+    setValidationErrors({});
+    if (suggestedLoanType) {
+      pendingStepIdRef.current = 'loan-type';
+      setFormData((prev) => {
+        const remaining = prev.loanTypes.filter((item) => item.type !== UOP_LOAN_TYPE);
+        if (!remaining.some((item) => item.type === suggestedLoanType)) {
+          remaining.push({ type: suggestedLoanType, quantity: 1 });
+        }
+        return { ...prev, loanTypes: remaining };
+      });
+      return;
+    }
+    const idx = steps.findIndex((s) => s.id === 'loan-type');
+    if (idx >= 0) setCurrentStep(idx);
+  };
+
   // Handle step click with confirmation if data will be lost
   const handleStepClick = (stepIndex: number) => {
     if (stepIndex === currentStep) return;
@@ -1842,8 +1862,10 @@ export const ESGWizard: React.FC = () => {
         }
         break;
       case 'uop-eligibility':
-      case 'uop-guidance':
       case 'uop-structure':
+      case 'uop-allocation':
+      case 'uop-emissions':
+      case 'uop-review':
       case 'uop-emissions-path':
       case 'uop-holdings':
       case 'uop-assets': {
@@ -1901,7 +1923,9 @@ export const ESGWizard: React.FC = () => {
         ...prev,
         uopByInstance: { ...prev.uopByInstance, [key]: nextDraft },
       };
-      setValidationErrors(validateUopStep(steps[currentStep]?.id, nextDraft));
+      setValidationErrors((prev) =>
+        Object.keys(prev).length === 0 ? prev : validateUopStep(steps[currentStep]?.id, nextDraft)
+      );
       return updated;
     });
   };
@@ -2443,11 +2467,7 @@ export const ESGWizard: React.FC = () => {
           return (
             <div className="space-y-4">
               {activeUopDraft ? (
-                <UopResultsPanel
-                  draft={activeUopDraft}
-                  counterpartyId={counterpartyId}
-                  onResult={(result) => updateActiveUop({ ...activeUopDraft, lastCalculation: result })}
-                />
+                <p className="text-sm text-[#64748B]">Use of Proceeds results are calculated on the Review step.</p>
               ) : (
                 <UopBackendUnavailableBanner />
               )}
@@ -2536,12 +2556,10 @@ export const ESGWizard: React.FC = () => {
 
         return (
           <div className="space-y-6">
-            {hasUopFamily && activeUopDraft && (
-              <UopResultsPanel
-                draft={activeUopDraft}
-                counterpartyId={counterpartyId}
-                onResult={(result) => updateActiveUop({ ...activeUopDraft, lastCalculation: result })}
-              />
+            {hasUopFamily && activeUopDraft?.lastCalculation && (
+              <p className="text-sm text-[#64748B]">
+                Use of Proceeds preview: {activeUopDraft.lastCalculation.financed_emissions ?? "—"} tCO₂e. Recalculate on the Review step.
+              </p>
             )}
             {!results || results.length === 0 ? (
               <div className="space-y-4">
@@ -2698,8 +2716,10 @@ export const ESGWizard: React.FC = () => {
       }
 
       case 'uop-eligibility':
-      case 'uop-guidance':
       case 'uop-structure':
+      case 'uop-allocation':
+      case 'uop-emissions':
+      case 'uop-review':
       case 'uop-emissions-path':
       case 'uop-holdings':
       case 'uop-assets': {
@@ -2752,6 +2772,7 @@ export const ESGWizard: React.FC = () => {
               onRetrySave={uopPersistence.retry}
               onRefreshDraft={uopPersistence.refresh}
               onApplyShared={uopPersistence.applyShared}
+              onLeaveUop={handleLeaveUop}
             />
           </div>
         );
@@ -2792,8 +2813,10 @@ export const ESGWizard: React.FC = () => {
         }
         return false;
       case 'uop-eligibility':
-      case 'uop-guidance':
       case 'uop-structure':
+      case 'uop-allocation':
+      case 'uop-emissions':
+      case 'uop-review':
       case 'uop-emissions-path':
       case 'uop-holdings':
       case 'uop-assets':
@@ -2807,6 +2830,11 @@ export const ESGWizard: React.FC = () => {
   const progressPct = steps.length > 1 ? Math.round((currentStep / (steps.length - 1)) * 100) : 0;
   const isResultsStep = steps[currentStep]?.id === 'results';
   const isEmissionStep = steps[currentStep]?.id === 'emission-calculation';
+  const isUopStep = String(steps[currentStep]?.id || '').startsWith('uop-');
+  const uopNeedsDifferentMethod =
+    steps[currentStep]?.id === 'uop-eligibility' &&
+    Boolean(activeUopDraft) &&
+    !uopQualifiesForMethod(resolveUopAccounting(activeUopDraft.eligibility));
   const listingLabel =
     formData.corporateStructure === 'listed'
       ? 'Listed'
@@ -2897,7 +2925,7 @@ export const ESGWizard: React.FC = () => {
                         active ? 'text-[#0F6E56]' : 'text-[#94A3B8]'
                       )}
                     >
-                      {s.title}
+                      {s.shortTitle || s.title}
                     </span>
                   </button>
                 </li>
@@ -2906,8 +2934,8 @@ export const ESGWizard: React.FC = () => {
           </ol>
         </nav>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
-          <div className="rounded-2xl border border-[#E8EEF0] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-7">
+        <div className={cn("grid grid-cols-1 gap-6 lg:items-start", !isUopStep && "lg:grid-cols-[minmax(0,1fr)_280px]")}>
+          <div className="rounded-2xl border border-[#E8EEF0] bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-8">
             <div className="mb-5">
               <h2 className="text-lg font-semibold text-[#0F172A] tracking-[-0.02em]">
                 {steps[currentStep]?.title || 'Loading...'}
@@ -2966,10 +2994,10 @@ export const ESGWizard: React.FC = () => {
                     </Button>
                   )}
                 </div>
-                {!isEmissionStep && currentStep < steps.length - 1 && (
+                {!isEmissionStep && currentStep < steps.length - 1 && !uopNeedsDifferentMethod && (
                   <Button
                     onClick={handleNext}
-                    disabled={!canProceed() || Object.keys(validationErrors).length > 0}
+                    disabled={isUopStep ? false : !canProceed() || Object.keys(validationErrors).length > 0}
                     className="h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white disabled:opacity-40"
                   >
                     Next
@@ -2980,7 +3008,7 @@ export const ESGWizard: React.FC = () => {
             )}
           </div>
 
-          <aside className="lg:sticky lg:top-6 rounded-2xl border border-[#E8EEF0] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <aside className={cn("lg:sticky lg:top-6 rounded-2xl border border-[#E8EEF0] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]", isUopStep && "hidden")}>
             <p className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">This calculation</p>
             <dl className="mt-4 space-y-3">
               {formData.loanTypes.length > 0 && (

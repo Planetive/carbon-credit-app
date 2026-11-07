@@ -26,7 +26,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
       method: "customer-segment",
       title: "Not a use-of-proceeds structure",
       guidance:
-        "There is not sufficient evidence that proceeds are allocated only to identifiable assets. Do not use the Use of Proceeds method. Select the asset class from customer-segment classification in Figure 5-1 Step 3a (listed equity and corporate bonds, or business loans and unlisted equity). Examples: general-purpose loans, working-capital loans, and general corporate bonds.",
+        "There is not enough evidence that the money is reserved for named assets. Do not use Use of Proceeds. Treat this as ordinary lending or investment instead — for example a general-purpose loan, working-capital loan, or general corporate bond.",
       pcafRef: `${PCAF_UOP_REF} Question 1; Table 5.7-1`,
     };
   }
@@ -38,7 +38,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
       method: "securitization-structured-products",
       title: "Account as securitization or structured product",
       guidance:
-        "A structure that is legally distinct from the issuing entity and issues securities backed by identifiable loans, leases, or receivables (for example RMBS, CMBS, CLO, Auto ABS) is in scope for Securitizations & Structured Products (§5.8), not Use of Proceeds (§5.7).",
+        "A separate company that issues notes backed by a pool of loans, leases, or receivables (for example RMBS, CMBS, CLO, or auto ABS) is treated as a securitization, not Use of Proceeds.",
       pcafRef: `${PCAF_FIGURE_5_1_REF} Steps 3b and 4b`,
     };
   }
@@ -55,7 +55,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
           method: "project-finance",
           title: "Account as project finance",
           guidance:
-            "A use-of-proceeds structure with control over the underlying assets is treated as a corporate, except when there is one fully allocated asset and that asset is a project. Account in line with the Project Finance method (including project-finance SPVs).",
+            "If this vehicle controls the assets, treat it as ordinary company financing — unless all of the money goes to one project. In that case, treat it as project finance.",
           pcafRef: `${PCAF_UOP_REF} Question 2 exception; Table 5.7-1`,
         };
       }
@@ -67,7 +67,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "listed-equity-corporate-bonds",
         title: "Account as listed equity or corporate bonds",
         guidance:
-          "A UoP structure that has control over underlying assets is equivalent to a corporate. Because the structure is listed, account it under Listed equity and corporate bonds. Typical example: a top-level holding with control.",
+          "Because this vehicle controls the assets and is listed, treat it as listed shares or corporate bonds — not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 2; Table 5.7-1`,
       };
     }
@@ -76,7 +76,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
       method: "business-loans-unlisted-equity",
       title: "Account as business loans and unlisted equity",
       guidance:
-        "A UoP structure that has control over underlying assets is equivalent to a corporate. Because the structure is unlisted, account it under Business loans and unlisted equity. Typical example: a top-level holding with control.",
+        "Because this vehicle controls the assets and is private, treat it as a business loan or private shares — not Use of Proceeds.",
       pcafRef: `${PCAF_UOP_REF} Question 2; Table 5.7-1`,
     };
   }
@@ -90,7 +90,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "mortgages",
         title: "Account as mortgages",
         guidance:
-          "A debt-based structure with one fully allocated identifiable asset is not calculated with the Use of Proceeds method. Use the Mortgages asset class (Figure 5-1 Step 6).",
+          "A loan for one home should be treated as a mortgage, not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 3; Table 5.7-1`,
       },
       "commercial-real-estate": {
@@ -98,7 +98,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "commercial-real-estate",
         title: "Account as commercial real estate",
         guidance:
-          "A debt-based structure with one fully allocated identifiable asset is not calculated with the Use of Proceeds method. Use the Commercial real estate asset class (Figure 5-1 Step 6).",
+          "A loan for one commercial building should be treated as a commercial property loan, not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 3; Table 5.7-1`,
       },
       "motor-vehicle-loan": {
@@ -106,7 +106,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "motor-vehicle-loans",
         title: "Account as motor vehicle loans",
         guidance:
-          "A debt-based structure with one fully allocated identifiable asset is not calculated with the Use of Proceeds method. Use the Motor vehicle loans asset class (Figure 5-1 Step 6).",
+          "A loan for one vehicle should be treated as a vehicle loan, not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 3; Table 5.7-1`,
       },
       "project-finance": {
@@ -114,7 +114,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "project-finance",
         title: "Account as project finance",
         guidance:
-          "A debt-based structure with one fully allocated project is not calculated with the Use of Proceeds method. Use Project finance, including the guidance for projects without a separate balance sheet.",
+          "A loan for one project should be treated as project finance, not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 3; Table 5.7-1`,
       },
       other: {
@@ -122,7 +122,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
         method: "figure-5-1-step-6",
         title: "Account under the matching asset class",
         guidance:
-          "A debt-based structure with one fully allocated identifiable asset is not calculated with the Use of Proceeds method. Select the asset class from asset type in Figure 5-1 Step 6.",
+          "A loan for one named asset should use that asset’s usual loan type, not Use of Proceeds.",
         pcafRef: `${PCAF_UOP_REF} Question 3`,
       },
     };
@@ -136,7 +136,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
       classification: "integrated",
       title: "Integrated use-of-proceeds structure",
       guidance:
-        "Underlying assets are part of the issuer’s balance sheet (for example labeled bonds/loans allocated to specific assets, or a loan earmarked to multiple designated projects). Account with the Use of Proceeds method. Investors may use issuer-level data when asset-level accounting is theoretically impossible, not practically feasible, or not material.",
+        "The funded assets sit on the borrower’s own books. Both money already assigned and leftover money count. Use the borrower’s company figures only when you cannot reasonably work it out asset by asset.",
       pcafRef: `${PCAF_UOP_REF} Question 4`,
     };
   }
@@ -146,7 +146,7 @@ export function resolveUopAccounting(answers: UopEligibilityAnswers): UopAccount
     classification: "separate",
     title: "Separate use-of-proceeds structure",
     guidance:
-      "Underlying assets are not part of the issuer’s balance sheet (for example debt funds, private equity funds, and certain SPVs without control). Account with the Use of Proceeds method. Issuer-level corporate emissions must not be used as a proxy for unallocated amounts.",
+      "The funded assets sit in a fund or special vehicle, not on the borrower’s own books. Work the emissions out from those assets. Do not use the borrower’s company-wide emissions as a stand-in for leftover cash.",
     pcafRef: `${PCAF_UOP_REF} Question 4; footnote 167`,
   };
 }

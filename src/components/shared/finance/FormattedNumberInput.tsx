@@ -8,6 +8,7 @@ interface FormattedNumberInputProps {
   value: number | null;
   onChange: (value: number) => void;
   onClear?: () => void;
+  onBlur?: () => void;
   className?: string;
   min?: number;
   max?: number;
@@ -21,6 +22,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   value,
   onChange,
   onClear,
+  onBlur,
   className,
   min,
   max,
@@ -52,6 +54,7 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
       placeholder={placeholder}
       value={displayValue}
       onChange={handleChange}
+      onBlur={onBlur}
       className={className}
       min={min}
       max={max}

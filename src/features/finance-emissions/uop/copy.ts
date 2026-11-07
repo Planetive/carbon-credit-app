@@ -13,37 +13,37 @@ export const ELIGIBILITY_COPY: Record<
   proceedsAllocatedToSpecificAssets: {
     title: "Is this money earmarked for named assets?",
     example: "Example: a green bond that must fund listed solar projects, not general working capital.",
-    pcaf: "PCAF Figure 5.7-2 Question 1: proceeds allocated only to specific, identifiable assets. A green or sustainable label is not enough on its own.",
+    pcaf: "The money must be reserved for named assets you can identify. Calling it a green or sustainable loan is not enough on its own.",
     recap: (answers) => yesNoRecap(answers.proceedsAllocatedToSpecificAssets),
   },
   isSecuritized: {
     title: "Is this a securitization (pooled loans sold as securities)?",
     example: "Example: RMBS, CMBS, CLO, or auto ABS — a separate company issues notes backed by a pool of loans.",
-    pcaf: "PCAF Figure 5-1 Step 3b: legally distinct issuer of securities backed by loans, leases, or receivables is §5.8, not Use of Proceeds.",
+    pcaf: "This is when a separate company sells notes backed by a pool of loans, leases, or receivables. Those deals are not treated as Use of Proceeds.",
     recap: (answers) => yesNoRecap(answers.isSecuritized),
   },
   structureHasControl: {
     title: "Does this vehicle control the underlying assets?",
     example: "Example: a holding company that consolidates subsidiaries. A minority stake in a fund usually does not have control.",
-    pcaf: "PCAF Figure 5.7-2 Question 2: only equity structures can have control. Control or equity-share consolidation is treated as a corporate, not Use of Proceeds.",
+    pcaf: "Control usually means the vehicle consolidates the assets, as a parent company would. A minority stake in a fund usually does not have control. If it does, treat it like ordinary company financing instead.",
     recap: (answers) => yesNoRecap(answers.structureHasControl),
   },
   controlOneFullyAllocatedAsset: {
     title: "Is all of the money going to one asset?",
     example: "Example: the vehicle exists only to own one power plant, and every rupee is tied to that plant.",
-    pcaf: "PCAF Figure 5.7-2 Question 2 exception: one fully allocated asset that is a project is Project Finance.",
+    pcaf: "If every rupee is tied to one project, this is treated as project finance rather than Use of Proceeds.",
     recap: (answers) => yesNoRecap(answers.controlOneFullyAllocatedAsset),
   },
   controlAssetIsProject: {
     title: "Is that single asset a project?",
     example: "Example: a wind farm, toll road, or plant with its own financing — not a portfolio of many loans.",
-    pcaf: "PCAF Table 5.7-1: a controlling structure with one fully allocated project uses the Project Finance method.",
+    pcaf: "A project is something like a wind farm, toll road, or plant with its own financing — not a portfolio of many loans.",
     recap: (answers) => yesNoRecap(answers.controlAssetIsProject),
   },
   structureListing: {
     title: "Is this vehicle listed on a stock exchange?",
     example: "Example: listed = shares trade on an exchange. Unlisted = a private holding company.",
-    pcaf: "PCAF Figure 5.7-2 Question 2: a controlling listed vehicle is listed equity / corporate bonds; unlisted is business loans and unlisted equity.",
+    pcaf: "If the vehicle’s shares trade on an exchange, treat it as listed shares or corporate bonds. If it is private, treat it as a business loan or private shares.",
     recap: (answers) =>
       answers.structureListing === "listed"
         ? "Listed"
@@ -54,19 +54,19 @@ export const ELIGIBILITY_COPY: Record<
   debtBasedWithOneFullyAllocatedAsset: {
     title: "Is this a loan for one single asset (a house, building, car, or project)?",
     example: "Example: a mortgage on one home, a loan on one office building, or a loan for one project company.",
-    pcaf: "PCAF Figure 5.7-2 Question 3: debt-only financing fully allocated to one identifiable asset uses that asset class, not Use of Proceeds.",
+    pcaf: "A loan for one house, one building, one vehicle, or one project should use that loan type instead of Use of Proceeds.",
     recap: (answers) => yesNoRecap(answers.debtBasedWithOneFullyAllocatedAsset),
   },
   singleAssetClass: {
     title: "What type of asset is that loan for?",
     example: "Example: choose Mortgage for a home, Commercial real estate for an office, or Project finance for a plant.",
-    pcaf: "PCAF Figure 5-1 Step 6: select the matching asset class instead of Use of Proceeds.",
+    pcaf: "Choose the matching loan type for that one asset, such as a home mortgage or a commercial property loan.",
     recap: (answers) => singleAssetRecap(answers.singleAssetClass),
   },
   assetsOnIssuerBalanceSheet: {
     title: "Do the funded assets sit on the borrower’s own books?",
     example: "Example: Yes — a company’s green bond funding projects on its balance sheet. No — a fund or SPV that holds the assets separately.",
-    pcaf: "PCAF Figure 5.7-2 Question 4: on the issuer balance sheet = Integrated Use of Proceeds; otherwise Separate Use of Proceeds (footnote 167).",
+    pcaf: "If the funded assets sit on the borrower’s own books, this is integrated Use of Proceeds. If they sit in a separate fund or vehicle, this is separate Use of Proceeds.",
     recap: (answers) => yesNoRecap(answers.assetsOnIssuerBalanceSheet),
   },
 };
@@ -103,14 +103,14 @@ export function uopOutcomeDisplay(outcome: UopAccountingOutcome): {
     return {
       heading: "Treat this as a separate Use of Proceeds investment",
       body: "The assets sit in a fund or special vehicle, not on the borrower’s own books. You will say how much of your money has already been assigned to those assets.",
-      official: `${outcome.title}. ${outcome.pcafRef}`,
+      official: "",
     };
   }
   if (outcome.kind === "uop" && outcome.classification === "integrated") {
     return {
       heading: "Treat this as an integrated Use of Proceeds investment",
       body: "The assets sit on the borrower’s own books (for example a labeled bond or an earmarked loan). Both money already assigned and money still unassigned are in scope.",
-      official: `${outcome.title}. ${outcome.pcafRef}`,
+      official: "",
     };
   }
   const redirects: Record<string, string> = {
@@ -127,6 +127,27 @@ export function uopOutcomeDisplay(outcome: UopAccountingOutcome): {
   return {
     heading: redirects[outcome.method] || outcome.title,
     body: outcome.guidance,
-    official: `${outcome.title}. ${outcome.pcafRef}`,
+    official: "",
   };
+}
+
+/** Matching financed loan type when eligibility says this is not Use of Proceeds. */
+export function uopRedirectLoanType(outcome: UopAccountingOutcome | null | undefined): string | null {
+  if (!outcome || outcome.kind === "uop") return null;
+  switch (outcome.method) {
+    case "project-finance":
+      return "project-finance";
+    case "listed-equity-corporate-bonds":
+      return "corporate-bond";
+    case "business-loans-unlisted-equity":
+      return "business-loan";
+    case "mortgages":
+      return "mortgage";
+    case "commercial-real-estate":
+      return "commercial-real-estate";
+    case "motor-vehicle-loans":
+      return "motor-vehicle-loan";
+    default:
+      return null;
+  }
 }

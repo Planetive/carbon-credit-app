@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createUopDraft, createUnderlyingAsset } from "./state";
 import { optionsForAssetClass, optionDef, isUnsupportedUopAssetClass } from "./underlyingOptions";
+import { bindApprovedFactorForTest } from "./factorLibrary";
 import { validateUopAssets } from "./validation";
 import { UOP_REPORTABLE_SAVE_AVAILABLE } from "./reportableGuard";
 import type { UopDraft } from "./types";
@@ -61,8 +62,16 @@ describe("Phase 5C.2 underlying PCAF option coverage", () => {
     ]);
     expect(optionDef("mortgage", "score5")).toBeUndefined();
     expect(optionDef("business-loan", "3")).toBeUndefined();
-    expect(isUnsupportedUopAssetClass("sovereign-debt")).toBe(true);
-    expect(isUnsupportedUopAssetClass("use-of-proceeds")).toBe(true);
+    expect(isUnsupportedUopAssetClass("sovereign-debt")).toBe(false);
+    expect(isUnsupportedUopAssetClass("use-of-proceeds")).toBe(false);
+    expect(isUnsupportedUopAssetClass("sub-sovereign-debt" as never)).toBe(false);
+    expect(optionsForAssetClass("sovereign-debt").map((item) => item.id)).toEqual([
+      "1a",
+      "1b",
+      "2a",
+      "3a",
+      "3b",
+    ]);
   });
 
   it("requires option-specific inputs and a sourced factor, not a typed score", () => {
@@ -86,6 +95,8 @@ describe("Phase 5C.2 underlying PCAF option coverage", () => {
     asset.estimation.factorGeography = "PK";
     asset.estimation.factorYear = "2024";
     asset.estimation.factorUnit = "kgCO2e/PKR";
+    expect(validateUopAssets(draft)["assets.asset-3a.estimation.libraryEntryId"]).toBeTruthy();
+    asset.estimation = bindApprovedFactorForTest(asset.estimation);
     expect(validateUopAssets(draft)).toEqual({});
   });
 
@@ -109,6 +120,8 @@ describe("Phase 5C.2 underlying PCAF option coverage", () => {
         factorGeography: "PK",
         factorYear: "2024",
         factorUnit: "tCO2e/kWh",
+        libraryEntryId: "11111111-1111-1111-1111-111111111111",
+        factorConfirmed: true,
       },
     });
     const second = createUnderlyingAsset({
@@ -130,6 +143,8 @@ describe("Phase 5C.2 underlying PCAF option coverage", () => {
         factorGeography: "PK",
         factorYear: "2024",
         factorUnit: "tCO2e/kWh",
+        libraryEntryId: "22222222-2222-2222-2222-222222222222",
+        factorConfirmed: true,
       },
     });
     const draft = draftWithAsset(first);
