@@ -43,9 +43,9 @@ function qualifyingAnswers(): SspEligibilityAnswers {
 describe("Phase 6B.1 — safety gates", () => {
   it("keeps Calculate and reportable Save disabled while drafts API is available", () => {
     expect(SSP_DRAFT_API_AVAILABLE).toBe(true);
-    expect(SSP_CALCULATE_AVAILABLE).toBe(false);
+    expect(SSP_CALCULATE_AVAILABLE).toBe(true);
     expect(SSP_REPORTABLE_SAVE_AVAILABLE).toBe(false);
-    expect(canCalculateSsp()).toBe(false);
+    expect(canCalculateSsp()).toBe(true);
     expect(canSaveReportableSsp()).toBe(false);
     expect(() => rejectSspReportableResults([{ type: SSP_LOAN_TYPE }])).toThrow();
   });

@@ -148,7 +148,7 @@ export function createSspDraft(instanceKey: string, financingInstanceId?: string
     tranches: [],
     holdings: [],
     lastPreviewNote:
-      "Drafts can persist to the server. Financed emissions are not calculated until Phase 6C.",
+      "Preview Calculate uses the backend §5.8 engine. Reportable Save and portfolio inclusion stay off.",
   };
 }
 

@@ -1,6 +1,6 @@
 /**
  * Phase 6C.2 — map backend POST /api/v1/ssp/calculate preview JSON for the Results panel.
- * Calculate remains gated by SSP_CALCULATE_AVAILABLE (still false).
+ * Never invents financed-emission totals; missing values stay null.
  */
 
 export type SspPreviewStatus = "complete" | "incomplete" | "unsupported" | "error" | string;
@@ -106,49 +106,62 @@ export function mapSspPreviewResponse(raw: unknown): SspPreviewViewModel {
     layers: {
       collateral: collateral.map((row, i) => {
         const r = row as Record<string, unknown>;
+        const caf = num(r.caf);
+        const method = text(r.method) || text(r.message);
+        const cafBasis = text(r.caf_basis ?? r.cafBasis);
         return {
           id: text(r.collateral_id ?? r.collateralId) || `collateral-${i}`,
           label: text(r.name) || text(r.collateral_type) || `Collateral ${i + 1}`,
-          financedEmissions: num(r.absolute_total_tco2e ?? r.absoluteTotalTco2e),
+          financedEmissions: num(
+            r.financed_emissions_tco2e ?? r.absolute_total_tco2e ?? r.absoluteTotalTco2e
+          ),
+          factor: caf,
           dataQualityScore: num(r.data_quality_score ?? r.dataQualityScore),
-          detail: text(r.method) || text(r.message),
+          detail: [method, caf != null ? `CAF${cafBasis ? ` (${cafBasis})` : ""}` : null]
+            .filter(Boolean)
+            .join(" · ") || null,
         };
       }),
       loans: loans.map((row, i) => {
         const r = row as Record<string, unknown>;
         return {
           id: text(r.loan_id ?? r.loanId) || `loan-${i}`,
-          label: text(r.loan_id ?? r.loanId) || `Loan ${i + 1}`,
+          label: text(r.name) || text(r.loan_id ?? r.loanId) || `Loan ${i + 1}`,
           financedEmissions: num(r.financed_emissions_tco2e ?? r.financedEmissionsTco2e),
           dataQualityScore: num(r.data_quality_score ?? r.dataQualityScore),
         };
       }),
       pools: pools.map((row, i) => {
         const r = row as Record<string, unknown>;
+        const lafRows = Array.isArray(r.laf_rows) ? r.laf_rows : Array.isArray(r.lafRows) ? r.lafRows : [];
+        const firstLaf = lafRows[0] as Record<string, unknown> | undefined;
         return {
           id: text(r.pool_id ?? r.poolId) || `pool-${i}`,
-          label: text(r.path) || text(r.pool_id) || `Pool ${i + 1}`,
+          label: text(r.name) || text(r.path) || text(r.pool_id) || `Pool ${i + 1}`,
           financedEmissions: num(r.financed_emissions_tco2e ?? r.financedEmissionsTco2e),
+          factor: num(firstLaf?.laf),
           dataQualityScore: num(r.data_quality_score ?? r.dataQualityScore),
-          detail: text(r.path),
+          detail: text(r.path) || (firstLaf ? "LAF from loan allocation" : null),
         };
       }),
       tranches: tranches.map((row, i) => {
         const r = row as Record<string, unknown>;
         return {
           id: text(r.tranche_id ?? r.trancheId) || `tranche-${i}`,
-          label: text(r.tranche_id ?? r.trancheId) || `Tranche ${i + 1}`,
+          label: text(r.name) || text(r.tranche_id ?? r.trancheId) || `Tranche ${i + 1}`,
           financedEmissions: num(r.financed_emissions_tco2e ?? r.financedEmissionsTco2e),
           factor: num(r.taf),
+          detail: "TAF",
         };
       }),
       holdings: holdings.map((row, i) => {
         const r = row as Record<string, unknown>;
         return {
           id: text(r.holding_id ?? r.holdingId) || `holding-${i}`,
-          label: text(r.holding_id ?? r.holdingId) || `Holding ${i + 1}`,
+          label: text(r.name) || text(r.holding_id ?? r.holdingId) || `Holding ${i + 1}`,
           financedEmissions: num(r.financed_emissions_tco2e ?? r.financedEmissionsTco2e),
           factor: num(r.iaf),
+          detail: "IAF",
         };
       }),
     },

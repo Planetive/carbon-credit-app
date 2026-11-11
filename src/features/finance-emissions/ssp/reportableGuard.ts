@@ -1,14 +1,14 @@
 import { PcafAuthorityError } from "../utils/pcafAuthority";
 import { SSP_LOAN_TYPE } from "../config/loanTypeOptions";
 
-/** Phase 6B: draft persistence on; Calculate + reportable Save still off. */
-export const SSP_CALCULATE_AVAILABLE = false;
+/** Phase 6C.2: preview Calculate on; reportable Save still off. */
+export const SSP_CALCULATE_AVAILABLE = true;
 export const SSP_REPORTABLE_SAVE_AVAILABLE = false;
 export const SSP_DRAFT_API_AVAILABLE = true;
 export const SSP_BACKEND_AVAILABLE = true;
 
 export const SSP_CALCULATE_BLOCKED_MESSAGE =
-  "Securitization preview calculation needs the Phase 6C calculation engine. Drafts persist, but figures are not calculated yet.";
+  "This securitization structure cannot be calculated yet. Use a supported single-pool deal with complete inputs, or finish the questionnaire.";
 
 export const SSP_REPORTABLE_BLOCKED_MESSAGE =
   "Securitization results cannot be saved to the portfolio yet. Reportable Save stays disabled.";

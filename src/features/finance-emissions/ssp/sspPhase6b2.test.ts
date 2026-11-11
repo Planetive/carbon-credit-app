@@ -37,7 +37,7 @@ function qualifyingAnswers(): SspEligibilityAnswers {
 
 describe("Phase 6B.2 — safety gates still hold", () => {
   it("keeps Calculate and reportable Save disabled", () => {
-    expect(SSP_CALCULATE_AVAILABLE).toBe(false);
+    expect(SSP_CALCULATE_AVAILABLE).toBe(true);
     expect(SSP_REPORTABLE_SAVE_AVAILABLE).toBe(false);
   });
 });

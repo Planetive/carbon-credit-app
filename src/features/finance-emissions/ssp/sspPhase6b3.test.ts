@@ -17,13 +17,13 @@ import {
 
 describe("Phase 6B.3 — safety gates", () => {
   it("keeps Calculate and reportable Save disabled", () => {
-    expect(SSP_CALCULATE_AVAILABLE).toBe(false);
+    expect(SSP_CALCULATE_AVAILABLE).toBe(true);
     expect(SSP_REPORTABLE_SAVE_AVAILABLE).toBe(false);
   });
 });
 
 describe("Phase 6B.3 — UX copy / soft vs hard validation", () => {
-  it("review step copy points to Phase 6C for calculation", () => {
+  it("review step copy points to backend preview Calculate", () => {
     const draft = createSspDraft(sspInstanceKey(1));
     const withEligibility = patchSspDraft(draft, {
       eligibility: {
@@ -41,8 +41,8 @@ describe("Phase 6B.3 — UX copy / soft vs hard validation", () => {
       },
     });
     const review = sspWizardSteps(withEligibility).find((s) => s.id === "ssp-review");
-    expect(review?.description.toLowerCase()).toContain("6c");
-    expect(review?.description.toLowerCase()).not.toMatch(/until phase 6b$/);
+    expect(review?.description.toLowerCase()).toMatch(/preview calculate|backend/);
+    expect(review?.description.toLowerCase()).toMatch(/reportable save stays off/);
   });
 
   it("COA mismatch warns but does not block hierarchy validation", () => {

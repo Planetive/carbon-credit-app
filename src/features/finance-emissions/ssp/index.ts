@@ -51,6 +51,12 @@ export {
 } from "./reportableGuard";
 export { mapSspPreviewResponse } from "./mapSspPreviewResponse";
 export type { SspPreviewViewModel, SspPreviewScopeBreakdown } from "./mapSspPreviewResponse";
+export {
+  canPreviewCalculateSsp,
+  sspPreviewCalculateBlockers,
+  SSP_SUPPORTED_STRUCTURE_TYPES,
+  SSP_BLOCKED_STRUCTURE_TYPES,
+} from "./previewGate";
 export { sspWizardSteps, isSspWizardStepId } from "./wizardSteps";
 export { SspQuestionnaire } from "./SspQuestionnaire";
 export { SspBackendUnavailableBanner, SspPreviewNotice, SspResultsPanel } from "./SspResultsPanel";

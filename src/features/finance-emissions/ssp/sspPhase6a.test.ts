@@ -290,13 +290,13 @@ describe("Phase 6A — wizard steps, calculate/save guards, no fabricated result
   });
 
   it("keeps Calculate and Save disabled with no fabricated totals", () => {
-    expect(SSP_CALCULATE_AVAILABLE).toBe(false);
+    expect(SSP_CALCULATE_AVAILABLE).toBe(true);
     expect(SSP_REPORTABLE_SAVE_AVAILABLE).toBe(false);
-    expect(canCalculateSsp()).toBe(false);
+    expect(canCalculateSsp()).toBe(true);
     expect(canSaveReportableSsp()).toBe(false);
     expect(() => rejectSspReportableResults([{ type: SSP_LOAN_TYPE }])).toThrow(SSP_REPORTABLE_BLOCKED_MESSAGE);
     const draft = createSspDraft(sspInstanceKey(1));
-    expect(draft.lastPreviewNote).toMatch(/not calculated/);
+    expect(draft.lastPreviewNote).toMatch(/Preview Calculate|reportable Save/i);
   });
 
   it("eligibility step incomplete until screening finishes", () => {

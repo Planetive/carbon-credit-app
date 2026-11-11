@@ -13,7 +13,8 @@
     "parity:api": "npx --yes tsx parity/compareApi.ts",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "dev:ssp-e2e": "node ./node_modules/vite/bin/vite.js --mode ssp-e2e --port 8080",
-    "test:e2e:ssp": "playwright test e2e/ssp-phase6b4.spec.ts"
+    "test:e2e:ssp": "playwright test e2e/ssp-phase6b4.spec.ts",
+    "test:e2e:ssp:6c2": "playwright test e2e/ssp-phase6c2.spec.ts"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",

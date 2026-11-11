@@ -355,7 +355,7 @@ function DealStep({
   );
 }
 
-function ReviewStep({ draft }: { draft: SspDraft }) {
+function ReviewStep({ draft, counterpartyId }: { draft: SspDraft; counterpartyId?: string | null }) {
   const [showDraftId, setShowDraftId] = useState(false);
   const pathLabel =
     draft.emissionsPath === "lookthrough"
@@ -392,7 +392,7 @@ function ReviewStep({ draft }: { draft: SspDraft }) {
           <p className="text-xs text-[#94A3B8] break-all">Draft id: {draft.financingInstanceId}</p>
         ) : null}
       </div>
-      <SspResultsPanel draft={draft} />
+      <SspResultsPanel draft={draft} counterpartyId={counterpartyId} />
     </div>
   );
 }
@@ -475,6 +475,7 @@ export function SspQuestionnaire({
   onRetrySave,
   onRefreshDraft,
   onApplyShared,
+  counterpartyId,
 }: {
   draft: SspDraft;
   onChange: (next: SspDraft) => void;
@@ -487,6 +488,7 @@ export function SspQuestionnaire({
   onRetrySave?: () => void;
   onRefreshDraft?: () => void;
   onApplyShared?: () => void;
+  counterpartyId?: string | null;
 }) {
   const instanceKey = draft.financingInstanceId || draft.instanceKey || "";
   const [eligibilityEdit, setEligibilityEdit] = useState<{
@@ -554,7 +556,9 @@ export function SspQuestionnaire({
       {stepId === "ssp-structure" && sspQualifiesForMethod(outcome) && (
         <SspHierarchyEditor draft={draft} onChange={onChange} errors={shownErrors} onTouch={onTouch} />
       )}
-      {stepId === "ssp-review" && sspQualifiesForMethod(outcome) && <ReviewStep draft={draft} />}
+      {stepId === "ssp-review" && sspQualifiesForMethod(outcome) && (
+        <ReviewStep draft={draft} counterpartyId={counterpartyId} />
+      )}
     </div>
   );
 }

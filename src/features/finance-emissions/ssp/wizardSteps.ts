@@ -42,7 +42,7 @@ export function sspWizardSteps(draft: SspDraft | null | undefined): SspWizardSte
       id: "ssp-review",
       title: "Review",
       shortTitle: "Review",
-      description: "Check the structure — financed-emissions calculation stays off until Phase 6C",
+      description: "Check the structure, then run a backend preview Calculate (reportable Save stays off)",
     }
   );
   return steps;
