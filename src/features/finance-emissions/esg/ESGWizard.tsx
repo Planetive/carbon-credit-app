@@ -3002,6 +3002,7 @@ export const ESGWizard: React.FC = () => {
               onRetrySave={sspPersistence.retry}
               onRefreshDraft={sspPersistence.refresh}
               onApplyShared={sspPersistence.applyShared}
+              counterpartyId={counterpartyId}
             />
           </div>
         );
