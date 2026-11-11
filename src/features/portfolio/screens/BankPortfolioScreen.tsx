@@ -10,7 +10,6 @@ import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumbe
 import { ArrowLeft, Building2, Plus, Search, Wallet, MapPin, Shield, Calendar, TrendingUp, Upload, Download, FileSpreadsheet, Edit, Trash2, X, Grid3X3, FileText, BarChart3, Factory, Sparkles, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PortfolioClient, Counterparty, Exposure } from '@/integrations/supabase/portfolioClient';
-import { supabase } from '@/integrations/supabase/client';
 import { fetchMyProfileDual } from '@/api/profileDualRead';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,10 +43,12 @@ const BankPortfolio: React.FC = () => {
   const [userType, setUserType] = useState<string>("financial_institution");
 
   const zeroPadId = (num: number, width = 4) => num.toString().padStart(width, '0');
-  const getNextId = (): string => {
-    const numericIds = entries
-      .map(e => parseInt(e.id, 10))
-      .filter(n => !isNaN(n));
+  const allocateExposureId = async (): Promise<string> => {
+    const existing = await PortfolioClient.getExposures();
+    const numericIds = [
+      ...existing.map((exposure) => parseInt(String(exposure.exposure_id), 10)),
+      ...entries.map((entry) => parseInt(entry.id, 10)),
+    ].filter((n) => !isNaN(n));
     const max = numericIds.length ? Math.max(...numericIds) : 0;
     return zeroPadId(max + 1);
   };
@@ -167,7 +168,7 @@ const BankPortfolio: React.FC = () => {
     try {
       setSaving(true);
       
-      const exposureId = getNextId();
+      const exposureId = await allocateExposureId();
       
       // Create counterparty and exposure in database
       const { counterparty, exposure } = await PortfolioClient.createCounterpartyWithExposure(
@@ -399,13 +400,7 @@ const BankPortfolio: React.FC = () => {
       
       // Delete from database
       if (entryToDelete.counterpartyId) {
-        // Delete the counterparty (this will cascade delete the exposure due to foreign key)
-        const { error } = await supabase
-          .from('counterparties')
-          .delete()
-          .eq('id', entryToDelete.counterpartyId);
-          
-        if (error) throw error;
+        await PortfolioClient.deleteCounterparty(entryToDelete.counterpartyId);
       }
       
       // Update local state

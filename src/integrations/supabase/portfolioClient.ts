@@ -1120,6 +1120,27 @@ export class PortfolioClient {
   // row, including aggregate plus components. Do not use this for reportable
   // finance totals — use listFinancedReportingRows + summarizeFinancedPortfolio.
   static async getPortfolioTotals(): Promise<PortfolioTotals> {
+    if (USE_JWT_AUTH) {
+      const [counterparties, exposures, financed] = await Promise.all([
+        listCounterparties(),
+        listExposures(),
+        listFinancedEmissions(),
+      ]);
+      const sumEmissions = (kind: 'finance' | 'facilitated') =>
+        financed.reduce((sum, row) => {
+          if (row.calc_kind !== kind) return sum;
+          return sum + (Number(row.financed_emissions) || 0);
+        }, 0);
+      return {
+        user_id: counterparties[0]?.user_id || exposures[0]?.user_id || financed[0]?.user_id || '',
+        total_finance_emissions: sumEmissions('finance'),
+        total_facilitated_emissions: sumEmissions('facilitated'),
+        total_exposure_pkr: exposures.reduce((sum, row) => sum + (Number(row.amount_pkr) || 0), 0),
+        total_counterparties: counterparties.length,
+        total_exposures: exposures.length,
+      };
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -1132,6 +1153,18 @@ export class PortfolioClient {
 
   // Loan type mappings for scenario building
   static async getLoanTypeMappings(): Promise<Map<string, string>> {
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions();
+      const map = new Map<string, string>();
+      for (const row of rows) {
+        if (row.status && row.status !== 'completed') continue;
+        if (row.counterparty_id && row.formula_id) {
+          map.set(row.counterparty_id, row.formula_id);
+        }
+      }
+      return map;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -1155,6 +1188,11 @@ export class PortfolioClient {
 
   // Get outstanding amount from finance emission calculations for a counterparty
   static async getOutstandingAmountForCounterparty(counterpartyId: string): Promise<number> {
+    if (USE_JWT_AUTH) {
+      const exposures = await listExposures(counterpartyId);
+      return exposures.reduce((sum, row) => sum + (Number(row.amount_pkr) || 0), 0);
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
@@ -1170,6 +1208,19 @@ export class PortfolioClient {
 
   // Get outstanding amounts for multiple counterparties
   static async getOutstandingAmountsForCounterparties(counterpartyIds: string[]): Promise<Map<string, number>> {
+    if (USE_JWT_AUTH) {
+      const wanted = new Set(counterpartyIds);
+      const exposures = await listExposures();
+      const amounts = new Map<string, number>();
+      for (const row of exposures) {
+        if (!row.counterparty_id || !wanted.has(row.counterparty_id)) continue;
+        const amount = Number(row.amount_pkr) || 0;
+        if (amount <= 0) continue;
+        amounts.set(row.counterparty_id, (amounts.get(row.counterparty_id) || 0) + amount);
+      }
+      return amounts;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 

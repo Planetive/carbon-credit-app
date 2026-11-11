@@ -26,12 +26,15 @@ import {
   type ScenarioPortfolioEntry
 } from '../core';
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
+import { USE_JWT_AUTH } from '@/api/config';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 const ScenarioBuildingScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
   
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [portfolioEntries, setPortfolioEntries] = useState<ScenarioPortfolioEntry[]>([]);
@@ -119,15 +122,19 @@ const ScenarioBuildingScreen: React.FC = () => {
       
       console.log('SimpleScenarioBuilding - Loading portfolio data from database...');
       
-      // Verify authentication first
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        throw new Error('User not authenticated. Please log in again.');
+      if (USE_JWT_AUTH) {
+        if (!authUser) {
+          throw new Error('User not authenticated. Please log in again.');
+        }
+      } else {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          throw new Error('User not authenticated. Please log in again.');
+        }
       }
-      
-      console.log('SimpleScenarioBuilding - User authenticated:', user.id);
+
+      console.log('SimpleScenarioBuilding - User authenticated:', authUser?.id);
       
       // Load counterparties and exposures from database (same logic as BankPortfolio)
       console.log('SimpleScenarioBuilding - Calling getCounterparties...');

@@ -378,16 +378,18 @@ const Dashboard2 = () => {
         }
       })();
 
-      const emissionCalculatorPromise = (async () => {
-        const { data: emissionRow, error: emissionError } = await (supabase as any)
-          .from("emission_calculator")
-          .select("*")
-          .eq("user_id", user.id)
-          .single();
-        if (!emissionError && emissionRow) {
-          setEmissionData(emissionRow);
-        }
-      })();
+      const emissionCalculatorPromise = USE_JWT_AUTH
+        ? Promise.resolve()
+        : (async () => {
+            const { data: emissionRow, error: emissionError } = await (supabase as any)
+              .from("emission_calculator")
+              .select("*")
+              .eq("user_id", user.id)
+              .single();
+            if (!emissionError && emissionRow) {
+              setEmissionData(emissionRow);
+            }
+          })();
 
       await Promise.all([
         projectsPromise,
@@ -544,8 +546,7 @@ const Dashboard2 = () => {
       const exposures = await PortfolioClient.getExposures();
       const exposure = exposures.find(e => e.counterparty_id === companyId);
       
-      // Delete exposure if exists
-      if (exposure) {
+      if (exposure && !USE_JWT_AUTH) {
         const { error: exposureError } = await supabase
           .from('exposures')
           .delete()
@@ -555,14 +556,7 @@ const Dashboard2 = () => {
         if (exposureError) throw exposureError;
       }
       
-      // Delete counterparty
-      const { error: counterpartyError } = await supabase
-        .from('counterparties')
-        .delete()
-        .eq('id', companyId)
-        .eq('user_id', user?.id);
-      
-      if (counterpartyError) throw counterpartyError;
+      await PortfolioClient.deleteCounterparty(companyId);
       
       // Refresh the list
       const counterparties = await PortfolioClient.getCounterparties();
