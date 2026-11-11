@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Plus, Building2, CheckCircle, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save, Car, Landmark, Minus, Home, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Building2, CheckCircle, BarChart3, Building, ArrowLeft, FileText, Shield, AlertCircle, Calculator, Save, Car, Landmark, Minus, Home, Layers, Boxes } from 'lucide-react';
 import { FinanceEmissionCalculator } from './FinanceEmissionCalculator';
 import {
   FINANCE_LOAN_TYPE_DEFS,
   UOP_LOAN_TYPE,
-  filterNonUopLoanTypes,
+  SSP_LOAN_TYPE,
+  filterQuestionnaireOnlyLoanTypes,
   financeLoanTypeLabel,
   isUopLoanType,
 } from '../config/loanTypeOptions';
@@ -26,6 +27,17 @@ import {
   validateUopStep,
   type UopByInstance,
 } from '../uop';
+import {
+  SspBackendUnavailableBanner,
+  SspQuestionnaire,
+  ensureSspInstances,
+  rejectSspReportableResults,
+  sspInstanceKey,
+  sspWizardSteps,
+  useSspDraftPersistence,
+  validateSspStep,
+  type SspByInstance,
+} from '../ssp';
 import { FormattedNumberInput } from "@/components/shared/finance/FormattedNumberInput";
 import { PortfolioClient } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
@@ -73,6 +85,7 @@ const LOAN_TYPE_ICONS: Record<string, LucideIcon> = {
   'motor-vehicle-loan': Car,
   'commercial-real-estate': Building,
   [UOP_LOAN_TYPE]: Layers,
+  [SSP_LOAN_TYPE]: Boxes,
 };
 
 const LOAN_TYPE_OPTIONS: Array<{
@@ -699,6 +712,8 @@ export const ESGWizard: React.FC = () => {
         unverified_emissions: 0,
         uopByInstance: {} as UopByInstance,
         uopActiveKey: '',
+        sspByInstance: {} as SspByInstance,
+        sspActiveKey: '',
       });
       setResults([]);
       setCurrentStep(0);
@@ -817,6 +832,8 @@ export const ESGWizard: React.FC = () => {
             unverified_emissions,
             uopByInstance: {} as UopByInstance,
             uopActiveKey: '',
+            sspByInstance: {} as SspByInstance,
+            sspActiveKey: '',
           });
 
           console.log('Loaded questionnaire data into form:', {
@@ -1037,6 +1054,8 @@ export const ESGWizard: React.FC = () => {
     unverified_emissions: 0,
     uopByInstance: {} as UopByInstance,
     uopActiveKey: '',
+    sspByInstance: {} as SspByInstance,
+    sspActiveKey: '',
   });
 
   const PROPERTY_DIRECT_TYPES = ['commercial-real-estate', 'mortgage'];
@@ -1063,11 +1082,17 @@ export const ESGWizard: React.FC = () => {
   const hasPropertyFamily = selectedTypeIds.some((t) => PROPERTY_FAMILY.includes(t));
   const hasSovereignFamily = selectedTypeIds.includes('sovereign-debt');
   const hasUopFamily = selectedTypeIds.includes(UOP_LOAN_TYPE);
+  const hasSspFamily = selectedTypeIds.includes(SSP_LOAN_TYPE);
   const uopQuantity = formData.loanTypes.find((item) => item.type === UOP_LOAN_TYPE)?.quantity || 0;
+  const sspQuantity = formData.loanTypes.find((item) => item.type === SSP_LOAN_TYPE)?.quantity || 0;
   const isUopOnly = hasUopFamily && formData.loanTypes.every((item) => item.type === UOP_LOAN_TYPE);
-  const nonUopLoanTypes = filterNonUopLoanTypes(formData.loanTypes);
+  const isSspOnly = hasSspFamily && formData.loanTypes.every((item) => item.type === SSP_LOAN_TYPE);
+  const isQuestionnaireOnly = isUopOnly || isSspOnly;
+  const calculatorLoanTypes = filterQuestionnaireOnlyLoanTypes(formData.loanTypes);
   const activeUopKey = formData.uopActiveKey || uopInstanceKey(1);
   const activeUopDraft = formData.uopByInstance?.[activeUopKey];
+  const activeSspKey = formData.sspActiveKey || sspInstanceKey(1);
+  const activeSspDraft = formData.sspByInstance?.[activeSspKey];
   const uopPersistence = useUopDraftPersistence({
     enabled: isUopOnly,
     drafts: formData.uopByInstance || {},
@@ -1077,9 +1102,18 @@ export const ESGWizard: React.FC = () => {
       setFormData((prev) => ({ ...prev, uopByInstance: next }));
     },
   });
+  const sspPersistence = useSspDraftPersistence({
+    enabled: isSspOnly,
+    drafts: formData.sspByInstance || {},
+    activeKey: activeSspKey,
+    counterpartyId,
+    onReplace: (next) => {
+      setFormData((prev) => ({ ...prev, sspByInstance: next }));
+    },
+  });
   const isMixedFamilies =
-    [hasBondFamily, hasVehicleFamily, hasPropertyFamily, hasSovereignFamily, hasUopFamily].filter(Boolean).length > 1;
-  const skipCompanyGhg = isDirectMethod || isUopOnly || (isMixedFamilies && !hasBondFamily);
+    [hasBondFamily, hasVehicleFamily, hasPropertyFamily, hasSovereignFamily, hasUopFamily, hasSspFamily].filter(Boolean).length > 1;
+  const skipCompanyGhg = isDirectMethod || isQuestionnaireOnly || (isMixedFamilies && !hasBondFamily);
   const methodFor = (type: string) => formData.calculationMethods?.[type] || '';
   const methodForFamily = (types: string[]) => types.map(methodFor).find(Boolean) || '';
   const activityMixLabels = [
@@ -1101,7 +1135,7 @@ export const ESGWizard: React.FC = () => {
     }
     if (skipCompanyGhg) {
       next = next.filter((s) => s.id !== 'emission-status');
-      if (isUopOnly) {
+      if (isQuestionnaireOnly) {
         next = next.filter((s) => s.id !== 'verification');
       } else {
         next = next.map((s) =>
@@ -1147,6 +1181,22 @@ export const ESGWizard: React.FC = () => {
       const at = insertAt >= 0 ? insertAt : next.length;
       next = [...next.slice(0, at), ...uopSteps, ...next.slice(at)];
     }
+    if (mode === 'finance' && hasSspFamily) {
+      const activeDraft = formData.sspByInstance?.[formData.sspActiveKey || sspInstanceKey(1)];
+      const sspSteps = sspWizardSteps(activeDraft).map((step) => ({
+        id: step.id,
+        title: step.title,
+        shortTitle: step.shortTitle,
+        description: step.description,
+        icon: Boxes,
+      }));
+      if (isSspOnly) {
+        next = next.filter((s) => s.id !== 'emission-calculation' && s.id !== 'results');
+      }
+      const insertAt = next.findIndex((s) => s.id === 'emission-calculation' || s.id === 'results');
+      const at = insertAt >= 0 ? insertAt : next.length;
+      next = [...next.slice(0, at), ...sspSteps, ...next.slice(at)];
+    }
     return next;
   })();
 
@@ -1172,6 +1222,22 @@ export const ESGWizard: React.FC = () => {
       return { ...prev, uopByInstance: nextMap, uopActiveKey: active };
     });
   }, [mode, uopQuantity]);
+
+  useEffect(() => {
+    if (mode !== 'finance') return;
+    setFormData((prev) => {
+      const qty = prev.loanTypes.find((item) => item.type === SSP_LOAN_TYPE)?.quantity || 0;
+      const nextMap = ensureSspInstances(prev.sspByInstance, qty);
+      const keys = Object.keys(nextMap);
+      const prevKeys = Object.keys(prev.sspByInstance || {});
+      const sameShape =
+        keys.length === prevKeys.length &&
+        keys.every((key) => prev.sspByInstance?.[key]?.financingInstanceId === nextMap[key]?.financingInstanceId);
+      const active = keys.includes(prev.sspActiveKey) ? prev.sspActiveKey : keys[0] || '';
+      if (sameShape && prev.sspActiveKey === active) return prev;
+      return { ...prev, sspByInstance: nextMap, sspActiveKey: active };
+    });
+  }, [mode, sspQuantity]);
 
   useEffect(() => {
     const currentId = steps[currentStep]?.id;
@@ -1408,28 +1474,74 @@ export const ESGWizard: React.FC = () => {
 
     console.log('✅ ESGWizard - Counterparty ID is valid UUID:', counterpartyId);
     rejectUopReportableResults(calculationResults);
+    rejectSspReportableResults(calculationResults);
     assertReportableResults(calculationResults);
 
     try {
       // Save questionnaire data first and get the questionnaire ID
       const questionnaire = await saveQuestionnaireDataAndGetId();
 
-      // If starting fresh, delete ALL old calculations for this counterparty and mode BEFORE saving new ones
-      if (startFresh) {
-        await deleteAllFinanceEmissionCalculations(counterpartyId, mode);
+      // Never wipe prior asset-class calculations on save.
+      // startFresh only clears the wizard form — existing DB rows are merged below.
+      void startFresh;
+      void deleteAllFinanceEmissionCalculations;
+
+      // Merge with previously saved component rows so adding Vehicle Loan later
+      // does not overwrite Project Finance (etc.).
+      const currentInstanceIds = new Set(
+        calculationResults
+          .map((r) => r.financingInstanceId || extractFinancingInstanceId(r.pcafInputs))
+          .filter((id): id is string => Boolean(id))
+      );
+      let preservedResults: EmissionResultRow[] = [];
+      try {
+        const existingAgg = await PortfolioClient.getEmissionCalculations(counterpartyId);
+        const prior = (existingAgg || []).find(
+          (row: { calculation_type?: string; formula_id?: string }) =>
+            row.calculation_type === mode && row.formula_id === 'aggregate'
+        );
+        const priorRows = Array.isArray(prior?.results?.allResults) ? prior.results.allResults : [];
+        preservedResults = priorRows
+          .filter((row: { financingInstanceId?: string; type?: string }) => {
+            const id = row.financingInstanceId;
+            if (id && currentInstanceIds.has(id)) return false;
+            // If current session recalculated this formula without instance id, prefer current.
+            if (!id && calculationResults.some((r) => r.type === row.type)) return false;
+            return Boolean(row.type || row.label);
+          })
+          .map((row: Record<string, unknown>) => ({
+            type: String(row.type || 'unknown'),
+            label: String(row.label || row.type || 'Loan'),
+            attributionFactor: Number(row.attributionFactor || 0),
+            financedEmissions: Number(row.financedEmissions || 0),
+            denominatorLabel: String(row.denominatorLabel || ''),
+            denominatorValue: Number(row.denominatorValue || 0),
+            dataQualityScore:
+              typeof row.dataQualityScore === 'number' && isFinite(row.dataQualityScore)
+                ? Number(row.dataQualityScore)
+                : undefined,
+            financingInstanceId:
+              typeof row.financingInstanceId === 'string' ? row.financingInstanceId : undefined,
+            instanceKey: typeof row.instanceKey === 'string' ? row.instanceKey : undefined,
+            scopeBreakdown: row.scopeBreakdown as EmissionResultRow['scopeBreakdown'],
+          }));
+      } catch (mergeErr) {
+        console.warn('Could not load prior emission rows for merge:', mergeErr);
       }
 
-      // Calculate aggregated values for all results
-      const totalFinancedEmissions = calculationResults.reduce(
+      const mergedResults: EmissionResultRow[] = [...preservedResults, ...calculationResults];
+
+      // Calculate aggregated values across preserved + newly calculated results
+      const totalFinancedEmissions = mergedResults.reduce(
         (sum, r) => sum + (sanitizeNumericValue(r.financedEmissions) || 0), 
         0
       );
-      const averageAttributionFactor = calculationResults.length > 0
-        ? calculationResults.reduce((sum, r) => sum + (sanitizeNumericValue(r.attributionFactor) || 0), 0) / calculationResults.length
+      const averageAttributionFactor = mergedResults.length > 0
+        ? mergedResults.reduce((sum, r) => sum + (sanitizeNumericValue(r.attributionFactor) || 0), 0) / mergedResults.length
         : 0;
-      const firstResult = calculationResults[0]; // Use first result for denominator (usually same for all)
+      const firstResult = mergedResults[0];
 
-      const resultsWithDataQualityScores = calculationResults.filter(
+      const resultsWithDataQualityScores = mergedResults.filter(
         (r) => r.dataQualityScore != null && isFinite(r.dataQualityScore)
       );
       const averageDataQualityScore =
@@ -1511,12 +1623,12 @@ export const ESGWizard: React.FC = () => {
           totalEquity: formData?.totalEquity,
           minorityInterest: formData?.minorityInterest,
           preferredStock: formData?.preferredStock,
-          loanTypes: calculationResults.map(r => r.type),
-          loanLabels: calculationResults.map(r => r.label)
+          loanTypes: mergedResults.map(r => r.type),
+          loanLabels: mergedResults.map(r => r.label)
         },
         results: {
-          // Aggregate all results
-          allResults: calculationResults.map(r => ({
+          // Aggregate preserved prior rows + newly calculated rows (additive, not overwrite)
+          allResults: mergedResults.map(r => ({
             type: r.type,
             label: r.label,
             attributionFactor: sanitizeNumericValue(r.attributionFactor),
@@ -1536,8 +1648,8 @@ export const ESGWizard: React.FC = () => {
           financedEmissions: sanitizeNumericValue(totalFinancedEmissions),
           denominatorLabel: firstResult?.denominatorLabel || '',
           denominatorValue: sanitizeNumericValue(firstResult?.denominatorValue || 0),
-          loanType: calculationResults.length === 1 ? firstResult?.type : 'multiple',
-          loanLabel: calculationResults.length === 1 ? firstResult?.label : `${calculationResults.length} loan types`,
+          loanType: mergedResults.length === 1 ? firstResult?.type : 'multiple',
+          loanLabel: mergedResults.length === 1 ? firstResult?.label : `${mergedResults.length} loan types`,
           dataQualityScore:
             averageDataQualityScore != null && isFinite(averageDataQualityScore)
               ? sanitizeNumericValue(averageDataQualityScore)
@@ -1568,7 +1680,7 @@ export const ESGWizard: React.FC = () => {
           denominator_value: firstResult?.denominatorValue || 0,
           updated_at: new Date().toISOString(),
           calculation_type: mode,
-          allResults: calculationResults.map((r) => ({
+          allResults: mergedResults.map((r) => ({
             type: r.type,
             label: r.label,
             attributionFactor: sanitizeNumericValue(r.attributionFactor),
@@ -1602,8 +1714,8 @@ export const ESGWizard: React.FC = () => {
             totalEquity: formData?.totalEquity,
             minorityInterest: formData?.minorityInterest,
             preferredStock: formData?.preferredStock,
-            loanTypes: calculationResults.map((r) => r.type),
-            loanLabels: calculationResults.map((r) => r.label)
+            loanTypes: mergedResults.map((r) => r.type),
+            loanLabels: mergedResults.map((r) => r.label)
           }
         };
         sessionStorage.setItem(cacheKey, JSON.stringify(summary));
@@ -1626,12 +1738,12 @@ export const ESGWizard: React.FC = () => {
         }
       }
 
-      // Remove post-save deletion to avoid wiping the new records
-      await cleanupOldFinanceEmissionCalculations(counterpartyId, calculationResults);
+      // Do not delete prior asset-class instances after save (additive calculations).
+      void cleanupOldFinanceEmissionCalculations;
 
       toast({
         title: "Emission Calculations Saved",
-        description: `Successfully saved ${calculationResults.length} ${mode} emission calculation(s) to the database.`,
+        description: `Saved ${calculationResults.length} new calculation(s). Company total now includes ${mergedResults.length} asset-class row(s).`,
         variant: "default"
       });
 
@@ -1764,6 +1876,23 @@ export const ESGWizard: React.FC = () => {
     if (idx >= 0) setCurrentStep(idx);
   };
 
+  const handleLeaveSsp = (suggestedLoanType?: string | null) => {
+    setValidationErrors({});
+    if (suggestedLoanType) {
+      pendingStepIdRef.current = 'loan-type';
+      setFormData((prev) => {
+        const remaining = prev.loanTypes.filter((item) => item.type !== SSP_LOAN_TYPE);
+        if (!remaining.some((item) => item.type === suggestedLoanType)) {
+          remaining.push({ type: suggestedLoanType, quantity: 1 });
+        }
+        return { ...prev, loanTypes: remaining };
+      });
+      return;
+    }
+    const idx = steps.findIndex((s) => s.id === 'loan-type');
+    if (idx >= 0) setCurrentStep(idx);
+  };
+
   // Handle step click with confirmation if data will be lost
   const handleStepClick = (stepIndex: number) => {
     if (stepIndex === currentStep) return;
@@ -1877,6 +2006,18 @@ export const ESGWizard: React.FC = () => {
         Object.assign(errors, validateUopStep(stepId, draft));
         break;
       }
+      case 'ssp-eligibility':
+      case 'ssp-deal':
+      case 'ssp-structure':
+      case 'ssp-review': {
+        const draft = dataToValidate.sspByInstance?.[dataToValidate.sspActiveKey || sspInstanceKey(1)];
+        if (!draft) {
+          errors.ssp = 'Complete the Securitization questions for this investment.';
+          break;
+        }
+        Object.assign(errors, validateSspStep(draft, stepId));
+        break;
+      }
     }
 
     return errors;
@@ -1925,6 +2066,20 @@ export const ESGWizard: React.FC = () => {
       };
       setValidationErrors((prev) =>
         Object.keys(prev).length === 0 ? prev : validateUopStep(steps[currentStep]?.id, nextDraft)
+      );
+      return updated;
+    });
+  };
+
+  const updateActiveSsp = (nextDraft: NonNullable<typeof activeSspDraft>) => {
+    setFormData((prev) => {
+      const key = prev.sspActiveKey || sspInstanceKey(1);
+      const updated = {
+        ...prev,
+        sspByInstance: { ...prev.sspByInstance, [key]: nextDraft },
+      };
+      setValidationErrors((prev) =>
+        Object.keys(prev).length === 0 ? prev : validateSspStep(nextDraft, steps[currentStep]?.id)
       );
       return updated;
     });
@@ -2045,6 +2200,7 @@ export const ESGWizard: React.FC = () => {
                   >
                     <button
                       type="button"
+                      data-testid={`loan-type-${option.value}`}
                       onClick={() => {
                         if (isSelected) removeLoanType(option.value);
                         else addLoanType(option.value, 1);
@@ -2068,7 +2224,9 @@ export const ESGWizard: React.FC = () => {
                     </button>
                     {isSelected && (
                       <div className="mt-3 ml-[52px] flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-xs font-medium text-[#64748B]">Quantity</span>
+                        <span className="text-xs font-medium text-[#64748B]">
+                          {option.value === SSP_LOAN_TYPE ? "Number of investments" : "Quantity"}
+                        </span>
                         <div className="inline-flex items-center rounded-lg border border-[#E2E8F0] bg-white">
                           <button
                             type="button"
@@ -2088,6 +2246,11 @@ export const ESGWizard: React.FC = () => {
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
+                        {option.value === SSP_LOAN_TYPE ? (
+                          <span className="text-[11px] text-[#94A3B8]">
+                            Separate holdings in the same or different deals
+                          </span>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -2463,13 +2626,19 @@ export const ESGWizard: React.FC = () => {
           loanTypes: formData.loanTypes,
           counterpartyId
         });
-        if (nonUopLoanTypes.length === 0) {
+        // Facilitated mode forces empty loanTypes — still mount the facilitated form.
+        if (calculatorLoanTypes.length === 0 && mode !== 'facilitated') {
           return (
             <div className="space-y-4">
               {activeUopDraft ? (
                 <p className="text-sm text-[#64748B]">Use of Proceeds results are calculated on the Review step.</p>
+              ) : activeSspDraft ? (
+                <p className="text-sm text-[#64748B]">Securitization results stay on the Review step until Phase 6B.</p>
               ) : (
-                <UopBackendUnavailableBanner />
+                <>
+                  <UopBackendUnavailableBanner />
+                  <SspBackendUnavailableBanner />
+                </>
               )}
             </div>
           );
@@ -2478,7 +2647,7 @@ export const ESGWizard: React.FC = () => {
           hasEmissions={formData.hasEmissions}
           verificationStatus={formData.verificationStatus}
           corporateStructure={formData.corporateStructure}
-          loanTypes={nonUopLoanTypes}
+          loanTypes={calculatorLoanTypes}
           calculationMethod={formData.calculationMethod}
           calculationMethods={formData.calculationMethods}
           counterpartyId={counterpartyId}
@@ -2671,7 +2840,8 @@ export const ESGWizard: React.FC = () => {
                         state: { 
                           ...originalState,
                           mode: 'facilitated',
-                          startFresh: true,
+                          // Keep company questionnaire; do not wipe financed rows.
+                          startFresh: false,
                           returnUrl
                         } 
                       })}
@@ -2778,6 +2948,65 @@ export const ESGWizard: React.FC = () => {
         );
       }
 
+      case 'ssp-eligibility':
+      case 'ssp-deal':
+      case 'ssp-structure':
+      case 'ssp-review': {
+        const sspKeys = Object.keys(formData.sspByInstance || {});
+        if (!activeSspDraft) {
+          return <p className="text-sm text-[#64748B]">Select Securitization & Structured Products to continue.</p>;
+        }
+        return (
+          <div className="space-y-4">
+            {sspKeys.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {sspKeys.map((key, index) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => updateFormData('sspActiveKey', key)}
+                    className={cn(
+                      'h-9 rounded-lg border px-3 text-sm font-medium',
+                      key === activeSspKey
+                        ? 'border-[#0F6E56] bg-[#EAF7F1] text-[#0F6E56]'
+                        : 'border-[#E2E8F0] bg-white text-[#64748B]'
+                    )}
+                  >
+                    Investment {index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+            <SspQuestionnaire
+              draft={activeSspDraft}
+              onChange={updateActiveSsp}
+              stepId={steps[currentStep].id}
+              errors={validationErrors}
+              onLeaveSsp={handleLeaveSsp}
+              saveStatus={sspPersistence.enabled ? sspPersistence.status : undefined}
+              saveError={sspPersistence.errorMessage}
+              saveConflictDetail={
+                sspPersistence.conflict
+                  ? [
+                      sspPersistence.conflict.sibling_count != null
+                        ? `${sspPersistence.conflict.sibling_count} other holding(s) share this deal`
+                        : null,
+                      sspPersistence.conflict.changed_fields?.length
+                        ? `Changed: ${sspPersistence.conflict.changed_fields.join(", ")}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  : undefined
+              }
+              onRetrySave={sspPersistence.retry}
+              onRefreshDraft={sspPersistence.refresh}
+              onApplyShared={sspPersistence.applyShared}
+            />
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -2822,6 +3051,12 @@ export const ESGWizard: React.FC = () => {
       case 'uop-assets':
         if (!activeUopDraft) return false;
         return Object.keys(validateUopStep(steps[currentStep].id, activeUopDraft)).length === 0;
+      case 'ssp-eligibility':
+      case 'ssp-deal':
+      case 'ssp-structure':
+      case 'ssp-review':
+        if (!activeSspDraft) return false;
+        return Object.keys(validateSspStep(activeSspDraft, steps[currentStep].id)).length === 0;
       default:
         return true;
     }
@@ -2996,6 +3231,7 @@ export const ESGWizard: React.FC = () => {
                 </div>
                 {!isEmissionStep && currentStep < steps.length - 1 && !uopNeedsDifferentMethod && (
                   <Button
+                    data-testid="esg-wizard-next"
                     onClick={handleNext}
                     disabled={isUopStep ? false : !canProceed() || Object.keys(validationErrors).length > 0}
                     className="h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white disabled:opacity-40"

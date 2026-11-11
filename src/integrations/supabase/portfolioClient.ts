@@ -1368,6 +1368,109 @@ export class PortfolioClient {
 
   }
 
+  /**
+   * Remove one asset-class instance and rebuild the aggregate total.
+   * Used when the user deletes a prior Project Finance / Vehicle Loan row
+   * without wiping the rest of the company's calculations.
+   */
+  static async removeFinanceEmissionInstance(
+    counterpartyId: string,
+    calculationMode: 'finance' | 'facilitated',
+    financingInstanceId: string,
+  ): Promise<void> {
+    if (!financingInstanceId) return;
+
+    if (USE_JWT_AUTH) {
+      const rows = await listFinancedEmissions({
+        counterparty_id: counterpartyId,
+        calc_kind: calculationMode,
+      });
+      const toDelete = rows.filter((r) => {
+        if ((r.formula_id || '') === 'aggregate') return false;
+        const id = extractFinancingInstanceId(r.inputs) || extractFinancingInstanceId(r);
+        return id === financingInstanceId;
+      });
+      await Promise.all(toDelete.map((r) => deleteFinancedEmission(r.id)));
+    }
+
+    const calcs = await this.getEmissionCalculations(counterpartyId);
+    const aggregate = calcs.find(
+      (c) => c.calculation_type === calculationMode && c.formula_id === 'aggregate'
+    );
+    if (!aggregate) return;
+
+    const prior = Array.isArray(aggregate.results?.allResults) ? aggregate.results.allResults : [];
+    const remaining = prior.filter(
+      (row: { financingInstanceId?: string }) => row.financingInstanceId !== financingInstanceId
+    );
+    const total = remaining.reduce(
+      (sum: number, row: { financedEmissions?: number }) => sum + (Number(row.financedEmissions) || 0),
+      0
+    );
+    const avgAttr =
+      remaining.length > 0
+        ? remaining.reduce(
+            (sum: number, row: { attributionFactor?: number }) =>
+              sum + (Number(row.attributionFactor) || 0),
+            0
+          ) / remaining.length
+        : 0;
+    const dqScores = remaining
+      .map((row: { dataQualityScore?: number }) => row.dataQualityScore)
+      .filter((n: unknown): n is number => typeof n === 'number' && isFinite(n));
+    const avgDq =
+      dqScores.length > 0 ? dqScores.reduce((a: number, b: number) => a + b, 0) / dqScores.length : null;
+
+    await this.upsertEmissionCalculation({
+      counterparty_id: counterpartyId,
+      exposure_id: aggregate.exposure_id ?? null,
+      questionnaire_id: aggregate.questionnaire_id ?? null,
+      calculation_type: calculationMode,
+      company_type: aggregate.company_type || 'unlisted',
+      formula_id: 'aggregate',
+      inputs: {
+        ...(aggregate.inputs || {}),
+        loanTypes: remaining.map((r: { type?: string }) => r.type),
+        loanLabels: remaining.map((r: { label?: string }) => r.label),
+      },
+      results: {
+        ...(aggregate.results || {}),
+        allResults: remaining,
+        financedEmissions: total,
+        attributionFactor: avgAttr,
+        dataQualityScore: avgDq,
+        loanType: remaining.length === 1 ? remaining[0]?.type : 'multiple',
+        loanLabel:
+          remaining.length === 1
+            ? remaining[0]?.label
+            : `${remaining.length} loan types`,
+      },
+      financed_emissions: total,
+      attribution_factor: avgAttr,
+      data_quality_score: avgDq,
+      evic: aggregate.evic ?? null,
+      total_equity_plus_debt: aggregate.total_equity_plus_debt ?? null,
+      status: remaining.length > 0 ? 'completed' : 'draft',
+    });
+
+    try {
+      const cacheKey = `latestEmissionSummary:${counterpartyId}:${calculationMode}`;
+      sessionStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          financed_emissions: total,
+          attribution_factor: avgAttr,
+          dataQualityScore: avgDq,
+          updated_at: new Date().toISOString(),
+          calculation_type: calculationMode,
+          allResults: remaining,
+        })
+      );
+    } catch {
+      /* ignore cache errors */
+    }
+  }
+
   /** Delete all finance/facilitated calcs for a counterparty+mode (fresh start). */
   static async deleteAllEmissionCalculationsForMode(
     counterpartyId: string,

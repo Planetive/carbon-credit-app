@@ -62,6 +62,10 @@ backups/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.ssp-e2e
+e2e/.ssp-e2e-*.json
+e2e/test-results/
+e2e/playwright-report/
 
 # Temporary files
 *.tmp
@@ -85,3 +89,8 @@ coverage/
 vite.config.ts.timestamp-* 
 *.tsbuildinfo
 *.map
+# Local e2e artifacts
+e2e/*.log
+e2e/.ssp-e2e-*.json
+e2e/test-results/
+

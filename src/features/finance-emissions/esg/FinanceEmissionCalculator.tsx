@@ -9,8 +9,9 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { isUopLoanType } from "../config/loanTypeOptions";
+import { isSspLoanType, isUopLoanType } from "../config/loanTypeOptions";
 import { UOP_REPORTABLE_BLOCKED_MESSAGE } from "../uop/reportableGuard";
+import { SSP_REPORTABLE_BLOCKED_MESSAGE } from "../ssp/reportableGuard";
 import { executePcafCalculation } from "../utils/executePcafCalculation";
 import {
   PcafAuthorityError,
@@ -217,7 +218,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
   const expandedLoanTypes = React.useMemo(() => {
     const list: Array<{ type: string; instance: number; key: string }> = [];
     (propLoanTypes || []).forEach(({ type, quantity }) => {
-      if (isUopLoanType(type)) return;
+      if (isUopLoanType(type) || isSspLoanType(type)) return;
       const qty = Math.max(1, Number(quantity) || 1);
       for (let i = 0; i < qty; i++) {
         list.push({ type, instance: i + 1, key: `${type}#${i + 1}` });
@@ -237,6 +238,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     'motor-vehicle-loan': 'Motor Vehicle Loan',
     'commercial-real-estate': 'Commercial Real Estate',
     'use-of-proceeds': 'Use of Proceeds Structures',
+    'securitization-structured-products': 'Securitization & Structured Products',
   };
 
   // Per-loan-instance form data store so duplicate types don't overwrite each other
@@ -441,10 +443,17 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
     let dataToUse = sharedCompanyData;
     
     if (!hasSharedData && propLoanTypes.length > 1) {
-      const firstLoanType = propLoanTypes[0].type;
-      const firstLoanData = perLoanFormData[firstLoanType];
+      // Prefer first business-loan / corporate-bond instance (forms keyed as type#n), not propLoanTypes[0].type alone.
+      const companyKeys = Object.keys(perLoanFormData).filter(
+        (k) => k.startsWith('business-loan') || k.startsWith('corporate-bond')
+      );
+      const fallbackKey =
+        companyKeys[0] ||
+        Object.keys(perLoanFormData)[0] ||
+        `${propLoanTypes[0].type}#0`;
+      const firstLoanData = perLoanFormData[fallbackKey] || perLoanFormData[propLoanTypes[0].type];
       if (firstLoanData) {
-        console.log('Shared data empty, using first loan data:', firstLoanData);
+        console.log('Shared data empty, using company-loan form data:', fallbackKey, firstLoanData);
         dataToUse = {
           sharePrice: firstLoanData.sharePrice || 0,
           outstandingShares: firstLoanData.outstandingShares || 0,
@@ -756,7 +765,7 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
   // Get available formulas based on questionnaire answers for a given loan type
   const getAvailableFormulasForLoan = (loanTypeParam: string) => {
-    if (isUopLoanType(loanTypeParam)) {
+    if (isUopLoanType(loanTypeParam) || isSspLoanType(loanTypeParam)) {
       return [];
     }
     const isListed = corporateStructure === 'listed';
@@ -1673,6 +1682,14 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       toast({
         title: "Calculation unavailable",
         description: UOP_REPORTABLE_BLOCKED_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isSspLoanType(loanType)) {
+      toast({
+        title: "Calculation unavailable",
+        description: SSP_REPORTABLE_BLOCKED_MESSAGE,
         variant: "destructive",
       });
       return;
@@ -2953,40 +2970,33 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
 
           {(loanType === 'corporate-bond' || loanType === 'business-loan') && (
             <div className="mt-4 space-y-4">
+              {/* Always editable on BL/CB tabs — do not gate on currentLoanIndex===0 (PF may be first). */}
               {corporateStructure === 'listed' ? (
-                propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
-                  <>
-                    <FieldGrid>
-                      <FormField label="Share price" unit="PKR" tooltip="Current price of one company share">
-                        <FormattedNumberInput id="share-price" placeholder="0" value={formData.sharePrice || 0} onChange={(value) => updateFormData('sharePrice', value)} className={FIELD_INPUT} />
-                      </FormField>
-                      <FormField label="Outstanding shares" tooltip="Total number of company shares">
-                        <FormattedNumberInput id="outstanding-shares" placeholder="0" value={formData.outstandingShares || 0} onChange={(value) => updateFormData('outstandingShares', value)} className={FIELD_INPUT} />
-                      </FormField>
-                      <FormField label="Total debt" unit="PKR" tooltip="Total amount the company owes">
-                        <FormattedNumberInput id="total-debt" placeholder="0" value={formData.totalDebt || 0} onChange={(value) => updateFormData('totalDebt', value)} className={FIELD_INPUT} />
-                      </FormField>
-                      <FormField label="Minority interest" tooltip="Ownership in subsidiaries held by outside investors">
-                        <FormattedNumberInput id="minority-interest" placeholder="0" value={formData.minorityInterest || 0} onChange={(value) => updateFormData('minorityInterest', value)} className={FIELD_INPUT} />
-                      </FormField>
-                      <FormField label="Preferred stock" tooltip="Preferred equity included in EVIC">
-                        <FormattedNumberInput id="preferred-stock" placeholder="0" value={formData.preferredStock || 0} onChange={(value) => updateFormData('preferredStock', value)} className={FIELD_INPUT} />
-                      </FormField>
-                    </FieldGrid>
-                    <ComputedBox
-                      label="Calculated EVIC"
-                      value={((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
-                      hint="Share price, shares, debt, minority interest, and preferred stock"
-                    />
-                  </>
-                ) : (
+                <>
+                  <FieldGrid>
+                    <FormField label="Share price" unit="PKR" tooltip="Current price of one company share">
+                      <FormattedNumberInput id="share-price" placeholder="0" value={formData.sharePrice || 0} onChange={(value) => updateFormData('sharePrice', value)} className={FIELD_INPUT} />
+                    </FormField>
+                    <FormField label="Outstanding shares" tooltip="Total number of company shares">
+                      <FormattedNumberInput id="outstanding-shares" placeholder="0" value={formData.outstandingShares || 0} onChange={(value) => updateFormData('outstandingShares', value)} className={FIELD_INPUT} />
+                    </FormField>
+                    <FormField label="Total debt" unit="PKR" tooltip="Total amount the company owes">
+                      <FormattedNumberInput id="total-debt" placeholder="0" value={formData.totalDebt || 0} onChange={(value) => updateFormData('totalDebt', value)} className={FIELD_INPUT} />
+                    </FormField>
+                    <FormField label="Minority interest" tooltip="Ownership in subsidiaries held by outside investors">
+                      <FormattedNumberInput id="minority-interest" placeholder="0" value={formData.minorityInterest || 0} onChange={(value) => updateFormData('minorityInterest', value)} className={FIELD_INPUT} />
+                    </FormField>
+                    <FormField label="Preferred stock" tooltip="Preferred equity included in EVIC">
+                      <FormattedNumberInput id="preferred-stock" placeholder="0" value={formData.preferredStock || 0} onChange={(value) => updateFormData('preferredStock', value)} className={FIELD_INPUT} />
+                    </FormField>
+                  </FieldGrid>
                   <ComputedBox
-                    label="Shared EVIC (from first loan)"
-                    value={((sharedCompanyData.sharePrice || 0) * (sharedCompanyData.outstandingShares || 0) + (sharedCompanyData.totalDebt || 0) + (sharedCompanyData.minorityInterest || 0) + (sharedCompanyData.preferredStock || 0)).toLocaleString()}
-                    hint="EVIC is edited on the first loan only"
+                    label="Calculated EVIC"
+                    value={((formData.sharePrice || 0) * (formData.outstandingShares || 0) + (formData.totalDebt || 0) + (formData.minorityInterest || 0) + (formData.preferredStock || 0)).toLocaleString()}
+                    hint="Share price, shares, debt, minority interest, and preferred stock"
                   />
-                )
-              ) : propLoanTypes.length === 1 || currentLoanIndex === 0 ? (
+                </>
+              ) : (
                 <>
                   <FieldGrid>
                     <FormField label="Total equity" unit="PKR" tooltip="Total value of company ownership">
@@ -3001,12 +3011,6 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                     value={((formData.totalEquity || 0) + (formData.totalDebt || 0)).toLocaleString()}
                   />
                 </>
-              ) : (
-                <ComputedBox
-                  label="Shared equity + debt (from first loan)"
-                  value={((sharedCompanyData.totalEquity || 0) + (sharedCompanyData.totalDebt || 0)).toLocaleString()}
-                  hint="Edited on the first loan only"
-                />
               )}
             </div>
           )}
@@ -3146,10 +3150,17 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
                 )}
               </Button>
               {expandedLoanTypes.length > 1 && !validation.isValid && (
-                <div className="mt-2 text-center">
-                  <p className="text-sm text-amber-600 font-medium">
-                    Please complete all selected forms
+                <div className="mt-3 w-full max-w-xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
+                  <p className="text-sm text-amber-800 font-medium mb-1">
+                    Please complete all selected forms before calculating
                   </p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {(validation.errors || []).slice(0, 8).map((err, idx) => (
+                      <li key={`${err.loanKey}-${idx}`} className="text-xs text-amber-700">
+                        <span className="font-semibold">{err.loanLabel}:</span> {err.error}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </>

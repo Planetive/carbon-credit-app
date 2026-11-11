@@ -46,6 +46,7 @@ export function FormField({
   required,
   tooltip,
   hint,
+  error,
   span,
   children,
 }: {
@@ -54,6 +55,7 @@ export function FormField({
   required?: boolean;
   tooltip?: string;
   hint?: ReactNode;
+  error?: string;
   span?: boolean;
   children: ReactNode;
 }) {
@@ -67,8 +69,9 @@ export function FormField({
         {unit && <span className="text-xs text-[#94A3B8]">{unit}</span>}
         {tooltip && <FieldTooltip content={tooltip} />}
       </div>
-      {hint}
+      {hint && (typeof hint === "string" ? <p className="text-xs text-[#94A3B8]">{hint}</p> : hint)}
       {children}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );
 }

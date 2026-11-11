@@ -321,6 +321,7 @@ const LoginScreen = () => {
 
               <Button
                 type="submit"
+                data-testid="login-submit"
                 disabled={loading}
                 className="group h-12 w-full rounded-full bg-[#1D9E75] text-base font-semibold text-[#04342C] shadow-[0_14px_40px_-12px_rgba(29,158,117,0.55)] hover:bg-[#22B87E] disabled:opacity-50"
               >

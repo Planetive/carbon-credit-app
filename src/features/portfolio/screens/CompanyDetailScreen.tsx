@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipPortal, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Building2, Wallet, Calculator, TrendingUp, BarChart3, MapPin, Shield, Calendar, Hash, Layers, Edit, CheckCircle, Activity, Zap, Target, AlertCircle, Info, Sparkles, Plus, Minus, Trash2 } from 'lucide-react';
 import { PortfolioClient, EmissionCalculation } from '@/integrations/supabase/portfolioClient';
 import { useToast } from '@/hooks/use-toast';
 import { USE_JWT_AUTH } from '@/api/config';
@@ -438,6 +438,9 @@ const CompanyDetail: React.FC = () => {
         const financedEmissions = Number(r.financedEmissions || 0);
         return {
           label: String(r.label || r.type || 'Loan'),
+          type: String(r.type || ''),
+          financingInstanceId:
+            typeof r.financingInstanceId === 'string' ? r.financingInstanceId : null,
           attributionFactor: Number(r.attributionFactor || 0),
           financedEmissions,
           dataQualityScore:
@@ -451,12 +454,46 @@ const CompanyDetail: React.FC = () => {
     return [
       {
         label: String(calc.formula_id || 'Financed emissions'),
+        type: String(calc.formula_id || ''),
+        financingInstanceId: null as string | null,
         attributionFactor: Number(calc.attribution_factor || 0),
         financedEmissions: total,
         dataQualityScore: calc.data_quality_score ?? null,
         scopeBreakdown: parseScopeBreakdown(calc.results as Record<string, unknown>, total),
       },
     ];
+  };
+
+  const handleDeleteBreakdownRow = async (
+    kind: 'finance' | 'facilitated',
+    financingInstanceId: string | null,
+    label: string,
+  ) => {
+    if (!counterpartyId || !financingInstanceId) {
+      toast({
+        title: 'Cannot delete',
+        description: 'This row has no saved instance id. Re-save the calculation, then try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!window.confirm(`Remove “${label}” from this company’s financed emissions? Other asset classes stay.`)) {
+      return;
+    }
+    try {
+      await PortfolioClient.removeFinanceEmissionInstance(counterpartyId, kind, financingInstanceId);
+      await loadEmissionCalculations();
+      toast({
+        title: 'Calculation removed',
+        description: `${label} was deleted. Remaining asset classes are still included in the total.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Could not delete calculation',
+        variant: 'destructive',
+      });
+    }
   };
 
   const prettifyKey = (key: string) =>
@@ -862,33 +899,41 @@ const CompanyDetail: React.FC = () => {
                 </>
               )}
               
-              <Button
-              onClick={() => navigate('/finance-emission', { 
-                state: financeResult ? {
-                  ...cleanPortfolioData,
-                  mode: 'finance', 
-                  startFresh: true, 
-                  returnUrl: currentPath
-                } : { 
-                  ...cleanPortfolioData,
-                  mode: 'finance' 
-                }
-              })}
-                className="w-full mt-4 bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
-                size="default"
-              >
-                {financeResult ? (
-                  <>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Update Calculation
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Calculate Emissions
-                  </>
+              <div className="mt-4 space-y-2">
+                <Button
+                  onClick={() =>
+                    navigate('/finance-emission', {
+                      state: {
+                        ...cleanPortfolioData,
+                        mode: 'finance',
+                        // Resume existing questionnaire — do not wipe prior asset-class rows.
+                        startFresh: false,
+                        returnUrl: currentPath,
+                      },
+                    })
+                  }
+                  className="w-full bg-[#1D9E75] hover:bg-[#22B87E] text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
+                  size="default"
+                >
+                  {financeResult ? (
+                    <>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit / add asset class
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Calculate Emissions
+                    </>
+                  )}
+                </Button>
+                {financeResult && (
+                  <p className="text-[11px] text-[#1C7A53] text-center leading-snug">
+                    Adding Vehicle Loan (or another class) keeps prior Project Finance rows and adds to the total.
+                    Open the + breakdown to delete an individual row.
+                  </p>
                 )}
-              </Button>
+              </div>
             </div>
           </motion.div>
 
@@ -985,24 +1030,23 @@ const CompanyDetail: React.FC = () => {
               )}
               
               <Button
-              onClick={() => navigate('/finance-emission', { 
-                state: facilitatedResult ? {
-                  ...cleanPortfolioData,
-                  mode: 'facilitated', 
-                  startFresh: true, 
-                  returnUrl: currentPath
-                } : { 
-                  ...cleanPortfolioData,
-                  mode: 'facilitated' 
+                onClick={() =>
+                  navigate('/finance-emission', {
+                    state: {
+                      ...cleanPortfolioData,
+                      mode: 'facilitated',
+                      startFresh: false,
+                      returnUrl: currentPath,
+                    },
+                  })
                 }
-              })}
                 className="w-full mt-4 bg-[#1C7A53] hover:bg-[#0A4D3E] text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 rounded-xl h-11"
                 size="default"
               >
                 {facilitatedResult ? (
                   <>
                     <Edit className="h-4 w-4 mr-2" />
-                    Update Calculation
+                    Edit facilitated calculation
                   </>
                 ) : (
                   <>
@@ -1138,6 +1182,7 @@ const CompanyDetail: React.FC = () => {
                                   <th className="text-center px-4 py-2.5 font-semibold">Data quality score</th>
                                   <th className="text-right px-4 py-2.5 font-semibold">Attribution Factor</th>
                                   <th className="text-right px-4 py-2.5 font-semibold">Financed Emissions</th>
+                                  <th className="text-right px-4 py-2.5 font-semibold">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1158,11 +1203,30 @@ const CompanyDetail: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-2.5 text-right text-gray-700 font-semibold">{(row.attributionFactor * 100).toFixed(2)}%</td>
                                     <td className="px-4 py-2.5 text-right font-bold text-gray-900">{row.financedEmissions.toFixed(2)} tCO₂e</td>
+                                    <td className="px-4 py-2.5 text-right">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        disabled={!row.financingInstanceId}
+                                        title={row.financingInstanceId ? 'Delete this asset-class calculation' : 'No instance id on this row'}
+                                        onClick={() =>
+                                          handleDeleteBreakdownRow(
+                                            expandedBreakdown === 'finance' ? 'finance' : 'facilitated',
+                                            row.financingInstanceId,
+                                            row.label,
+                                          )
+                                        }
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
                                   </tr>
                                 ))}
                                 {(expandedBreakdown === 'finance' ? financeBreakdown : facilitatedBreakdown).length === 0 && (
                                   <tr>
-                                    <td className="px-3 py-3 text-gray-500" colSpan={4}>No result breakdown available.</td>
+                                    <td className="px-3 py-3 text-gray-500" colSpan={5}>No result breakdown available.</td>
                                   </tr>
                                 )}
                               </tbody>

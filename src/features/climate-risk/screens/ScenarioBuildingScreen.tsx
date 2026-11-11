@@ -256,6 +256,38 @@ const ScenarioBuildingScreen: React.FC = () => {
       setError('Please select a scenario type');
       return;
     }
+    if (!portfolioEntries || portfolioEntries.length === 0) {
+      setError('No portfolio entries loaded. Open Risk Analysis from a portfolio with exposures.');
+      toast({
+        title: 'Nothing to analyse',
+        description: 'Load bank portfolio data before running climate risk scenarios.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const missingPdLgd = portfolioEntries.filter(
+      (e) => !(Number(e.probabilityOfDefault) > 0) || !(Number(e.lossGivenDefault) > 0)
+    );
+    if (missingPdLgd.length === portfolioEntries.length) {
+      setError(
+        'All portfolio rows have PD or LGD set to 0. Expected loss stays flat under every scenario until PD and LGD are set on exposures.'
+      );
+      toast({
+        title: 'PD / LGD required',
+        description:
+          'Climate risk multiplies probability of default and loss given default. Enter non-zero PD and LGD on portfolio exposures, then run again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (missingPdLgd.length > 0) {
+      toast({
+        title: 'Some rows have PD/LGD = 0',
+        description: `${missingPdLgd.length} of ${portfolioEntries.length} exposures will show little or no loss change under stress.`,
+        variant: 'default',
+      });
+    }
 
     setIsRunning(true);
     setProgress(0);
@@ -787,7 +819,7 @@ const ScenarioBuildingScreen: React.FC = () => {
               <div className="flex-1 max-w-md">
                 <Button
                   onClick={runScenario}
-                  disabled={!selectedScenario || isRunning}
+                  disabled={!selectedScenario || isRunning || portfolioEntries.length === 0}
                   size="lg"
                   className="w-full px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
@@ -814,6 +846,18 @@ const ScenarioBuildingScreen: React.FC = () => {
                   </div>
                   <span className="text-amber-800 font-medium">
                     Please select a scenario to run the analysis
+                  </span>
+                </div>
+              </div>
+            )}
+            {selectedScenario && portfolioEntries.length === 0 && (
+              <div className="mt-6 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="p-2 bg-amber-100 rounded-xl">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <span className="text-amber-800 font-medium">
+                    No portfolio exposures loaded — risk analysis cannot run
                   </span>
                 </div>
               </div>
