@@ -158,12 +158,21 @@ const BankPortfolio: React.FC = () => {
   }, [entries, search]);
 
   const addEntry = async () => {
-    if (!newCompany.trim() || 
-        !newSector || 
-        !newGeography || 
-        (Number(newPD) || 0) <= 0 || 
-        (Number(newLGD) || 0) <= 0 || 
-        (Number(newTenor) || 0) <= 0) return;
+    const missing: string[] = [];
+    if (!newCompany.trim()) missing.push("company name");
+    if (!newSector) missing.push("sector");
+    if (!newGeography) missing.push("geography");
+    if ((Number(newPD) || 0) <= 0) missing.push("probability of default");
+    if ((Number(newLGD) || 0) <= 0) missing.push("loss given default");
+    if ((Number(newTenor) || 0) <= 0) missing.push("tenor");
+    if (missing.length > 0) {
+      toast({
+        title: "Missing fields",
+        description: `Enter ${missing.join(", ")} before adding the company.`,
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
       setSaving(true);
@@ -217,6 +226,10 @@ const BankPortfolio: React.FC = () => {
       toast({
         title: "Success",
         description: "Company added to portfolio successfully",
+      });
+      const routeId = exposure?.exposure_id || exposureId;
+      navigate(`/bank-portfolio/${routeId}`, {
+        state: { ...newEntry, id: routeId },
       });
     } catch (error) {
       console.error('Error adding company:', error);
