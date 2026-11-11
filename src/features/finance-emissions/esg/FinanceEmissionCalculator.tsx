@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, Info, Building2, Users, Check, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { listFinancedEmissions } from "@/api/financed";
 import { isSspLoanType, isUopLoanType } from "../config/loanTypeOptions";
 import { UOP_REPORTABLE_BLOCKED_MESSAGE } from "../uop/reportableGuard";
 import { SSP_REPORTABLE_BLOCKED_MESSAGE } from "../ssp/reportableGuard";
@@ -56,8 +57,62 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   clonePropertyList,
   ensureFinancingInstanceId,
+  extractFinancingInstanceId,
   identityFieldsForSave,
 } from "@/utils/financedExposureIdentity";
+
+/** Map persisted financed-emissions inputs back into calculator form fields. */
+function formDataFromSavedInputs(inputs: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const src = inputs || {};
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return {
+    outstandingLoan: num(src.outstandingLoan ?? src.outstanding_amount),
+    sharePrice: num(src.sharePrice ?? src.share_price),
+    outstandingShares: num(src.outstandingShares ?? src.outstanding_shares),
+    totalDebt: num(src.totalDebt ?? src.total_debt),
+    minorityInterest: num(src.minorityInterest ?? src.minority_interest),
+    preferredStock: num(src.preferredStock ?? src.preferred_stock),
+    totalEquity: num(src.totalEquity ?? src.total_equity),
+    totalProjectEquity: num(src.totalProjectEquity ?? src.total_project_equity),
+    totalProjectDebt: num(src.totalProjectDebt ?? src.total_project_debt),
+    energy_consumption: num(src.energy_consumption ?? src.energyConsumption),
+    emission_factor: num(src.emission_factor ?? src.emissionFactor),
+    average_emission_factor: num(src.average_emission_factor ?? src.averageEmissionFactor),
+    floor_area: num(src.floor_area ?? src.floorArea),
+    estimated_energy_consumption_from_labels: num(
+      src.estimated_energy_consumption_from_labels ?? src.estimatedEnergyConsumptionFromLabels
+    ),
+    estimated_energy_consumption_from_statistics: num(
+      src.estimated_energy_consumption_from_statistics ?? src.estimatedEnergyConsumptionFromStatistics
+    ),
+    number_of_buildings: num(src.number_of_buildings ?? src.numberOfBuildings),
+    factor_grid_country: src.factor_grid_country ?? src.factorGridCountry ?? "",
+    cbecs_category: src.cbecs_category ?? src.cbecsCategory ?? "",
+    production: num(src.production),
+    production_emission_factor: num(src.production_emission_factor ?? src.productionEmissionFactor),
+    process_emissions: num(src.process_emissions ?? src.processEmissions),
+    company_revenue: num(src.company_revenue ?? src.companyRevenue),
+    sector_intensity: num(src.sector_intensity ?? src.sectorIntensity),
+    asset_turnover_ratio: num(src.asset_turnover_ratio ?? src.assetTurnoverRatio),
+    pp_adjusted_gdp: num(src.pp_adjusted_gdp),
+    sovereign_country_name: src.sovereign_country_name || "",
+    verified_country_emissions: num(src.verified_country_emissions),
+    unverified_country_emissions: num(src.unverified_country_emissions),
+    total_vehicle_emissions: num(src.total_vehicle_emissions ?? src.totalVehicleEmissions),
+    total_value_at_origination: num(src.total_value_at_origination ?? src.totalValueAtOrigination),
+    vehicle_entries: Array.isArray(src.vehicle_entries) ? src.vehicle_entries : src.vehicleEntries,
+    properties: Array.isArray(src.properties) ? src.properties : undefined,
+    commercialProperties: Array.isArray(src.commercialProperties)
+      ? src.commercialProperties
+      : Array.isArray(src.commercial_properties)
+        ? src.commercial_properties
+        : undefined,
+    pcaf_formula_id: src.pcaf_formula_id || src.pcafFormulaId || "",
+  };
+}
 
 
 
@@ -654,6 +709,91 @@ export const FinanceEmissionCalculator: React.FC<FinanceEmissionCalculatorProps>
       financingInstanceIdsRef.current = {};
     }
   }, [resolvedCounterpartyId]);
+
+  // Resume prior asset-class rows (e.g. Project Finance) with saved fields + instance ids
+  // so Edit updates the same row, and adding Vehicle Loan keeps the old total.
+  const hydratedCounterpartyRef = useRef<string>("");
+  useEffect(() => {
+    if (activeTab !== "finance") return;
+    if (!resolvedCounterpartyId || expandedLoanTypes.length === 0) return;
+    const hydrateKey = `${resolvedCounterpartyId}:${expandedLoanTypes.map((l) => l.key).join(",")}`;
+    if (hydratedCounterpartyRef.current === hydrateKey) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const rows = await listFinancedEmissions({
+          counterparty_id: resolvedCounterpartyId,
+          calc_kind: "finance",
+        });
+        if (cancelled) return;
+        const components = (rows || []).filter(
+          (r) => r.formula_id && r.formula_id !== "aggregate"
+        );
+        if (components.length === 0) {
+          hydratedCounterpartyRef.current = hydrateKey;
+          return;
+        }
+
+        const byFormula = new Map<string, typeof components>();
+        for (const row of components) {
+          const fid = String(row.formula_id);
+          const list = byFormula.get(fid) || [];
+          list.push(row);
+          byFormula.set(fid, list);
+        }
+
+        const nextForms: Record<string, Record<string, unknown>> = {};
+        const nextIds: Record<string, string> = { ...financingInstanceIdsRef.current };
+
+        for (const inst of expandedLoanTypes) {
+          const list = byFormula.get(inst.type) || [];
+          const row = list[inst.instance - 1];
+          if (!row) continue;
+          const instanceId = extractFinancingInstanceId(row.inputs) || extractFinancingInstanceId(row);
+          if (instanceId) nextIds[inst.key] = instanceId;
+          const mapped = formDataFromSavedInputs(row.inputs || {});
+          nextForms[inst.key] = mapped;
+          if (Array.isArray(mapped.properties) && mapped.properties.length) {
+            mortgagePropertiesRef.current[inst.key] = clonePropertyList(
+              mapped.properties as Property[],
+              defaultMortgageProperties()
+            );
+          }
+          if (Array.isArray(mapped.commercialProperties) && mapped.commercialProperties.length) {
+            crePropertiesRef.current[inst.key] = clonePropertyList(
+              mapped.commercialProperties as CREProperty[],
+              defaultCreProperties()
+            );
+          }
+        }
+
+        persistInstanceIds(nextIds);
+        setPerLoanFormData((prev) => ({ ...nextForms, ...prev })); // local edits win over hydrate
+        // Seed the visible form from the current instance when empty
+        const currentKey = expandedLoanTypes[currentLoanIndex]?.key;
+        if (currentKey && nextForms[currentKey]) {
+          setFormData((prev) => {
+            const hasValues =
+              Number(prev.outstandingLoan || 0) > 0 ||
+              Number(prev.totalProjectEquity || 0) > 0 ||
+              Number(prev.totalProjectDebt || 0) > 0;
+            return hasValues ? prev : { ...prev, ...nextForms[currentKey] };
+          });
+          const formulaId = String(nextForms[currentKey].pcaf_formula_id || "");
+          if (formulaId) setSelectedFormula(formulaId);
+        }
+        hydratedCounterpartyRef.current = hydrateKey;
+      } catch (err) {
+        console.warn("Could not hydrate prior financed-emission forms:", err);
+        hydratedCounterpartyRef.current = hydrateKey;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, resolvedCounterpartyId, expandedLoanTypes, currentLoanIndex]);
 
   const calcInputsSignature = financeWizardInputSignature({
     formData,
