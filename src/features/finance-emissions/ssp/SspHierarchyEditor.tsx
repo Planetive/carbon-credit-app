@@ -197,20 +197,20 @@ export function SspHierarchyEditor({
     <div className="space-y-6">
       <InputSection
         title="Emissions calculation path"
-        description="Choose look-through or evidenced reported pool emissions. Do not combine both for the same pool."
+        description="Choose one approach for this deal. Looking through to each asset and using reported pool totals should not be mixed for the same pool."
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(
             [
               {
                 value: "lookthrough" as const,
-                title: "Look-through",
-                description: "Use underlying PCAF asset-class calculators for each collateral item",
+                title: "Look through to underlying assets",
+                description: "Calculate using the matching PCAF method for each collateral item",
               },
               {
                 value: "reported_pool" as const,
                 title: "Reported pool emissions",
-                description: "Use issuer/servicer reported pool totals with evidence — not issuer corporate GHG by default",
+                description: "Use evidenced pool totals from the issuer or servicer (not the issuer’s corporate GHG by default)",
               },
             ] as const
           ).map((opt) => (
@@ -256,7 +256,7 @@ export function SspHierarchyEditor({
 
       <InputSection
         title="Collateral"
-        description="Each asset behind the loans. Use the matching PCAF questionnaire — do not invent a one-size-fits-all value."
+        description="Each asset behind the loans. Use the matching PCAF asset-class questions for that collateral type."
       >
         <ErrorText message={errors.collateral} />
         <div className="space-y-3">
@@ -264,7 +264,7 @@ export function SspHierarchyEditor({
             <ExpandCard
               key={row.collateralId}
               title={row.name || `Collateral ${index + 1}`}
-              subtitle={`${row.collateralType || "class pending"} · id ${row.collateralId.slice(0, 12)}…`}
+              subtitle={row.collateralType || "Class pending"}
               open={Boolean(open[row.collateralId])}
               onToggle={() => toggle(row.collateralId)}
               onRemove={() =>
@@ -310,7 +310,7 @@ export function SspHierarchyEditor({
                   </select>
                 </FormField>
                 <FormField
-                  label="Attribution value"
+                  label="Attribution value (for PCAF factor)"
                   hint={row.denominatorLabel || cafDenominatorHint(row.collateralType)}
                   tooltip="Usually property or vehicle value at origination from the underlying PCAF class. Not the pool or tranche total."
                   error={errors[`collateral.${row.collateralId}.attributionDenominator`]}
@@ -375,8 +375,7 @@ export function SspHierarchyEditor({
                 </Suspense>
               ) : (
                 <p className="text-sm text-[#64748B]">
-                  Reported-pool path uses pool-level emissions. Underlying asset questionnaires are available when
-                  look-through is selected.
+                  This path uses reported pool emissions. Asset-level questions appear when you choose look-through.
                 </p>
               )}
             </ExpandCard>
@@ -388,14 +387,14 @@ export function SspHierarchyEditor({
         </Button>
       </InputSection>
 
-      <InputSection title="Underlying loans" description="Each loan keeps its own id. Multiple collateral items may attach to one loan.">
+      <InputSection title="Underlying loans" description="Each loan can link to one or more collateral items.">
         <ErrorText message={errors.loans} />
         <div className="space-y-3">
           {draft.loans.map((loan, index) => (
             <ExpandCard
               key={loan.loanId}
               title={loan.name || `Loan ${index + 1}`}
-              subtitle={`COA ${loan.currentOutstandingAmount ?? "—"} · id ${loan.loanId.slice(0, 12)}…`}
+              subtitle={`Outstanding ${loan.currentOutstandingAmount ?? "—"}`}
               open={Boolean(open[loan.loanId])}
               onToggle={() => toggle(loan.loanId)}
               onRemove={() =>
@@ -472,7 +471,7 @@ export function SspHierarchyEditor({
         </Button>
       </InputSection>
 
-      <InputSection title="Collateral pools" description="One deal may contain multiple pools. Pool COA is not auto-balanced to loan totals.">
+      <InputSection title="Collateral pools" description="A deal may contain multiple pools. Entered pool outstanding amounts are not auto-balanced to loan totals.">
         <ErrorText message={errors.pools} />
         <div className="space-y-3">
           {draft.pools.map((pool, index) => {
@@ -646,7 +645,7 @@ export function SspHierarchyEditor({
       </InputSection>
 
       {needsPop ? (
-        <InputSection title="Pool of pools" description="Optional wrap of multiple pools before tranche attribution.">
+        <InputSection title="Pool of pools" description="Optional. Groups several pools before tranche allocation.">
           <ErrorText message={errors.poolOfPools} />
           {!draft.poolOfPools ? (
             <Button
@@ -757,7 +756,7 @@ export function SspHierarchyEditor({
       ) : null}
 
       {needsTranches ? (
-        <InputSection title="Tranches" description="Optional for untranched deals. Seniority does not change the attribution formula.">
+        <InputSection title="Tranches" description="Skip if the deal is untranched. Seniority does not change how emissions are attributed.">
           <ErrorText message={errors.tranches} />
           <div className="space-y-3">
             {draft.tranches.map((tranche, index) => (

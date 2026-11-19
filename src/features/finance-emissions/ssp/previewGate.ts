@@ -63,7 +63,7 @@ export function sspPreviewCalculateBlockers(draft: SspDraft): string[] {
     blockers.push("Add at least one collateral pool before calculating.");
   }
   if (!draft.emissionsPath) {
-    blockers.push("Choose look-through or reported pool emissions.");
+    blockers.push("Choose look-through assets or reported pool emissions.");
   }
   return blockers;
 }

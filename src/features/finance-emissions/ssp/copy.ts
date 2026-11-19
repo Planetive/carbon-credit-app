@@ -48,11 +48,11 @@ export const ELIGIBILITY_COPY: Record<
   },
   isGssCollateralBond: {
     title: "Is this a Secured Green Collateral Bond (GSS+ collateral itself)?",
-    help: "Optional Figure 5.8-2 Step 3a. Green collateral still uses SSP look-through — it does not automatically become Use of Proceeds.",
+    help: "Green collateral still uses securitization look-through — it does not automatically become Use of Proceeds.",
   },
   isGssStandardBondForOriginatorProjects: {
     title: "Do sale proceeds fund the originator’s GSS+ corporate projects instead?",
-    help: "Figure 5.8-2 Step 3b. If yes, Use of Proceeds may apply instead of SSP.",
+    help: "If yes, Use of Proceeds may apply instead of securitization.",
   },
   collateralRemainsWithOriginator: {
     title: "Does the collateral stay with the originator / issuer?",
@@ -60,15 +60,15 @@ export const ELIGIBILITY_COPY: Record<
   },
   hasTranches: {
     title: "Does the deal have tranches?",
-    help: "Untranched structures are allowed. Seniority does not change financed-emissions maths.",
+    help: "Untranched structures are allowed. Seniority does not change how financed emissions are attributed.",
   },
   hasPoolOfPools: {
     title: "Is there a pool of pools?",
-    help: "Optional. Some deals wrap several loan pools before tranche allocation (Table 5.8-3).",
+    help: "Optional. Some deals wrap several loan pools before tranche allocation.",
   },
   poolsLinkedToSpecificTranches: {
     title: "Are specific pools linked to particular tranches?",
-    help: "If yes, treat those as separate attribution paths and aggregate investor holdings afterwards.",
+    help: "If yes, keep those pools on separate paths and combine your holdings afterwards.",
   },
 };
 

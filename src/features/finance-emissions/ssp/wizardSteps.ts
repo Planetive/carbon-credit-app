@@ -19,30 +19,30 @@ export function sspWizardSteps(draft: SspDraft | null | undefined): SspWizardSte
   const steps: SspWizardStep[] = [
     {
       id: "ssp-eligibility",
-      title: "Is this a securitization?",
-      shortTitle: "Screen",
-      description: "Check whether securitization accounting applies, or another method",
+      title: "Eligibility",
+      shortTitle: "Eligibility",
+      description: "Confirm whether securitization accounting applies",
     },
   ];
   if (!resolved || !sspQualifiesForMethod(resolved)) return steps;
   steps.push(
     {
       id: "ssp-deal",
-      title: "Deal information",
-      shortTitle: "Deal",
-      description: "Name, structure, year, and documentation",
+      title: "Deal details",
+      shortTitle: "Deal details",
+      description: "Name, structure, year and documentation",
     },
     {
       id: "ssp-structure",
-      title: "Collateral, pools and tranches",
-      shortTitle: "Structure",
-      description: "Build the look-through hierarchy",
+      title: "Assets & structure",
+      shortTitle: "Assets & structure",
+      description: "Underlying assets, pools, tranches and your investment",
     },
     {
       id: "ssp-review",
       title: "Review",
       shortTitle: "Review",
-      description: "Check the structure, then run a backend preview Calculate (reportable Save stays off)",
+      description: "Check the structure and calculate financed emissions",
     }
   );
   return steps;

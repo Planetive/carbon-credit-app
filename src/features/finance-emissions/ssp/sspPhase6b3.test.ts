@@ -23,7 +23,7 @@ describe("Phase 6B.3 — safety gates", () => {
 });
 
 describe("Phase 6B.3 — UX copy / soft vs hard validation", () => {
-  it("review step copy points to backend preview Calculate", () => {
+  it("wizard step labels stay user-facing", () => {
     const draft = createSspDraft(sspInstanceKey(1));
     const withEligibility = patchSspDraft(draft, {
       eligibility: {
@@ -40,9 +40,11 @@ describe("Phase 6B.3 — UX copy / soft vs hard validation", () => {
         poolsLinkedToSpecificTranches: "no",
       },
     });
+    const titles = sspWizardSteps(withEligibility).map((s) => s.title);
+    expect(titles).toEqual(["Eligibility", "Deal details", "Assets & structure", "Review"]);
     const review = sspWizardSteps(withEligibility).find((s) => s.id === "ssp-review");
-    expect(review?.description.toLowerCase()).toMatch(/preview calculate|backend/);
-    expect(review?.description.toLowerCase()).toMatch(/reportable save stays off/);
+    expect(review?.description.toLowerCase()).toMatch(/calculate financed emissions/);
+    expect(review?.description.toLowerCase()).not.toMatch(/reportable save|backend|phase 6/);
   });
 
   it("COA mismatch warns but does not block hierarchy validation", () => {

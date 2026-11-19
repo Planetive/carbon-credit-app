@@ -89,6 +89,9 @@ describe("Phase 6A — eligibility and routing", () => {
     const outcome = resolveSspAccounting(qualifyingAnswers());
     expect(sspQualifiesForMethod(outcome)).toBe(true);
     expect(outcome).toMatchObject({ kind: "ssp", structureHint: "rmbs" });
+    expect(outcome?.title).toBe("Continue with securitization");
+    expect(outcome?.guidance || "").toMatch(/assessed under the PCAF securitization methodology/i);
+    expect(outcome?.guidance || "").not.toMatch(/Do not invent|universal attribution/i);
   });
 
   it("routes CMBS and CLO/CDO structure hints", () => {
@@ -272,7 +275,7 @@ describe("Phase 6A — hierarchy, IDs, and financial validation", () => {
       pools: [pool],
       holdings: [createHolding({ bankOutstandingInvestment: 2 })],
     });
-    expect(validateSspHierarchy(draft).emissionsPath).toMatch(/Do not combine/);
+    expect(validateSspHierarchy(draft).emissionsPath).toMatch(/not both|look-through/i);
   });
 });
 

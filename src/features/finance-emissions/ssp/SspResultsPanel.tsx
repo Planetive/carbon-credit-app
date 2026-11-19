@@ -209,7 +209,8 @@ export function SspResultsPanel({
               {formatMaybe(preview.scopeBreakdown.scope3)} tCO₂e
             </p>
             <p className="text-xs text-[#94A3B8] mt-1">
-              Pool financed emissions {formatMaybe(preview.poolFinancedEmissions)} tCO₂e before IAF.
+              Pool financed emissions {formatMaybe(preview.poolFinancedEmissions)} tCO₂e before investment
+              attribution.
             </p>
           </div>
         ) : preview ? (
@@ -226,8 +227,7 @@ export function SspResultsPanel({
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-[#E2E8F0] px-3 py-2 text-sm text-[#64748B]">
-            Scope 1 / 2 / 3, CAF, LAF, TAF and IAF appear here after a successful backend preview. This screen never
-            invents numbers.
+            Scope breakdown and attribution factors appear here after you run Calculate preview.
           </div>
         )}
 
@@ -240,8 +240,8 @@ export function SspResultsPanel({
               <>
                 <LayerTable title="Pool of pools (experimental)" rows={preview.layers.poolOfPools} />
                 <p className="text-xs text-amber-800 px-1">
-                  Pool-of-pools follows PCAF Table 5.8-3 composition weights for preview only — not
-                  methodology-verified for reportable Save.
+                  Pool-of-pools preview uses composition weights from PCAF Table 5.8-3 and is not yet
+                  available for portfolio Save.
                 </p>
               </>
             ) : null}

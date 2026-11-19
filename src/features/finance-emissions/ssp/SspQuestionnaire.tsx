@@ -65,6 +65,7 @@ function YesNo({ value, onChange }: { value: SspYesNo; onChange: (value: SspYesN
 }
 
 function OutcomeCard({ draft }: { draft: SspDraft }) {
+  const [showMethod, setShowMethod] = useState(false);
   const outcome = resolveSspAccounting(draft.eligibility);
   if (!outcome) return null;
   const display = sspOutcomeDisplay(outcome);
@@ -76,12 +77,47 @@ function OutcomeCard({ draft }: { draft: SspDraft }) {
         : display.tone === "reroute"
           ? "border-sky-200 bg-sky-50"
           : "border-[#E2E8F0] bg-[#F8FAFC]";
+  const bodyParagraphs = String(display.body || "")
+    .split(/\n\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const pcafRef = "pcafRef" in outcome ? outcome.pcafRef : null;
+  const structureHint =
+    outcome.kind === "ssp" && "structureHint" in outcome ? outcome.structureHint : null;
   return (
-    <div className={cn("rounded-xl border px-5 py-4", toneClass)}>
+    <div className={cn("rounded-xl border px-5 py-4 space-y-2", toneClass)}>
       <p className="font-semibold text-[#0F172A]">{display.heading}</p>
-      <p className="mt-2 text-sm text-[#64748B] leading-relaxed">{display.body}</p>
-      {"pcafRef" in outcome ? (
-        <p className="mt-2 text-xs text-[#94A3B8]">{outcome.pcafRef}</p>
+      {bodyParagraphs.map((paragraph) => (
+        <p key={paragraph.slice(0, 48)} className="text-sm text-[#64748B] leading-relaxed">
+          {paragraph}
+        </p>
+      ))}
+      {pcafRef || structureHint ? (
+        <div className="pt-1">
+          <button
+            type="button"
+            className="text-xs text-[#0F6E56] underline-offset-2 hover:underline"
+            onClick={() => setShowMethod((v) => !v)}
+          >
+            {showMethod ? "Hide methodology details" : "Methodology details"}
+          </button>
+          {showMethod ? (
+            <div className="mt-2 rounded-lg border border-[#E8EEF0] bg-[#F8FAFC] px-3 py-2 text-xs text-[#64748B] space-y-1">
+              {pcafRef ? <p>PCAF reference: {pcafRef}</p> : null}
+              {structureHint ? (
+                <p>
+                  Suggested structure: {STRUCTURE_TYPE_LABELS[structureHint] || structureHint}
+                </p>
+              ) : null}
+              {outcome.kind === "ssp" ? (
+                <p>
+                  Attribution follows the deal path: collateral → loan → pool → optional pool of
+                  pools → tranche → investment (PCAF Table 5.8-3).
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -138,9 +174,7 @@ function EligibilityStep({
               </Button>
             ) : null}
           </div>
-        ) : (
-          <p className="text-sm text-[#0F6E56]">Continue to deal information.</p>
-        )}
+        ) : null}
         <button
           type="button"
           className="text-sm text-[#64748B] underline"
@@ -219,8 +253,8 @@ function DealStep({
 
   return (
     <InputSection
-      title="Deal information"
-      description="Plain-language deal facts. Leave SPV blank when the structure does not use one."
+      title="Deal details"
+      description="Key facts about this securitization. Leave SPV blank if the structure does not use one."
     >
       <FieldGrid>
         <FormField label="Deal name" error={errors["deal.dealName"]}>
@@ -384,13 +418,13 @@ function ReviewStep({ draft, counterpartyId }: { draft: SspDraft; counterpartyId
         </p>
         <button
           type="button"
-          className="text-xs text-[#0F6E56] underline-offset-2 hover:underline"
+          className="text-xs text-[#64748B] underline-offset-2 hover:underline"
           onClick={() => setShowDraftId((v) => !v)}
         >
-          {showDraftId ? "Hide technical draft id" : "Show technical draft id"}
+          {showDraftId ? "Hide draft reference" : "Show draft reference"}
         </button>
         {showDraftId ? (
-          <p className="text-xs text-[#94A3B8] break-all">Draft id: {draft.financingInstanceId}</p>
+          <p className="text-xs text-[#94A3B8] break-all">Reference: {draft.financingInstanceId}</p>
         ) : null}
       </div>
       <SspResultsPanel draft={draft} counterpartyId={counterpartyId} />
@@ -597,7 +631,7 @@ export function SspQuestionnaire({
       ) : null}
       {warnings.length ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 space-y-1">
-          <p className="font-medium">Heads-up (does not block Save or Next)</p>
+          <p className="font-medium">Notes</p>
           {warnings.map((warning) => (
             <p key={warning}>{warning}</p>
           ))}

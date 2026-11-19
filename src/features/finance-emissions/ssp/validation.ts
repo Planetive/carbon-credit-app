@@ -105,7 +105,7 @@ export function validateSspHierarchy(draft: SspDraft): SspFieldErrors {
     if (draft.emissionsPath === "reported_pool") {
       if (missingNumber(pool.reportedEmissionsTotal)) {
         errors[`pools.${pool.poolId}.reportedEmissionsTotal`] =
-          "Enter the reported pool emissions total, or switch to look-through.";
+          "Enter the reported pool emissions total, or switch to look-through assets.";
       }
       if (requireText(pool.reportedSource)) {
         errors[`pools.${pool.poolId}.reportedSource`] = "Record the source of reported pool emissions.";
@@ -240,7 +240,7 @@ export function validateSspHierarchy(draft: SspDraft): SspFieldErrors {
   }
 
   if (!draft.emissionsPath) {
-    errors.emissionsPath = "Choose look-through or reported pool emissions.";
+    errors.emissionsPath = "Choose look-through assets or reported pool emissions.";
   }
   if (draft.emissionsPath === "lookthrough" && draft.emissionsPath === "reported_pool") {
     // unreachable — kept for clarity that both paths must not be combined silently
@@ -249,7 +249,7 @@ export function validateSspHierarchy(draft: SspDraft): SspFieldErrors {
     const anyReported = draft.pools.some((pool) => pool.reportedEmissionsTotal != null);
     if (anyReported && draft.collateral.some((row) => row.emissionsPath === "asset-class-estimate")) {
       errors.emissionsPath =
-        "Do not combine a reported pool total with look-through child calculations for the same pool. Choose one path.";
+        "Use either reported pool totals or look-through asset calculations for the same pool — not both.";
     }
   }
 

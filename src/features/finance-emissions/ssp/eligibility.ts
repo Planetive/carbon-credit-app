@@ -130,7 +130,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
       kind: "choose-class",
       title: "Not a securitization or structured product",
       guidance:
-        "Return to loan-type selection and pick the matching PCAF asset class (for example mortgage, business loan, or Use of Proceeds). Do not force every green bond or ordinary loan into securitization, and do not assume Business Loan by default.",
+        "Return to loan-type selection and choose the matching PCAF asset class (for example mortgage, business loan, or Use of Proceeds).",
       pcafRef: PCAF_58_FIG2,
     };
   }
@@ -224,7 +224,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
           method: "use-of-proceeds",
           title: "Use Use of Proceeds instead",
           guidance:
-            "If net sale proceeds fund the originator’s GSS+ corporate projects (Secured Green Standard Bond), PCAF Figure 5.8-2 Step 3b points to the Use of Proceeds Structures method — not SSP look-through of green-labelled notes alone.",
+            "If sale proceeds fund the originator’s green or sustainability projects, Use of Proceeds is the better fit than securitization look-through of green-labelled notes alone.",
           pcafRef: `${PCAF_58_FIG2} Step 3b`,
         };
       }
@@ -238,9 +238,9 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
 
   return {
     kind: "ssp",
-    title: "Continue as Securitization & Structured Products",
+    title: "Continue with securitization",
     guidance:
-      "Continue with the PCAF look-through path: collateral → loan → pool → optional pool-of-pools → tranche → investment. Do not invent a single universal attribution denominator.",
+      "Based on your answers, this investment can be assessed under the PCAF securitization methodology.\n\nNext, provide details about the deal, its underlying assets and your investment to calculate financed emissions.",
     pcafRef: `${PCAF_58}; Tables 5.8-1 to 5.8-3`,
     structureHint: structureHint(answers),
     collateralFamily: answers.collateralFamily as SspCollateralFamily,
@@ -282,7 +282,7 @@ export function cafDenominatorHint(collateralType: string): string {
     case "listed-equity":
       return "EVIC (listed) / equity + debt";
     default:
-      return "Collateral attribution denominator from the underlying PCAF class (Table 5.8-2)";
+      return "Value used for attribution in the matching PCAF asset class";
   }
 }
 
