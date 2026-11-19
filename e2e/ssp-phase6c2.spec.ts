@@ -251,7 +251,7 @@ test.describe("Phase 6C.2 SSP frontend preview Calculate", () => {
     });
     expect([401, 403]).toContain(badAuth.status);
 
-    const { res: unsupported, body: unsupportedBody } = await apiJson(stack, "/api/v1/ssp/calculate", {
+    const { res: incompletePop, body: incompletePopBody } = await apiJson(stack, "/api/v1/ssp/calculate", {
       method: "POST",
       token: tokenA,
       body: JSON.stringify({
@@ -264,8 +264,74 @@ test.describe("Phase 6C.2 SSP frontend preview Calculate", () => {
         },
       }),
     });
-    expect(unsupported.status).toBe(200);
-    expect((unsupportedBody as { status?: string }).status).toBe("unsupported");
+    expect(incompletePop.status).toBe(200);
+    expect((incompletePopBody as { status?: string }).status).toBe("incomplete");
+    expect((incompletePopBody as { code?: string }).code).toBe("missing_pop_coa");
+
+    // Multi-pool shared loan: LAF 25/40 and 15/40 on loan FE 4 → pools 2.5 + 1.5; holding 1.0
+    const multiDraft = {
+      ...goldenDraft(),
+      pools: [
+        {
+          poolId: "p1",
+          name: "P1",
+          loanIds: ["l1"],
+          loanAllocations: [{ loanId: "l1", amountInPool: 25 }],
+          evidence: { source: "", notes: "", documentReference: "" },
+        },
+        {
+          poolId: "p2",
+          name: "P2",
+          loanIds: ["l1"],
+          loanAllocations: [{ loanId: "l1", amountInPool: 15 }],
+          evidence: { source: "", notes: "", documentReference: "" },
+        },
+      ],
+    };
+    const { res: multiRes, body: multiBody } = await apiJson(stack, "/api/v1/ssp/calculate", {
+      method: "POST",
+      token: tokenA,
+      body: JSON.stringify({ persist_preview: false, holding_client_id: "h1", draft: multiDraft }),
+    });
+    expect(multiRes.status, JSON.stringify(multiBody)).toBe(200);
+    const multi = multiBody as {
+      status?: string;
+      financed_emissions?: number;
+      pools?: Array<{ pool_id: string; financed_emissions_tco2e: number }>;
+    };
+    expect(multi.status).toBe("complete");
+    expect(multi.financed_emissions).toBe(1);
+    const byPool = Object.fromEntries((multi.pools || []).map((p) => [p.pool_id, p.financed_emissions_tco2e]));
+    expect(byPool.p1).toBe(2.5);
+    expect(byPool.p2).toBe(1.5);
+
+    // Overallocation must not silently normalize
+    const overDraft = {
+      ...goldenDraft(),
+      pools: [
+        {
+          poolId: "p1",
+          name: "P1",
+          loanIds: ["l1"],
+          loanAllocations: [{ loanId: "l1", amountInPool: 30 }],
+          evidence: { source: "", notes: "", documentReference: "" },
+        },
+        {
+          poolId: "p2",
+          name: "P2",
+          loanIds: ["l1"],
+          loanAllocations: [{ loanId: "l1", amountInPool: 20 }],
+          evidence: { source: "", notes: "", documentReference: "" },
+        },
+      ],
+    };
+    const { body: overBody } = await apiJson(stack, "/api/v1/ssp/calculate", {
+      method: "POST",
+      token: tokenA,
+      body: JSON.stringify({ persist_preview: false, draft: overDraft }),
+    });
+    expect((overBody as { status?: string }).status).toBe("error");
+    expect((overBody as { code?: string }).code).toBe("laf_sum_exceeds_loan");
   });
 
   test("Browser: save draft, Calculate preview shows 1.0, refresh keeps draft, Save reportable stays off", async ({

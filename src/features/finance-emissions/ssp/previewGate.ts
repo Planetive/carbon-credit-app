@@ -1,6 +1,6 @@
 /**
- * Phase 6C.2 — frontend gates for preview Calculate.
- * Mirrors backend first-release support: single-pool, no PoP, known structure types.
+ * Phase 6C.3 — frontend gates for preview Calculate.
+ * Mirrors backend support: multi-pool, tranche-specific pools, and PoP (literal Table 5.8-3).
  * The backend remains authoritative; this only avoids calling unsupported paths.
  */
 
@@ -41,10 +41,26 @@ export function sspPreviewCalculateBlockers(draft: SspDraft): string[] {
     blockers.push(`Structure “${structure}” is not in the supported preview set.`);
   }
   if (draft.deal.hasPoolOfPools === "yes" || draft.eligibility.hasPoolOfPools === "yes") {
-    blockers.push("Pool-of-pools structures are not supported for preview yet.");
+    if (!draft.poolOfPools || draft.poolOfPools.poolIds.length < 1) {
+      blockers.push("Create a pool-of-pools and link member pools before calculating.");
+    } else if (
+      draft.poolOfPools.currentOutstandingAmount == null ||
+      !(draft.poolOfPools.currentOutstandingAmount > 0)
+    ) {
+      blockers.push("Enter a positive pool-of-pools current outstanding amount (PoP deal COA).");
+    } else if (draft.poolOfPools.poolIds.length > 1) {
+      const allocs = draft.poolOfPools.poolAllocations || [];
+      const missing = draft.poolOfPools.poolIds.some((pid) => {
+        const row = allocs.find((a) => a.poolId === pid);
+        return !row || row.amountInPop == null || !(row.amountInPop >= 0);
+      });
+      if (missing) {
+        blockers.push("Enter amount-in-PoP for each member pool when more than one pool is included.");
+      }
+    }
   }
-  if (draft.pools.length !== 1) {
-    blockers.push("Preview calculation supports exactly one pool (single-pool first release).");
+  if (draft.pools.length < 1) {
+    blockers.push("Add at least one collateral pool before calculating.");
   }
   if (!draft.emissionsPath) {
     blockers.push("Choose look-through or reported pool emissions.");

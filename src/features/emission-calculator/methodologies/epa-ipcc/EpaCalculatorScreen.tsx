@@ -1495,6 +1495,7 @@ const EmissionCalculatorEPA = () => {
                         companyContext={!!companyContext}
                         counterpartyId={companyContext?.counterpartyId}
                         framework="epa"
+                        onInventoryChanged={() => void refreshSummaryFromDb()}
                       />
                     </CardContent>
                   </Card>

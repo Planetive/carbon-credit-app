@@ -3,8 +3,9 @@ import { Label } from "@/components/ui/label";
 import { FieldTooltip } from "@/components/shared/finance/FieldTooltip";
 import { cn } from "@/lib/utils";
 
+/** Shared control chrome — works for Input and native <select> (needs w-full + padding). */
 export const FIELD_INPUT =
-  "h-11 border-[#E2E8F0] bg-white text-[#0F172A] focus-visible:border-[#0F6E56] focus-visible:ring-[#0F6E56]/15";
+  "flex h-11 w-full rounded-md border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] focus-visible:outline-none focus-visible:border-[#0F6E56] focus-visible:ring-2 focus-visible:ring-[#0F6E56]/15 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function InputSection({
   title,

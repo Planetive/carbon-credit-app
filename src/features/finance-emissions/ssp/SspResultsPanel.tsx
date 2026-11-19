@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertCircle, Calculator, ChevronDown, ChevronRight, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/api/client";
-import { calculateSsp } from "@/api/sspDrafts";
+import { calculateSsp, type SspCalculateResponse } from "@/api/sspDrafts";
 import { questionnairePayload } from "./draftPersistence";
 import { mapSspPreviewResponse, type SspPreviewLayerRow, type SspPreviewViewModel } from "./mapSspPreviewResponse";
 import { canPreviewCalculateSsp, sspPreviewCalculateBlockers } from "./previewGate";
@@ -10,6 +10,9 @@ import {
   SSP_REPORTABLE_BLOCKED_MESSAGE,
   canCalculateSsp,
   canSaveReportableSsp,
+  canSubmitReportableSspSave,
+  sspReportableSaveBlockers,
+  type SspCalculationResult,
 } from "./reportableGuard";
 import { sumLoanCoaInPool } from "./state";
 import { STRUCTURE_TYPE_LABELS } from "./copy";
@@ -24,7 +27,9 @@ export function SspPreviewNotice({ compact = false }: { compact?: boolean }) {
   return (
     <p className={compact ? "text-[11px] text-slate-500" : "text-xs text-slate-500"}>
       {canCalculateSsp()
-        ? "Preview figures come from the backend §5.8 engine. Reportable Save and portfolio inclusion stay off."
+        ? canSaveReportableSsp()
+          ? "Figures come from the backend §5.8 engine. Eligible holdings can be saved into the portfolio."
+          : "Preview figures come from the backend §5.8 engine. Reportable Save stays off until Phase 6D enablement."
         : "Questionnaire and draft save only — financed emissions are not calculated yet."}
     </p>
   );
@@ -82,55 +87,68 @@ export function SspResultsPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<SspPreviewViewModel | null>(null);
+  const [rawResult, setRawResult] = useState<SspCalculationResult | null>(null);
+  const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
 
   const blockers = sspPreviewCalculateBlockers(draft);
   const calculateOk = canPreviewCalculateSsp(draft);
-  const saveOk = canSaveReportableSsp() && calculateOk;
+  const saveReady = canSubmitReportableSspSave(draft, rawResult);
+  const saveOk = canSaveReportableSsp() && saveReady;
 
   const bankInvestment = draft.holdings.reduce((sum, row) => {
     return sum + (row.bankOutstandingInvestment != null ? row.bankOutstandingInvestment : 0);
   }, 0);
 
-  const tryCalculate = async () => {
+  const run = async (persistReportable: boolean) => {
     if (!calculateOk || busy) {
       setError(blockers[0] || "Calculate is not available for this deal.");
+      return;
+    }
+    if (persistReportable && !saveReady) {
+      setError(sspReportableSaveBlockers(draft, rawResult).join(", ") || SSP_REPORTABLE_BLOCKED_MESSAGE);
       return;
     }
     setBusy(true);
     setError("");
     try {
-      const response = await calculateSsp({
+      const response: SspCalculateResponse = await calculateSsp({
         financing_instance_id: draft.financingInstanceId || undefined,
         deal_id: draft.dealId || undefined,
         holding_id: draft.holdingId || undefined,
         counterparty_id: counterpartyId || undefined,
-        // Preview does not require optimistic locks; sending stale expected_* can
-        // trip backend lock helpers and is unnecessary for non-reportable results.
         persist_preview: false,
+        persist_reportable: persistReportable,
+        expected_fingerprint: persistReportable ? rawResult?.calculation_fingerprint : undefined,
         holding_client_id: draft.holdings[0]?.holdingId || undefined,
         draft: questionnairePayload(draft),
       });
-      if (response?.is_reportable === true || response?.include_in_portfolio === true) {
+      if (
+        !persistReportable &&
+        (response?.is_reportable === true || response?.include_in_portfolio === true)
+      ) {
         setError("Server returned a reportable/portfolio flag; preview results were discarded.");
         setPreview(null);
+        setRawResult(null);
         return;
       }
+      setRawResult(response);
       setPreview(mapSspPreviewResponse(response));
+      if (response.persisted_reportable && response.reportable_record_id) {
+        setSavedRecordId(String(response.reportable_record_id));
+      }
     } catch (err) {
       const message =
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "The securitization preview calculation could not be completed.";
+            : persistReportable
+              ? "The securitization result could not be saved as reportable."
+              : "The securitization preview calculation could not be completed.";
       setError(message);
     } finally {
       setBusy(false);
     }
-  };
-
-  const trySave = () => {
-    setError(SSP_REPORTABLE_BLOCKED_MESSAGE);
   };
 
   return (
@@ -217,6 +235,15 @@ export function SspResultsPanel({
             <LayerTable title="Collateral (absolute × CAF)" factorLabel="CAF" rows={preview.layers.collateral} />
             <LayerTable title="Loans" rows={preview.layers.loans} />
             <LayerTable title="Pools (× LAF)" factorLabel="LAF" rows={preview.layers.pools} />
+            {preview.layers.poolOfPools.length ? (
+              <>
+                <LayerTable title="Pool of pools (experimental)" rows={preview.layers.poolOfPools} />
+                <p className="text-xs text-amber-800 px-1">
+                  Pool-of-pools follows PCAF Table 5.8-3 composition weights for preview only — not
+                  methodology-verified for reportable Save.
+                </p>
+              </>
+            ) : null}
             <LayerTable title="Tranches (× TAF)" factorLabel="TAF" rows={preview.layers.tranches} />
             <LayerTable title="Holdings (× IAF)" factorLabel="IAF" rows={preview.layers.holdings} />
           </div>
@@ -300,7 +327,7 @@ export function SspResultsPanel({
           type="button"
           className="h-10 bg-[#0F6E56] hover:bg-[#0C5A47] text-white disabled:opacity-40"
           disabled={!calculateOk || busy}
-          onClick={() => void tryCalculate()}
+          onClick={() => void run(false)}
           data-testid="ssp-calculate-preview"
         >
           <Calculator className="h-4 w-4 mr-2" />
@@ -310,12 +337,12 @@ export function SspResultsPanel({
           type="button"
           variant="outline"
           className="h-10 disabled:opacity-40"
-          disabled={!saveOk}
-          onClick={trySave}
+          disabled={!saveOk || busy}
+          onClick={() => void run(true)}
           data-testid="ssp-save-reportable"
         >
           <Save className="h-4 w-4 mr-2" />
-          Save reportable
+          {savedRecordId || rawResult?.persisted_reportable ? "Saved" : "Save reportable"}
         </Button>
         {!calculateOk && (
           <p className="text-sm text-[#64748B]" data-testid="ssp-calculate-blockers">
@@ -323,7 +350,26 @@ export function SspResultsPanel({
             {blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ""}
           </p>
         )}
+        {canSaveReportableSsp() && rawResult && !saveReady && (
+          <p className="text-sm text-[#64748B]" data-testid="ssp-save-blockers">
+            Reportable Save blocked: {sspReportableSaveBlockers(draft, rawResult).join(", ")}.
+          </p>
+        )}
       </div>
+
+      {savedRecordId && (
+        <div
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950"
+          data-testid="ssp-save-confirmation"
+        >
+          <p className="font-semibold">Saved as the reportable holding total</p>
+          <p className="mt-1">
+            Company Overview, My Portfolio, Category 15 and exports use this holding parent (
+            <span data-testid="ssp-reportable-record-id">{savedRecordId}</span>). Intermediate layers stay
+            non-reportable.
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="text-sm text-amber-800 flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">

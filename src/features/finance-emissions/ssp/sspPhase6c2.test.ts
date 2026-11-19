@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mapSspPreviewResponse } from "./mapSspPreviewResponse";
 import { canPreviewCalculateSsp, sspPreviewCalculateBlockers } from "./previewGate";
 import { SSP_CALCULATE_AVAILABLE, canCalculateSsp, canSaveReportableSsp } from "./reportableGuard";
+import { validateSspHierarchy } from "./validation";
 import { createSspDraft, createCollateral, createLoan, createPool, createTranche, createHolding } from "./state";
 
 describe("Phase 6C.2 SSP preview response mapping", () => {
@@ -11,7 +12,7 @@ describe("Phase 6C.2 SSP preview response mapping", () => {
     expect(canSaveReportableSsp()).toBe(false);
   });
 
-  it("blocks unsupported multi-pool / PoP before calling the API", () => {
+  function multiPoolDraft(allocations: [number | null, number | null]) {
     const c1 = createCollateral({
       name: "House",
       collateralType: "mortgage",
@@ -22,8 +23,16 @@ describe("Phase 6C.2 SSP preview response mapping", () => {
       collateralIds: [c1.collateralId],
       currentOutstandingAmount: 40,
     });
-    const poolA = createPool({ name: "P1", loanIds: [loan.loanId] });
-    const poolB = createPool({ name: "P2", loanIds: [loan.loanId] });
+    const poolA = createPool({
+      name: "P1",
+      loanIds: [loan.loanId],
+      loanAllocations: [{ loanId: loan.loanId, amountInPool: allocations[0] }],
+    });
+    const poolB = createPool({
+      name: "P2",
+      loanIds: [loan.loanId],
+      loanAllocations: [{ loanId: loan.loanId, amountInPool: allocations[1] }],
+    });
     const tranche = createTranche({ name: "Senior", currentOutstandingAmount: 40 });
     const holding = createHolding({
       name: "Bank",
@@ -62,8 +71,45 @@ describe("Phase 6C.2 SSP preview response mapping", () => {
     draft.pools = [poolA, poolB];
     draft.tranches = [tranche];
     draft.holdings = [holding];
+    return draft;
+  }
+
+  it("no longer blocks multi-pool in the preview gate when allocations are valid", () => {
+    const draft = multiPoolDraft([25, 15]);
+    expect(draft.pools).toHaveLength(2);
+    expect(sspPreviewCalculateBlockers(draft).some((b) => /one pool|single.pool/i.test(b))).toBe(false);
+    expect(canPreviewCalculateSsp(draft)).toBe(true);
+  });
+
+  it("still fails questionnaire validation for shared loans without/over allocations", () => {
+    const missing = multiPoolDraft([25, null]);
+    expect(validateSspHierarchy(missing)[`pools.${missing.pools[1].poolId}.loanAllocations.${missing.loans[0].loanId}`]).toBeTruthy();
+    expect(canPreviewCalculateSsp(missing)).toBe(false);
+
+    const over = multiPoolDraft([30, 20]);
+    expect(
+      validateSspHierarchy(over)[`pools.${over.pools[0].poolId}.loanAllocations.${over.loans[0].loanId}`]
+    ).toMatch(/exceed/i);
+    expect(canPreviewCalculateSsp(over)).toBe(false);
+  });
+
+  it("allows pool-of-pools when PoP COA and member amounts are set", () => {
+    const draft = multiPoolDraft([25, 15]);
+    draft.deal = { ...draft.deal, hasPoolOfPools: "yes" };
+    draft.eligibility = { ...draft.eligibility, hasPoolOfPools: "yes" };
     expect(canPreviewCalculateSsp(draft)).toBe(false);
-    expect(sspPreviewCalculateBlockers(draft).some((b) => /single pool|one pool/i.test(b))).toBe(true);
+    draft.poolOfPools = {
+      poolOfPoolsId: "pop1",
+      name: "PoP",
+      poolIds: draft.pools.map((p) => p.poolId),
+      currentOutstandingAmount: 40,
+      poolAllocations: draft.pools.map((p, i) => ({
+        poolId: p.poolId,
+        amountInPop: i === 0 ? 25 : 15,
+      })),
+      evidence: { sourceType: "", reference: "", asOfDate: "", notes: "" },
+    };
+    expect(canPreviewCalculateSsp(draft)).toBe(true);
   });
 
   it("maps complete preview layers, scopes, DQ, and provenance", () => {

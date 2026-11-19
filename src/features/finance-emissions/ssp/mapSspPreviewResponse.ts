@@ -34,6 +34,7 @@ export interface SspPreviewViewModel {
     collateral: SspPreviewLayerRow[];
     loans: SspPreviewLayerRow[];
     pools: SspPreviewLayerRow[];
+    poolOfPools: SspPreviewLayerRow[];
     tranches: SspPreviewLayerRow[];
     holdings: SspPreviewLayerRow[];
   };
@@ -45,8 +46,10 @@ export interface SspPreviewViewModel {
     warnings: string[];
     collateralMethods: string[];
   };
-  isReportable: false;
-  includeInPortfolio: false;
+  isReportable: boolean;
+  includeInPortfolio: boolean;
+  calculationFingerprint: string | null;
+  reportableRecordId: string | null;
   missingOrBlocked: boolean;
 }
 
@@ -73,6 +76,8 @@ export function mapSspPreviewResponse(raw: unknown): SspPreviewViewModel {
   const collateral = Array.isArray(body.collateral) ? body.collateral : [];
   const loans = Array.isArray(body.loans) ? body.loans : [];
   const pools = Array.isArray(body.pools) ? body.pools : [];
+  const popRaw = body.pool_of_pools ?? body.poolOfPools;
+  const pop = popRaw && typeof popRaw === "object" ? (popRaw as Record<string, unknown>) : null;
   const tranches = Array.isArray(body.tranches) ? body.tranches : [];
   const holdings = Array.isArray(body.holdings) ? body.holdings : [];
   const notes = Array.isArray(body.notes) ? body.notes.map(String) : [];
@@ -86,8 +91,7 @@ export function mapSspPreviewResponse(raw: unknown): SspPreviewViewModel {
     .filter((v): v is string => Boolean(v));
 
   const financed = num(body.financed_emissions ?? body.financedEmissions);
-  const missingOrBlocked =
-    status !== "complete" || financed == null || body.is_reportable === true;
+  const missingOrBlocked = status !== "complete" || financed == null;
 
   return {
     status,
@@ -144,6 +148,17 @@ export function mapSspPreviewResponse(raw: unknown): SspPreviewViewModel {
           detail: text(r.path) || (firstLaf ? "LAF from loan allocation" : null),
         };
       }),
+      poolOfPools: pop
+        ? [
+            {
+              id: text(pop.pool_of_pools_id ?? pop.poolOfPoolsId) || "pop",
+              label: "Pool of pools",
+              financedEmissions: num(pop.financed_emissions_tco2e ?? pop.financedEmissionsTco2e),
+              dataQualityScore: num(pop.data_quality_score ?? pop.dataQualityScore),
+              detail: text(pop.path) || "Table 5.8-3 composition weights",
+            },
+          ]
+        : [],
       tranches: tranches.map((row, i) => {
         const r = row as Record<string, unknown>;
         return {
@@ -173,8 +188,10 @@ export function mapSspPreviewResponse(raw: unknown): SspPreviewViewModel {
       warnings,
       collateralMethods,
     },
-    isReportable: false,
-    includeInPortfolio: false,
+    isReportable: Boolean(body.is_reportable ?? body.isReportable),
+    includeInPortfolio: Boolean(body.include_in_portfolio ?? body.includeInPortfolio),
+    calculationFingerprint: text(body.calculation_fingerprint ?? body.calculationFingerprint),
+    reportableRecordId: text(body.reportable_record_id ?? body.reportableRecordId),
     missingOrBlocked,
   };
 }

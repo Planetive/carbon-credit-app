@@ -16,6 +16,7 @@ import {
   createTranche,
   patchSspDraft,
   sumLoanCoaInPool,
+  syncLoanAllocations,
 } from "./state";
 import type {
   SspCollateral,
@@ -404,6 +405,9 @@ export function SspHierarchyEditor({
                     pools: draft.pools.map((pool) => ({
                       ...pool,
                       loanIds: pool.loanIds.filter((id) => id !== loan.loanId),
+                      loanAllocations: (pool.loanAllocations || []).filter(
+                        (alloc) => alloc.loanId !== loan.loanId
+                      ),
                     })),
                   })
                 )
@@ -527,9 +531,50 @@ export function SspHierarchyEditor({
                       label: loan.name || `Loan ${i + 1}`,
                     }))}
                     selected={pool.loanIds}
-                    onChange={(loanIds) => updatePool(pool.poolId, { loanIds })}
+                    onChange={(loanIds) =>
+                      updatePool(pool.poolId, {
+                        loanIds,
+                        loanAllocations: syncLoanAllocations(loanIds, pool.loanAllocations),
+                      })
+                    }
                   />
                 </FormField>
+                {pool.loanIds.length ? (
+                  <FieldGrid>
+                    {pool.loanIds.map((loanId) => {
+                      const loan = draft.loans.find((row) => row.loanId === loanId);
+                      const loanLabel = loan?.name || loanId;
+                      const alloc = (pool.loanAllocations || []).find((row) => row.loanId === loanId);
+                      const inPoolCount = draft.pools.filter((p) => p.loanIds.includes(loanId)).length;
+                      const errorKey = `pools.${pool.poolId}.loanAllocations.${loanId}`;
+                      return (
+                        <FormField
+                          key={loanId}
+                          label={`Amount in pool — ${loanLabel}`}
+                          hint={
+                            inPoolCount > 1
+                              ? `Required: this loan is in ${inPoolCount} pools. Loan COA ${loan?.currentOutstandingAmount ?? "—"}.`
+                              : `Optional unless this loan is shared with another pool. Loan COA ${loan?.currentOutstandingAmount ?? "—"}.`
+                          }
+                          error={errors[errorKey]}
+                        >
+                          <MoneyInput
+                            value={alloc?.amountInPool ?? null}
+                            onChange={(amountInPool) =>
+                              updatePool(pool.poolId, {
+                                loanAllocations: syncLoanAllocations(pool.loanIds, [
+                                  ...(pool.loanAllocations || []).filter((row) => row.loanId !== loanId),
+                                  { loanId, amountInPool },
+                                ]),
+                              })
+                            }
+                            onBlur={() => onTouch(errorKey)}
+                          />
+                        </FormField>
+                      );
+                    })}
+                  </FieldGrid>
+                ) : null}
                 {draft.emissionsPath === "reported_pool" ? (
                   <FieldGrid>
                     <FormField
@@ -648,15 +693,56 @@ export function SspHierarchyEditor({
                     label: pool.name || `Pool ${i + 1}`,
                   }))}
                   selected={draft.poolOfPools.poolIds}
-                  onChange={(poolIds) =>
+                  onChange={(poolIds) => {
+                    const prev = draft.poolOfPools!.poolAllocations || [];
+                    const poolAllocations = poolIds.map((poolId) => {
+                      const existing = prev.find((a) => a.poolId === poolId);
+                      return existing || { poolId, amountInPop: null as number | null };
+                    });
                     onChange(
                       patchSspDraft(draft, {
-                        poolOfPools: { ...draft.poolOfPools!, poolIds },
+                        poolOfPools: { ...draft.poolOfPools!, poolIds, poolAllocations },
                       })
-                    )
-                  }
+                    );
+                  }}
                 />
               </FormField>
+              {draft.poolOfPools.poolIds.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-[#64748B]">
+                    Amount of each pool included in the PoP (PCAF Table 5.8-3 numerator). Required when more than one
+                    member pool is linked.
+                  </p>
+                  {draft.poolOfPools.poolIds.map((pid) => {
+                    const pool = draft.pools.find((p) => p.poolId === pid);
+                    const allocs = draft.poolOfPools!.poolAllocations || [];
+                    const row = allocs.find((a) => a.poolId === pid);
+                    return (
+                      <FormField
+                        key={pid}
+                        label={`Amount in PoP — ${pool?.name || pid}`}
+                      >
+                        <ErrorText message={errors[`poolOfPools.poolAllocations.${pid}`]} />
+                        <MoneyInput
+                          value={row?.amountInPop ?? null}
+                          onChange={(amountInPop) => {
+                            const next = (draft.poolOfPools!.poolAllocations || []).slice();
+                            const idx = next.findIndex((a) => a.poolId === pid);
+                            if (idx >= 0) next[idx] = { ...next[idx], amountInPop };
+                            else next.push({ poolId: pid, amountInPop });
+                            onChange(
+                              patchSspDraft(draft, {
+                                poolOfPools: { ...draft.poolOfPools!, poolAllocations: next },
+                              })
+                            );
+                          }}
+                        />
+                      </FormField>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <ErrorText message={errors["poolOfPools.currentOutstandingAmount"]} />
               <Button
                 type="button"
                 variant="ghost"

@@ -98,9 +98,11 @@ type Props = {
   counterpartyId?: string;
   /** Assessment framework for verified Scope 3 saves (must match the calculator). */
   framework?: "uk" | "epa";
+  /** Refresh calculator sidebar / results after verified Scope 3 saves. */
+  onInventoryChanged?: () => void;
 };
 
-export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData, onSaveAndNext, companyContext = false, counterpartyId, framework = "uk" }) => {
+export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, setEmissionData, onSaveAndNext, companyContext = false, counterpartyId, framework = "uk", onInventoryChanged }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [year, setYear] = useState(readSelectedReportingYear);
@@ -2143,6 +2145,7 @@ export const Scope3Section: React.FC<Props> = ({ activeCategory, emissionData, s
         framework={framework}
         setEmissionData={setEmissionData}
         onSaveAndNext={onSaveAndNext}
+        onInventoryChanged={onInventoryChanged}
       />
     );
   }

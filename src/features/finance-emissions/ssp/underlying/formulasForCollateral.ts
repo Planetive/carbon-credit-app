@@ -123,7 +123,9 @@ export function formulasForCollateral(
         };
       }
       if (method.hasEmissions === "no") {
-        const allowed = ["2a", "2b", "3a", "3c"];
+        // 3c is intentionally excluded for SSP: it embeds its own attribution, which would
+        // double-count with the SSP §5.8 pool/tranche/holding attribution layers.
+        const allowed = ["2a", "2b", "3a"];
         const picked = allowed.includes(method.calculationMethod) ? method.calculationMethod : null;
         return withUncertainty(
           COMPANY_FORMULAS.filter(

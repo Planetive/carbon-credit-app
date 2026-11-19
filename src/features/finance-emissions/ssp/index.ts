@@ -45,10 +45,13 @@ export {
   SSP_REPORTABLE_BLOCKED_MESSAGE,
   canCalculateSsp,
   canSaveReportableSsp,
+  canSubmitReportableSspSave,
+  sspReportableSaveBlockers,
   assertSspNotReportable,
   rejectSspReportableResults,
   isSspResultType,
 } from "./reportableGuard";
+export type { SspCalculationResult } from "./reportableGuard";
 export { mapSspPreviewResponse } from "./mapSspPreviewResponse";
 export type { SspPreviewViewModel, SspPreviewScopeBreakdown } from "./mapSspPreviewResponse";
 export {

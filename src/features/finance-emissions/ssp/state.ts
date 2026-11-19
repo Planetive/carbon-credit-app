@@ -86,6 +86,9 @@ export function createPool(partial?: Partial<SspPool>): SspPool {
     poolId: partial?.poolId || createSspId("pool"),
     name: partial?.name || "",
     loanIds: partial?.loanIds ? [...partial.loanIds] : [],
+    loanAllocations: partial?.loanAllocations
+      ? partial.loanAllocations.map((row) => ({ ...row }))
+      : [],
     poolCurrentOutstandingAmount: partial?.poolCurrentOutstandingAmount ?? null,
     reportedEmissionsTotal: partial?.reportedEmissionsTotal ?? null,
     reportedEmissionsPeriod: partial?.reportedEmissionsPeriod || "",
@@ -96,11 +99,25 @@ export function createPool(partial?: Partial<SspPool>): SspPool {
   };
 }
 
+/** Keep one allocation entry per linked loan, preserving any amounts already entered. */
+export function syncLoanAllocations(
+  loanIds: string[],
+  existing: SspPool["loanAllocations"] | undefined
+): SspPool["loanAllocations"] {
+  return loanIds.map((loanId) => {
+    const prior = (existing || []).find((row) => row.loanId === loanId);
+    return { loanId, amountInPool: prior?.amountInPool ?? null };
+  });
+}
+
 export function createPoolOfPools(partial?: Partial<SspPoolOfPools>): SspPoolOfPools {
   return {
     poolOfPoolsId: partial?.poolOfPoolsId || createSspId("pop"),
     name: partial?.name || "Pool of pools",
     poolIds: partial?.poolIds ? [...partial.poolIds] : [],
+    ...(partial?.poolAllocations
+      ? { poolAllocations: partial.poolAllocations.map((row) => ({ ...row })) }
+      : {}),
     currentOutstandingAmount: partial?.currentOutstandingAmount ?? null,
     evidence: { ...emptyEvidence(), ...(partial?.evidence || {}) },
   };
@@ -171,12 +188,16 @@ export function copySharedDeal(from: SspDraft, onto: SspDraft): SspDraft {
     pools: from.pools.map((row) => ({
       ...row,
       loanIds: [...row.loanIds],
+      loanAllocations: (row.loanAllocations || []).map((alloc) => ({ ...alloc })),
       evidence: { ...row.evidence },
     })),
     poolOfPools: from.poolOfPools
       ? {
           ...from.poolOfPools,
           poolIds: [...from.poolOfPools.poolIds],
+          ...(from.poolOfPools.poolAllocations
+            ? { poolAllocations: from.poolOfPools.poolAllocations.map((alloc) => ({ ...alloc })) }
+            : {}),
           evidence: { ...from.poolOfPools.evidence },
         }
       : null,

@@ -145,6 +145,11 @@ export type SspPool = {
   poolId: string;
   name: string;
   loanIds: string[];
+  /**
+   * Portion of each linked loan allocated to this pool. Required when a loan appears in
+   * multiple pools; optional (null) otherwise. Kept in sync with loanIds.
+   */
+  loanAllocations: Array<{ loanId: string; amountInPool: number | null }>;
   /** Optional override when pool COA is published separately from sum of loan COAs. */
   poolCurrentOutstandingAmount: number | null;
   reportedEmissionsTotal: number | null;
@@ -159,6 +164,8 @@ export type SspPoolOfPools = {
   poolOfPoolsId: string;
   name: string;
   poolIds: string[];
+  /** Portion of each member pool allocated to this pool-of-pools (Table 5.8-3 numerator). */
+  poolAllocations?: Array<{ poolId: string; amountInPop: number | null }>;
   currentOutstandingAmount: number | null;
   evidence: SspEvidence;
 };

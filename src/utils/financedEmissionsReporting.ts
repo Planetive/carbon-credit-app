@@ -128,6 +128,22 @@ export function isUopParentFormulaId(formulaId: string | null | undefined): bool
   return key.startsWith("uop") || key.includes("use-of-proceeds");
 }
 
+export function isSspParentFormulaId(formulaId: string | null | undefined): boolean {
+  const key = String(formulaId ?? "").trim().toLowerCase();
+  return (
+    key === "ssp" ||
+    key.startsWith("ssp") ||
+    key.includes("securitization") ||
+    key.includes("securitisation") ||
+    key.includes("structured-product")
+  );
+}
+
+/** UoP / SSP parents survive aggregate selection and must not be dropped. */
+export function isSpecialParentFormulaId(formulaId: string | null | undefined): boolean {
+  return isUopParentFormulaId(formulaId) || isSspParentFormulaId(formulaId);
+}
+
 function resultsRecord(results: unknown): Record<string, unknown> | null {
   return results && typeof results === "object" ? (results as Record<string, unknown>) : null;
 }
@@ -256,22 +272,26 @@ export function selectFinancedGroup(
     }
   }
 
-  const uopParents = collapseSameFinancingInstance(
-    working.filter((row) => isUopParentFormulaId(row.formulaId)),
+  const specialParents = collapseSameFinancingInstance(
+    working.filter((row) => isSpecialParentFormulaId(row.formulaId)),
   );
-  const general = working.filter((row) => !isUopParentFormulaId(row.formulaId));
+  const general = working.filter((row) => !isSpecialParentFormulaId(row.formulaId));
   const aggregates = general.filter((row) => isAggregateFormulaId(row.formulaId));
   const components = general.filter((row) => !isAggregateFormulaId(row.formulaId));
   const selectedIds = new Set<string>();
 
-  const withUopParents = (base: FinancedCalculationRow[], reason: FinancedSelectionReason, total: number): FinancedGroupSelection => {
-    const selected = [...base, ...uopParents];
+  const withSpecialParents = (
+    base: FinancedCalculationRow[],
+    reason: FinancedSelectionReason,
+    total: number,
+  ): FinancedGroupSelection => {
+    const selected = [...base, ...specialParents];
     selected.forEach((row) => selectedIds.add(`${row.source}:${row.id}`));
     return {
       counterpartyId: selected[0]?.counterpartyId ?? counterpartyId,
       calcKind: selected[0]?.calcKind ?? calcKind,
-      total: total + sumEmissions(uopParents),
-      reason: base.length === 0 && uopParents.length > 0 ? "components-sum" : reason,
+      total: total + sumEmissions(specialParents),
+      reason: base.length === 0 && specialParents.length > 0 ? "components-sum" : reason,
       selectedRows: selected,
       discardedRows: rows.filter((row) => !selectedIds.has(`${row.source}:${row.id}`)),
     };
@@ -280,10 +300,10 @@ export function selectFinancedGroup(
   if (aggregates.length > 0) {
     const aggregate = latestRow(aggregates);
     if (!aggregate) return empty();
-    return withUopParents([aggregate], "aggregate", financedEmissionsNumber(aggregate.financedEmissions));
+    return withSpecialParents([aggregate], "aggregate", financedEmissionsNumber(aggregate.financedEmissions));
   }
 
-  if (components.length > 0 || uopParents.length > 0) {
+  if (components.length > 0 || specialParents.length > 0) {
     const instanced = components.filter((row) => Boolean(row.financingInstanceId));
     const activeComponents =
       components.length === 0
@@ -294,9 +314,9 @@ export function selectFinancedGroup(
               if (row.financingInstanceId) return true;
               return !instanced.some((item) => item.formulaId === row.formulaId);
             });
-    if (activeComponents.length === 0 && uopParents.length === 0) return empty();
+    if (activeComponents.length === 0 && specialParents.length === 0) return empty();
     const collapsedComponents = collapseSameFinancingInstance(activeComponents);
-    return withUopParents(collapsedComponents, "components-sum", sumEmissions(collapsedComponents));
+    return withSpecialParents(collapsedComponents, "components-sum", sumEmissions(collapsedComponents));
   }
 
   return empty();

@@ -191,12 +191,39 @@ function asLoan(value: unknown): SspLoan {
   });
 }
 
+function asLoanAllocations(value: unknown): SspPool["loanAllocations"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      const raw = asRecord(row);
+      return {
+        loanId: asString(pick(raw, "loanId", "loan_id")),
+        amountInPool: asNumber(pick(raw, "amountInPool", "amount_in_pool")),
+      };
+    })
+    .filter((row) => row.loanId);
+}
+
+function asPoolAllocations(value: unknown): NonNullable<SspPoolOfPools["poolAllocations"]> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .map((row) => {
+      const raw = asRecord(row);
+      return {
+        poolId: asString(pick(raw, "poolId", "pool_id")),
+        amountInPop: asNumber(pick(raw, "amountInPop", "amount_in_pop")),
+      };
+    })
+    .filter((row) => row.poolId);
+}
+
 function asPool(value: unknown): SspPool {
   const raw = asRecord(value);
   return createPool({
     poolId: asString(pick(raw, "poolId", "pool_id")) || undefined,
     name: asString(raw.name),
     loanIds: asStringArray(pick(raw, "loanIds", "loan_ids")),
+    loanAllocations: asLoanAllocations(pick(raw, "loanAllocations", "loan_allocations")),
     poolCurrentOutstandingAmount: asNumber(
       pick(raw, "poolCurrentOutstandingAmount", "pool_current_outstanding_amount")
     ),
@@ -220,6 +247,7 @@ function asPoolOfPools(value: unknown): SspPoolOfPools | null {
     poolOfPoolsId: asString(pick(raw, "poolOfPoolsId", "pool_of_pools_id")) || undefined,
     name: asString(raw.name) || undefined,
     poolIds: asStringArray(pick(raw, "poolIds", "pool_ids")),
+    poolAllocations: asPoolAllocations(pick(raw, "poolAllocations", "pool_allocations")),
     currentOutstandingAmount: asNumber(
       pick(raw, "currentOutstandingAmount", "current_outstanding_amount")
     ),

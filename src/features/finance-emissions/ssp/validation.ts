@@ -4,6 +4,8 @@ import type { SspDraft } from "./types";
 
 export type SspFieldErrors = Record<string, string>;
 
+const ALLOCATION_EPSILON = 1e-6;
+
 function missingNumber(value: number | null | undefined): boolean {
   return value == null || !Number.isFinite(value);
 }
@@ -114,12 +116,66 @@ export function validateSspHierarchy(draft: SspDraft): SspFieldErrors {
     }
   }
 
+  // Loan allocations across pools (a loan may be split between pools; never over-allocated).
+  for (const loan of draft.loans) {
+    const linkedPools = draft.pools.filter((pool) => pool.loanIds.includes(loan.loanId));
+    if (!linkedPools.length) continue;
+    const multiPool = linkedPools.length > 1;
+    let sum = 0;
+    let allSet = true;
+    for (const pool of linkedPools) {
+      const alloc = (pool.loanAllocations || []).find((row) => row.loanId === loan.loanId);
+      const amount = alloc?.amountInPool;
+      if (amount == null || !Number.isFinite(amount)) {
+        allSet = false;
+        if (multiPool) {
+          errors[`pools.${pool.poolId}.loanAllocations.${loan.loanId}`] =
+            "This loan is in more than one pool. Enter the amount of the loan allocated to this pool.";
+        }
+      } else {
+        if (amount < 0) {
+          errors[`pools.${pool.poolId}.loanAllocations.${loan.loanId}`] =
+            "Amount in pool cannot be negative.";
+        }
+        sum += amount;
+      }
+    }
+    if (
+      allSet &&
+      loan.currentOutstandingAmount != null &&
+      Number.isFinite(loan.currentOutstandingAmount) &&
+      sum > loan.currentOutstandingAmount + ALLOCATION_EPSILON
+    ) {
+      for (const pool of linkedPools) {
+        errors[`pools.${pool.poolId}.loanAllocations.${loan.loanId}`] =
+          `Amounts across pools (${sum}) exceed this loan’s outstanding amount (${loan.currentOutstandingAmount}). Totals are not auto-corrected.`;
+      }
+    }
+  }
+
   if (draft.deal.hasPoolOfPools === "yes" || draft.eligibility.hasPoolOfPools === "yes") {
     if (!draft.poolOfPools || !draft.poolOfPools.poolIds.length) {
       errors.poolOfPools = "Add a pool-of-pools and link member pools, or set pool-of-pools to No.";
     } else {
       for (const pid of draft.poolOfPools.poolIds) {
         if (!poolIds.has(pid)) errors.poolOfPools = "Pool-of-pools references a missing pool.";
+      }
+      if (
+        draft.poolOfPools.currentOutstandingAmount == null ||
+        !(draft.poolOfPools.currentOutstandingAmount > 0)
+      ) {
+        errors["poolOfPools.currentOutstandingAmount"] =
+          "Enter the pool-of-pools current outstanding amount (PoP deal COA).";
+      }
+      if (draft.poolOfPools.poolIds.length > 1) {
+        const allocs = draft.poolOfPools.poolAllocations || [];
+        for (const pid of draft.poolOfPools.poolIds) {
+          const row = allocs.find((a) => a.poolId === pid);
+          if (!row || row.amountInPop == null || row.amountInPop < 0) {
+            errors[`poolOfPools.poolAllocations.${pid}`] =
+              "Enter amount-in-PoP for each member pool when multiple pools are included.";
+          }
+        }
       }
     }
   }

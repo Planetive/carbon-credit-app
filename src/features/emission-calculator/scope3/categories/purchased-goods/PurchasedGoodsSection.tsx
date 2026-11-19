@@ -12,7 +12,7 @@ import {
 } from "@/features/scope3/adapters/scope3SupabaseAdapter";
 import { USE_JWT_AUTH } from "@/api/config";
 import { ApiError } from "@/api/client";
-import { getOrCreateDraftAssessment } from "@/api/ghg";
+import { getOrCreateDraftAssessment, listEmissionActivities } from "@/api/ghg";
 import { calcScope3Spend, saveScope3Spend, verifiedActivityId } from "@/api/scope3Verified";
 import { spendEmissionsKg } from "@/lib/emissions/scope3FactorUnits";
 import { SupplierAutocomplete } from "@/components/emissions/scope3/SupplierAutocomplete";
@@ -24,7 +24,11 @@ import {
   Scope3PeriodFields,
   scope3Period,
 } from "@/features/emission-calculator/scope3/verified/Scope3PeriodFields";
-import { readSelectedReportingYear } from "@/features/emission-calculator/results/reportingYear";
+import {
+  readSelectedReportingYear,
+  reportingYearFromPeriod,
+} from "@/features/emission-calculator/results/reportingYear";
+import { SCOPE3_ACCOUNTING_VERSION } from "@/features/emission-calculator/results/scope3Results";
 
 interface PurchasedGoodsSectionProps {
   user: { id: string } | null;
@@ -33,6 +37,8 @@ interface PurchasedGoodsSectionProps {
   framework?: "uk" | "epa";
   setEmissionData: React.Dispatch<React.SetStateAction<EmissionData>>;
   onSaveAndNext?: () => void;
+  /** Refresh EPA/UK sidebar totals after verified Scope 3 inventory changes. */
+  onInventoryChanged?: () => void;
 }
 
 export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
@@ -42,6 +48,7 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
   framework = "uk",
   setEmissionData,
   onSaveAndNext,
+  onInventoryChanged,
 }) => {
   const { toast } = useToast();
 
@@ -54,6 +61,8 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
   const [year, setYear] = useState(readSelectedReportingYear);
   const [month, setMonth] = useState("01");
   const [factorError, setFactorError] = useState<string | null>(null);
+  /** Legacy table rows shown under JWT that are not yet in verified inventory. */
+  const [legacyNeedsVerifiedSave, setLegacyNeedsVerifiedSave] = useState(false);
   const period = scope3Period(year, month);
 
   const newPurchasedGoodsRow = (): PurchasedGoodsRow => ({
@@ -147,11 +156,101 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
       if (companyContext && !counterpartyId) {
         setPurchasedGoodsRows([]);
         setExistingPurchasedGoods([]);
+        setLegacyNeedsVerifiedSave(false);
         setIsInitialLoadPurchasedGoods(false);
         return;
       }
 
       try {
+        setLegacyNeedsVerifiedSave(false);
+
+        if (USE_JWT_AUTH) {
+          // Sidebar totals only count verified emission_activities — load those first.
+          const activities = await listEmissionActivities({
+            scope: 3,
+            category: "purchased_goods",
+            legacy_source: SCOPE3_ACCOUNTING_VERSION,
+          });
+          const verifiedRows: PurchasedGoodsRow[] = (activities || [])
+            .filter((activity) => {
+              const raw = (activity.raw || {}) as Record<string, unknown>;
+              const meta = (raw.activity_meta || {}) as Record<string, unknown>;
+              const activityYear = reportingYearFromPeriod(String(meta.period || ""));
+              if (activityYear !== year) return false;
+              if (companyContext && counterpartyId) {
+                return String(activity.counterparty_id || "") === String(counterpartyId);
+              }
+              return true;
+            })
+            .map((activity) => {
+              const raw = (activity.raw || {}) as Record<string, unknown>;
+              const inputs = (raw.inputs || {}) as Record<string, unknown>;
+              const factor = (raw.factor || {}) as Record<string, unknown>;
+              const supplierId = inputs.supplier_id != null ? String(inputs.supplier_id) : "";
+              const supplierCode = String(inputs.supplier_code || factor.code || "");
+              const supplierName = String(factor.supplier_name || supplierCode || "Supplier");
+              const amount = Number(inputs.amount ?? activity.quantity);
+              const tco2e = Number(activity.emissions_tco2e);
+              const kg = Number.isFinite(tco2e) ? tco2e * 1000 : undefined;
+              const supplier: Supplier | null = supplierId || supplierCode
+                ? {
+                    id: supplierId || supplierCode,
+                    supplier_name: supplierName,
+                    code: supplierCode,
+                    unit: "USD",
+                    emission_factor: Number(factor.emission_factor) || 0,
+                  }
+                : null;
+              return {
+                id: crypto.randomUUID(),
+                dbId: activity.id,
+                isExisting: true,
+                supplier,
+                amountSpent: Number.isFinite(amount) ? amount : undefined,
+                emissions: kg,
+              };
+            });
+
+          if (verifiedRows.length > 0) {
+            setExistingPurchasedGoods(verifiedRows);
+            setPurchasedGoodsRows(verifiedRows);
+            return;
+          }
+
+          // Fall back to legacy table for display, but force a verified save before
+          // those kg can appear in the Scope 3 sidebar total.
+          const legacy = await fetchScope3CategoryEntries(
+            "scope3_purchased_goods_services",
+            user.id,
+            !!companyContext,
+            counterpartyId,
+          );
+          const legacyDrafts: PurchasedGoodsRow[] = (legacy || []).map((entry) => {
+            const supplier: Supplier | null =
+              entry.supplier_id != null
+                ? {
+                    id: entry.supplier_id,
+                    supplier_name: entry.supplier_name || "",
+                    code: entry.supplier_code || "",
+                    unit: "USD",
+                    emission_factor: entry.emission_factor,
+                  }
+                : null;
+            return {
+              id: crypto.randomUUID(),
+              // No verified activity id — Save must create emission_activities rows.
+              isExisting: false,
+              supplier,
+              amountSpent: entry.amount_spent,
+              emissions: entry.emissions,
+            };
+          });
+          setExistingPurchasedGoods([]);
+          setPurchasedGoodsRows(legacyDrafts);
+          setLegacyNeedsVerifiedSave(legacyDrafts.length > 0);
+          return;
+        }
+
         const data = await fetchScope3CategoryEntries(
           "scope3_purchased_goods_services",
           user.id,
@@ -198,7 +297,7 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
 
     loadPurchasedGoods();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- omit toast (unstable); reload only on identity/scope inputs
-  }, [user, companyContext, counterpartyId]);
+  }, [user, companyContext, counterpartyId, year]);
 
   // Sync purchased goods rows to emissionData
   useEmissionSync({
@@ -294,10 +393,12 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
             ),
           );
         }
+        setLegacyNeedsVerifiedSave(false);
         toast({
           title: "Verified purchased goods saved",
-          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}.`,
+          description: `Saved ${toSave.length} activit${toSave.length === 1 ? "y" : "ies"} for ${period}. Scope 3 totals will refresh.`,
         });
+        onInventoryChanged?.();
         return;
       }
 
@@ -433,6 +534,13 @@ export const PurchasedGoodsSection: React.FC<PurchasedGoodsSectionProps> = ({
             Verified saves use 2022 USD purchaser-price factors for the selected reporting month.
             Client emission totals are not trusted.
           </p>
+          {legacyNeedsVerifiedSave && totalEmissions > 0 ? (
+            <p className="mt-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2" role="status">
+              These entries are calculated but not yet in the verified Scope 3 inventory, so the
+              sidebar still shows 0. Click <span className="font-semibold">Save</span> to add them
+              to the {year} total ({(totalEmissions / 1000).toFixed(3)} tCO₂e).
+            </p>
+          ) : null}
         </div>
         <Button
           onClick={addPurchasedGoodsRow}

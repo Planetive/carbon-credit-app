@@ -151,13 +151,15 @@ export function deleteSspDraft(holdingId: string) {
   });
 }
 
-/** Phase 6C.2 — preview only. Never reportable / never portfolio. */
+/** Phase 6C.2 preview + Phase 6D gated reportable Save. */
 export type SspCalculateBody = {
   financing_instance_id?: string | null;
   deal_id?: string | null;
   holding_id?: string | null;
   counterparty_id?: string | null;
   persist_preview?: boolean;
+  persist_reportable?: boolean;
+  expected_fingerprint?: string | null;
   expected_deal_updated_at?: string | null;
   expected_holding_updated_at?: string | null;
   draft?: SspDraftSnapshot | null;
@@ -169,8 +171,14 @@ export type SspCalculateResponse = Record<string, unknown> & {
   code?: string | null;
   message?: string | null;
   financed_emissions?: number | null;
+  formula_id?: string | null;
+  iaf?: number | null;
   is_reportable?: boolean;
   include_in_portfolio?: boolean;
+  persisted_reportable?: boolean;
+  reportable_record_id?: string | null;
+  calculation_fingerprint?: string | null;
+  pool_of_pools?: Record<string, unknown> | null;
 };
 
 export function calculateSsp(body: SspCalculateBody) {
