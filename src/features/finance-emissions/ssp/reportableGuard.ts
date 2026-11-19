@@ -4,8 +4,7 @@ import { canPreviewCalculateSsp, sspPreviewCalculateBlockers } from "./previewGa
 import type { SspDraft } from "./types";
 
 /**
- * Phase 6D implements reportable holding Save on the backend.
- * Production default stays false. Isolated UAT may set
+ * Reportable holding Save is gated for production. Isolated UAT may set
  * VITE_SSP_REPORTABLE_SAVE_AVAILABLE=true in `.env.ssp-e2e` only.
  */
 function envFlagTrue(name: string): boolean {
@@ -25,7 +24,7 @@ export const SSP_CALCULATE_BLOCKED_MESSAGE =
   "This securitization structure cannot be calculated yet. Use a supported single-pool deal with complete inputs, or finish the questionnaire.";
 
 export const SSP_REPORTABLE_BLOCKED_MESSAGE =
-  "Securitization results cannot be saved to the portfolio yet. Reportable Save stays disabled until Phase 6D enablement.";
+  "Calculation preview only. Results have not been added to your portfolio.";
 
 const IMPLEMENTED_SSP_FORMULAS = new Set(["ssp-lookthrough", "ssp-reported-pool"]);
 

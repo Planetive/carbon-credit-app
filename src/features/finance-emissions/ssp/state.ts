@@ -164,8 +164,7 @@ export function createSspDraft(instanceKey: string, financingInstanceId?: string
     poolOfPools: null,
     tranches: [],
     holdings: [],
-    lastPreviewNote:
-      "Preview Calculate uses the backend §5.8 engine. Reportable Save and portfolio inclusion stay off.",
+    lastPreviewNote: "Calculation preview only. Results have not been added to your portfolio.",
   };
 }
 

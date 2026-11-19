@@ -11,25 +11,25 @@ export const ELIGIBILITY_COPY: Record<
   },
   underlyingIdentifiable: {
     title: "Can you identify the underlying assets in the collateral pool?",
-    help: "PCAF needs a look-through to the collateral class and sector. Unknown pools cannot use §5.8.",
+    help: "PCAF requires a look-through to the collateral class and sector. Unknown pools are not eligible for this method.",
   },
   structureFamily: {
     title: "What kind of structure is it?",
-    help: "Pick the closest match. TBAs and classic repos are out of scope for this method.",
+    help: "Pick the closest match. TBAs and classic repos are not supported here.",
     options: [
       { value: "true-sale", label: "True-sale ABS / MBS to an SPV", hint: "Assets sold into a bankruptcy-remote vehicle" },
       { value: "covered-bond", label: "Covered bond", hint: "Collateral usually stays with the issuer" },
       { value: "synthetic", label: "Synthetic / credit-risk transfer", hint: "Risk transferred; assets may stay on balance sheet" },
       { value: "warehouse", label: "Warehouse facility", hint: "Growing pool funded over time" },
       { value: "private-abs", label: "Private asset-backed financing", hint: "Private deal with identifiable collateral" },
-      { value: "whole-loan", label: "Eligible whole-loan transaction", hint: "Only if it qualifies under §5.8 guidance" },
-      { value: "tba-repo", label: "TBA or repurchase agreement", hint: "Out of scope for §5.8" },
+      { value: "whole-loan", label: "Eligible whole-loan transaction", hint: "Only if it qualifies under PCAF securitization guidance" },
+      { value: "tba-repo", label: "TBA or repurchase agreement", hint: "Not supported for this method" },
       { value: "unknown", label: "Not sure yet", hint: "We’ll ask for more detail" },
     ],
   },
   collateralFamily: {
     title: "What mainly backs the pool?",
-    help: "Table 5.8-1. Consumer receivables and public-sector covered bonds are generally out of scope.",
+    help: "Consumer receivables and public-sector covered bonds are generally out of scope (PCAF Table 5.8-1).",
     options: [
       { value: "residential-real-estate", label: "Residential mortgages (RMBS)" },
       { value: "commercial-real-estate", label: "Commercial property loans (CMBS / CRE)" },

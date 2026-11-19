@@ -15,10 +15,11 @@ import {
 import { ELIGIBILITY_COPY, STRUCTURE_TYPE_LABELS, sspOutcomeDisplay, sspRedirectLoanType } from "./copy";
 import { SSP_CURRENCIES, patchSspDraft, patchSspEligibility } from "./state";
 import { validateSspStep } from "./validation";
-import { SspBackendUnavailableBanner, SspResultsPanel } from "./SspResultsPanel";
+import { SspResultsPanel } from "./SspResultsPanel";
 import { SspHierarchyEditor } from "./SspHierarchyEditor";
-import type { SspDraftSaveStatus } from "./draftPersistence";
+import { sspConflictUx, type SspDraftSaveStatus } from "./draftPersistence";
 import { sspHierarchyWarnings } from "./validation";
+import type { SspDraftConflict } from "@/api/sspDrafts";
 import type { SspDraft, SspStructureType, SspYesNo } from "./types";
 
 const TILE = "w-full text-left rounded-xl border px-4 py-3.5 transition-all duration-200";
@@ -400,65 +401,119 @@ function ReviewStep({ draft, counterpartyId }: { draft: SspDraft; counterpartyId
 function SspDraftStatusBar({
   status,
   errorMessage,
-  conflictDetail,
+  conflict,
+  sharedWritePending,
   onRetry,
   onRefresh,
   onApplyShared,
+  onReviewMine,
+  onReopenSharedConflict,
 }: {
   status: SspDraftSaveStatus;
   errorMessage?: string;
-  conflictDetail?: string;
+  conflict?: SspDraftConflict | null;
+  sharedWritePending?: boolean;
   onRetry?: () => void;
   onRefresh?: () => void;
   onApplyShared?: () => void;
+  onReviewMine?: () => void;
+  onReopenSharedConflict?: () => void;
 }) {
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+
   if (status === "idle") return null;
-  const palettes: Record<SspDraftSaveStatus, string> = {
-    idle: "",
-    saving: "border-slate-200 bg-slate-50 text-slate-700",
-    saved: "border-[#BFE3D3] bg-[#EAF7F1] text-[#0F6E56]",
-    unsaved: "border-amber-200 bg-amber-50 text-amber-950",
-    failed: "border-red-200 bg-red-50 text-red-800",
-    conflict: "border-amber-300 bg-amber-50 text-amber-950",
-  };
-  const labels: Record<SspDraftSaveStatus, string> = {
-    idle: "",
-    saving: "Saving draft…",
-    saved: "Draft saved (not portfolio-reportable)",
-    unsaved: "Unsaved changes",
-    failed: "Save failed — check your connection and retry",
-    conflict: "Shared deal needs a decision",
-  };
-  return (
-    <div className={cn("rounded-lg border px-3 py-2 text-xs flex flex-wrap items-center gap-2 justify-between", palettes[status])}>
-      <div className="min-w-0 space-y-0.5">
+
+  // Quiet autosave feedback — no alert banner for routine success.
+  if (status === "saving" || status === "saved" || status === "unsaved") {
+    const quiet: Record<"saving" | "saved" | "unsaved", string> = {
+      saving: "Saving…",
+      saved: "All changes saved",
+      unsaved: "Unsaved changes",
+    };
+    return (
+      <div
+        className="flex flex-wrap items-center gap-2 text-xs text-[#64748B]"
+        data-testid={`ssp-save-status-${status}`}
+        aria-live="polite"
+      >
+        <p>{quiet[status]}</p>
+        {status === "unsaved" && sharedWritePending && onReopenSharedConflict ? (
+          <Button type="button" variant="outline" className="h-7 text-xs" onClick={onReopenSharedConflict}>
+            Update shared deal…
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div
+        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex flex-wrap items-center gap-2 justify-between"
+        data-testid="ssp-save-status-failed"
+      >
         <p className="font-medium">
-          {labels[status]}
-          {errorMessage && status !== "saved" && status !== "saving" ? (
-            <span className="ml-2 font-normal">{errorMessage}</span>
-          ) : null}
+          Unable to save changes
+          {errorMessage ? <span className="ml-2 font-normal">{errorMessage}</span> : null}
         </p>
-        {status === "conflict" && conflictDetail ? (
-          <p className="font-normal text-amber-900/80">{conflictDetail}</p>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {status === "failed" && onRetry ? (
+        {onRetry ? (
           <Button type="button" variant="outline" className="h-8" onClick={onRetry}>
-            Retry save
-          </Button>
-        ) : null}
-        {status === "conflict" && onRefresh ? (
-          <Button type="button" variant="outline" className="h-8" onClick={onRefresh}>
-            Refresh from server
-          </Button>
-        ) : null}
-        {status === "conflict" && onApplyShared ? (
-          <Button type="button" className="h-8 bg-[#0F6E56] hover:bg-[#0c5a46]" onClick={onApplyShared}>
-            Apply to shared deal
+            Try again
           </Button>
         ) : null}
       </div>
+    );
+  }
+
+  const ux = sspConflictUx(conflict);
+  return (
+    <div
+      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 space-y-2"
+      data-testid="ssp-save-status-conflict"
+      role="status"
+    >
+      <div className="space-y-1">
+        <p className="font-medium">{ux.title}</p>
+        <p className="font-normal text-amber-900/90">{ux.explanation}</p>
+      </div>
+      {confirmOverwrite ? (
+        <div className="rounded-md border border-amber-400 bg-white/70 px-2.5 py-2 space-y-2">
+          <p className="text-amber-950">{ux.overwriteWarning}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              className="h-8 bg-[#0F6E56] hover:bg-[#0c5a46]"
+              onClick={() => {
+                setConfirmOverwrite(false);
+                onApplyShared?.();
+              }}
+            >
+              Confirm replace
+            </Button>
+            <Button type="button" variant="outline" className="h-8" onClick={() => setConfirmOverwrite(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {ux.showLoadLatest && onRefresh ? (
+            <Button type="button" className="h-8 bg-[#0F6E56] hover:bg-[#0c5a46]" onClick={onRefresh}>
+              Load latest version
+            </Button>
+          ) : null}
+          {ux.showReviewMine && onReviewMine ? (
+            <Button type="button" variant="outline" className="h-8" onClick={onReviewMine}>
+              Review my changes
+            </Button>
+          ) : null}
+          {ux.showOverwriteShared && onApplyShared ? (
+            <Button type="button" variant="outline" className="h-8" onClick={() => setConfirmOverwrite(true)}>
+              {ux.overwriteLabel}
+            </Button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -471,10 +526,13 @@ export function SspQuestionnaire({
   onLeaveSsp,
   saveStatus,
   saveError,
-  saveConflictDetail,
+  saveConflict,
+  sharedWritePending,
   onRetrySave,
   onRefreshDraft,
   onApplyShared,
+  onReviewMine,
+  onReopenSharedConflict,
   counterpartyId,
 }: {
   draft: SspDraft;
@@ -484,10 +542,13 @@ export function SspQuestionnaire({
   onLeaveSsp?: (suggestedLoanType?: string | null) => void;
   saveStatus?: SspDraftSaveStatus;
   saveError?: string;
-  saveConflictDetail?: string;
+  saveConflict?: SspDraftConflict | null;
+  sharedWritePending?: boolean;
   onRetrySave?: () => void;
   onRefreshDraft?: () => void;
   onApplyShared?: () => void;
+  onReviewMine?: () => void;
+  onReopenSharedConflict?: () => void;
   counterpartyId?: string | null;
 }) {
   const instanceKey = draft.financingInstanceId || draft.instanceKey || "";
@@ -521,15 +582,17 @@ export function SspQuestionnaire({
 
   return (
     <div className="space-y-6" data-testid={`ssp-step-${stepId}`}>
-      {continues && stepId !== "ssp-review" ? <SspBackendUnavailableBanner /> : null}
       {continues && saveStatus && saveStatus !== "idle" ? (
         <SspDraftStatusBar
           status={saveStatus}
           errorMessage={saveError}
-          conflictDetail={saveConflictDetail}
+          conflict={saveConflict}
+          sharedWritePending={sharedWritePending}
           onRetry={onRetrySave}
           onRefresh={onRefreshDraft}
           onApplyShared={onApplyShared}
+          onReviewMine={onReviewMine}
+          onReopenSharedConflict={onReopenSharedConflict}
         />
       ) : null}
       {warnings.length ? (

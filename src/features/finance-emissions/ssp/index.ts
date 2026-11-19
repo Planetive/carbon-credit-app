@@ -85,8 +85,11 @@ export {
   mergeResumedDrafts as mergeResumedSspDrafts,
   nextSaveSeq as nextSspSaveSeq,
   isStaleSaveResponse as isStaleSspSaveResponse,
+  tokensFromRecord as sspTokensFromRecord,
+  withVersionTokens as sspWithVersionTokens,
+  sspConflictUx,
 } from "./draftPersistence";
-export type { SspDraftSaveStatus } from "./draftPersistence";
+export type { SspDraftSaveStatus, SspVersionTokens, SspConflictUx } from "./draftPersistence";
 export { useSspDraftPersistence } from "./useSspDraftPersistence";
 export type {
   SspDraft,

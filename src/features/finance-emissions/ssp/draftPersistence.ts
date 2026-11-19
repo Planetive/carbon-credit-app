@@ -439,6 +439,127 @@ export function nextSaveSeq(current: number): number {
   return current + 1;
 }
 
+/** Server optimistic-concurrency tokens (independent of questionnaire fingerprint). */
+export type SspVersionTokens = {
+  dealUpdatedAt: string | null;
+  holdingUpdatedAt: string | null;
+  dealId?: string | null;
+  holdingId?: string | null;
+  siblingCount?: number;
+};
+
+export function tokensFromRecord(record: SspDraftRecord): SspVersionTokens {
+  return {
+    dealUpdatedAt: record.deal?.updated_at || null,
+    holdingUpdatedAt: record.holding?.updated_at || null,
+    dealId: record.deal?.id || null,
+    holdingId: record.holding?.id || null,
+    siblingCount: record.sibling_count ?? 0,
+  };
+}
+
+export function tokensFromConflict(conflict: SspDraftConflict): SspVersionTokens | null {
+  if (!conflict.deal_updated_at && !conflict.holding_updated_at) return null;
+  return {
+    dealUpdatedAt: conflict.deal_updated_at || null,
+    holdingUpdatedAt: conflict.holding_updated_at || null,
+    dealId: conflict.deal_id || null,
+    holdingId: conflict.holding_id || null,
+    siblingCount: conflict.sibling_count,
+  };
+}
+
+/**
+ * Apply version tokens onto a draft without changing questionnaire fields.
+ * IDs are filled only when missing so adopting tokens after a discarded
+ * in-flight save does not rewrite deal/holding identity or fingerprint.
+ */
+export function withVersionTokens(draft: SspDraft, tokens: SspVersionTokens): SspDraft {
+  return {
+    ...draft,
+    dealId: draft.dealId || tokens.dealId || null,
+    holdingId: draft.holdingId || tokens.holdingId || null,
+    dealUpdatedAt: tokens.dealUpdatedAt,
+    holdingUpdatedAt: tokens.holdingUpdatedAt,
+    siblingCount: tokens.siblingCount ?? draft.siblingCount,
+  };
+}
+
+export type SspConflictUx = {
+  title: string;
+  explanation: string;
+  showLoadLatest: boolean;
+  showReviewMine: boolean;
+  showOverwriteShared: boolean;
+  overwriteLabel: string;
+  overwriteWarning: string;
+};
+
+/** User-facing conflict copy — keeps optimistic concurrency, drops internal jargon. */
+export function sspConflictUx(conflict: SspDraftConflict | null | undefined): SspConflictUx {
+  const code = conflict?.code || "";
+  const siblings = conflict?.sibling_count ?? 0;
+  const changed = conflict?.changed_fields?.length
+    ? ` Fields that differ: ${conflict.changed_fields.join(", ")}.`
+    : "";
+
+  if (code === "shared_deal_conflict") {
+    return {
+      title: "A newer version of this calculation is available.",
+      explanation:
+        siblings > 0
+          ? `Another holding on this deal already has shared structure data.${changed} Load the latest version, or keep reviewing your edits. Replacing the shared deal will update every holding that uses it.`
+          : `Shared deal data on the server differs from your edits.${changed} Load the latest version, or keep reviewing your edits before replacing it.`,
+      showLoadLatest: true,
+      showReviewMine: true,
+      showOverwriteShared: true,
+      overwriteLabel: "Replace shared deal with my changes",
+      overwriteWarning:
+        "This replaces shared deal, collateral, loan, pool and tranche data for every holding on this deal. Your other investments’ outstanding amounts are kept. This cannot be undone from here.",
+    };
+  }
+
+  if (code === "stale_deal") {
+    return {
+      title: "A newer version of this calculation is available.",
+      explanation:
+        "The shared deal was saved elsewhere (another tab, user, or session). Load the latest version before changing shared structure data. Your unsaved edits stay on this screen until you choose.",
+      showLoadLatest: true,
+      showReviewMine: true,
+      showOverwriteShared: true,
+      overwriteLabel: "Replace shared deal with my changes",
+      overwriteWarning:
+        "Only continue if you intend to overwrite the newer shared deal data on the server. Outstanding amounts on other holdings are kept.",
+    };
+  }
+
+  if (code === "stale_holding") {
+    return {
+      title: "A newer version of this calculation is available.",
+      explanation:
+        "This investment was saved more recently elsewhere. Load the latest version to continue, or review your edits first. Saving again without loading may overwrite that newer data.",
+      showLoadLatest: true,
+      showReviewMine: true,
+      showOverwriteShared: false,
+      overwriteLabel: "",
+      overwriteWarning: "",
+    };
+  }
+
+  return {
+    title: "A newer version of this calculation is available.",
+    explanation:
+      conflict?.message ||
+      "Someone else may have saved this calculation. Load the latest version, or review your changes before continuing.",
+    showLoadLatest: true,
+    showReviewMine: true,
+    showOverwriteShared: code === "shared_deal_conflict" || code === "stale_deal",
+    overwriteLabel: "Replace shared deal with my changes",
+    overwriteWarning:
+      "This replaces shared data for every holding on this deal. Confirm only if you mean to overwrite the server version.",
+  };
+}
+
 export function mergeResumedDrafts(
   local: Record<string, SspDraft>,
   records: SspDraftRecord[]

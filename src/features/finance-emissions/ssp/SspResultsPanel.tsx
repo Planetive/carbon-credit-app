@@ -23,27 +23,32 @@ function formatMaybe(value: number | null | undefined, digits = 4): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value);
 }
 
+const PREVIEW_ONLY_NOTICE =
+  "Calculation preview only. Results have not been added to your portfolio.";
+
+/** Shown beside calculation results when reportable Save is disabled. */
 export function SspPreviewNotice({ compact = false }: { compact?: boolean }) {
+  if (!canCalculateSsp()) {
+    return (
+      <p className={compact ? "text-[11px] text-slate-500" : "text-xs text-slate-500"}>
+        Finish the questionnaire to calculate financed emissions.
+      </p>
+    );
+  }
+  if (canSaveReportableSsp()) return null;
   return (
-    <p className={compact ? "text-[11px] text-slate-500" : "text-xs text-slate-500"}>
-      {canCalculateSsp()
-        ? canSaveReportableSsp()
-          ? "Figures come from the backend §5.8 engine. Eligible holdings can be saved into the portfolio."
-          : "Preview figures come from the backend §5.8 engine. Reportable Save stays off until Phase 6D enablement."
-        : "Questionnaire and draft save only — financed emissions are not calculated yet."}
+    <p
+      className={compact ? "text-[11px] text-slate-500" : "text-xs text-slate-500"}
+      data-testid="ssp-preview-only-notice"
+    >
+      {PREVIEW_ONLY_NOTICE}
     </p>
   );
 }
 
+/** @deprecated Kept for import compatibility — no longer shows internal banners. */
 export function SspBackendUnavailableBanner() {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-      <SspPreviewNotice />
-      <p className="text-xs text-slate-500">
-        Drafts can autosave when you are signed in. Results stay out of the portfolio until reportable Save is enabled.
-      </p>
-    </div>
-  );
+  return null;
 }
 
 function LayerTable({ title, factorLabel, rows }: { title: string; factorLabel?: string; rows: SspPreviewLayerRow[] }) {
@@ -153,12 +158,8 @@ export function SspResultsPanel({
 
   return (
     <div className="space-y-4" data-testid="ssp-results-panel">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-        <SspPreviewNotice />
-        <p className="text-xs text-slate-500">Calculated by the server — not typed in this form</p>
-      </div>
-
       <div className="rounded-xl border border-[#DCEAE2] bg-white px-5 py-4 space-y-3">
+        <SspPreviewNotice />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-[#64748B]">Deal</p>
@@ -315,7 +316,7 @@ export function SspResultsPanel({
               ))}
             </ul>
             <p className="text-xs text-[#94A3B8]">
-              Methodology reference: PCAF Part A 2025 §5.8; Tables 5.8-1, 5.8-2, 5.8-3. Evidence:{" "}
+              Methodology reference: PCAF Part A 2025 §5.8 (Tables 5.8-1, 5.8-2, 5.8-3). Evidence:{" "}
               {draft.deal.documentationSource || "not recorded"}.
             </p>
           </div>

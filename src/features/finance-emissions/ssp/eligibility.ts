@@ -142,7 +142,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
       reasonCode: "unknown_collateral",
       title: "Look-through required",
       guidance:
-        "PCAF cannot apply §5.8 when the nature of assets in the collateral pool is unknown. Follow-the-money look-through is required.",
+        "PCAF requires a look-through to the assets in the collateral pool. If their nature is unknown, this method cannot be used.",
       pcafRef: `${PCAF_58}; Table 5.8-1`,
     };
   }
@@ -154,7 +154,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
       reasonCode: "tba_repo_out_of_scope",
       title: "TBAs / repurchase agreements are out of scope here",
       guidance:
-        "PCAF §5.8 Table 5.8-4 places TBAs out of scope and repurchase agreements under separate derivative guidance when available.",
+        "TBAs are out of scope for this method. Repurchase agreements follow separate derivative guidance when available (PCAF Table 5.8-4).",
       pcafRef: `${PCAF_58} Table 5.8-4`,
     };
   }
@@ -178,7 +178,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
       reasonCode: "public_sector_covered_bond_out_of_scope",
       title: "Public-sector covered bonds are out of scope",
       guidance:
-        "Public-sector covered bonds and land/forest covered bonds are not included in Part A §5.8 (Table 5.8-1).",
+        "Public-sector and land/forest covered bonds are not included in this PCAF method (Table 5.8-1).",
       pcafRef: PCAF_58_T1,
     };
   }
@@ -240,7 +240,7 @@ export function resolveSspAccounting(answers: SspEligibilityAnswers): SspAccount
     kind: "ssp",
     title: "Continue as Securitization & Structured Products",
     guidance:
-      "Apply the §5.8 look-through: collateral → loan → pool → optional pool-of-pools → tranche → investment. Do not invent a single universal attribution denominator.",
+      "Continue with the PCAF look-through path: collateral → loan → pool → optional pool-of-pools → tranche → investment. Do not invent a single universal attribution denominator.",
     pcafRef: `${PCAF_58}; Tables 5.8-1 to 5.8-3`,
     structureHint: structureHint(answers),
     collateralFamily: answers.collateralFamily as SspCollateralFamily,

@@ -2633,7 +2633,7 @@ export const ESGWizard: React.FC = () => {
               {activeUopDraft ? (
                 <p className="text-sm text-[#64748B]">Use of Proceeds results are calculated on the Review step.</p>
               ) : activeSspDraft ? (
-                <p className="text-sm text-[#64748B]">Securitization results stay on the Review step until Phase 6B.</p>
+                <p className="text-sm text-[#64748B]">Securitization results are calculated on the Review step.</p>
               ) : (
                 <>
                   <UopBackendUnavailableBanner />
@@ -2985,23 +2985,13 @@ export const ESGWizard: React.FC = () => {
               onLeaveSsp={handleLeaveSsp}
               saveStatus={sspPersistence.enabled ? sspPersistence.status : undefined}
               saveError={sspPersistence.errorMessage}
-              saveConflictDetail={
-                sspPersistence.conflict
-                  ? [
-                      sspPersistence.conflict.sibling_count != null
-                        ? `${sspPersistence.conflict.sibling_count} other holding(s) share this deal`
-                        : null,
-                      sspPersistence.conflict.changed_fields?.length
-                        ? `Changed: ${sspPersistence.conflict.changed_fields.join(", ")}`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || undefined
-                  : undefined
-              }
+              saveConflict={sspPersistence.conflict}
+              sharedWritePending={sspPersistence.sharedWritePending}
               onRetrySave={sspPersistence.retry}
               onRefreshDraft={sspPersistence.refresh}
               onApplyShared={sspPersistence.applyShared}
+              onReviewMine={sspPersistence.dismissConflict}
+              onReopenSharedConflict={sspPersistence.reopenSharedConflict}
               counterpartyId={counterpartyId}
             />
           </div>
